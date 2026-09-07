@@ -502,10 +502,16 @@ export class LedgerService {
       commission_reversed: string;
       payable_credited: string;
       payable_reversed: string;
+      base_amount: string;
+      commission_column: string;
+      payable_column: string;
     }>(sql`
       SELECT b.currency_id::text,
              b.fx_rate_to_syp::text,
              b.partner_id::text,
+             b.base_amount::text AS base_amount,
+             b.partner_commission_amount::text AS commission_column,
+             b.partner_payable_amount::text AS payable_column,
              coalesce((
                SELECT sum(r.amount) FROM refunds r
                 WHERE r.booking_id = b.id
@@ -548,8 +554,40 @@ export class LedgerService {
     const payable = toMinor(row.payable_credited, MONEY_SCALE);
     const accommodation = commission + payable;
 
-    /* Nothing was captured for this booking, so there is nothing to give back. */
-    if (accommodation <= 0n) return null;
+    /*
+      No capture in the LEDGER, and the obligation still has to come down.
+      -------------------------------------------------------------------
+      Bashar, 2026-09-07: «Partner payable amounts should be reduced proportionally to the refunded
+      amount. SAFRA should not absorb partial-refund costs while continuing to recognise the full
+      partner earning.» That is a rule about the OBLIGATION, and it cannot be conditional on the
+      ledger having something to reverse.
+
+      A booking in this state is a data-integrity fault rather than a timing gap: §13.3 posts the
+      capture group in the SAME transaction as the status change, so a payable with no
+      `partner_payable` credit behind it means the capture never happened. `bookings
+      .partner_payable_amount` is then a quote that accrual would nonetheless pay.
+
+      So the column comes down and NO ledger legs are posted. Debiting an account that was never
+      credited would take it negative for money it never held — the books would stop describing the
+      world in order to look tidy, which is the opposite of the consistency being asked for. The
+      fault is reported instead: `docs/FUTURE-WORK.md` carries it, and the guard that would stop
+      accrual paying an unbacked payable is a separate decision because refusing to pay a partner
+      is not the same act as reducing what they are owed.
+    */
+    if (accommodation <= 0n) {
+      /*
+        The obligation still comes down, and if the money has ALREADY gone the overpayment is
+        still recorded. Missing that was a real gap in the first version of this branch: a booking
+        with no capture group whose transfer had been paid would have had its column reduced and
+        left no balance behind, so the difference would have been absorbed in silence — the exact
+        thing both of Bashar's 2026-09-07 decisions exist to stop.
+      */
+      const reduced = await this.reducePayableWithoutLedger(tx, bookingId, row);
+
+      if (reduced !== null) await this.recordOverpayment(tx, bookingId, reduced);
+
+      return null;
+    }
 
     /*
       A refund can never exceed the accommodation: the SAFRA fee is not refundable, and a figure
@@ -689,7 +727,10 @@ export class LedgerService {
           await inner.execute(sql`
             UPDATE partner_payouts p
                SET gross_amount = coalesce(i.total, 0),
-                   net_amount = coalesce(i.total, 0) - p.fine_amount,
+                   -- Every subtraction, or the identity CHECK refuses the row. recovery_amount
+                   -- joined fine_amount on 2026-09-07, and a retotal that forgot it would fail on
+                   -- exactly the payouts carrying an overpayment: the ones that matter.
+                   net_amount = coalesce(i.total, 0) - p.fine_amount - p.recovery_amount,
                    updated_at = now()
               FROM (
                 SELECT coalesce(sum(amount), 0) AS total
@@ -700,7 +741,146 @@ export class LedgerService {
         }
       }
 
+      /*
+        And the case where the money has ALREADY gone.
+
+        A booking on a PAID payout cannot have its line corrected: the total is frozen by trigger
+        the moment money moves, and rightly — a transfer is evidence of what happened rather than a
+        figure to restate. So the difference between what was paid for that stay and what it is now
+        worth is a real overpayment, and until 2026-09-07 it had nowhere to live.
+      */
+      await this.recordOverpayment(inner as unknown as Database, bookingId, remaining);
+
       return posted;
     });
+  }
+
+  /**
+   * The overpayment a refund creates on a transfer that has already been paid.
+   *
+   * ## Bashar's rule (2026-09-07)
+   *
+   * «If a payout has already been paid and a refund later creates an overpayment, I want the
+   * difference recorded as a recoverable balance that is deducted from future payouts. Do not
+   * automatically create negative transfers or attempt to claw money back outside the normal
+   * payout process.»
+   *
+   * So this records and does not collect. The deduction happens in `PayoutService` when the next
+   * transfer is totalled, through the ordinary process, where the partner can see it.
+   *
+   * ## The amount is what was PAID minus what the stay is now worth
+   *
+   * Not the whole reversal. Part of a booking's payable may still be sitting on an unpaid payout,
+   * and that part is corrected in place by the caller — recovering it as well would take it twice.
+   *
+   * ## Idempotent, and it can only grow
+   *
+   * One row per booking, so a second refund on the same stay raises the SAME balance rather than a
+   * second one a partner cannot reconcile. `greatest` on update, because `recovered_amount` may
+   * already have been taken against it and the CHECK will not allow the recorded overpayment to
+   * fall below what has been collected. `settled_at` is recomputed with it: a balance that grows
+   * past what has been recovered is outstanding again, and the CHECK holds the two in agreement.
+   */
+  private async recordOverpayment(
+    tx: Database,
+    bookingId: string,
+    remaining: bigint,
+  ): Promise<void> {
+    const paid = await tx.execute<{
+      payout_id: string;
+      partner_id: string;
+      currency_id: string;
+      paid_amount: string;
+    }>(sql`
+      SELECT i.payout_id::text, p.partner_id::text, p.currency_id::text,
+             i.amount::text AS paid_amount
+        FROM partner_payout_items i
+        JOIN partner_payouts p ON p.id = i.payout_id
+       WHERE i.booking_id = ${bookingId}
+         AND p.deleted_at IS NULL
+         AND p.status = 'paid'
+       LIMIT 1
+    `);
+
+    const row = paid.rows[0];
+
+    if (!row) return;
+
+    const overpaid = toMinor(row.paid_amount, MONEY_SCALE) - remaining;
+
+    if (overpaid <= 0n) return;
+
+    const amount = fromMinor(overpaid, MONEY_SCALE);
+
+    await tx.execute(sql`
+      INSERT INTO partner_recoveries
+        (partner_id, booking_id, currency_id, amount, paid_payout_id)
+      VALUES (${row.partner_id}, ${bookingId}, ${row.currency_id}, ${amount},
+              ${row.payout_id})
+      ON CONFLICT (booking_id) DO UPDATE
+         SET amount = greatest(partner_recoveries.amount, excluded.amount),
+             settled_at = CASE
+               WHEN partner_recoveries.recovered_amount
+                      >= greatest(partner_recoveries.amount, excluded.amount)
+               THEN coalesce(partner_recoveries.settled_at, now())
+               ELSE NULL
+             END,
+             updated_at = now()
+    `);
+  }
+
+  /**
+   * The obligation, reduced in proportion, for a booking the ledger never captured.
+   *
+   * ## Why the basis is not the column itself
+   *
+   * `payable × (1 − p)` applied twice reduces twice. Every input here is IMMUTABLE — `base_amount`
+   * and `partner_commission_amount` are never written by this service, and completed refunds only
+   * accumulate — so the target is a fixed value that repeated calls converge on rather than walk
+   * down. That is what makes a retry, a webhook arriving after a reply, and a second refund all
+   * land on the same figure.
+   *
+   * ## And it can only ever fall
+   *
+   * `least(current, target)`. The identity `base = commission + payable` holds on the overwhelming
+   * majority of bookings and is broken on a few hundred, and where it is broken this must not
+   * INVENT an obligation larger than the one on record. Under-reducing in that corner is a gap
+   * worth reporting; over-recognising what SAFRA owes is the defect being fixed, and it would be
+   * perverse to reintroduce it here.
+   */
+  private async reducePayableWithoutLedger(
+    tx: Database,
+    bookingId: string,
+    row: { refunded: string; base_amount: string; commission_column: string },
+  ): Promise<bigint | null> {
+    const base = toMinor(row.base_amount, MONEY_SCALE);
+
+    if (base <= 0n) return null;
+
+    const refunded = toMinor(row.refunded, MONEY_SCALE);
+    const returned = refunded > base ? base : refunded;
+
+    if (returned <= 0n) return null;
+
+    const quoted = toMinor(row.commission_column, MONEY_SCALE);
+    const original = base - quoted;
+
+    if (original <= 0n) return null;
+
+    /* Kept, not multiplied out: the remaining share of an obligation that was never captured. */
+    const target = (original * (base - returned)) / base;
+
+    await tx.execute(sql`
+      UPDATE bookings
+         SET partner_payable_amount = least(
+               partner_payable_amount,
+               ${fromMinor(target, MONEY_SCALE)}::numeric
+             ),
+             updated_at = now()
+       WHERE id = ${bookingId}
+         AND partner_payable_amount > ${fromMinor(target, MONEY_SCALE)}::numeric
+    `);
+
+    return target;
   }
 }

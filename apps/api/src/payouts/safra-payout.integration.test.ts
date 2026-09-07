@@ -619,6 +619,161 @@ describeIfDb('SafraPayoutService', () => {
       await db.execute(sql`DELETE FROM partner_payouts WHERE id = ${payoutId}::uuid`);
     });
 
+    /*
+      Bashar's 2026-09-07 rule applied to a booking the LEDGER never captured.
+
+      §13.3 posts the capture group in the same transaction as the status change, so a payable with
+      no `partner_payable` credit behind it means the capture never happened — a data-integrity
+      fault. `bookings.partner_payable_amount` is then a quote that accrual would nonetheless pay,
+      in full, on a stay the guest got money back for.
+
+      «Partner payable amounts should be reduced proportionally to the refunded amount» is a rule
+      about the obligation, so it cannot be conditional on there being something to reverse. The
+      column comes down; no ledger legs are posted, because debiting an account that was never
+      credited would take it negative for money it never held.
+
+      Built rather than found: the state arises from a fault, so no fixture has one, and the
+      testbed resets during this work removed the single real example ($613.80 on BKG-2026-425971).
+    */
+    it('reduces the obligation on a booking whose capture never reached the ledger', async () => {
+      const clean = await db.execute<{ id: string; base: string; payable: string }>(sql`
+        SELECT b.id::text, b.base_amount::text AS base,
+               b.partner_payable_amount::text AS payable
+          FROM bookings b
+         WHERE b.base_amount > 0
+           AND b.partner_payable_amount > 0
+           AND abs(b.base_amount - b.partner_commission_amount - b.partner_payable_amount) <= 0.001
+           AND NOT EXISTS (SELECT 1 FROM refunds r
+                            WHERE r.booking_id = b.id AND r.deleted_at IS NULL)
+           AND NOT EXISTS (SELECT 1 FROM ledger_entries e WHERE e.booking_id = b.id)
+           AND EXISTS (SELECT 1 FROM payments p WHERE p.booking_id = b.id)
+         LIMIT 1
+      `);
+
+      const row = clean.rows[0];
+
+      expect(row, 'a booking with a payable and no ledger at all').toBeDefined();
+
+      await addRefund(row!.id, 0.5);
+
+      /* Null, because there is nothing to reverse — and the column must still move. */
+      expect(
+        await ledger.reverseForRefund(db, row!.id),
+        'no ledger group, because no credits exist to reverse',
+      ).toBeNull();
+
+      const after = await db.execute<{ payable: string }>(sql`
+        SELECT partner_payable_amount::text AS payable FROM bookings WHERE id = ${row!.id}::uuid
+      `);
+
+      expect(Number(after.rows[0]!.payable), 'halved, like the refund').toBeCloseTo(
+        Number(row!.payable) / 2,
+        1,
+      );
+
+      /* And no legs were invented for accounts that never held the money. */
+      const posted = await db.execute<{ n: string }>(sql`
+        SELECT count(*)::text AS n FROM ledger_entries WHERE booking_id = ${row!.id}::uuid
+      `);
+
+      expect(Number(posted.rows[0]!.n), 'the ledger is still silent about it').toBe(0);
+    });
+
+    /* Reducing the same obligation twice would take it to a quarter. It must converge. */
+    it('reduces it to the same figure however many times it is asked', async () => {
+      const clean = await db.execute<{ id: string; payable: string }>(sql`
+        SELECT b.id::text, b.partner_payable_amount::text AS payable
+          FROM bookings b
+         WHERE b.base_amount > 0
+           AND b.partner_payable_amount > 0
+           AND abs(b.base_amount - b.partner_commission_amount - b.partner_payable_amount) <= 0.001
+           AND NOT EXISTS (SELECT 1 FROM refunds r
+                            WHERE r.booking_id = b.id AND r.deleted_at IS NULL)
+           AND NOT EXISTS (SELECT 1 FROM ledger_entries e WHERE e.booking_id = b.id)
+           AND EXISTS (SELECT 1 FROM payments p WHERE p.booking_id = b.id)
+         LIMIT 1
+      `);
+
+      const row = clean.rows[0];
+
+      expect(row).toBeDefined();
+      await addRefund(row!.id, 0.5);
+
+      await ledger.reverseForRefund(db, row!.id);
+      const once = await db.execute<{ payable: string }>(sql`
+        SELECT partner_payable_amount::text AS payable FROM bookings WHERE id = ${row!.id}::uuid
+      `);
+
+      await ledger.reverseForRefund(db, row!.id);
+      await ledger.reverseForRefund(db, row!.id);
+      const thrice = await db.execute<{ payable: string }>(sql`
+        SELECT partner_payable_amount::text AS payable FROM bookings WHERE id = ${row!.id}::uuid
+      `);
+
+      expect(
+        Number(thrice.rows[0]!.payable),
+        'unchanged by the second and third',
+      ).toBeCloseTo(Number(once.rows[0]!.payable), 3);
+    });
+
+    /*
+      The corner the clamp exists for, and it had no test until a mutation proved that.
+
+      `base = commission + payable` holds on nearly every booking and is broken on a few hundred.
+      Where it is broken the immutable basis can be LARGER than the obligation on record, and
+      multiplying it out would raise what SAFRA owes — reintroducing the exact defect this whole
+      change removes, on the bookings least able to withstand it.
+
+      Removing `least(...)` passed every other test here, because they all use fixtures where the
+      identity holds. So the broken identity is built deliberately: the payable is set well below
+      `base - commission`, and the only acceptable answer is that a refund does not raise it.
+    */
+    it('never raises the obligation, even where base does not equal commission plus payable', async () => {
+      const clean = await db.execute<{ id: string; base: string }>(sql`
+        SELECT b.id::text, b.base_amount::text AS base
+          FROM bookings b
+         WHERE b.base_amount > 100
+           AND b.partner_payable_amount > 0
+           AND NOT EXISTS (SELECT 1 FROM refunds r
+                            WHERE r.booking_id = b.id AND r.deleted_at IS NULL)
+           AND NOT EXISTS (SELECT 1 FROM ledger_entries e WHERE e.booking_id = b.id)
+           AND EXISTS (SELECT 1 FROM payments p WHERE p.booking_id = b.id)
+         LIMIT 1
+      `);
+
+      const row = clean.rows[0];
+
+      expect(row, 'a booking with no ledger to build the broken case on').toBeDefined();
+
+      /*
+        Deliberately inconsistent: a tenth of the stay owed, against a commission of nothing. So
+        `base - commission` is ten times the obligation, and an unclamped write would multiply THAT
+        by the unrefunded share and hand the partner far more than the record ever said.
+      */
+      await db.execute(sql`
+        UPDATE bookings
+           SET partner_payable_amount = round(base_amount / 10, 3),
+               partner_commission_amount = 0
+         WHERE id = ${row!.id}::uuid
+      `);
+
+      const before = await db.execute<{ payable: string }>(sql`
+        SELECT partner_payable_amount::text AS payable FROM bookings WHERE id = ${row!.id}::uuid
+      `);
+
+      await addRefund(row!.id, 0.5);
+      await ledger.reverseForRefund(db, row!.id);
+
+      const after = await db.execute<{ payable: string }>(sql`
+        SELECT partner_payable_amount::text AS payable FROM bookings WHERE id = ${row!.id}::uuid
+      `);
+
+      expect(
+        Number(after.rows[0]!.payable),
+        'a refund never raises what SAFRA owes',
+      ).toBeLessThanOrEqual(Number(before.rows[0]!.payable) + 0.001);
+    });
+
     /* Advertising revenue has no booking, so a join written carelessly deletes the ad business. */
     it('keeps advertising revenue, which has no booking to refund', async () => {
       const summary = await service.revenueSummary();
