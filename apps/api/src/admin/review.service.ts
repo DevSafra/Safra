@@ -321,6 +321,8 @@ export class ReviewService {
         isNull(schema.properties.deletedAt),
       ),
       columns: {
+        /* Needed by `inventoryOf` below, and stripped from the response like `cityId` is. */
+        id: true,
         reference: true,
         slug: true,
         nameAr: true,
@@ -394,11 +396,21 @@ export class ReviewService {
         amenities: { with: { amenity: { columns: { code: true, nameAr: true } } } },
         units: {
           columns: {
+            id: true,
             nameAr: true,
             nameEn: true,
             maxGuests: true,
             basePrice: true,
             minNights: true,
+            /*
+              The grouping key, so the console can show a listing as its INVENTORY.
+              
+              A thirteen-room hotel arrived here as thirteen rows and a moderator could not see
+              «six doubles, four with a view, one family room, two suites» — the shape of what they
+              were approving. Grouped on the same triple the allocation and the property page use:
+              type code, price, capacity.
+            */
+            roomTypeCode: true,
           },
           /*
             The unit's CURRENCY, because «95 / الليلة» is a number nobody can act on.
@@ -430,7 +442,12 @@ export class ReviewService {
     assertCanRead(actor, property.cityId);
 
     /* `cityId` was for the check above; it does not belong in the response. */
-    const { cityId: _cityId, ...visible } = property;
+    /*
+      `id` comes out too. It is needed to read the inventory below and is an internal identifier —
+      the console addresses a property by its REFERENCE, and sending both would be sending a key
+      nothing on that screen has any use for.
+    */
+    const { cityId: _cityId, id: propertyId, ...visible } = property;
 
     /*
       Flattened to CODES before it leaves.
@@ -462,7 +479,81 @@ export class ReviewService {
           nameAr: link.amenity.nameAr,
         })),
       })),
+      /*
+        The listing as INVENTORY: one entry per room type, how many are configured, and how many
+        are free right now.
+        
+        Bashar asked the moderation screen to show configured inventory and remaining availability
+        (2026-09-07). Both were computable and neither was on any screen: the console listed the
+        physical rooms, so «is this hotel full tonight» took a database query.
+      */
+      inventory: await this.inventoryOf(propertyId),
     };
+  }
+
+  /**
+   * A property's room types: how many of each exist, and how many are free tonight.
+   *
+   * ## What «free» means here
+   *
+   * Not held by a live booking over tonight, and not closed on the partner's calendar for tonight.
+   * Deliberately TONIGHT rather than a range the caller picks: this is a moderation and operations
+   * screen, and the question it answers is «what is the shape of this listing, and is it full» —
+   * a date picker would be a different feature.
+   *
+   * Grouped by the same triple the allocation uses, so «the same room» means one thing across the
+   * platform: type code, price, capacity. A room with no type code is one of a kind and groups
+   * with nothing.
+   */
+  private async inventoryOf(propertyId: string) {
+    const rows = await this.db.execute<{
+      name_ar: string;
+      max_guests: number;
+      base_price: string;
+      currency_code: string;
+      min_nights: number;
+      configured: number;
+      available: number;
+    }>(sql`
+      SELECT min(u.name_ar)                              AS name_ar,
+             u.max_guests,
+             u.base_price::text                          AS base_price,
+             min(cur.code)                               AS currency_code,
+             min(u.min_nights)::int                      AS min_nights,
+             count(*)::int                               AS configured,
+             count(*) FILTER (
+               WHERE NOT EXISTS (
+                 SELECT 1 FROM booking_units bu
+                 WHERE bu.unit_id = u.id
+                   AND bu.status IN ('pending_payment', 'pending_confirmation', 'confirmed', 'checked_in', 'disputed')
+                   AND bu.check_in <= current_date
+                   AND bu.check_out > current_date
+               )
+               AND NOT EXISTS (
+                 SELECT 1 FROM availability_days ad
+                 WHERE ad.unit_id = u.id
+                   AND ad.date = current_date
+                   AND ad.status <> 'available'
+               )
+             )::int                                      AS available
+      FROM units u
+      JOIN currencies cur ON cur.id = u.currency_id
+      WHERE u.property_id = ${propertyId}
+        AND u.is_active
+        AND u.deleted_at IS NULL
+      GROUP BY coalesce(u.room_type_code, u.id::text), u.base_price, u.max_guests
+      ORDER BY u.base_price
+    `);
+
+    return rows.rows.map((row) => ({
+      nameAr: row.name_ar,
+      maxGuests: row.max_guests,
+      basePrice: row.base_price,
+      currencyCode: row.currency_code,
+      minNights: row.min_nights,
+      configured: row.configured,
+      available: row.available,
+    }));
   }
 
   /**

@@ -317,6 +317,65 @@ export default async function PropertyPage({
         )}
       </Section>
 
+      {/*
+        The listing as INVENTORY, before the physical rooms.
+
+        A thirteen-room hotel arrived here as thirteen rows, so a moderator could not see «six
+        doubles, four with a view, one family room, two suites» — the shape of the thing they were
+        approving — and «is this hotel full tonight» took a database query. The rooms themselves
+        are still listed below, because a moderator approving a listing is approving each room's
+        claims and those are per room.
+      */}
+      {property.inventory.length > 0 ? (
+        <Section title={t.sections.propertyDetail.inventory}>
+          <p className="mb-2 text-[11.5px] leading-relaxed text-faint2">
+            {t.sections.propertyDetail.inventoryNote}
+          </p>
+          <ul data-inventory className="grid gap-2 text-sm">
+            {property.inventory.map((type) => (
+              <li
+                key={`${type.nameAr}-${type.basePrice}-${type.maxGuests}`}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-card px-4 py-3"
+              >
+                <span className="text-text">
+                  {type.nameAr}
+                  <span className="mt-1 block text-[11px] text-faint2">
+                    {plural(t.sections.propertyDetail.unitLine, {
+                      guests: type.maxGuests,
+                      price: type.basePrice,
+                      /* Never `?? ''` — the shape the standing rule exists to forbid. */
+                      currency: type.currencyCode,
+                      minNights: type.minNights,
+                    })}
+                  </span>
+                </span>
+                <span className="flex flex-wrap items-baseline gap-x-3 text-xs">
+                  <span className="text-faint">
+                    {t.sections.propertyDetail.inventoryConfigured}:{' '}
+                    <span className="font-bold tabular-nums text-text">
+                      {count(type.configured)}
+                    </span>
+                  </span>
+                  {/*
+                    Nothing free reads as a WARNING rather than as a zero. «متاح الليلة: ٠» in the
+                    same grey as the rest is a figure an operator scans past, and it is the one
+                    fact on this row that might need acting on.
+                  */}
+                  <span className={type.available === 0 ? 'text-warn' : 'text-faint'}>
+                    {t.sections.propertyDetail.inventoryAvailable}:{' '}
+                    <span className="font-bold tabular-nums">
+                      {type.available === 0
+                        ? t.sections.propertyDetail.inventoryFull
+                        : count(type.available)}
+                    </span>
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      ) : null}
+
       <Section title={t.sections.propertyDetail.units}>
         {property.units.length === 0 ? (
           <p className="text-sm text-bad">{t.sections.propertyDetail.noUnits}</p>
