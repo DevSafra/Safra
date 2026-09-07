@@ -436,6 +436,8 @@ export class BookingCreationService {
       two different numbers for the same code on two consecutive screens.
     */
     rooms?: number | undefined;
+    /** The other room types. A percentage coupon is worth more on a bigger basket. */
+    additionalLines?: readonly { unitId: string; rooms: number }[] | undefined;
   }): Promise<CouponPreview> {
     const scope = await this.db.execute<{
       city_id: string;
@@ -459,7 +461,10 @@ export class BookingCreationService {
       unitId: input.unitId,
       checkIn: input.checkIn,
       checkOut: input.checkOut,
-      rooms: input.rooms,
+      lines: [
+        { unitId: input.unitId, rooms: Math.max(1, Math.trunc(input.rooms ?? 1)) },
+        ...(input.additionalLines ?? []),
+      ],
     });
 
     const match = await this.coupons.preview(input.code, {
@@ -476,7 +481,10 @@ export class BookingCreationService {
       unitId: input.unitId,
       checkIn: input.checkIn,
       checkOut: input.checkOut,
-      rooms: input.rooms,
+      lines: [
+        { unitId: input.unitId, rooms: Math.max(1, Math.trunc(input.rooms ?? 1)) },
+        ...(input.additionalLines ?? []),
+      ],
       discountAmount: match.discountAmount,
     });
 
