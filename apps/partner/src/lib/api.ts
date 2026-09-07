@@ -367,6 +367,30 @@ const recoverySchema = z.object({
 
 export type PartnerRecovery = z.infer<typeof recoverySchema>;
 
+/**
+ * A fine this partner still owes, and how much of it has been taken.
+ *
+ * Separate from `recoverySchema` by instruction (Bashar, 2026-09-07): fines and recoveries are
+ * separate concepts with separate balances. A fine names its KIND and, where there is one, the
+ * booking it arose from — a penalty with no cause cannot be appealed.
+ */
+const fineSchema = z.object({
+  kind: z.string(),
+  bookingReference: z.string().nullable(),
+  amount: z.string(),
+  collected: z.string(),
+  outstanding: z.string(),
+  currencyCode: z.string(),
+  createdAt: z.string(),
+  reason: z.string().nullable(),
+});
+
+export type PartnerFine = z.infer<typeof fineSchema>;
+
+export async function getMyFines() {
+  return partnerFetch('/partner/payouts/fines', z.object({ fines: z.array(fineSchema) }));
+}
+
 export async function getMyRecoveries() {
   return partnerFetch(
     '/partner/payouts/recoveries',

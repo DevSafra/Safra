@@ -1181,6 +1181,24 @@ export const ar = {
       is a debt nobody can dispute. Deliberately not «غرامة»: a fine is a penalty they can appeal,
       and this is money that was paid out before a guest was refunded.
     */
+    /*
+      Outstanding FINES, and separate from recoveries by instruction (Bashar, 2026-09-07).
+
+      «Keep fines and recoveries as separate concepts and separate balances… Finance, operations and
+      the partner should be able to see the outstanding fine balance and how deductions are applied
+      over time.»
+
+      Its own words throughout, because the two are not the same thing to the person paying them: a
+      fine is a penalty with a ladder and an appeal, a recovery is a correction of money never owed.
+      «غرامات» here and «مبالغ مستردّة» there, never one word for both.
+    */
+    fineTitle: 'غرامات قائمة',
+    fineNote:
+      'تُخصم الغرامات المستحقّة من التحويلات القادمة تلقائياً. إن كان التحويل أصغر من الرصيد القائم يُخصم المتاح منه ويُنقل الباقي إلى الفترة التالية — ولا تُنشأ تحويلات سالبة.',
+    fineOutstanding: 'الرصيد القائم',
+    fineCollected: 'خُصم حتى الآن',
+    fineOnBooking: 'على الحجز',
+    fineNone: 'لا غرامات قائمة.',
     recoveryTitle: 'مبالغ مستردّة من سفرة',
     recoveryNote:
       'حين يُسترد مبلغ للضيف بعد تحويل مستحقات ذلك الحجز، يُسجَّل الفرق كرصيد قابل للاستعادة ويُخصم من التحويلات القادمة. لا تُنشأ تحويلات سالبة ولا يُطلب منك سداد شيء خارج دورة التحويل.',

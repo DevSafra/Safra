@@ -3,8 +3,10 @@ import Link from 'next/link';
 import {
   getMyPayoutAccounts,
   getMyPayouts,
+  getMyFines,
   getMyRecoveries,
   getMyWithheldPayouts,
+  type PartnerFine,
   type PartnerRecovery,
   type WithheldBooking,
   type PartnerPayout,
@@ -16,7 +18,7 @@ import { SectionRefusal } from '@/components/section-refusal';
 import { Ltr } from '@/components/ltr';
 import { amount, count } from '@/lib/format';
 import { addMoney } from '@/lib/money';
-import { fill, payoutStatus, plural, t } from '@/lib/strings';
+import { fill, payoutStatus, plural, t, violationKind } from '@/lib/strings';
 import { TONES } from '@/lib/tones';
 import { payoutIsSettled } from '@safra/contracts';
 import { statusTone } from '@safra/ui';
@@ -100,11 +102,12 @@ export default async function PayoutsPage() {
     The accounts are read HERE so the summary can name the destination — and say when there is
     none. Both reads are the partner's own and neither blocks the other, so they go together.
   */
-  const [payouts, accounts, withheld, recoveries] = await Promise.all([
+  const [payouts, accounts, withheld, recoveries, fines] = await Promise.all([
     getMyPayouts(),
     getMyPayoutAccounts(),
     getMyWithheldPayouts(),
     getMyRecoveries(),
+    getMyFines(),
   ]);
 
   const suspended =
@@ -181,6 +184,17 @@ export default async function PayoutsPage() {
                 ? []
                 : recoveries.recoveries
             }
+          />
+
+          {/*
+            And the third reason a total can be lower than expected — a PENALTY rather than a
+            correction. Its own panel by instruction: «Keep fines and recoveries as separate
+            concepts and separate balances» (Bashar, 2026-09-07). One panel for both would make a
+            partner work out which kind each row was before they could act on it, and a fine is
+            the one they can appeal.
+          */}
+          <Fines
+            rows={fines === 'failed' || fines === 'unauthenticated' ? [] : fines.fines}
           />
 
           {payouts.length === 0 ? (
@@ -319,6 +333,88 @@ function Summary({
           </Link>
         </p>
       )}
+    </section>
+  );
+}
+
+/**
+ * Fines still outstanding, and how much of each has been taken.
+ *
+ * ## Its own panel, not a row in the recoveries one
+ *
+ * Bashar, 2026-09-07: «Keep fines and recoveries as separate concepts and separate balances.» The
+ * two look alike on a screen and are not alike to the person paying them — a fine is a penalty with
+ * a ladder and an appeal, a recovery is a correction of money that was never owed. Merging them
+ * would make a partner establish which kind a row was before they could do anything about it.
+ *
+ * ## Each fine names its kind and its booking
+ *
+ * A penalty with no cause cannot be appealed. «تقويم غير محدَّث على الحجز BKG-…» is something a
+ * partner can check and contest; «غرامة $10» is a demand.
+ *
+ * ## And how much has already gone
+ *
+ * «how deductions are applied over time» was the explicit requirement, so a partly collected fine
+ * shows what has been taken beside what remains rather than only the balance.
+ */
+function Fines({ rows }: { readonly rows: readonly PartnerFine[] }) {
+  if (rows.length === 0) return null;
+
+  /* Per currency: a platform settling in several must never add across them. */
+  const totals = new Map<string, number>();
+
+  for (const row of rows) {
+    totals.set(
+      row.currencyCode,
+      (totals.get(row.currencyCode) ?? 0) + Number(row.outstanding),
+    );
+  }
+
+  return (
+    <section
+      data-fines
+      className="grid gap-3 rounded-card border border-line2 bg-field p-5"
+    >
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h2 className="text-[13px] font-bold text-text">{t.payouts.fineTitle}</h2>
+        <span className="ms-auto text-[12.5px] font-bold tabular-nums text-text">
+          {t.payouts.fineOutstanding}:{' '}
+          {[...totals].map(([code, sum]) => amount(sum.toFixed(2), code)).join(' · ')}
+        </span>
+      </div>
+
+      <p className="text-[11.5px] leading-relaxed text-text2">{t.payouts.fineNote}</p>
+
+      <ul className="grid gap-1.5">
+        {rows.map((row) => (
+          <li
+            key={`${row.kind}-${row.bookingReference ?? ''}-${row.createdAt}`}
+            data-fine={row.bookingReference ?? row.kind}
+            className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg border border-line px-3 py-2 text-[12px]"
+          >
+            <span className="font-semibold text-text">{violationKind(row.kind)}</span>
+
+            {row.bookingReference ? (
+              <span className="text-muted">
+                {t.payouts.fineOnBooking}{' '}
+                <Ltr className="font-semibold text-sky">{row.bookingReference}</Ltr>
+              </span>
+            ) : null}
+
+            {/* Only when some has gone: «خُصم ٠» on a fresh fine is noise. */}
+            {Number(row.collected) > 0 ? (
+              <span className="text-faint">
+                {t.payouts.fineCollected}:{' '}
+                <Ltr>{amount(row.collected, row.currencyCode)}</Ltr>
+              </span>
+            ) : null}
+
+            <span className="ms-auto font-bold tabular-nums text-text">
+              <Ltr>{amount(row.outstanding, row.currencyCode)}</Ltr>
+            </span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
