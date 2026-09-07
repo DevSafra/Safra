@@ -44,6 +44,25 @@ export interface CspOptions {
   readonly imgSrc: string;
   /** Set in production only: it upgrades http subresources and blocks mixed content. */
   readonly upgradeInsecure: boolean;
+  /**
+   * `'unsafe-eval'`, for the DEV SERVER only.
+   *
+   * `next dev` bundles and hot-reloads through `eval`, so this policy — correct in
+   * production — stops every dev page from hydrating. The page still renders, still
+   * returns 200, and every control in it is inert: a form falls back to the browser's
+   * own submit, a stepper does nothing, a dialog never opens.
+   *
+   * That is worse than a plain outage, because it makes the dev server useless for
+   * exactly the browser-driven verification this project requires before calling a
+   * client-side change done — while looking, in a screenshot, completely fine. Found on
+   * 2026-09-07 driving the partner sign-in, which submitted as a GET and put the
+   * password in the query string because no handler was ever attached.
+   *
+   * A POSITIVE test for development at the call site, never `!== 'production'`: an unset
+   * or misspelt environment then yields the STRICT policy. This directive is the one
+   * thing in the header that must not be enabled by an accident, so it fails closed.
+   */
+  readonly allowEval?: boolean;
 }
 
 /**
@@ -101,11 +120,11 @@ export function mediaOrigins(bases: readonly (string | undefined)[]): readonly s
 
 /** Builds the policy string. */
 export function buildCsp(options: CspOptions): string {
-  const { nonce, imgSrc, upgradeInsecure } = options;
+  const { nonce, imgSrc, upgradeInsecure, allowEval } = options;
 
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${allowEval ? " 'unsafe-eval'" : ''}`,
     /**
      * `unsafe-inline` for STYLES only. Next injects critical CSS inline and offers no
      * hash-stable or nonce-able equivalent for it. The exposure is a styling attack

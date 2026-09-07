@@ -102,6 +102,11 @@ export default async function middleware(request: NextRequest) {
       response, and there is nothing to gain from that.
     */
     upgradeInsecure: request.nextUrl.protocol === 'https:',
+    /*
+      The dev server, and nothing else. `next dev` needs `eval` to hydrate at all; a
+      production build never does. Positive test, so an unset NODE_ENV is strict.
+    */
+    allowEval: process.env.NODE_ENV === 'development',
   });
 
   request.headers.set('content-security-policy', csp);

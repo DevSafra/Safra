@@ -50,6 +50,31 @@ describe('buildCsp', () => {
     expect(policy()).not.toContain("'unsafe-eval'");
   });
 
+  /*
+    `'unsafe-eval'` for the dev server, and the CONTROL that it is off by default.
+
+    Both halves are needed. Without the first, `next dev` cannot hydrate and the dev server is
+    useless for browser verification while looking fine in a screenshot — which is how a sign-in
+    form came to submit as a GET with the password in the query string. Without the second, the
+    directive could default on and ship, and the test above would be the only thing standing
+    between a typo and arbitrary eval in production — so it is asserted here as an ABSENCE for an
+    omitted option and for an explicit `false`, not merely for the default.
+  */
+  it('allows eval only when the caller asks for it', () => {
+    expect(policy({ allowEval: true })).toMatch(/script-src[^;]*'unsafe-eval'/);
+    expect(policy({ allowEval: false })).not.toContain("'unsafe-eval'");
+    expect(policy()).not.toContain("'unsafe-eval'");
+  });
+
+  /* And it must not leak past script-src into anything else. */
+  it('keeps eval inside script-src', () => {
+    const directives = policy({ allowEval: true }).split('; ');
+    const carrying = directives.filter((one) => one.includes("'unsafe-eval'"));
+
+    expect(carrying).toHaveLength(1);
+    expect(carrying[0]).toMatch(/^script-src /);
+  });
+
   describe('the rest of the policy', () => {
     it('takes img-src from the caller, because the two apps differ', () => {
       expect(policy({ imgSrc: "'self' https:" })).toContain("img-src 'self' https:");
