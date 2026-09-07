@@ -405,6 +405,13 @@ export async function getMyPayoutAccounts() {
 const payoutBookingSchema = z.object({
   bookingReference: z.string(),
   amount: z.string(),
+  /*
+    What the guest got back, as a STRING — the column is `numeric`, so pg answers "330.000" and a
+    `z.number()` here would fail at runtime while compiling perfectly. Required rather than
+    defaulted: a `.default('0')` would invent «nothing was refunded» for a field the API had
+    stopped sending, which is the one wrong answer this line exists to prevent.
+  */
+  refunded: z.string(),
   checkIn: z.string(),
   checkOut: z.string(),
   property: z.string().nullable(),

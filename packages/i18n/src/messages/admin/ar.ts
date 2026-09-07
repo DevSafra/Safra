@@ -1232,13 +1232,16 @@ export const ar = {
         What the GUEST got back on a covered booking (Bashar's Stage 3, 2026-09-07).
 
         A payout line read «$613.80 owed» on a booking whose guest had been refunded $330 and no
-        screen said so. The partner's payable is snapshotted at booking time and never adjusted for
-        a refund, so SAFRA absorbs the difference — which may be the intended rule, but nobody
-        could see it happening.
+        screen said so, because the payable was snapshotted at booking time and never adjusted.
+
+        This note said the difference was absorbed by SAFRA. It no longer is — Bashar ruled on
+        2026-09-07 that the payable comes down in proportion to the refund — so the sentence was
+        rewritten rather than left standing. A note that describes the previous rule is worse than
+        no note: an operator reads it as current and tells a partner something untrue.
       */
       colRefunded: 'مُسترد للعميل',
       refundedNote:
-        'المبالغ المستردة للعملاء لا تُخصم من مستحقات الشريك — الفرق تتحمّله سفرة. تُعرض هنا حتى تكون الحالة مرئية للمالية.',
+        'يُخفَّض مستحق الشريك بنسبة ما استُرد للعميل، وتُخفَّض عمولة سفرة بالنسبة نفسها. المبلغ المعروض هنا هو ما أُعيد للضيف، والمستحق المقابل معروض بعد الخصم.',
       title: 'تحويلات الشركاء',
       searchPlaceholder: 'بحث بالمرجع أو الشريك أو مرجع الحوالة…',
       allStatuses: 'كل الحالات',

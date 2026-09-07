@@ -59,6 +59,19 @@ export default async function PayoutPage({
 
   if (!payout) notFound();
 
+  /*
+    A failed load is NOT an empty payout.
+
+    This was `Array.isArray(bookings) ? bookings : []`, so a request that failed — an expired
+    session, an API restart, a schema the API had stopped satisfying — rendered «لا حجوزات على هذه
+    الفترة بعد»: a partner being told with confidence that their transfer covers nothing. Found
+    exactly that way on 2026-09-07, when adding a required field to the response made the parse
+    fail against a running API that predated it.
+
+    The payout's own total is read from a different endpoint and kept showing the real figure, so
+    the screen contradicted itself and the wrong half was the one that mentioned bookings.
+  */
+  const coveredFailed = bookings === 'failed' || bookings === 'unauthenticated';
   const covered = Array.isArray(bookings) ? bookings : [];
 
   return (
@@ -120,10 +133,18 @@ export default async function PayoutPage({
 
         <section>
           <h2 className="mb-2 text-[14px] font-extrabold text-gold">
-            {t.payouts.coveredBookings} ({count(covered.length)})
+            {/* No count on a failed load: «(٠)» is the same false claim as «no bookings». */}
+            {t.payouts.coveredBookings}
+            {coveredFailed ? '' : ` (${count(covered.length)})`}
           </h2>
 
-          {covered.length === 0 ? (
+          {coveredFailed ? (
+            <p className="text-[12.5px] text-warn">
+              {bookings === 'unauthenticated'
+                ? t.dashboard.sessionExpired
+                : t.dashboard.loadFailed}
+            </p>
+          ) : covered.length === 0 ? (
             <p className="text-[12.5px] text-faint">{t.payouts.noBookings}</p>
           ) : (
             <ul className="grid gap-2">
@@ -146,14 +167,49 @@ export default async function PayoutPage({
                   <Ltr className="text-[11.5px] text-faint">
                     {booking.checkIn} ← {booking.checkOut}
                   </Ltr>
-                  <span className="ms-auto text-[13px] font-bold text-gold">
-                    <Ltr>{amount(booking.amount, payout.currencyCode)}</Ltr>
+                  <span className="ms-auto grid justify-items-end gap-0.5">
+                    <Ltr className="text-[13px] font-bold text-gold">
+                      {amount(booking.amount, payout.currencyCode)}
+                    </Ltr>
+                    {/*
+                      Why this line is worth less than the stay was.
+
+                      Deliberately NOT a colour. Every semantic tone is spoken for on this screen
+                      by the payout's own status pill — `pending_release` IS warn and `on_hold` IS
+                      orange — so painting an annotation in one of them makes a colour mean two
+                      things in one view, which is the thing `statusTone` exists to prevent. And
+                      the light theme's warn measures 4.47:1 at this size, under the 4.5 floor,
+                      so it would have been unreadable as well as ambiguous.
+
+                      The meaning is carried by POSITION and NOTATION instead: directly under the
+                      figure it explains, with a leading minus. The minus sits inside the LTR
+                      isolate rather than in the catalogue sentence, because a sign belongs to the
+                      number it negates — outside the isolate the bidi algorithm reorders it to
+                      the far side of the amount and it reads as a dash between two words.
+                    */}
+                    {Number(booking.refunded) > 0 ? (
+                      <span className="text-[11px] text-muted">
+                        <Ltr>−{amount(booking.refunded, payout.currencyCode)}</Ltr>{' '}
+                        {t.payouts.refundedToGuest}
+                      </span>
+                    ) : null}
                   </span>
                 </li>
               ))}
             </ul>
           )}
         </section>
+
+        {/*
+          Said once under the table rather than on every reduced line, and only when there is a
+          reduced line to explain. The rule itself — a refund takes the partner's share down in
+          proportion — is not something a partner can infer from a smaller number.
+        */}
+        {covered.some((one) => Number(one.refunded) > 0) ? (
+          <p className="rounded-lg border border-line bg-field px-3 py-2 text-[11.5px] leading-relaxed text-muted">
+            {t.payouts.refundedNote}
+          </p>
+        ) : null}
 
         <p className="rounded-lg border border-dashed border-line px-3 py-2 text-[11.5px] leading-relaxed text-faint">
           {t.payouts.readOnly}

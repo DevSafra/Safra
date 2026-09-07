@@ -1162,6 +1162,18 @@ export const ar = {
     colProperty: 'العقار',
     colStay: 'الإقامة',
     colAmount: 'المبلغ',
+    /*
+      Why a line is worth less than the stay was (Bashar, 2026-09-07).
+
+      From that date a refund to the guest reduces the partner's share in proportion. Without this
+      the partner reads a smaller figure than their own booking says the stay was worth, with
+      nothing on the screen accounting for the difference — and a number that changes silently is
+      the thing a partner rings support about.
+    */
+    refundedToGuest: 'أُعيد للضيف',
+    refundedNote:
+      'عند استرداد مبلغ للضيف يُخفَّض نصيب الشريك من ذلك الحجز بالنسبة نفسها، وتُخفَّض عمولة سفرة بالنسبة نفسها أيضاً. المبالغ أعلاه معروضة بعد الخصم.',
+
     back: 'رجوع',
     /*
       Read-only, and the screen says why rather than leaving a partner hunting for a button.

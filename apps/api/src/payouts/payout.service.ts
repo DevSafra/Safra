@@ -861,13 +861,27 @@ export class PayoutService {
     const rows = await this.db.execute<{
       booking_reference: string;
       amount: string;
+      refunded: string;
       check_in: string;
       check_out: string;
       property: string;
     }>(sql`
       SELECT b.reference AS booking_reference, i.amount::text AS amount,
              b.check_in::text, b.check_out::text,
-             coalesce(pr.name_ar, pr.name_en) AS property
+             coalesce(pr.name_ar, pr.name_en) AS property,
+             /*
+               What the GUEST got back, so the partner can account for a line worth less than the
+               stay was. Since Bashar's 2026-09-07 rule the payable comes down in proportion to a
+               refund, and a figure that moves without a reason beside it is what a partner rings
+               support about. Completed refunds only: one still at the provider has returned
+               nothing yet and has not moved this line.
+             */
+             coalesce((
+               SELECT sum(r.amount) FROM refunds r
+                WHERE r.booking_id = b.id
+                  AND r.status = 'completed'
+                  AND r.deleted_at IS NULL
+             ), 0)::text AS refunded
       FROM partner_payout_items i
       JOIN partner_payouts p ON p.id = i.payout_id
       JOIN bookings b        ON b.id = i.booking_id
@@ -879,6 +893,7 @@ export class PayoutService {
     return rows.rows.map((row) => ({
       bookingReference: row.booking_reference,
       amount: row.amount,
+      refunded: row.refunded,
       checkIn: row.check_in,
       checkOut: row.check_out,
       property: row.property,
