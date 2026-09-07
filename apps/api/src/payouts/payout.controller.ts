@@ -65,6 +65,25 @@ export class PartnerPayoutController {
     return { withheld: await this.payouts.withheldForPartner(user) };
   }
 
+  /**
+   * What this partner still owes back from an earlier overpayment.
+   *
+   * Placed before `:reference/bookings` deliberately — a literal segment must be declared ahead of
+   * the parameterised one or Nest matches «recoveries» as a reference and answers a 404 for a
+   * transfer nobody asked about.
+   *
+   * Same permission and the same reasoning as `withheld` above: it is the payout question answered
+   * for the part of it that runs the other way.
+   */
+  @Get('recoveries')
+  @RequirePermissions(P.PAYOUT_READ_OWN)
+  @AuditExempt(
+    'A partner reading what they owe back on their own transfers; changes nothing.',
+  )
+  async recoveries(@CurrentUser() user: AccessTokenClaims | undefined) {
+    return { recoveries: await this.payouts.recoveriesForPartner(user) };
+  }
+
   @Get(':reference/bookings')
   @RequirePermissions(P.PAYOUT_READ_OWN)
   @AuditExempt('A partner reading their own transfers; changes nothing.')

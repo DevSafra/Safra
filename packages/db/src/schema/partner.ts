@@ -851,6 +851,17 @@ export const partnerPayouts = pgTable(
     grossAmount: money('gross_amount').notNull().default('0'),
     /** §6.4 fines and other deductions withheld from this transfer. */
     fineAmount: money('fine_amount').notNull().default('0'),
+    /**
+     * An earlier overpayment being taken back on this transfer (Bashar, 2026-09-07).
+     *
+     * Its own column rather than folded into `fineAmount`, because a fine is a penalty a partner
+     * can appeal and reads as «الغرامات». Labelling money the platform is recovering as a fine
+     * would tell them something untrue on the one screen where they check what they were paid.
+     *
+     * `net = gross - fine - recovery`, and `net >= 0` is what forces a recovery larger than the
+     * transfer to be taken over several of them instead of producing a negative one.
+     */
+    recoveryAmount: money('recovery_amount').notNull().default('0'),
     netAmount: money('net_amount').notNull().default('0'),
 
     status: payoutStatus('status').notNull().default('accruing'),
@@ -897,6 +908,102 @@ export const partnerPayouts = pgTable(
       .where(sql`status = 'accruing' AND deleted_at IS NULL`),
     index('partner_payouts_partner_idx').on(t.partnerId, t.createdAt),
     index('partner_payouts_status_idx').on(t.status, t.scheduledFor),
+  ],
+);
+
+/**
+ * What a partner owes back, when a refund lands after their money has already gone.
+ *
+ * ## The case, and why it needs a balance
+ *
+ * A stay completes, accrual attaches it to a transfer, the transfer is released and PAID, and then
+ * the guest is refunded. `LedgerService.reverseForRefund` reduces what the partner is owed — but
+ * that booking's share has already left the company, and a paid payout is immutable by trigger
+ * because it is evidence of what happened rather than a figure to restate.
+ *
+ * Bashar's decision, 2026-09-07: «I want the difference recorded as a recoverable balance that is
+ * deducted from future payouts. Do not automatically create negative transfers or attempt to claw
+ * money back outside the normal payout process. The outstanding recovery amount should be visible
+ * to finance, operations and the partner.»
+ *
+ * ## `amount` never moves; `recoveredAmount` does
+ *
+ * What arose is a fact. How much has come back is a running total, and the two are separate columns
+ * so that «you were overpaid $400 and $150 has been recovered» stays answerable — a single
+ * decrementing balance answers neither half of that sentence.
+ *
+ * `settledAt` and the arithmetic are held in agreement by a CHECK, because a row marked settled
+ * with something outstanding hides a debt and one fully recovered but unmarked never leaves the
+ * queue. Both are screens that lie, in opposite directions.
+ *
+ * ## One per booking
+ *
+ * A second refund on the same stay raises the SAME balance rather than a second one — otherwise a
+ * partner sees two debts for one guest and cannot reconcile either.
+ */
+export const partnerRecoveries = pgTable(
+  'partner_recoveries',
+  {
+    id: primaryId(),
+    partnerId: foreignId('partner_id')
+      .notNull()
+      .references(() => partners.id),
+    /**
+     * The stay whose refund caused it. NOT NULL deliberately: a recovery with no cause is a debt
+     * nobody can dispute, and a partner is entitled to be told which booking it came from.
+     */
+    bookingId: foreignId('booking_id')
+      .notNull()
+      .references(() => bookings.id),
+    currencyId: foreignId('currency_id')
+      .notNull()
+      .references(() => currencies.id),
+    amount: money('amount').notNull(),
+    recoveredAmount: money('recovered_amount').notNull().default('0'),
+    /** The transfer that had already been paid, so the record says what went wrong where. */
+    paidPayoutId: foreignId('paid_payout_id').references(() => partnerPayouts.id),
+    ...timestamps,
+    settledAt: timestamp('settled_at', { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex('partner_recoveries_booking_unique').on(t.bookingId),
+    /*
+      Outstanding, per partner and currency — the only question the payout path asks. Partial, so
+      it indexes the rows that still matter: a settled recovery is history, and on a platform that
+      settles most of them an unfiltered index grows toward the answers nobody needs.
+    */
+    index('partner_recoveries_outstanding_idx')
+      .on(t.partnerId, t.currencyId)
+      .where(sql`settled_at IS NULL`),
+  ],
+);
+
+/**
+ * Which transfer settled which recovery, and by how much.
+ *
+ * The balance answers «what does this partner still owe back». This answers «which payouts took it
+ * off», which is the direction a reconciliation is walked in when somebody queries a figure. One
+ * table with a running total answers the first and loses the second.
+ *
+ * A recovery is taken off a given transfer ONCE — the unique index says so, and a second bite
+ * would be a bug rather than a top-up.
+ */
+export const partnerRecoveryDeductions = pgTable(
+  'partner_recovery_deductions',
+  {
+    id: primaryId(),
+    recoveryId: foreignId('recovery_id')
+      .notNull()
+      .references(() => partnerRecoveries.id),
+    payoutId: foreignId('payout_id')
+      .notNull()
+      .references(() => partnerPayouts.id),
+    amount: money('amount').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('partner_recovery_deductions_once').on(t.recoveryId, t.payoutId),
+    index('partner_recovery_deductions_payout_idx').on(t.payoutId),
   ],
 );
 

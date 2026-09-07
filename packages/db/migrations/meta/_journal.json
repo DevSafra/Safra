@@ -505,6 +505,13 @@
       "when": 1788778915827,
       "tag": "0071_proportional_refund_reversal",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1788788021087,
+      "tag": "0072_partner_recoveries",
+      "breakpoints": true
     }
   ]
 }

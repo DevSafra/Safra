@@ -966,6 +966,21 @@ async function build(db: Seeder): Promise<void> {
     );
   }
 
+  /*
+    Overpayments and their applications, before the transfers and bookings they point at.
+
+    A recovery references a booking, a partner AND the paid payout it came from, so it has to come
+    out ahead of all three — and the deductions ahead of it, since they reference the recoveries.
+    `testbed-cascade.integration.test.ts` asked the database and failed on the commit that added
+    these tables, which is exactly the point of it: the alternative is a reset that stops on a
+    foreign key weeks later, on the run somebody needed at the time.
+  */
+  await db.execute(sql`DELETE FROM partner_recovery_deductions
+    WHERE recovery_id IN (SELECT id FROM partner_recoveries
+                          WHERE booking_id IN (${testbedBookings}))`);
+  await db.execute(sql`DELETE FROM partner_recoveries
+    WHERE booking_id IN (${testbedBookings})`);
+
   await db.execute(sql`DELETE FROM partner_payout_items
     WHERE booking_id IN (${testbedBookings})`);
   await db.execute(sql`DELETE FROM partner_payouts
@@ -1193,6 +1208,19 @@ async function build(db: Seeder): Promise<void> {
   );
   await db.execute(
     sql`DELETE FROM partner_employee_roles WHERE partner_id IN (${testbedPartners})`,
+  );
+  /*
+    And by PARTNER as well as by booking. A recovery hangs off both, so clearing only the
+    booking-shaped ones leaves any raised against a partner whose bookings have already gone —
+    which is the shape of the ten tables this cascade was missing on 2026-08-27.
+  */
+  await db.execute(
+    sql`DELETE FROM partner_recovery_deductions
+        WHERE recovery_id IN (SELECT id FROM partner_recoveries
+                              WHERE partner_id IN (${testbedPartners}))`,
+  );
+  await db.execute(
+    sql`DELETE FROM partner_recoveries WHERE partner_id IN (${testbedPartners})`,
   );
   await db.execute(
     sql`DELETE FROM partner_payout_accounts WHERE partner_id IN (${testbedPartners})`,

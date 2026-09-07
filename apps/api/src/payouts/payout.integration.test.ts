@@ -53,10 +53,12 @@ describeIfDb('PayoutService', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   /* Every row this suite writes is discarded when the test that wrote it ends. */
   const db: Database = harness.db;
+  /* Shared, so the recovery tests can post a reversal through the same instance the service uses. */
+  const ledger = new LedgerService(db);
   const service = new PayoutService(
     db,
     new AuditService(db),
-    new LedgerService(db),
+    ledger,
     new SettingsService(db),
   );
 
@@ -765,5 +767,386 @@ describeIfDb('PayoutService', () => {
     `);
 
     expect(theirs.rows[0]?.n).toBe(0);
+  });
+
+  /*
+    An overpayment that arises AFTER the money has gone, and how it comes back.
+
+    Bashar's decision, 2026-09-07: «If a payout has already been paid and a refund later creates an
+    overpayment, I want the difference recorded as a recoverable balance that is deducted from
+    future payouts. Do not automatically create negative transfers or attempt to claw money back
+    outside the normal payout process.»
+
+    The sequence is the whole point and each step is a different guarantee: the transfer is PAID and
+    therefore frozen, the refund lands afterwards, the balance is recorded rather than collected,
+    and the collecting happens on the next ordinary transfer — capped so it can never make one
+    negative, and carried forward when it does not fit.
+  */
+  describe('an overpayment recovered from a later transfer', () => {
+    /** The fixture partner's three bookings, paid out in full and the transfer marked sent. */
+    async function payTheFirstTransfer(): Promise<string> {
+      const payout = await openPayout();
+
+      await service.release(payout.id, { scheduledFor: '2026-08-20' }, finance);
+      await service.markPaid(payout.id, { paidReference: 'BANK-REF-RECOVERY' }, finance);
+
+      return payout.id;
+    }
+
+    /** A completed refund of the whole stay on one of them. */
+    async function refundOneStayInFull(bookingId: string): Promise<void> {
+      await db.execute(sql`
+        INSERT INTO payments (booking_id, method, provider, amount, currency_id, status,
+                              captured_at)
+        SELECT b.id, 'bank_transfer', 'manual', b.total_amount, b.currency_id, 'captured', now()
+          FROM bookings b WHERE b.id = ${bookingId}
+      `);
+      await db.execute(sql`
+        INSERT INTO refunds (payment_id, booking_id, amount, currency_id,
+                             applied_refund_percent, reason, status, wallet_amount, completed_at)
+        SELECT p.id, b.id, b.base_amount, b.currency_id, 100,
+               'recovery test: the whole stay, after the transfer was paid',
+               'completed', 0, now()
+          FROM bookings b JOIN payments p ON p.booking_id = b.id
+         WHERE b.id = ${bookingId} LIMIT 1
+      `);
+    }
+
+    async function recoveryFor(bookingId: string) {
+      const rows = await db.execute<{
+        amount: string;
+        recovered: string;
+        settled: string | null;
+      }>(sql`
+        SELECT amount::text, recovered_amount::text AS recovered, settled_at::text AS settled
+          FROM partner_recoveries WHERE booking_id = ${bookingId}::uuid
+      `);
+
+      return rows.rows[0];
+    }
+
+    it('records the difference as a balance instead of restating the paid transfer', async () => {
+      if (bookingIds.length === 0) return;
+
+      const paidPayout = await payTheFirstTransfer();
+
+      await refundOneStayInFull(bookingIds[0]!);
+      await ledger.reverseForRefund(db, bookingIds[0]!);
+
+      const recovery = await recoveryFor(bookingIds[0]!);
+
+      expect(recovery, 'a balance was raised').toBeDefined();
+      /* The stay was paid out at 186.00 and is now worth nothing, so all of it is owed back. */
+      expect(Number(recovery!.amount), 'the whole payable that was sent').toBeCloseTo(
+        186,
+        2,
+      );
+      expect(Number(recovery!.recovered), 'nothing collected yet').toBeCloseTo(0, 2);
+      expect(recovery!.settled).toBeNull();
+
+      /* And the transfer that was paid is untouched — it is evidence, not a figure. */
+      const frozen = await db.execute<{ gross: string; net: string; status: string }>(sql`
+        SELECT gross_amount::text AS gross, net_amount::text AS net, status::text
+          FROM partner_payouts WHERE id = ${paidPayout}
+      `);
+
+      expect(frozen.rows[0]!.status).toBe('paid');
+      expect(Number(frozen.rows[0]!.gross), 'still says what was sent').toBeCloseTo(
+        558,
+        2,
+      );
+    });
+
+    it('takes it off the next transfer, through the ordinary total', async () => {
+      if (bookingIds.length === 0) return;
+
+      await payTheFirstTransfer();
+      await refundOneStayInFull(bookingIds[0]!);
+      await ledger.reverseForRefund(db, bookingIds[0]!);
+
+      /*
+        A new stay for the same partner, so there is a next transfer for the balance to come off.
+        Built rather than reused: the three the fixture made are on the paid payout already.
+      */
+      await db.execute(sql`
+        INSERT INTO bookings (customer_profile_id, unit_id, property_id, partner_id, city_id,
+                              check_in, check_out, guests_adults, status,
+                              base_amount, customer_fee_value, customer_fee_amount,
+                              partner_commission_rate, partner_commission_amount,
+                              total_amount, partner_payable_amount, currency_id,
+                              fx_rate_to_syp, total_syp, cancellation_policy_snapshot,
+                              paid_at, confirmed_at, completed_at)
+        SELECT b.customer_profile_id, b.unit_id, b.property_id, b.partner_id, b.city_id,
+               (now() - interval '5 day')::date, (now() - interval '3 day')::date,
+               2, 'completed',
+               b.base_amount, b.customer_fee_value, b.customer_fee_amount,
+               b.partner_commission_rate, b.partner_commission_amount,
+               b.total_amount, b.partner_payable_amount, b.currency_id,
+               b.fx_rate_to_syp, b.total_syp, b.cancellation_policy_snapshot,
+               now(), now(), now()
+          FROM bookings b WHERE b.id = ${bookingIds[1]!} LIMIT 1
+      `);
+
+      await service.accrue();
+
+      const next = await db.execute<{
+        gross: string;
+        fine: string;
+        recovery: string;
+        net: string;
+      }>(sql`
+        SELECT gross_amount::text AS gross, fine_amount::text AS fine,
+               recovery_amount::text AS recovery, net_amount::text AS net
+          FROM partner_payouts
+         WHERE partner_id = ${partnerId} AND status = 'accruing' AND deleted_at IS NULL
+      `);
+
+      const row = next.rows[0];
+
+      expect(row, 'a new accruing transfer').toBeDefined();
+      expect(Number(row!.gross), 'the new stay alone').toBeCloseTo(186, 2);
+      expect(Number(row!.recovery), 'and the whole balance came off it').toBeCloseTo(
+        186,
+        2,
+      );
+      expect(Number(row!.net), 'so nothing is due this period').toBeCloseTo(0, 2);
+      expect(Number(row!.net), 'the identity the CHECK enforces').toBeCloseTo(
+        Number(row!.gross) - Number(row!.fine) - Number(row!.recovery),
+        3,
+      );
+
+      const recovery = await recoveryFor(bookingIds[0]!);
+
+      expect(
+        Number(recovery!.recovered),
+        'the balance records what was taken',
+      ).toBeCloseTo(186, 2);
+      expect(recovery!.settled, 'and it is settled').not.toBeNull();
+
+      /* Walkable in the other direction too: which transfer settled it. */
+      const deductions = await db.execute<{ n: string; amount: string }>(sql`
+        SELECT count(*)::text AS n, coalesce(sum(d.amount), 0)::text AS amount
+          FROM partner_recovery_deductions d
+          JOIN partner_recoveries r ON r.id = d.recovery_id
+         WHERE r.booking_id = ${bookingIds[0]!}::uuid
+      `);
+
+      expect(Number(deductions.rows[0]!.n), 'one application, on one transfer').toBe(1);
+      expect(Number(deductions.rows[0]!.amount)).toBeCloseTo(186, 2);
+    });
+
+    /*
+      «Do not automatically create negative transfers» — expressed as arithmetic rather than trust.
+
+      Two stays are refunded, so more is owed back than the next transfer is worth. The database
+      would refuse a negative net, so the only correct behaviour is to take what fits and leave the
+      rest outstanding for the period after.
+    */
+    it('never makes a transfer negative, and carries the rest forward', async () => {
+      if (bookingIds.length < 2) return;
+
+      await payTheFirstTransfer();
+
+      for (const id of [bookingIds[0]!, bookingIds[1]!]) {
+        await refundOneStayInFull(id);
+        await ledger.reverseForRefund(db, id);
+      }
+
+      /* One new stay: 186 due, against 372 owed back. */
+      await db.execute(sql`
+        INSERT INTO bookings (customer_profile_id, unit_id, property_id, partner_id, city_id,
+                              check_in, check_out, guests_adults, status,
+                              base_amount, customer_fee_value, customer_fee_amount,
+                              partner_commission_rate, partner_commission_amount,
+                              total_amount, partner_payable_amount, currency_id,
+                              fx_rate_to_syp, total_syp, cancellation_policy_snapshot,
+                              paid_at, confirmed_at, completed_at)
+        SELECT b.customer_profile_id, b.unit_id, b.property_id, b.partner_id, b.city_id,
+               (now() - interval '5 day')::date, (now() - interval '3 day')::date,
+               2, 'completed',
+               b.base_amount, b.customer_fee_value, b.customer_fee_amount,
+               b.partner_commission_rate, b.partner_commission_amount,
+               b.total_amount, b.partner_payable_amount, b.currency_id,
+               b.fx_rate_to_syp, b.total_syp, b.cancellation_policy_snapshot,
+               now(), now(), now()
+          FROM bookings b WHERE b.id = ${bookingIds[2]!} LIMIT 1
+      `);
+
+      await service.accrue();
+
+      const next = await db.execute<{ gross: string; recovery: string; net: string }>(sql`
+        SELECT gross_amount::text AS gross, recovery_amount::text AS recovery,
+               net_amount::text AS net
+          FROM partner_payouts
+         WHERE partner_id = ${partnerId} AND status = 'accruing' AND deleted_at IS NULL
+      `);
+      const row = next.rows[0];
+
+      expect(row).toBeDefined();
+      expect(Number(row!.net), 'nothing due, and nothing negative').toBeCloseTo(0, 2);
+      expect(Number(row!.recovery), 'only what the transfer could carry').toBeCloseTo(
+        Number(row!.gross),
+        2,
+      );
+
+      const left = await db.execute<{ outstanding: string }>(sql`
+        SELECT coalesce(sum(amount - recovered_amount), 0)::text AS outstanding
+          FROM partner_recoveries
+         WHERE partner_id = ${partnerId} AND settled_at IS NULL
+      `);
+
+      expect(
+        Number(left.rows[0]!.outstanding),
+        'the remainder waits for the next period rather than being written off',
+      ).toBeCloseTo(186, 2);
+    });
+
+    /*
+      A balance larger than the transfer it meets — where the clamp is the only thing that holds.
+
+      The carry-forward test above happens to have a balance EXACTLY equal to the transfer, so
+      removing `least(outstanding, headroom)` changed nothing and the mutation passed. That is a
+      test proving less than it appears to. Here one recovery of 186.00 meets a transfer worth
+      40.00, so an unclamped deduction would drive `net_amount` to -146.00 and the CHECK would
+      refuse the row — the failure would be a rejected statement rather than a wrong figure.
+    */
+    it('takes only what the transfer can carry when one balance exceeds it', async () => {
+      if (bookingIds.length === 0) return;
+
+      await payTheFirstTransfer();
+      await refundOneStayInFull(bookingIds[0]!);
+      await ledger.reverseForRefund(db, bookingIds[0]!);
+
+      /* A small new stay: 40.00 due against 186.00 owed back. */
+      await db.execute(sql`
+        INSERT INTO bookings (customer_profile_id, unit_id, property_id, partner_id, city_id,
+                              check_in, check_out, guests_adults, status,
+                              base_amount, customer_fee_value, customer_fee_amount,
+                              partner_commission_rate, partner_commission_amount,
+                              total_amount, partner_payable_amount, currency_id,
+                              fx_rate_to_syp, total_syp, cancellation_policy_snapshot,
+                              paid_at, confirmed_at, completed_at)
+        SELECT b.customer_profile_id, b.unit_id, b.property_id, b.partner_id, b.city_id,
+               (now() - interval '5 day')::date, (now() - interval '3 day')::date,
+               2, 'completed',
+               '43.00', b.customer_fee_value, b.customer_fee_amount,
+               b.partner_commission_rate, '3.00',
+               '44.99', '40.00', b.currency_id,
+               b.fx_rate_to_syp, b.total_syp, b.cancellation_policy_snapshot,
+               now(), now(), now()
+          FROM bookings b WHERE b.id = ${bookingIds[1]!} LIMIT 1
+      `);
+
+      await service.accrue();
+
+      const row = await db.execute<{ gross: string; recovery: string; net: string }>(sql`
+        SELECT gross_amount::text AS gross, recovery_amount::text AS recovery,
+               net_amount::text AS net
+          FROM partner_payouts
+         WHERE partner_id = ${partnerId} AND status = 'accruing' AND deleted_at IS NULL
+      `);
+
+      expect(Number(row.rows[0]!.gross), 'the small stay alone').toBeCloseTo(40, 2);
+      expect(Number(row.rows[0]!.recovery), 'only what it could carry').toBeCloseTo(
+        40,
+        2,
+      );
+      expect(Number(row.rows[0]!.net), 'never below zero').toBeCloseTo(0, 2);
+
+      const recovery = await recoveryFor(bookingIds[0]!);
+
+      expect(Number(recovery!.recovered), 'part collected').toBeCloseTo(40, 2);
+      expect(recovery!.settled, 'and still outstanding').toBeNull();
+      expect(
+        Number(recovery!.amount) - Number(recovery!.recovered),
+        'the rest waits',
+      ).toBeCloseTo(146, 2);
+    });
+
+    /* `retotal` runs on every accrual and correction, so applying twice must change nothing. */
+    it('collects the same balance once however often the total is recomputed', async () => {
+      if (bookingIds.length === 0) return;
+
+      await payTheFirstTransfer();
+      await refundOneStayInFull(bookingIds[0]!);
+      await ledger.reverseForRefund(db, bookingIds[0]!);
+
+      await db.execute(sql`
+        INSERT INTO bookings (customer_profile_id, unit_id, property_id, partner_id, city_id,
+                              check_in, check_out, guests_adults, status,
+                              base_amount, customer_fee_value, customer_fee_amount,
+                              partner_commission_rate, partner_commission_amount,
+                              total_amount, partner_payable_amount, currency_id,
+                              fx_rate_to_syp, total_syp, cancellation_policy_snapshot,
+                              paid_at, confirmed_at, completed_at)
+        SELECT b.customer_profile_id, b.unit_id, b.property_id, b.partner_id, b.city_id,
+               (now() - interval '5 day')::date, (now() - interval '3 day')::date,
+               2, 'completed',
+               b.base_amount, b.customer_fee_value, b.customer_fee_amount,
+               b.partner_commission_rate, b.partner_commission_amount,
+               b.total_amount, b.partner_payable_amount, b.currency_id,
+               b.fx_rate_to_syp, b.total_syp, b.cancellation_policy_snapshot,
+               now(), now(), now()
+          FROM bookings b WHERE b.id = ${bookingIds[1]!} LIMIT 1
+      `);
+
+      await service.accrue();
+
+      /*
+        A second stay, so the NEXT accrual has something to attach and therefore retotals. Without
+        this the later calls are no-ops: `accrue` only retotals the payouts it TOUCHED, so the
+        original version of this test asserted idempotence while running the path exactly once.
+      */
+      await db.execute(sql`
+        INSERT INTO bookings (customer_profile_id, unit_id, property_id, partner_id, city_id,
+                              check_in, check_out, guests_adults, status,
+                              base_amount, customer_fee_value, customer_fee_amount,
+                              partner_commission_rate, partner_commission_amount,
+                              total_amount, partner_payable_amount, currency_id,
+                              fx_rate_to_syp, total_syp, cancellation_policy_snapshot,
+                              paid_at, confirmed_at, completed_at)
+        SELECT b.customer_profile_id, b.unit_id, b.property_id, b.partner_id, b.city_id,
+               (now() - interval '9 day')::date, (now() - interval '8 day')::date,
+               2, 'completed',
+               '215.00', b.customer_fee_value, b.customer_fee_amount,
+               b.partner_commission_rate, '15.00',
+               '216.99', '200.00', b.currency_id,
+               b.fx_rate_to_syp, b.total_syp, b.cancellation_policy_snapshot,
+               now(), now(), now()
+          FROM bookings b WHERE b.id = ${bookingIds[2]!} LIMIT 1
+      `);
+
+      await service.accrue();
+      await service.accrue();
+
+      const row = await db.execute<{ gross: string; recovery: string; net: string }>(sql`
+        SELECT gross_amount::text AS gross, recovery_amount::text AS recovery,
+               net_amount::text AS net
+          FROM partner_payouts
+         WHERE partner_id = ${partnerId} AND status = 'accruing' AND deleted_at IS NULL
+      `);
+
+      expect(Number(row.rows[0]!.gross), 'both new stays').toBeCloseTo(386, 2);
+      expect(Number(row.rows[0]!.net), 'the rest is due after the balance').toBeCloseTo(
+        200,
+        2,
+      );
+      expect(Number(row.rows[0]!.recovery), 'taken once, not three times').toBeCloseTo(
+        186,
+        2,
+      );
+
+      const recovery = await recoveryFor(bookingIds[0]!);
+
+      expect(Number(recovery!.recovered)).toBeCloseTo(186, 2);
+
+      const applications = await db.execute<{ n: string }>(sql`
+        SELECT count(*)::text AS n FROM partner_recovery_deductions d
+          JOIN partner_recoveries r ON r.id = d.recovery_id
+         WHERE r.booking_id = ${bookingIds[0]!}::uuid
+      `);
+
+      expect(Number(applications.rows[0]!.n), 'one application, not three').toBe(1);
+    });
   });
 });

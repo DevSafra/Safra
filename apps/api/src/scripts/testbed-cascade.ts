@@ -72,6 +72,13 @@ export const CASCADE_HANDLES = new Set<string>([
   'partner_employees',
   'partner_payout_accounts',
   'partner_payout_items',
+  /*
+    An overpayment a refund created after a transfer was paid, and each application of it.
+    Children of bookings, partners AND partner_payouts, so both come out before any of them —
+    the deductions first, because they point at the recoveries.
+  */
+  'partner_recoveries',
+  'partner_recovery_deductions',
   'partner_violations',
   'payment_provider_events',
   'property_images',

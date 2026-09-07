@@ -15,6 +15,7 @@ import {
   offsetPage,
 } from '@safra/contracts';
 
+import { fromMinor, MONEY_SCALE, toMinor } from '../common/money.js';
 import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { SettingsService } from '../settings/settings.service.js';
@@ -153,7 +154,7 @@ export class PayoutService {
   }
 
   /**
-   * Recomputes a payout's total from its items.
+   * Recomputes a payout's total from its items, and takes off what the partner owes back.
    *
    * Only ever called while the payout is open — the paid-immutability trigger refuses it
    * afterwards, which is the point: a total is frozen the moment money moves.
@@ -162,13 +163,161 @@ export class PayoutService {
     await tx.execute(sql`
       UPDATE partner_payouts p
       SET gross_amount = coalesce(i.total, 0),
-          net_amount = coalesce(i.total, 0) - p.fine_amount,
+          net_amount = coalesce(i.total, 0) - p.fine_amount - p.recovery_amount,
           updated_at = now()
       FROM (
         SELECT coalesce(sum(amount), 0) AS total
         FROM partner_payout_items WHERE payout_id = ${payoutId}
       ) i
       WHERE p.id = ${payoutId}
+    `);
+
+    await this.applyRecoveries(tx, payoutId);
+  }
+
+  /**
+   * Outstanding overpayments, taken off this transfer through the ordinary process.
+   *
+   * ## Bashar's rule (2026-09-07)
+   *
+   * «If a payout has already been paid and a refund later creates an overpayment, I want the
+   * difference recorded as a recoverable balance that is deducted from future payouts. Do not
+   * automatically create negative transfers or attempt to claw money back outside the normal
+   * payout process.»
+   *
+   * `LedgerService.recordOverpayment` writes the balance when the refund settles. This is the
+   * collecting half, and it happens here — where a transfer's figure is computed — so the deduction
+   * is part of the ordinary total rather than a separate movement anybody has to chase.
+   *
+   * ## It never produces a negative transfer
+   *
+   * `net_amount >= 0` is a CHECK, so a balance larger than the transfer cannot be taken in one
+   * go. `least(outstanding, headroom)` takes what fits and leaves the rest outstanding for the
+   * next period — which is «deducted from future payouts» in the plural, as asked.
+   *
+   * ## Applied per recovery, oldest first
+   *
+   * So a partner reading «$150 recovered» can be shown WHICH overpayments it settled, and the
+   * oldest debt clears first rather than an arbitrary one. `partner_recovery_deductions` is the
+   * record, unique on (recovery, payout) — a second bite at the same balance on the same transfer
+   * is a bug, not a top-up, and the database says so.
+   *
+   * ## Idempotent, because `retotal` runs often
+   *
+   * Every accrual, close and correction lands here. A deduction already recorded against this
+   * payout is skipped by the unique index, and the amounts are recomputed from the balances rather
+   * than accumulated — so running it twice leaves the same figure.
+   */
+  private async applyRecoveries(tx: Database, payoutId: string): Promise<void> {
+    const payout = await tx.execute<{
+      partner_id: string;
+      currency_id: string;
+      gross_amount: string;
+      fine_amount: string;
+      status: string;
+    }>(sql`
+      SELECT partner_id::text, currency_id::text,
+             gross_amount::text, fine_amount::text, status::text
+        FROM partner_payouts
+       WHERE id = ${payoutId} AND deleted_at IS NULL
+    `);
+
+    const row = payout.rows[0];
+
+    /* Paid or cancelled: frozen by trigger, and money already sent is not ours to restate. */
+    if (!row || row.status === 'paid' || row.status === 'cancelled') return;
+
+    /*
+      Reset first, so this is a RECOMPUTATION rather than an accumulation.
+
+      `retotal` is called on every accrual and every correction. Adding to `recovery_amount` each
+      time would take the same balance repeatedly off one transfer; clearing the applications and
+      re-deciding them means the answer depends only on what is outstanding now.
+    */
+    await tx.execute(sql`
+      UPDATE partner_recoveries r
+         SET recovered_amount = r.recovered_amount - d.amount,
+             settled_at = NULL,
+             updated_at = now()
+        FROM partner_recovery_deductions d
+       WHERE d.recovery_id = r.id AND d.payout_id = ${payoutId}
+    `);
+    await tx.execute(sql`
+      DELETE FROM partner_recovery_deductions WHERE payout_id = ${payoutId}
+    `);
+    /*
+      Both columns together, because the identity CHECK is enforced per STATEMENT.
+
+      Clearing `recovery_amount` on its own leaves `net_amount` still carrying the deduction, and
+      `net = gross - fine - recovery` then fails on the reset itself — before the reapplication
+      that would have made it true again. Found by a test that genuinely re-ran the path: the
+      earlier version of it called `accrue` three times without attaching anything, so the second
+      and third calls never reached here and this was invisible. It would have surfaced on the
+      second accrual of any transfer carrying a balance.
+    */
+    await tx.execute(sql`
+      UPDATE partner_payouts
+         SET recovery_amount = 0,
+             net_amount = gross_amount - fine_amount
+       WHERE id = ${payoutId}
+    `);
+
+    const outstanding = await tx.execute<{ id: string; left: string }>(sql`
+      SELECT id::text, (amount - recovered_amount)::text AS left
+        FROM partner_recoveries
+       WHERE partner_id = ${row.partner_id}
+         AND currency_id = ${row.currency_id}
+         AND settled_at IS NULL
+         AND amount > recovered_amount
+       ORDER BY created_at
+    `);
+
+    if (outstanding.rows.length === 0) return;
+
+    let headroom =
+      toMinor(row.gross_amount, MONEY_SCALE) - toMinor(row.fine_amount, MONEY_SCALE);
+
+    if (headroom <= 0n) return;
+
+    let taken = 0n;
+
+    for (const recovery of outstanding.rows) {
+      if (headroom <= 0n) break;
+
+      const left = toMinor(recovery.left, MONEY_SCALE);
+      const take = left > headroom ? headroom : left;
+
+      if (take <= 0n) continue;
+
+      const amount = fromMinor(take, MONEY_SCALE);
+
+      await tx.execute(sql`
+        INSERT INTO partner_recovery_deductions (recovery_id, payout_id, amount)
+        VALUES (${recovery.id}, ${payoutId}, ${amount})
+      `);
+      await tx.execute(sql`
+        UPDATE partner_recoveries
+           SET recovered_amount = recovered_amount + ${amount}::numeric,
+               settled_at = CASE
+                 WHEN recovered_amount + ${amount}::numeric >= amount THEN now()
+                 ELSE NULL
+               END,
+               updated_at = now()
+         WHERE id = ${recovery.id}
+      `);
+
+      headroom -= take;
+      taken += take;
+    }
+
+    if (taken <= 0n) return;
+
+    await tx.execute(sql`
+      UPDATE partner_payouts
+         SET recovery_amount = ${fromMinor(taken, MONEY_SCALE)},
+             net_amount = gross_amount - fine_amount - ${fromMinor(taken, MONEY_SCALE)}::numeric,
+             updated_at = now()
+       WHERE id = ${payoutId}
     `);
   }
 
@@ -509,6 +658,63 @@ export class PayoutService {
     `);
 
     return rows.rows.map(toView);
+  }
+
+  /**
+   * What this partner still owes back, and which stay each balance came from.
+   *
+   * ## Why the partner sees it at all
+   *
+   * Bashar, 2026-09-07: «The outstanding recovery amount should be visible to finance, operations
+   * and the partner.» A deduction they cannot see is the defect this platform keeps finding on the
+   * other side of every money question — the console knew a figure and the business whose money it
+   * was did not.
+   *
+   * So the balance is theirs to read BEFORE it is taken, not explained afterwards by a smaller
+   * transfer. The booking reference is included because a debt with no cause cannot be disputed,
+   * and the guest is not named: the partner is a party to the money, not to the refund.
+   *
+   * ## Settled ones are left out
+   *
+   * A recovery that has been collected in full is history and belongs with the transfer that took
+   * it — which is where `recoveryAmount` on each payout says so. Listing them here would put a
+   * permanent list of past debts on the screen a partner opens to see what they are owed.
+   */
+  async recoveriesForPartner(claims: AccessTokenClaims | undefined) {
+    const partnerId = requirePartnerId(claims, P.PAYOUT_READ_OWN);
+
+    const rows = await this.db.execute<{
+      booking_reference: string;
+      amount: string;
+      recovered: string;
+      outstanding: string;
+      currency_code: string;
+      created_at: string;
+    }>(sql`
+      SELECT b.reference AS booking_reference,
+             r.amount::text AS amount,
+             r.recovered_amount::text AS recovered,
+             (r.amount - r.recovered_amount)::text AS outstanding,
+             cur.code AS currency_code,
+             r.created_at::text AS created_at
+        FROM partner_recoveries r
+        JOIN bookings b ON b.id = r.booking_id
+        JOIN currencies cur ON cur.id = r.currency_id
+       WHERE r.partner_id = ${partnerId}
+         AND r.settled_at IS NULL
+         AND r.amount > r.recovered_amount
+       ORDER BY r.created_at
+       LIMIT 100
+    `);
+
+    return rows.rows.map((row) => ({
+      bookingReference: row.booking_reference,
+      amount: row.amount,
+      recovered: row.recovered,
+      outstanding: row.outstanding,
+      currencyCode: row.currency_code,
+      createdAt: row.created_at,
+    }));
   }
 
   /**
@@ -965,6 +1171,7 @@ type PayoutRow = {
   period_end: string;
   gross_amount: string;
   fine_amount: string;
+  recovery_amount: string;
   net_amount: string;
   status: string;
   scheduled_for: string | null;
@@ -997,7 +1204,8 @@ const PAYOUT_COLUMNS = sql`
            '1'
          ) AS fx_rate_to_syp,
          p.period_start::text, p.period_end::text,
-         p.gross_amount::text, p.fine_amount::text, p.net_amount::text,
+         p.gross_amount::text, p.fine_amount::text, p.recovery_amount::text,
+         p.net_amount::text,
          p.status::text AS status,
          p.scheduled_for::text, p.released_at::text, p.paid_at::text,
          p.paid_reference, p.hold_reason,
@@ -1069,6 +1277,12 @@ function toView(row: PayoutRow) {
     periodEnd: row.period_end,
     grossAmount: row.gross_amount,
     fineAmount: row.fine_amount,
+    /*
+      An earlier overpayment being taken back (Bashar, 2026-09-07). Carried alongside the fine
+      rather than added to it: finance reading «الغرامات: $186» about money that is not a penalty
+      would be reading something untrue, and so would the partner.
+    */
+    recoveryAmount: row.recovery_amount,
     netAmount: row.net_amount,
     status: row.status,
     scheduledFor: row.scheduled_for,
