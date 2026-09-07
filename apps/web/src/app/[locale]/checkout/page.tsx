@@ -13,7 +13,7 @@ import { CheckoutTotal } from '@/components/checkout-total';
 import { couponMessages } from '@/lib/coupon-messages';
 import { DateRange } from '@/components/date-range';
 import { isLocale } from '@/i18n/routing';
-import { getMyWallet } from '@/lib/account';
+import { getAccountSummary, getMyWallet } from '@/lib/account';
 import { ltrIsolate } from '@/lib/bidi';
 import { getPublicSettings } from '@/lib/catalog';
 import { formatMoney, localisedName, localisedText } from '@/lib/localise';
@@ -154,7 +154,7 @@ export default async function CheckoutPage({
    * The offered payment methods come from the same round of requests: neither depends
    * on the other, so awaiting them in sequence would add latency for nothing (§3).
    */
-  const [priced, methods, session, settings] = await Promise.all([
+  const [priced, offered, session, settings] = await Promise.all([
     quote({
       unitId,
       checkIn,
@@ -198,7 +198,9 @@ export default async function CheckoutPage({
    * at checkout — the rate would move between page load and payment — so showing a
    * JOD balance against a USD stay would promise a discount that never arrives.
    */
-  const walletResult = session ? await getMyWallet() : null;
+  const [walletResult, profileResult] = session
+    ? await Promise.all([getMyWallet(), getAccountSummary()])
+    : [null, null];
 
   const balance =
     walletResult && walletResult !== 'failed' && walletResult !== 'unauthenticated'
@@ -207,6 +209,26 @@ export default async function CheckoutPage({
 
   const applicable =
     balance && balance.currencyCode === priced.currencyCode ? balance.balance : null;
+
+  /*
+    The signed-in customer's own details, so the form does not ask for what we already hold.
+
+    Bashar, 2026-09-07: «I do not want checkout fields that collect information and then ignore
+    it.» It did exactly that — the three fields were typed, and `resolveCustomerProfile` returned
+    the session's profile without reading one of them.
+
+    A FAILED read falls back to an empty form rather than to blank fields presented as the profile:
+    an unreachable profile service must not tell somebody their name is empty, and the guest path
+    still collects everything the booking needs.
+  */
+  const account =
+    profileResult && profileResult !== 'failed' && profileResult !== 'unauthenticated'
+      ? {
+          fullName: profileResult.fullName,
+          email: profileResult.email,
+          phone: profileResult.phone,
+        }
+      : null;
 
   const name = localisedText(property.name, locale);
   const cityName = localisedName(property.city, locale);
@@ -270,7 +292,8 @@ export default async function CheckoutPage({
             children={children}
             infants={infants}
             propertySlug={slug}
-            methods={methods}
+            methods={offered.methods}
+            offlineRail={offered.offline}
             wallet={
               applicable
                 ? {
@@ -281,6 +304,7 @@ export default async function CheckoutPage({
                 : null
             }
             signedIn={session !== null}
+            account={account}
           />
 
           {/* ── Payment summary (§6.3 step 3) ──────────────────────────────── */}

@@ -320,7 +320,9 @@
     "couponApplying": "Wird geprüft…",
     "couponRemove": "Entfernen",
     "couponApplied": "Rabatt {code}",
-    "couponInvalid": "Dieser Code konnte nicht angewendet werden."
+    "couponInvalid": "Dieser Code konnte nicht angewendet werden.",
+    "signedInDetails": "Dies sind Ihre Kontodaten. Ändern Sie Name oder Telefonnummer bei Bedarf — Ihr Konto wird aktualisiert und diese Buchung samt Nachrichten verwendet die neuen Werte.",
+    "emailLocked": "Ihre Anmeldeadresse. Ändern Sie sie in den Kontoeinstellungen."
   },
   "bookingPending": {
     "title": "Bezahlt. Ihre Buchung wird bestätigt",
@@ -357,7 +359,9 @@
     "shamCashHint": "Mobile Wallet innerhalb Syriens",
     "gift_card": "Geschenkkarte",
     "wallet": "SAFRA-Guthaben",
-    "bank_transfer": "Banküberweisung"
+    "bank_transfer": "Banküberweisung",
+    "offlineHeading": "Zahlung per Banküberweisung",
+    "offlineBody": "Nach dem Fortfahren zeigen wir Ihnen die Kontodaten und den Verwendungszweck für Ihre Überweisung."
   },
   "auth": {
     "signIn": "Anmelden",

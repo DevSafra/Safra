@@ -10,7 +10,7 @@ import type { CustomerFacingMethod } from '@safra/contracts';
 
 import type { Locale } from '@/i18n/routing';
 import { formatMoney } from '@/lib/localise';
-import { errorMessage } from '@safra/i18n';
+import { errorMessage, ltrIsolate } from '@safra/i18n';
 import { dynamicMessage } from '@/lib/dynamic-message';
 import { PhoneField } from '@/components/phone-field';
 import type { DialOption } from '@/lib/dial-options';
@@ -41,8 +41,10 @@ export function CheckoutForm({
   infants,
   propertySlug,
   methods,
+  offlineRail,
   wallet,
   signedIn,
+  account,
 }: {
   /**
    * The phone field's country list, built on the server — see `dialOptions`.
@@ -70,12 +72,29 @@ export function CheckoutForm({
    */
   methods: readonly CustomerFacingMethod[];
   /**
+   * Whether an EMPTY method list still leads somewhere money can be paid.
+   *
+   * Finding 214: this screen said «no online payment method is available yet, our team will
+   * contact you» while the button below it said «continue to payment» and landed on a page giving
+   * bank details and a reference. One screen said wait, the next said act. The first was out of
+   * date — `manual_transfer` is the rail the platform runs on — and an empty list alone cannot
+   * tell «nothing can take money» from «one rail serves everyone, so there is nothing to choose».
+   */
+  offlineRail: boolean;
+  /**
    * The customer's spendable balance in THIS booking's currency (§7.3), or null
    * when there is none to offer. Resolved server-side; the amount shown here is
    * advisory, and the API recomputes what it actually applies.
    */
   wallet: { balance: string; currencyCode: string; total: string } | null;
   signedIn: boolean;
+  /**
+   * The signed-in customer's own details, for prefilling.
+   *
+   * `null` for a guest, who types their own — §4 keeps guest checkout open and these fields are
+   * the only place their name and number can come from.
+   */
+  readonly account: { fullName: string; email: string; phone: string } | null;
 }) {
   const t = useTranslations('checkout');
   const tm = useTranslations('paymentMethods');
@@ -195,7 +214,20 @@ export function CheckoutForm({
       className="rounded-card border border-line bg-card p-5"
     >
       <h2 className="font-display text-lg text-text">{t('guestDetails')}</h2>
-      <p className="mt-1 text-sm text-faint">{t('noAccountNeeded')}</p>
+      {/*
+        Two different sentences, because two different people are reading.
+
+        A guest is told an account is not needed. A signed-in customer is told these ARE their
+        account details and that editing them updates the account — Bashar, 2026-09-07: «If the
+        customer is allowed to update those details during checkout, then the booking,
+        communications and related workflows should use the updated values consistently.»
+
+        Saying «you can book without an account» to somebody who is signed in was the smaller half
+        of the same defect: the copy did not know who it was talking to either.
+      */}
+      <p className="mt-1 text-sm text-faint">
+        {account ? t('signedInDetails') : t('noAccountNeeded')}
+      </p>
 
       {formError ? (
         <p
@@ -213,20 +245,32 @@ export function CheckoutForm({
           autoComplete="name"
           error={fieldErrors['guest.fullName']}
           required
+          {...(account ? { defaultValue: account.fullName } : {})}
         />
+        {/*
+          The email is SHOWN and not offered for editing when somebody is signed in.
+
+          It is the sign-in identity. Changing it from a checkout form would move an account behind
+          a booking button with nothing verifying that the new address belongs to the person — so
+          the field says where it can be changed instead. A guest still types theirs: it is the only
+          way to reach them.
+        */}
         <Field
           name="email"
           type="email"
           label={t('email')}
           autoComplete="email"
           error={fieldErrors['guest.email']}
-          required
+          {...(account
+            ? { defaultValue: account.email, readOnly: true, hint: t('emailLocked') }
+            : { required: true })}
         />
         <PhoneField
           countries={countries}
           label={t('phone')}
           hint={t('phoneHint')}
           error={fieldErrors['guest.phone']}
+          {...(account ? { defaultValue: account.phone } : {})}
         />
       </div>
 
@@ -240,10 +284,25 @@ export function CheckoutForm({
               onChange={(event) => setApplyWallet(event.target.checked)}
               className="mt-0.5 accent-gold"
             />
+            {/*
+              Both amounts are ISOLATED, and it was measured rather than assumed.
+
+              Found beside findings 213-215 on 2026-09-07, not part of them: reading the layout
+              boxes character by character, «استخدم $45 من رصيدي» rendered the symbol at the far
+              end — «45$» — and «المتبقي للدفع: $131.99» came out «131.99$». The amount is
+              interpolated into an Arabic sentence, so the bidi algorithm placed the currency at the
+              visual end of the run.
+
+              `formatMoney` returns the right string; nothing downstream of it can tell. The fix is
+              the project's own convention for a Latin value inside Arabic prose, the same one the
+              partner's accept dialog needed in this change.
+            */}
             <span>
               <span className="block text-sm text-text">
                 {t('walletApply', {
-                  amount: formatMoney(wallet.balance, wallet.currencyCode, locale),
+                  amount: ltrIsolate(
+                    formatMoney(wallet.balance, wallet.currencyCode, locale),
+                  ),
                 })}
               </span>
               <span className="block text-xs text-faint">
@@ -251,10 +310,12 @@ export function CheckoutForm({
                   ? t('walletCoversAll')
                   : t('walletRemaining') +
                     ': ' +
-                    formatMoney(
-                      remainder(wallet, applyWallet),
-                      wallet.currencyCode,
-                      locale,
+                    ltrIsolate(
+                      formatMoney(
+                        remainder(wallet, applyWallet),
+                        wallet.currencyCode,
+                        locale,
+                      ),
                     )}
               </span>
             </span>
@@ -277,12 +338,27 @@ export function CheckoutForm({
 
         {methods.length === 0 ? (
           /*
-           * Said plainly rather than hidden. No external rail is contracted yet, and
-           * a customer who reaches checkout deserves to know payment will be arranged
-           * separately — not to meet a dead button or an empty box.
+           * Nothing to CHOOSE is not nothing to say, and which sentence is true depends on whether
+           * a rail is routed. When one is, the panel describes the transfer that is about to be
+           * asked for — the same thing the next screen says, one screen earlier. When none is, the
+           * old sentence is still the honest one: the booking is taken and payment is arranged
+           * separately.
            */
-          <p className="mt-2 rounded-lg border border-sky/30 bg-sky/10 p-3 text-xs text-sky">
-            {tm('none')}
+          <p
+            className={`mt-2 rounded-lg border p-3 text-xs ${
+              offlineRail
+                ? 'border-line bg-field text-muted'
+                : 'border-sky/30 bg-sky/10 text-sky'
+            }`}
+          >
+            {offlineRail ? (
+              <>
+                <span className="block text-sm text-text">{tm('offlineHeading')}</span>
+                <span className="mt-1 block">{tm('offlineBody')}</span>
+              </>
+            ) : (
+              tm('none')
+            )}
           </p>
         ) : (
           <div className="mt-2 grid gap-2">
@@ -506,19 +582,41 @@ function Field({
     .filter(Boolean)
     .join(' ');
 
+  /*
+    A field that cannot be typed into must not LOOK like one.
+
+    An input styled as editable that silently swallows keystrokes is the same defect as a field
+    that collects and discards, one step earlier. The first attempt only stepped the fill back one
+    shade — #eceef5 against the field's #f1f3f8 — which measured as a change and read as nothing:
+    driven at four widths, the locked email was indistinguishable from the editable name beside it.
+
+    So the AFFORDANCE goes rather than the shade. No fill, a dashed rule instead of a solid one,
+    muted ink and the arrow cursor: four signals that agree, none of which depends on remembering
+    what the editable one looked like. The box shape stays so the form keeps its rhythm, and the
+    hint says where the value CAN be changed.
+
+    The required marker goes too. An asterisk asks the reader for something; there is nothing here
+    for them to satisfy, and `required` on a read-only input is a validation rule nobody can act on.
+  */
+  const locked = rest.readOnly === true;
+
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={id} className="text-sm text-muted">
-        {label} <span className="text-gold">*</span>
+        {label} {locked ? null : <span className="text-gold">*</span>}
       </label>
       <input
         id={id}
         name={name}
         aria-invalid={error ? 'true' : undefined}
         aria-describedby={describedBy || undefined}
-        className={`rounded-lg border bg-field px-3 py-2.5 text-text ${
-          error ? 'border-bad' : 'border-line'
-        } ${latinValue ? 'field-ltr' : ''}`}
+        className={`rounded-lg px-3 py-2.5 ${
+          locked
+            ? 'cursor-default border border-dashed border-line bg-transparent text-muted'
+            : 'border bg-field text-text'
+        } ${error ? 'border-bad' : locked ? '' : 'border-line'} ${
+          latinValue ? 'field-ltr' : ''
+        }`}
         {...rest}
       />
       {hint ? (

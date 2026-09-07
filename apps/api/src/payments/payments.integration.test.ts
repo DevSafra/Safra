@@ -1132,6 +1132,54 @@ describeIfDb('payment collection, webhooks and refunds', () => {
 
       expect(await misconfigured.availableMethodsForCountry('SY')).toStrictEqual([]);
     });
+
+    /*
+      An empty list means two different things, and checkout has to tell them apart (finding 214).
+
+      It could not: the screen said «no online payment method is available yet, our team will
+      contact you» and the button under it said «continue to payment», which landed on a page
+      giving bank details and a reference to quote. One screen said wait, the next said act. What
+      the first sentence was missing is the state below — a rail IS routed, the customer simply
+      does not choose it because there is only one.
+    */
+    const registryRouting = (slugs: string[]) =>
+      new PaymentProviderRegistry(
+        {
+          PAYMENT_SIMULATOR_ENABLED: false,
+          PAYMENT_SIMULATOR_WEBHOOK_SECRETS: [],
+        } as never,
+        {
+          get: <T>(_key: string, _fallback: T) =>
+            Promise.resolve({ '*': slugs } as unknown as T),
+        } as unknown as SettingsService,
+        new ManualTransferProvider(),
+        new InternalCaptureProvider(),
+      );
+
+    it('says a payment will be settled off-session when only the offline rail is routed', async () => {
+      const offlineOnly = registryRouting(['manual_transfer']);
+
+      expect(await offlineOnly.availableMethodsForCountry('SY')).toStrictEqual([]);
+      expect(await offlineOnly.offlineRailForCountry('SY')).toBe(true);
+    });
+
+    it('says nothing is routed when nothing is routed', async () => {
+      /*
+        The opposite control. Without it «offline» could be a constant true — and the screen would
+        promise transfer instructions to a customer who is about to be told nobody can take their
+        money. `some_unsigned_acquirer` is registered nowhere, which is exactly the shape an
+        operator produces by naming an acquirer before the integration exists.
+      */
+      expect(
+        await registryRouting(['some_unsigned_acquirer']).offlineRailForCountry('SY'),
+      ).toBe(false);
+      expect(await registryRouting([]).offlineRailForCountry('SY')).toBe(false);
+    });
+
+    it('an online rail is not reported as offline', async () => {
+      /* The simulator serves cards in-session, so the panel must NOT describe a bank transfer. */
+      expect(await registry.offlineRailForCountry('SY')).toBe(false);
+    });
   });
 
   /*

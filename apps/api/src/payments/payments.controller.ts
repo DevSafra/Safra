@@ -57,7 +57,17 @@ export class PaymentsController {
   async methods(@Query('country') country?: string) {
     const code = /^[A-Za-z]{2}$/.test(country ?? '') ? (country as string) : '*';
 
-    return { methods: await this.registry.availableMethodsForCountry(code) };
+    /*
+      `offline` travels with the list because an EMPTY list is ambiguous on its own — it is both
+      «nothing can take money» and «one rail serves everyone, so there is nothing to choose». The
+      checkout screen has to say a different true thing in each case (finding 214).
+    */
+    const [methods, offline] = await Promise.all([
+      this.registry.availableMethodsForCountry(code),
+      this.registry.offlineRailForCountry(code),
+    ]);
+
+    return { methods, offline };
   }
 
   /**

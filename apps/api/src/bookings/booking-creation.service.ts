@@ -1043,6 +1043,39 @@ export class BookingCreationService {
     claims: AccessTokenClaims | undefined,
   ): Promise<string> {
     if (claims?.customerProfileId) {
+      /*
+        A signed-in customer's own profile — and their EDITS, honoured.
+
+        Bashar, 2026-09-07: «I do not want checkout fields that collect information and then ignore
+        it… If the customer is allowed to update those details during checkout, then the booking,
+        communications and related workflows should use the updated values consistently.»
+
+        They were ignored. The form asked for a name, an email and a phone number, the profile won
+        every time, and a guest correcting the number they travel on watched it vanish — measured by
+        typing one and reading the booking back.
+
+        The profile IS the source every downstream workflow reads, so honouring the edit means
+        writing it HERE rather than carrying a second copy on the booking: the confirmation, the
+        voucher, the partner's arrivals list and support all resolve the same row, and a per-booking
+        contact would give them two answers to «how do we reach this guest».
+
+        The EMAIL is deliberately not written. It is the sign-in identity, and changing it from a
+        checkout form would move somebody's account behind a booking button, with no verification
+        that the new address is theirs. The form shows it and does not offer to change it.
+
+        `coalesce` on a blank so an empty field cannot erase a name that is already there.
+      */
+      await tx.execute(sql`
+        UPDATE customer_profiles
+           SET full_name = coalesce(nullif(${guest.fullName}, ''), full_name),
+               phone = coalesce(nullif(${guest.phone}, ''), phone),
+               updated_at = now()
+         WHERE id = ${claims.customerProfileId}
+           AND deleted_at IS NULL
+           AND (full_name IS DISTINCT FROM nullif(${guest.fullName}, '')
+                OR phone IS DISTINCT FROM nullif(${guest.phone}, ''))
+      `);
+
       return claims.customerProfileId;
     }
 

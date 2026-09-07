@@ -320,7 +320,9 @@
     "couponApplying": "Checking…",
     "couponRemove": "Remove",
     "couponApplied": "{code} discount",
-    "couponInvalid": "That code could not be applied."
+    "couponInvalid": "That code could not be applied.",
+    "signedInDetails": "These are your account details. Edit the name or phone if you need to — your account is updated and this booking and its messages use the new values.",
+    "emailLocked": "Your sign-in address. Change it in account settings."
   },
   "bookingPending": {
     "title": "Paid. Your booking is pending confirmation",
@@ -357,7 +359,9 @@
     "shamCashHint": "Mobile wallet inside Syria",
     "gift_card": "Gift card",
     "wallet": "SAFRA wallet",
-    "bank_transfer": "Bank transfer"
+    "bank_transfer": "Bank transfer",
+    "offlineHeading": "Payment by bank transfer",
+    "offlineBody": "After you continue we show you the account details and the reference to quote with your transfer."
   },
   "auth": {
     "signIn": "Sign in",
