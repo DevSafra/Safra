@@ -258,7 +258,14 @@ export class SupportService {
              created_at::text AS created_at
       FROM messages
       WHERE conversation_id = ${conversationId}::uuid AND internal = false
-      ORDER BY created_at ASC
+      -- id as the tiebreaker, and it is not cosmetic: created_at alone leaves the order of two
+      -- messages sharing a timestamp to whatever the planner returns, so a reply can render above
+      -- the question it answers. Rare in production (microsecond resolution) and CERTAIN inside a
+      -- transaction, where now() is the transaction's clock and every message written by one
+      -- request shares it. id is a UUIDv7, so it is monotonic in time: ordering by it AGREES with
+      -- created_at rather than merely being deterministic. The conversation lists in this file
+      -- already do this; the two message queries were the ones that did not.
+      ORDER BY created_at ASC, id ASC
     `);
 
     return rows.rows.map((row) => ({

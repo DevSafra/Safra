@@ -373,7 +373,8 @@ export class MessagingService {
       LEFT JOIN users u    ON u.id = m.sender_user_id
       WHERE c.reference = ${reference} AND c.deleted_at IS NULL
         AND ${scopeFilter(actor, 'coalesce(b.city_id, p.city_id)')}
-      ORDER BY m.created_at ASC
+      -- m.id as the tiebreaker, a UUIDv7 and so monotonic. See the note in SupportService.
+      ORDER BY m.created_at ASC, m.id ASC
       LIMIT 200
     `);
 
