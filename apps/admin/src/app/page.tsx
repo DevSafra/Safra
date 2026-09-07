@@ -6,12 +6,14 @@ import {
   getPendingPartners,
   type DashboardOverview,
   type PendingPartnerPage,
+  getOperatingSettings,
 } from '@/lib/api';
-import { amount, count } from '@/lib/format';
+import { amount, count, customerFeeLabel } from '@/lib/format';
 import { AdminSidebar } from '@/components/admin-sidebar';
 import { RevenueChart } from '@/components/revenue-chart';
 import { ConsoleHeader } from '@/components/console-header';
-import { t, auditAction, bookingStatus } from '@/lib/strings';
+import { fill, t, auditAction, bookingStatus } from '@/lib/strings';
+import { partnerCommissionPercent, SLA_EXPIRY_WARNING_MINUTES } from '@safra/contracts';
 import { StatusPill } from '@/components/admin-table';
 import { statusTone } from '@/lib/status-tone';
 import { ORNAMENT_BRAND, SidebarBackdrop } from '@safra/ui';
@@ -90,9 +92,11 @@ export default async function DashboardPage() {
     also what stopped this panel silently growing: `getPendingPartners()` used to return whatever the
     API's fifty-row default gave it.
   */
-  const [overview, partners] = await Promise.all([
+  const [overview, partners, settings] = await Promise.all([
     getDashboard(),
     getPendingPartners({ page: 1, limit: DASHBOARD_QUEUE_ROWS }),
+    /* The fee and the rate this card DESCRIBES, as configured — never as copy (finding 217). */
+    getOperatingSettings(),
   ]);
 
   return (
@@ -126,7 +130,7 @@ export default async function DashboardPage() {
             <p className="text-sm text-bad">{t.dashboard.countersFailed}</p>
           </Card>
         ) : (
-          <Overview overview={overview} partners={partners} />
+          <Overview overview={overview} partners={partners} settings={settings} />
         )}
       </main>
 
@@ -161,9 +165,12 @@ export default async function DashboardPage() {
 function Overview({
   overview,
   partners,
+  settings,
 }: {
   overview: DashboardOverview;
   partners: PendingPartnerPage | 'unauthenticated' | 'failed';
+  /** The live configuration, so the revenue card describes the fee the platform charges TODAY. */
+  settings: Record<string, unknown>;
 }) {
   const { counters } = overview;
   const delta = counters.bookings_today - counters.bookings_yesterday;
@@ -236,7 +243,13 @@ function Overview({
         </div>
 
         <div className="grid min-w-0 gap-4">
-          <RevenueChart series={overview.revenue} />
+          <RevenueChart
+            series={overview.revenue}
+            sub={fill(t.admin.weekRevenueSub, {
+              rate: partnerCommissionPercent(settings),
+              fee: customerFeeLabel(settings),
+            })}
+          />
           <PartnerQueue partners={partners} />
           <RecentActivity rows={overview.recentAudit} />
         </div>
@@ -295,7 +308,7 @@ function Attention({ counters }: { counters: DashboardOverview['counters'] }) {
     counters.sla_expiring_soon > 0
       ? {
           code: 'EC-008',
-          text: `${count(counters.sla_expiring_soon)} ${t.admin.attentionSla}`,
+          text: `${count(counters.sla_expiring_soon)} ${fill(t.admin.attentionSla, { minutes: SLA_EXPIRY_WARNING_MINUTES })}`,
           /*
             The most time-critical row on this screen, and until 2026-08-13 the only one with no
             destination.

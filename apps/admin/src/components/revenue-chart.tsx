@@ -42,8 +42,16 @@ const BAR_GAP = 12;
  */
 export function RevenueChart({
   series,
+  sub,
 }: {
   series: readonly { day: string; amount: string }[];
+  /**
+   * The subtitle, composed by the caller from the ACTIVE configuration (finding 217).
+   *
+   * A prop rather than a read here: this component draws a chart, and a chart that fetches settings
+   * is a component with two reasons to change. The page already loads what it needs.
+   */
+  readonly sub: string;
 }) {
   const values = series.map((point) => Number(point.amount));
 
@@ -59,7 +67,7 @@ export function RevenueChart({
     <div className="rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
       {/* `h2` like every other panel title, so the console has one heading outline. */}
       <h2 className="text-[14.5px] font-extrabold text-gold">{t.admin.weekRevenue}</h2>
-      <p className="mt-1 mb-3.5 text-[11px] text-faint">{t.admin.weekRevenueSub}</p>
+      <p className="mt-1 mb-3.5 text-[11px] text-faint">{sub}</p>
 
       <svg
         viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}

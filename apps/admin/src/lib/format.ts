@@ -11,10 +11,19 @@
  * Formatting is neither server nor client work, so it lives here with no imports beyond the
  * string table and the locale constant, and both sides can use it.
  */
-import { currencyDecimals, symbolTrails } from '@safra/contracts';
+import {
+  currencyDecimals,
+  customerFeeMode,
+  customerFeeValue,
+  durationParts,
+  DEFAULT_MONEY_CURRENCY,
+  symbolTrails,
+} from '@safra/contracts';
+
+import { ltrIsolate } from '@safra/i18n';
 
 import { ARABIC_WESTERN_DIGITS } from '@/lib/numerals';
-import { fill, t } from '@/lib/strings';
+import { fill, plural, t } from '@/lib/strings';
 
 /**
  * Money, two decimals, Western digits.
@@ -246,4 +255,46 @@ export function amount(value: string | null | undefined, currency: string): stri
   const written = money(value, currencyDecimals(currency));
 
   return symbolTrails(symbol) ? `${written} ${symbol}` : `${symbol}${written}`;
+}
+
+/**
+ * SAFRA's service fee, written the way the ACTIVE configuration means it.
+ *
+ * Two settings decide this and a screen that read only one would be confidently wrong: `flat` mode
+ * makes `commission.customer_fee_value` an AMOUNT and `percent` mode makes the same number a
+ * PERCENTAGE, so a card assuming flat prints «رسوم خدمة 5$» for a setting that means five per cent.
+ *
+ * `DEFAULT_MONEY_CURRENCY` for the flat amount rather than a guess: `money.always_usd` is on and
+ * the card this feeds already says «بالدولار». Never a bare number — an amount with no currency is
+ * the one shape the money rule forbids outright.
+ */
+export function customerFeeLabel(settings: Record<string, unknown>): string {
+  const value = customerFeeValue(settings);
+
+  /*
+    ISOLATED, because this label is interpolated into «عمولة الشريك {rate}٪ + {fee} · بالدولار».
+
+    Caught by `e2e/bidi-runs.spec.ts` the first time it ran over التقارير — the sweep written for
+    this same class two hours earlier, catching the code written to fix a different one. The string
+    «رسوم خدمة $1.99» is correct and laid out as «رسوم خدمة 1.99$», with the currency at the far end.
+  */
+  return customerFeeMode(settings) === 'percent'
+    ? fill(t.admin.feePercent, { value: ltrIsolate(value) })
+    : fill(t.admin.feeFlat, { value: ltrIsolate(amount(value, DEFAULT_MONEY_CURRENCY)) });
+}
+
+/**
+ * A configured duration, in the unit a sentence should use.
+ *
+ * «ساعتان» is Arabic DUAL — correct at 120 minutes and wrong at every other value, and Arabic has
+ * six plural forms to choose between. `durationParts` picks the unit, the catalogue's ICU message
+ * knows the forms, and `plural` renders it with Western digits the way this console writes numbers.
+ */
+export function durationLabel(minutes: number): string {
+  const parts = durationParts(minutes);
+
+  return plural(
+    parts.unit === 'hours' ? t.admin.durationHours : t.admin.durationMinutes,
+    { count: parts.count },
+  );
 }

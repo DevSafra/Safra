@@ -1,8 +1,9 @@
-import { getReports, type ReportCard } from '@/lib/api';
+import { getOperatingSettings, getReports, type ReportCard } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
-import { money, percent } from '@/lib/format';
+import { customerFeeLabel, durationLabel, money, percent } from '@/lib/format';
 import { ConsoleShell } from '@/components/console-shell';
-import { t } from '@/lib/strings';
+import { fill, t } from '@/lib/strings';
+import { confirmationWindowMinutes, partnerCommissionPercent } from '@safra/contracts';
 import { refuseSection } from '@/components/section-refusal';
 
 /**
@@ -47,7 +48,12 @@ export default async function ReportsPage() {
 
   if (refused) return refused;
 
-  const [result, counts] = await Promise.all([getReports(), sidebarCounts()]);
+  const [result, counts, settings] = await Promise.all([
+    getReports(),
+    sidebarCounts(),
+    /* إيرادات العمولات describes the fee and the rate, so it reads them (finding 217). */
+    getOperatingSettings(),
+  ]);
 
   return (
     <ConsoleShell title={t.nav.reports} counts={counts}>
@@ -58,7 +64,7 @@ export default async function ReportsPage() {
       ) : (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-4">
           {result.cards.map((card) => (
-            <Card key={card.key} card={card} />
+            <Card key={card.key} card={card} settings={settings} />
           ))}
         </div>
       )}
@@ -66,7 +72,14 @@ export default async function ReportsPage() {
   );
 }
 
-function Card({ card }: { card: ReportCard }) {
+function Card({
+  card,
+  settings,
+}: {
+  card: ReportCard;
+  /** Live configuration: the commission card names a fee and a rate a super admin can change. */
+  settings: Record<string, unknown>;
+}) {
   const meta = COPY[card.key];
   const values = card.series.map((point) => Number(point.value));
   const peak = Math.max(...values, 1);
@@ -100,7 +113,9 @@ function Card({ card }: { card: ReportCard }) {
         ))}
       </div>
 
-      <p className="mt-2 text-[10.5px] leading-relaxed text-faint">{meta.sub}</p>
+      <p className="mt-2 text-[10.5px] leading-relaxed text-faint">
+        {typeof meta.sub === 'function' ? meta.sub(settings) : meta.sub}
+      </p>
     </section>
   );
 }
@@ -139,10 +154,24 @@ function Trend({ card }: { card: ReportCard }) {
   );
 }
 
-const COPY: Record<ReportCard['key'], { title: string; sub: string }> = {
+const COPY: Record<
+  ReportCard['key'],
+  { title: string; sub: string | ((settings: Record<string, unknown>) => string) }
+> = {
   commission_revenue: {
     title: t.sections.reports.commissionRevenue,
-    sub: t.sections.reports.commissionRevenueSub,
+    /*
+      A FUNCTION for this one, because its subtitle depends on configuration and the others' do not.
+
+      «رسوم خدمة 1.99$ للعميل + عمولة 7٪ شريك» was a literal describing two settings edited from
+      this same console. The rest of the map stays a plain string: turning them all into functions
+      to look uniform would hide which card actually reads the platform's state.
+    */
+    sub: (settings: Record<string, unknown>) =>
+      fill(t.sections.reports.commissionRevenueSub, {
+        fee: customerFeeLabel(settings),
+        rate: partnerCommissionPercent(settings),
+      }),
   },
   ad_revenue: {
     title: t.sections.reports.adRevenue,
@@ -158,7 +187,10 @@ const COPY: Record<ReportCard['key'], { title: string; sub: string }> = {
   },
   partner_response: {
     title: t.sections.reports.partnerResponse,
-    sub: t.sections.reports.partnerResponseSub,
+    sub: (settings: Record<string, unknown>) =>
+      fill(t.sections.reports.partnerResponseSub, {
+        window: durationLabel(confirmationWindowMinutes(settings)),
+      }),
   },
 };
 

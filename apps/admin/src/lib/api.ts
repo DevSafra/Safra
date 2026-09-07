@@ -2432,3 +2432,50 @@ export type JobRun = z.infer<typeof jobRunSchema>;
 export async function getJobRuns() {
   return staffFetch('/admin/jobs', z.array(jobRunSchema));
 }
+
+// ─── The operating values the console PRINTS (finding 217) ───────────────────
+
+/**
+ * The fee, the commission rate and the other rules the platform runs on right now.
+ *
+ * Bashar, 2026-09-07: operational values *"should always be derived from the active configuration
+ * rather than embedded in static strings"*. Two cards on this console described the platform in
+ * literals — «عمولة الشريك 7٪ + رسوم خدمة 1.99$» over إيرادات الأسبوع and «رسوم خدمة 1.99$ للعميل +
+ * عمولة 7٪ شريك» over إيرادات العمولات — and both are rows a super admin edits from this very
+ * application. Change the fee here and two of this console's own screens kept quoting the old one.
+ *
+ * ## Why the PUBLIC endpoint, from a staff app
+ *
+ * `/admin/settings` requires `SETTINGS_READ`, held by operations and above. These two cards are on
+ * the dashboard and on التقارير, which narrower roles read — coupling a subtitle to a permission
+ * its reader lacks would blank the card for exactly the people it is written for, which is how
+ * withholding becomes hiding. `/settings/public` exists to answer "what rules are in force" and
+ * needs no permission at all, because none of these values is a secret: every one of them is
+ * already implied by a price the customer site prints.
+ *
+ * ## A failed read leaves the SUBTITLE off, never a wrong one
+ *
+ * `{}` falls through to each reader's documented default, which is the seeded value — so the worst
+ * case is the figure the platform shipped with rather than a blank or an invented one. The caller
+ * decides whether that is good enough to print; `revenue-chart.tsx` prints it, because a card whose
+ * subtitle vanished would be a bigger change than one quoting a default.
+ */
+export async function getOperatingSettings(): Promise<Record<string, unknown>> {
+  try {
+    const response = await fetch(`${API_URL}/api/v1/settings/public`, {
+      headers: { Accept: 'application/json' },
+      /* Short cache: it changes only when an admin saves, and no screen may pay for it per view. */
+      next: { revalidate: 60 },
+    });
+
+    if (!response.ok) return {};
+
+    const body: unknown = await response.json();
+
+    return typeof body === 'object' && body !== null && !Array.isArray(body)
+      ? (body as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}

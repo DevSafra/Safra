@@ -1,8 +1,14 @@
 import { renderRedactions } from '@safra/i18n';
+import { confirmationWindowMinutes } from '@safra/contracts';
 
-import { getNotifications, type NotificationItem, type Notifications } from '@/lib/api';
+import {
+  getNotifications,
+  getOperatingSettings,
+  type NotificationItem,
+  type Notifications,
+} from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
-import { count, shortDateTime } from '@/lib/format';
+import { count, durationLabel, shortDateTime } from '@/lib/format';
 import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
 import { TablePagination } from '@/components/table-pagination';
 import {
@@ -64,9 +70,11 @@ export default async function CommsPage({
   const status =
     (Array.isArray(rawStatus) ? rawStatus[0] : rawStatus)?.trim() || undefined;
 
-  const [result, counts] = await Promise.all([
+  const [result, counts, settings] = await Promise.all([
     getNotifications({ q, status, page, limit: size }),
     sidebarCounts(),
+    /* The note states the confirmation window, which is a setting (finding 217). */
+    getOperatingSettings(),
   ]);
 
   return (
@@ -125,7 +133,11 @@ export default async function CommsPage({
               size={size}
             />
 
-            <FootNote>{t.sections.comms.note}</FootNote>
+            <FootNote>
+              {fill(t.sections.comms.note, {
+                window: durationLabel(confirmationWindowMinutes(settings)),
+              })}
+            </FootNote>
             <FootNote>{t.sections.comms.whatsappBlocked}</FootNote>
           </ConsolePanel>
         </div>
