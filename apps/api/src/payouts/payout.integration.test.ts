@@ -1063,6 +1063,74 @@ describeIfDb('PayoutService', () => {
       ).toBeCloseTo(146, 2);
     });
 
+    /*
+      Cancelling a transfer must give the balance BACK, not quietly settle it.
+
+      Found by asking what `cancel` does with a recovery: it deleted the items and marked the
+      payout final while leaving `recovery_amount` standing and the deduction rows in place — so a
+      balance stayed marked as collected against a transfer that never happened. The partner's debt
+      disappeared and SAFRA absorbed it, which is the defect the whole recovery mechanism exists to
+      remove, reintroduced by the mechanism itself.
+    */
+    it('returns the balance to outstanding when the transfer is cancelled', async () => {
+      if (bookingIds.length === 0) return;
+
+      await payTheFirstTransfer();
+      await refundOneStayInFull(bookingIds[0]!);
+      await ledger.reverseForRefund(db, bookingIds[0]!);
+
+      await db.execute(sql`
+        INSERT INTO bookings (customer_profile_id, unit_id, property_id, partner_id, city_id,
+                              check_in, check_out, guests_adults, status,
+                              base_amount, customer_fee_value, customer_fee_amount,
+                              partner_commission_rate, partner_commission_amount,
+                              total_amount, partner_payable_amount, currency_id,
+                              fx_rate_to_syp, total_syp, cancellation_policy_snapshot,
+                              paid_at, confirmed_at, completed_at)
+        SELECT b.customer_profile_id, b.unit_id, b.property_id, b.partner_id, b.city_id,
+               (now() - interval '5 day')::date, (now() - interval '3 day')::date,
+               2, 'completed',
+               b.base_amount, b.customer_fee_value, b.customer_fee_amount,
+               b.partner_commission_rate, b.partner_commission_amount,
+               b.total_amount, b.partner_payable_amount, b.currency_id,
+               b.fx_rate_to_syp, b.total_syp, b.cancellation_policy_snapshot,
+               now(), now(), now()
+          FROM bookings b WHERE b.id = ${bookingIds[1]!} LIMIT 1
+      `);
+
+      await service.accrue();
+
+      const open = await db.execute<{ id: string }>(sql`
+        SELECT id FROM partner_payouts
+         WHERE partner_id = ${partnerId} AND status = 'accruing' AND deleted_at IS NULL
+      `);
+      const id = open.rows[0]!.id;
+
+      /* Collected before the cancellation, so the release is the thing being measured. */
+      const taken = await recoveryFor(bookingIds[0]!);
+
+      expect(Number(taken!.recovered), 'collected first').toBeCloseTo(186, 2);
+
+      await service.cancel(id, { reason: 'recovery release test' }, finance);
+
+      const after = await recoveryFor(bookingIds[0]!);
+
+      expect(
+        Number(after!.recovered),
+        'nothing collected, because no transfer happened',
+      ).toBeCloseTo(0, 2);
+      expect(after!.settled, 'and outstanding again').toBeNull();
+
+      const applications = await db.execute<{ n: string }>(sql`
+        SELECT count(*)::text AS n FROM partner_recovery_deductions WHERE payout_id = ${id}
+      `);
+
+      expect(
+        Number(applications.rows[0]!.n),
+        'the application is gone with the transfer',
+      ).toBe(0);
+    });
+
     /* `retotal` runs on every accrual and correction, so applying twice must change nothing. */
     it('collects the same balance once however often the total is recomputed', async () => {
       if (bookingIds.length === 0) return;

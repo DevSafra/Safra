@@ -176,6 +176,45 @@ export class PayoutService {
   }
 
   /**
+   * Puts back every balance this transfer had taken, so it is outstanding again.
+   *
+   * Called at the top of `applyRecoveries`, which is what makes that a recomputation rather than an
+   * accumulation — and on CANCELLATION, which is where its absence was a real defect.
+   *
+   * ## The cancellation case
+   *
+   * `cancel` deletes a payout's items and marks it final. Without this it left `recovery_amount`
+   * standing and the deduction rows in place, so a balance stayed marked as collected while no
+   * money had ever moved: the partner's debt silently disappeared and SAFRA absorbed it. Exactly
+   * the shape of the defect Bashar's 2026-09-07 decisions exist to remove, reintroduced by the
+   * mechanism built to satisfy them.
+   *
+   * ## Both columns in one statement
+   *
+   * `net = gross - fine - recovery` is enforced per STATEMENT, so clearing `recovery_amount` alone
+   * fails the CHECK before the reapplication that would make it true again.
+   */
+  private async releaseRecoveries(tx: Database, payoutId: string): Promise<void> {
+    await tx.execute(sql`
+      UPDATE partner_recoveries r
+         SET recovered_amount = r.recovered_amount - d.amount,
+             settled_at = NULL,
+             updated_at = now()
+        FROM partner_recovery_deductions d
+       WHERE d.recovery_id = r.id AND d.payout_id = ${payoutId}
+    `);
+    await tx.execute(sql`
+      DELETE FROM partner_recovery_deductions WHERE payout_id = ${payoutId}
+    `);
+    await tx.execute(sql`
+      UPDATE partner_payouts
+         SET recovery_amount = 0,
+             net_amount = gross_amount - fine_amount
+       WHERE id = ${payoutId}
+    `);
+  }
+
+  /**
    * Outstanding overpayments, taken off this transfer through the ordinary process.
    *
    * ## Bashar's rule (2026-09-07)
@@ -234,33 +273,7 @@ export class PayoutService {
       time would take the same balance repeatedly off one transfer; clearing the applications and
       re-deciding them means the answer depends only on what is outstanding now.
     */
-    await tx.execute(sql`
-      UPDATE partner_recoveries r
-         SET recovered_amount = r.recovered_amount - d.amount,
-             settled_at = NULL,
-             updated_at = now()
-        FROM partner_recovery_deductions d
-       WHERE d.recovery_id = r.id AND d.payout_id = ${payoutId}
-    `);
-    await tx.execute(sql`
-      DELETE FROM partner_recovery_deductions WHERE payout_id = ${payoutId}
-    `);
-    /*
-      Both columns together, because the identity CHECK is enforced per STATEMENT.
-
-      Clearing `recovery_amount` on its own leaves `net_amount` still carrying the deduction, and
-      `net = gross - fine - recovery` then fails on the reset itself — before the reapplication
-      that would have made it true again. Found by a test that genuinely re-ran the path: the
-      earlier version of it called `accrue` three times without attaching anything, so the second
-      and third calls never reached here and this was invisible. It would have surfaced on the
-      second accrual of any transfer carrying a balance.
-    */
-    await tx.execute(sql`
-      UPDATE partner_payouts
-         SET recovery_amount = 0,
-             net_amount = gross_amount - fine_amount
-       WHERE id = ${payoutId}
-    `);
+    await this.releaseRecoveries(tx, payoutId);
 
     const outstanding = await tx.execute<{ id: string; left: string }>(sql`
       SELECT id::text, (amount - recovered_amount)::text AS left
@@ -627,6 +640,17 @@ export class PayoutService {
       await tx.execute(
         sql`DELETE FROM partner_payout_items WHERE payout_id = ${payoutId}`,
       );
+
+      /*
+        And put back any balance this transfer was going to collect.
+
+        Cancelling returns the bookings to accrual, so it has to return the RECOVERIES too — a
+        balance left marked as collected against a transfer that never happened is a partner's debt
+        disappearing and SAFRA absorbing it. Before the items are gone and before the status is
+        final, because `applyRecoveries` refuses to touch a cancelled payout.
+      */
+      await this.releaseRecoveries(tx as unknown as Database, payoutId);
+
       await tx.execute(sql`
         UPDATE partner_payouts
         SET status = 'cancelled', notes = ${input.reason}, scheduled_for = NULL,
