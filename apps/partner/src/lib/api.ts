@@ -303,6 +303,22 @@ const dashboardSchema = z.object({
       scheduledFor: z.string().nullable(),
     })
     .nullable(),
+  /**
+   * The operating rules this screen STATES, as configured (finding 217).
+   *
+   * «مهلة ساعتين — الغرامة 10$ عند عدم الرد» was a literal over the acceptance queue — the rule a
+   * partner is judged by, on the screen where being wrong about it costs them money.
+   *
+   * Not `.optional()` and not `.default(...)`: an API that stopped sending this must fail the parse
+   * loudly rather than let the banner fall back to the numbers it used to hard-code, which is the
+   * defect wearing a schema.
+   */
+  rules: z.object({
+    confirmationWindowMinutes: z.number(),
+    /* Strings, because `numeric` arrives as one from pg and money never becomes a float. */
+    firstViolationFine: z.string(),
+    firstViolationFineCurrency: z.string(),
+  }),
 });
 
 export type PartnerDashboard = z.infer<typeof dashboardSchema>;

@@ -15,6 +15,7 @@ import { Ltr } from '@/components/ltr';
 import { amount, count } from '@/lib/format';
 import { fill, plural, t, violationKind } from '@/lib/strings';
 import { ltrIsolate } from '@safra/i18n';
+import { durationParts } from '@safra/contracts';
 import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 
 /**
@@ -94,7 +95,7 @@ export default async function DashboardPage() {
             opening this on a phone must not have to scroll past a calendar to find it.
           */}
           <div className="grid items-start gap-4.5 lg:grid-cols-[1.4fr_1fr]">
-            <Requests requests={dashboard.pendingRequests} />
+            <Requests requests={dashboard.pendingRequests} rules={dashboard.rules} />
 
             <div className="grid gap-4.5">
               <Calendar calendar={dashboard.calendar} />
@@ -269,9 +270,14 @@ function Kpi({
 /** طلبات حجز بانتظار ردك — §7.1's warn-bordered panel with the SLA badge. */
 function Requests({
   requests,
+  rules,
 }: {
   readonly requests: PartnerDashboard['pendingRequests'];
+  /** The window and the fine, as configured — never as copy. See `dashboard.service.ts`. */
+  readonly rules: PartnerDashboard['rules'];
 }) {
+  const window = durationParts(rules.confirmationWindowMinutes);
+
   return (
     <section className="rounded-card border border-warn/40 bg-card p-5">
       <div className="flex flex-wrap items-center gap-2.5">
@@ -279,7 +285,17 @@ function Requests({
           {t.dashboard.requestsTitle}
         </h2>
         <span className="rounded-full border border-warn bg-warn/15 px-2.5 py-0.5 text-[11px] font-extrabold text-warn">
-          {t.dashboard.requestsRule}
+          {fill(t.dashboard.requestsRule, {
+            window: plural(
+              window.unit === 'hours'
+                ? t.dashboard.durationHours
+                : t.dashboard.durationMinutes,
+              { count: window.count },
+            ),
+            fine: ltrIsolate(
+              amount(rules.firstViolationFine, rules.firstViolationFineCurrency),
+            ),
+          })}
         </span>
       </div>
 
