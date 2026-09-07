@@ -336,14 +336,28 @@ function Requests({
                   <p className="text-[15px] font-extrabold text-gold">
                     <Ltr>{amount(request.amount, request.currencyCode)}</Ltr>
                   </p>
-                  <p className="text-[11px] font-bold text-warn">
+                  {/*
+                    Retired by CSS once the row states its own outcome — see `globals.css`.
+
+                    «متبقٍ 01:57» ticking beside «تم قبول الحجز» contradicts the answer the partner
+                    just got, which is the whole thing finding 215 is about. The countdown lives in
+                    a server-rendered sibling of the decision control, so `li:has([data-decided])`
+                    is what lets the answer retire it without lifting state through the row.
+                  */}
+                  <p data-deadline className="text-[11px] font-bold text-warn">
                     <Deadline at={request.deadlineAt} />
                   </p>
                 </div>
               </div>
 
               <div className="mt-3">
-                <BookingDecision reference={request.reference} />
+                <BookingDecision
+                  reference={request.reference}
+                  unitName={request.unitName}
+                  checkIn={request.checkIn}
+                  checkOut={request.checkOut}
+                  amount={amount(request.amount, request.currencyCode)}
+                />
               </div>
             </li>
           ))}

@@ -63,6 +63,15 @@
    * as `--color-text2` and `--ease-out-strong`.
    */
   --radius-card: 0.875rem;
+  /*
+    The project's one ease-out, so a SHARED component can spend it.
+
+    It lived only in the customer app, which meant `Modal` — and therefore every `useConfirm()`
+    dialog in this app — asked for `ease-out-strong`, got nothing, and animated `linear`. A shared
+    package may only spend what all three apps have; the fix is to give all three the token rather
+    than to write the curve out at each call site. Same lesson as `--color-text2` above.
+  */
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
   --color-sky: #78aee0;
   --color-ok: #6fc792;
   --color-bad: #e06868;
@@ -576,4 +585,69 @@ body {
 
 :root[dir='rtl'] .field-ltr {
   text-align: right;
+}
+
+/**
+ * The answered booking request settling into place.
+ *
+ * A state that appears instantly reads as a repaint; this one is the ANSWER to the most consequential
+ * press in the portal, so it arrives the way a thing arrives — from slightly below, over 200ms, on
+ * the project's one ease-out. It is a keyframe rather than a transition because there is no prior
+ * state to transition FROM: the element is mounted in its final form.
+ *
+ * `translateY` and `opacity` only, so it composites; and it is skipped outright for a reader who has
+ * asked for no motion, because 200ms of nothing happening is worse than the animation they turned
+ * off.
+ */
+@keyframes safra-decided {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [style*='safra-decided'] {
+    animation: none !important;
+  }
+}
+
+/**
+ * The success ink on the answered-request panel, readable in BOTH themes.
+ *
+ * `--color-ok` is a STATUS colour, tuned for a pill: a short word on a solid chip, where 12.5px
+ * bold at #1f7d53 is fine. This panel puts the same green on a 10%-of-itself wash over the row's
+ * own `--color-field`, and measured off the rendered pixels that comes to **4.03:1** — under the
+ * 4.5 floor, on «تم قبول الحجز», which is the single line in this portal a partner most needs to
+ * read. The dark theme's #6fc792 on a dark panel is comfortably clear and is left alone.
+ *
+ * Scoped to this panel rather than darkening the token: `--color-ok` paints every success pill in
+ * the app, and moving it to fix one new surface would restyle screens this change never touched.
+ * #17603f measures 5.9:1 on the same wash.
+ */
+.decided-ink {
+  color: var(--color-ok);
+}
+
+:root[data-theme='light'] .decided-ink {
+  color: #17603f;
+}
+
+/**
+ * A decided request stops counting down.
+ *
+ * The two-hour clock is the reason the accept matters, and «متبقٍ 01:57» left ticking beside
+ * «تم قبول الحجز» tells the partner two different things about the same booking — which is the
+ * misunderstanding finding 215 exists to remove, arriving one second after it was removed.
+ *
+ * `:has()` rather than lifting state through the row: the countdown is a server-rendered sibling of
+ * the decision control, and threading a callback up through the list to hide one line would put the
+ * queue's rendering in the browser to solve a presentation problem CSS states in one rule.
+ */
+li:has([data-decided]) [data-deadline] {
+  display: none;
 }
