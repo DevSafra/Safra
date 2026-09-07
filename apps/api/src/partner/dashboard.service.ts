@@ -3,9 +3,15 @@ import { bookingLines, type BookingLine } from '../bookings/booking-lines.js';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import { PERMISSIONS as P } from '@safra/contracts';
+import {
+  CONFIRMATION_WINDOW_SETTING,
+  FIRST_VIOLATION_FINE_SETTING,
+  PERMISSIONS as P,
+} from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
+import { MoneySettingsService } from '../settings/money-settings.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { requirePartnerId } from '../rbac/ownership.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
@@ -39,7 +45,11 @@ const REQUEST_LINES = bookingLines(sql`b.id`);
 
 @Injectable()
 export class PartnerDashboardService {
-  constructor(@Inject(DATABASE) private readonly db: Database) {}
+  constructor(
+    @Inject(DATABASE) private readonly db: Database,
+    private readonly settings: SettingsService,
+    private readonly money: MoneySettingsService,
+  ) {}
 
   async overview(claims: AccessTokenClaims | undefined) {
     const partnerId = requirePartnerId(claims, P.BOOKING_READ_OWN);
@@ -88,6 +98,38 @@ export class PartnerDashboardService {
       violations,
       notices,
       payout,
+      rules: await this.rules(),
+    };
+  }
+
+  /**
+   * The two operating values this dashboard STATES, read from configuration.
+   *
+   * Bashar, 2026-09-07: operational values «should always be derived from the active configuration
+   * rather than embedded in static strings». «مهلة ساعتين — الغرامة 10$ عند عدم الرد» sat over the
+   * acceptance queue as a literal, and it is the worst place in the platform for one: it is the
+   * rule the partner is about to be judged by, on the screen where being wrong about it costs them
+   * money. Change the window to ninety minutes and the banner kept promising two hours.
+   *
+   * Sent in this PAYLOAD rather than read from a settings endpoint by the portal, and the reason is
+   * authorization rather than convenience: `/admin/settings` requires `SETTINGS_READ`, which no
+   * partner holds and no employee should. A screen must not need a permission its reader lacks to
+   * render a sentence it is already entitled to read — that is how withholding becomes hiding.
+   *
+   * The fine goes through `MoneySettingsService`, so it arrives with the currency it will actually
+   * be charged in: the same lapse used to cost a partner $10 or about $14 depending on the
+   * booking's currency, and the banner must name the figure the ledger will use.
+   */
+  private async rules() {
+    const [windowMinutes, fine] = await Promise.all([
+      this.settings.getNumber(CONFIRMATION_WINDOW_SETTING, 120),
+      this.money.read(FIRST_VIOLATION_FINE_SETTING, '10'),
+    ]);
+
+    return {
+      confirmationWindowMinutes: windowMinutes,
+      firstViolationFine: fine.amount,
+      firstViolationFineCurrency: fine.currency,
     };
   }
 

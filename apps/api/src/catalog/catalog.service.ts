@@ -435,6 +435,14 @@ export class CatalogService {
       'commission.partner_rate',
       'booking.confirmation_window_minutes',
       'booking.same_day_cutoff_hour',
+      /*
+        The FLAG as well as the hour, and the flag is the half that was missing.
+
+        الشروط stated «حجوزات اليوم نفسه تُغلق الساعة 17:00» as settled terms while
+        `booking.same_day_cutoff_enabled` was `false` — a legal page describing a rule the platform
+        does not apply. Sending the hour without the flag lets a surface be precise and wrong.
+      */
+      'booking.same_day_cutoff_enabled',
       'refund.minimum_percent',
     ];
 

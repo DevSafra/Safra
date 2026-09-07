@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { AdminModule } from '../admin/admin.module.js';
+import { SettingsModule } from '../settings/settings.module.js';
 import { AuthModule } from '../auth/auth.module.js';
 
 import { CalendarService } from './calendar.service.js';
@@ -42,7 +43,8 @@ import { PropertyImageService } from './property-images.service.js';
     a converted account already had, `MailService` sends it, `PasswordService` hashes the first
     password. Imported rather than re-provided, so there is one Argon2id cost and one token table.
   */
-  imports: [AuthModule, AdminModule],
+  /* `SettingsModule` because the dashboard STATES the confirmation window and the first fine. */
+  imports: [AuthModule, AdminModule, SettingsModule],
   controllers: [
     PartnerController,
     PartnerImagesController,

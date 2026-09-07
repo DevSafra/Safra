@@ -14,6 +14,7 @@ export * from './geo.js';
 export * from './gift-card.js';
 export * from './catalogue.js';
 export * from './customer-fee.js';
+export * from './operating-rules.js';
 export * from './invoice.js';
 export * from './pagination.js';
 export * from './payment.js';

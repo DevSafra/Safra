@@ -4,6 +4,9 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createRollbackDatabase, type Database } from '@safra/db';
 import { PERMISSIONS as P } from '@safra/contracts';
 
+import type { FxRateService } from '../fx/fx-rate.service.js';
+import { MoneySettingsService } from '../settings/money-settings.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { PartnerDashboardService } from './dashboard.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
@@ -26,11 +29,28 @@ import type { AccessTokenClaims } from '../auth/token.service.js';
 const DATABASE_URL = process.env['DATABASE_URL'];
 const describeIfDb = DATABASE_URL ? describe : describe.skip;
 
+/*
+  The dashboard STATES the confirmation window and the first fine, so it reads them (finding 217).
+
+  Real services against the real `settings` rows rather than stubs: the values these produce are
+  printed to a partner as the rule they are judged by, and a stub would prove the payload has a
+  shape while saying nothing about whether it carries the platform's own configuration. FX is
+  stubbed to THROW, which is an assertion in disguise — the fine is read in its own currency and
+  nothing here may quietly convert it.
+*/
+const settingsFor = (db: Database) => new SettingsService(db);
+const moneyFor = (db: Database) =>
+  new MoneySettingsService(new SettingsService(db), {
+    rateToSyp: () => {
+      throw new Error('The dashboard must not convert the fine.');
+    },
+  } as unknown as FxRateService);
+
 describeIfDb('PartnerDashboardService', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   /* Every row this suite writes is discarded when the test that wrote it ends. */
   const db: Database = harness.db;
-  const service = new PartnerDashboardService(db);
+  const service = new PartnerDashboardService(db, settingsFor(db), moneyFor(db));
 
   /** The partner under test, and a NEIGHBOUR whose data must never appear. */
   let partnerId = '';
