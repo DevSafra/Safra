@@ -14,6 +14,7 @@ import { Shell } from '@/components/shell';
 import { Ltr } from '@/components/ltr';
 import { amount, count } from '@/lib/format';
 import { fill, plural, t, violationKind } from '@/lib/strings';
+import { ltrIsolate } from '@safra/i18n';
 import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 
 /**
@@ -415,9 +416,21 @@ function Calendar({ calendar }: { readonly calendar: PartnerDashboard['calendar'
           {fill(t.dashboard.calendarTitle, { month: monthName })}
         </h2>
         <span className="text-[11px] text-faint">
+          {/*
+            Money interpolated into an Arabic sentence is ISOLATED — measured, not assumed.
+
+            Swept across all three apps on 2026-09-07 by reading the layout boxes character by
+            character: «26 وحدة · تبدأ من $45.00» rendered the symbol at the far end, «45.00$». The
+            same probe found it on «غرامة {amount} مسجَّلة» and «مستحقات قيد التجميع» below, and on
+            four customer screens. `amount()` returns the right string; only the layout shows it.
+
+            Isolated at the SENTENCE rather than inside `amount()`: standalone `<span>{amount()}</span>`
+            already renders correctly, and putting invisible control characters into every money
+            string in the app would change what a hundred assertions compare against for no defect.
+          */}
           {fill(t.dashboard.calendarDefaultPrice, {
             count: count(calendar.unitCount),
-            price: amount(calendar.fromPrice, calendar.currencyCode),
+            price: ltrIsolate(amount(calendar.fromPrice, calendar.currencyCode)),
           })}
         </span>
       </div>
@@ -628,9 +641,11 @@ function Alerts({
                 <>
                   {' · '}
                   {fill(t.dashboard.alertFine, {
-                    amount: amount(
-                      alert.fineAmount,
-                      alert.currencyCode ?? DEFAULT_MONEY_CURRENCY,
+                    amount: ltrIsolate(
+                      amount(
+                        alert.fineAmount,
+                        alert.currencyCode ?? DEFAULT_MONEY_CURRENCY,
+                      ),
                     ),
                   })}
                 </>
@@ -655,11 +670,12 @@ function Alerts({
               ? t.dashboard.payoutNone
               : payout.status === 'scheduled' && payout.scheduledFor
                 ? fill(t.dashboard.payoutScheduled, {
-                    amount: amount(payout.netAmount, payout.currencyCode),
-                    date: payout.scheduledFor,
+                    amount: ltrIsolate(amount(payout.netAmount, payout.currencyCode)),
+                    /* The date is the same class — it is only ever the sweep's second finding. */
+                    date: ltrIsolate(payout.scheduledFor),
                   })
                 : fill(t.dashboard.payoutAccruing, {
-                    amount: amount(payout.netAmount, payout.currencyCode),
+                    amount: ltrIsolate(amount(payout.netAmount, payout.currencyCode)),
                   })}
           </span>
         </li>

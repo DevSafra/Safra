@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 
 import { LegalPage } from '@/components/legal-page';
 import { isLocale, routing } from '@/i18n/routing';
+import { ltrIsolate } from '@/lib/bidi';
 import { LEGAL_UPDATED } from '@/lib/legal';
 
 /**
@@ -58,7 +59,7 @@ export default async function TermsPage({
       locale={locale}
       title={t('terms.title')}
       intro={t('terms.intro')}
-      updated={t('updated', { date: LEGAL_UPDATED })}
+      updated={t('updated', { date: ltrIsolate(LEGAL_UPDATED) })}
       pending={{ title: t('pendingTitle'), body: t('pendingBody') }}
       backLabel={t('backHome')}
       sections={[

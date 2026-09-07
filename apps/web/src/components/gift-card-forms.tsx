@@ -340,7 +340,7 @@ export function BuyForm({
           </select>
           {spendable === '' ? null : (
             <span className="text-xs text-faint">
-              {t('giftSpendable', { amount: spendable })}
+              {t('giftSpendable', { amount: ltrIsolate(spendable) })}
             </span>
           )}
         </label>
