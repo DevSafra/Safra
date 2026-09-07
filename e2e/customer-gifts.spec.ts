@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+import { STAFF_STATE } from './staff.js';
+
 import en from '../packages/i18n/src/messages/web/en.json' assert { type: 'json' };
 
 /**
@@ -39,6 +41,7 @@ test.describe('بطاقات الهدايا', () => {
 
   test('refuses a bad code, then buys and redeems a card back to par', async ({
     page,
+    browser,
   }) => {
     /*
       `p[role=alert]`, not `getByRole('alert')`.
@@ -572,6 +575,45 @@ test.describe('بطاقات الهدايا', () => {
     /* Masked, and said out loud — otherwise they wait for a call that cannot come. */
     await expect(disputeRow).not.toContainText('0955123456');
     await expect(disputeRow).toContainText('masked');
+
+    /*
+      ── And the dispute this run raised is CLOSED again ──
+
+      A live dispute is a durable financial HOLD: `release` refuses the host's whole payout while
+      one is open. The comment above says a spec «cannot tidy up after itself here», and that was
+      true of the CUSTOMER — they have no way to close their own dispute. The SUITE can: closing is
+      a staff action and the staff session is already captured.
+
+      Left open, every run added one, and once a leftover landed on a payout that
+      `payout-accounts.spec.ts` releases, that spec answered «frozen_by_dispute» where it expects
+      «no_verified_account» and reported a rule broken that was working. One spec's litter became
+      another spec's failure.
+
+      Not «close every open dispute» — only the one whose title THIS run invented, so nothing
+      belonging to another spec or to the seed is touched.
+    */
+    const reference = /DSP-\d+/.exec(await disputeRow.innerText())?.[0] ?? '';
+
+    expect(reference, 'the raised dispute has a reference to close').not.toBe('');
+
+    const staff = await browser.newContext({ storageState: STAFF_STATE });
+
+    try {
+      const closed = await staff.request.post(
+        `http://localhost:3001/api/disputes/${reference}/close`,
+        {
+          data: {
+            outcome: 'rejected',
+            resolution:
+              'أُغلق في نهاية اختبار آلي؛ لا قرار حقيقي، والغرض ألا يبقى تجميد على مستحقات الشريك.',
+          },
+        },
+      );
+
+      expect(closed.status(), 'the hold it created was lifted').toBeLessThan(300);
+    } finally {
+      await staff.close();
+    }
 
     /* No page scrolls sideways, at every width the project promises. */
     for (const width of [390, 768, 1024, 1440]) {

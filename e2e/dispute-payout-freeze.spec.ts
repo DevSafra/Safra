@@ -30,6 +30,8 @@ test.describe.configure({ mode: 'serial' });
 /** Discovered, never named: a fixture that is renamed must fail rather than skip. */
 let bookingReference = '';
 let payoutReference = '';
+/** The dispute this spec OPENED, so it can put the world back. Empty when it reused an existing one. */
+let openedDispute = '';
 
 test('an operator opens a dispute on a booking that is already on a transfer', async ({
   browser,
@@ -54,6 +56,34 @@ test('an operator opens a dispute on a booking that is already on a transfer', a
     payoutReference = found?.[0] ?? '';
   } finally {
     await partner.close();
+  }
+
+  /*
+    Money ALREADY held will do.
+
+    This spec is about what the partner can see; opening a dispute is only setup. The first version
+    insisted on opening one, so a second run — with every booking on the transfer already disputed —
+    found no candidate and reported the feature broken. Re-runnable now.
+  */
+  const already = await browser.newContext({ storageState: PARTNER_STATE });
+  const held = await already.newPage();
+
+  try {
+    await held.goto(`${PARTNER_BASE}/payouts`, { waitUntil: 'domcontentloaded' });
+
+    const section = held.locator('[data-withheld]');
+
+    if ((await section.count()) > 0) {
+      const found = /BKG-\d{4}-\d+/.exec(await section.innerText());
+
+      if (found) {
+        bookingReference = found[0];
+
+        return;
+      }
+    }
+  } finally {
+    await already.close();
   }
 
   const staff = await browser.newContext({ storageState: STAFF_STATE });
@@ -85,6 +115,7 @@ test('an operator opens a dispute on a booking that is already on a transfer', a
 
       if (opened.ok()) {
         bookingReference = candidate;
+        openedDispute = ((await opened.json()) as { reference?: string }).reference ?? '';
         break;
       }
     }
@@ -134,5 +165,64 @@ test('the partner’s own page names what is held and which transfer it stops', 
     expect(shown, 'no complaint text').not.toContain('نزاع أُنشئ أثناء اختبار');
   } finally {
     await partner.close();
+  }
+});
+
+/**
+ * Puts the world back.
+ *
+ * A dispute is a durable financial HOLD: while it is open, `release` refuses the whole payout with
+ * `PAYOUT_FROZEN_BY_DISPUTE`. Leaving one behind changed another spec's outcome —
+ * `payout-accounts.spec.ts` asserts a release refused for «no verified account» and got «frozen by
+ * dispute» instead, because this file had frozen the payout it uses.
+ *
+ * `payout-accounts.spec.ts` states the discipline this was missing: «a fixture that only works from
+ * one starting point is a fixture that works once». A spec that creates a hold lifts it.
+ *
+ * Only the dispute this run OPENED. One it merely read was somebody else's state and closing it
+ * would be this file reaching outside its own work.
+ */
+test('closes the dispute it opened, so the transfer is not left frozen', async ({
+  browser,
+}) => {
+  test.skip(openedDispute === '', 'this run reused an existing dispute');
+
+  const staff = await browser.newContext({ storageState: STAFF_STATE });
+  const page = await staff.newPage();
+
+  try {
+    const closed = await page.request.post(
+      `${CONSOLE}/api/disputes/${openedDispute}/close`,
+      {
+        data: {
+          outcome: 'rejected',
+          resolution:
+            'أُغلق تلقائياً في نهاية اختبار آلي؛ لا قرار حقيقي هنا، والغرض إعادة الحالة كما كانت.',
+        },
+      },
+    );
+
+    expect(closed.status(), 'the dispute was closed').toBeLessThan(300);
+
+    /* And the money is no longer held — the assertion that makes the restoration mean something. */
+    const partner = await browser.newContext({ storageState: PARTNER_STATE });
+    const portal = await partner.newPage();
+
+    try {
+      await portal.goto(`${PARTNER_BASE}/payouts`, { waitUntil: 'domcontentloaded' });
+
+      const held = portal.locator('[data-withheld]');
+
+      if ((await held.count()) > 0) {
+        await expect(
+          held,
+          'this booking is no longer among the held ones',
+        ).not.toContainText(bookingReference);
+      }
+    } finally {
+      await partner.close();
+    }
+  } finally {
+    await staff.close();
   }
 });
