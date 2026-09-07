@@ -6,6 +6,7 @@ import {
   OUTSIDE_SCOPE_ACCESS,
   SANCTIONS_POLICIES,
   STAFF_SCOPE_KINDS,
+  OPERATING_SETTINGS_TAG,
 } from '@safra/contracts';
 
 import { DEFAULT_PAGE_SIZE } from './search-params';
@@ -2464,8 +2465,18 @@ export async function getOperatingSettings(): Promise<Record<string, unknown>> {
   try {
     const response = await fetch(`${API_URL}/api/v1/settings/public`, {
       headers: { Accept: 'application/json' },
-      /* Short cache: it changes only when an admin saves, and no screen may pay for it per view. */
-      next: { revalidate: 60 },
+      /*
+        Tagged AND short-lived, and both matter.
+
+        The tag is how a save arrives IMMEDIATELY: `PUT /admin/settings/:key` asks this app to
+        revalidate it, so an operator who changes the fee sees the card follow rather than
+        wondering whether the save worked. These pages are `force-dynamic`, which does NOT make
+        this fetch fresh — the data cache is a separate thing, and it was holding sixty seconds of
+        a figure the operator had just changed on the screen next door.
+
+        The sixty seconds stays as a floor for the case where the revalidation call never lands.
+      */
+      next: { revalidate: 60, tags: [OPERATING_SETTINGS_TAG] },
     });
 
     if (!response.ok) return {};

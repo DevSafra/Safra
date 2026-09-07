@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { OPERATING_SETTINGS_TAG } from '@safra/contracts';
+
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
 
 /**
@@ -18,11 +20,12 @@ async function read<T>(
   schema: z.ZodType<T>,
   fallback: T,
   revalidate = 300,
+  tags: readonly string[] = [],
 ): Promise<T> {
   try {
     const response = await fetch(`${API_URL}/api/v1${path}`, {
       headers: { Accept: 'application/json' },
-      next: { revalidate },
+      next: { revalidate, ...(tags.length > 0 ? { tags: [...tags] } : {}) },
     });
 
     if (!response.ok) return fallback;
@@ -222,7 +225,22 @@ export async function getAmenities(): Promise<Amenity[]> {
  * request per half-minute against an endpoint whose own answer is already cached.
  */
 export async function getPublicSettings(): Promise<Record<string, unknown>> {
-  return read('/settings/public', z.record(z.string(), z.unknown()), {}, 30);
+  /*
+    TAGGED, so a settings change reaches this page instead of waiting out a cache.
+
+    The thirty seconds on this fetch was never the binding constraint: الرئيسية is prerendered with
+    `revalidate = 300` and العقار with 60, so the PAGE held the old figure however fresh the data
+    behind it was. `revalidateTag` invalidates the fetch AND every prerendered page whose render
+    consumed it, which is why this is a tag rather than a list of paths — a path list would have to
+    name الشروط, الرئيسية, العقار, الدفع and both booking screens, and would be wrong the day a
+    seventh screen reads a setting.
+
+    The TTL stays as a floor: if the API's revalidation call never arrives — the app was restarting,
+    the network blipped — the value is still at most thirty seconds stale rather than pinned.
+  */
+  return read('/settings/public', z.record(z.string(), z.unknown()), {}, 30, [
+    OPERATING_SETTINGS_TAG,
+  ]);
 }
 
 const currencyCatalogueSchema = z.object({
