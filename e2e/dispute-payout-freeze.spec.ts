@@ -52,7 +52,24 @@ test('an operator opens a dispute on a booking that is already on a transfer', a
 
     const found = /PYT-\d+/.exec(await portal.locator('main').innerText());
 
-    expect(found, 'this partner has a transfer').not.toBeNull();
+    /*
+      The precondition, stated rather than guarded past.
+
+      `db:testbed` creates NO payouts — every one on a dev database was left behind by the hourly
+      `payout-accrual` job or by earlier runs. So on a freshly reset testbed there is nothing to
+      dispute, and this fails saying so, exactly as `payout-accounts.spec.ts` does for the same
+      reason. Provisioning it from here was tried and cannot work: `POST /admin/payouts/accrue`
+      exists but has no reachable surface, and a browser session is not an API token, so the call
+      answers 401.
+
+      Reported rather than worked around, because a spec that skipped here would report coverage of
+      a money-freezing workflow nobody had exercised.
+    */
+    expect(
+      found,
+      'this partner has a transfer — needs the payout-accrual job to have run; ' +
+        'a freshly reset testbed has none',
+    ).not.toBeNull();
     payoutReference = found?.[0] ?? '';
   } finally {
     await partner.close();
