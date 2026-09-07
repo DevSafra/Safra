@@ -2895,6 +2895,21 @@ export const ar = {
       capturePayment: 'تأكيد استلام الحوالة',
       capturing: 'جارٍ التأكيد…',
       /*
+        Asked before recording that money arrived (2026-09-07).
+
+        The control acted on the first press, like «تسجيل وصول» beside it — and it is not like it.
+        It posts a balanced ledger group, sets `paid_at`, and starts the partner's two-hour clock
+        with a $10 fine attached to the far end. None of that can be taken back by pressing
+        something else, and a ledger is append-only by design.
+
+        The question names the CONSEQUENCE rather than asking whether the operator is sure: what
+        they are asserting is that the transfer is on the bank statement.
+      */
+      capturePaymentTitle: 'تأكيد استلام حوالة العميل؟',
+      capturePaymentBody:
+        'أنت تُقرّ بأن مبلغ الحجز وصل فعلاً إلى حساب سفرة. يُسجَّل الاستلام في الدفاتر ولا يمكن التراجع عنه، وتبدأ مهلة الشريك للرد فوراً.',
+      capturePaymentConfirm: 'نعم، وصلت الحوالة',
+      /*
         What it DOES and what it ASSUMES, in that order. Confirming starts the partner's window,
         and the assumption — that finance has seen the credit — is the one an operator must not
         make casually.

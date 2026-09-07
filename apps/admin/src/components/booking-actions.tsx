@@ -9,6 +9,8 @@ import {
   ENFORCEMENT_REASON_MIN,
 } from '@safra/contracts';
 
+import { useConfirm } from '@safra/ui';
+
 import { text } from '@/lib/form';
 import { Ltr } from '@/components/admin-table';
 import { money } from '@/lib/format';
@@ -77,11 +79,33 @@ export function BookingActions({
   currencies: readonly string[];
 }) {
   const router = useRouter();
+  const { ask, dialog } = useConfirm();
 
   const [open, setOpen] = useState<Explained | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+
+  /**
+   * Recording that the customer's transfer arrived — asked for first.
+   *
+   * `useConfirm()` from `@safra/ui`, per the standing rule that the browser's own popup is never
+   * called. Not `tone: 'danger'`: this is not destructive, it is an assertion of fact about money
+   * that has moved, and painting it red would spend the colour that means «you cannot undo this»
+   * on the wrong half of this screen — cancelling a paid stay is the one that deserves it.
+   */
+  async function confirmThenCapture(): Promise<void> {
+    const go = await ask({
+      title: copy.capturePaymentTitle,
+      message: copy.capturePaymentBody,
+      confirmLabel: copy.capturePaymentConfirm,
+      cancelLabel: t.sections.dialog.cancel,
+    });
+
+    if (!go) return;
+
+    await submit('capture-payment', undefined, copy.paymentCaptured);
+  }
 
   async function submit(step: string, body: unknown, success: string): Promise<void> {
     if (busy) return;
@@ -191,14 +215,20 @@ export function BookingActions({
               onClick={() => setOpen(open === 'confirm' ? null : 'confirm')}
             />
           ) : null}
+          {/*
+            Asked first, unlike its neighbours — and the difference is what it does.
+
+            Recording that a transfer arrived posts a ledger group, sets `paid_at` and starts the
+            partner's two-hour clock. A ledger is append-only, so none of it comes back by pressing
+            something else. Cancel, refund and compensate already demand a reason; this asserted a
+            fact about somebody's money on one press.
+          */}
           {offer.capture ? (
             <Press
               busy={busy}
               idle={copy.capturePayment}
               working={copy.capturing}
-              onClick={() =>
-                void submit('capture-payment', undefined, copy.paymentCaptured)
-              }
+              onClick={() => void confirmThenCapture()}
             />
           ) : null}
           {offer.checkIn ? (
@@ -311,6 +341,8 @@ export function BookingActions({
           onSubmit={(body) => void submit('compensate', body, copy.compensated)}
         />
       ) : null}
+
+      {dialog}
     </section>
   );
 }
