@@ -29,6 +29,12 @@ test-results/
 # runs. NOT under test-results/, which Playwright empties at the start of every run.
 .e2e-secrets/
 
+# What the unattended runners leave behind for a person to read the next morning. Also NOT
+# under test-results/, and for the same reason one line up — which both runners ignored until
+# 2026-09-07, when a two-project browser run ended with the first project's report deleted by
+# the second project's start, and the vitest summary deleted along with it.
+test-reports/
+
 # Logs
 *.log
 npm-debug.log*
