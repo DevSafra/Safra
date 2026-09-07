@@ -68,6 +68,7 @@ const NEEDS_PARTNER_SESSION = new RegExp(
     'dispute-payout-freeze',
     'mixed-booking-downstream',
     'refund-visibility',
+    'checkout-and-acceptance',
   ].join('|')})\\.spec\\.ts`,
 );
 
