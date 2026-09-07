@@ -154,9 +154,30 @@ const translatedNameSchema = z.object({
  * Somebody else's reference answers 404 here exactly as an unknown one does; the caller cannot tell
  * the two apart, and references are sequential, so any difference would enumerate them.
  */
+/**
+ * One refund on the caller's own booking.
+ *
+ * No provider reference and no staff name: a payment-processor identifier is the wrong thing for a
+ * customer to quote to their bank, and naming the employee who issued a refund on a customer-facing
+ * screen is the audit-privacy finding this codebase already carries.
+ */
+const refundSchema = z.object({
+  amount: z.string(),
+  walletAmount: z.string(),
+  status: z.string(),
+  reason: z.string().nullable(),
+  createdAt: z.string(),
+  completedAt: z.string().nullable(),
+});
+
 const bookingDetailSchema = z.object({
   reference: z.string(),
   status: z.string(),
+  /*
+    The money that came back. `.default([])` is right here: an empty list means «nothing was
+    refunded», which is the ordinary case and renders nothing — it invents no amount.
+  */
+  refunds: z.array(refundSchema).default([]),
   /* Where the stay is. A reference and a total describe a transaction, not a trip. */
   property: translatedNameSchema,
   unit: translatedNameSchema,

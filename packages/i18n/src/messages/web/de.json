@@ -639,7 +639,13 @@
     "voucherOpen": "Voucher öffnen (PDF)",
     "voucherHint": "Enthält einen QR-Code zur Prüfung bei der Ankunft.",
     "roomsCount": "{count, plural, one {1 Zimmer} other {# Zimmer}}",
-    "bookingRoomsHeading": "Gebuchte Zimmer"
+    "bookingRoomsHeading": "Gebuchte Zimmer",
+    "refundsHeading": "Rückerstattungen",
+    "refundLine": "{amount} erstattet",
+    "refundWalletLine": "{amount} erstattet, davon {walletAmount} in Ihr Guthaben",
+    "refundPending": "In Bearbeitung — bis zur Gutschrift auf Ihrer Karte können einige Werktage vergehen.",
+    "refundDone": "Abgeschlossen am {date}",
+    "refundReason": "Grund"
   },
   "ads": {
     "title": "In der Nähe, von unseren Partnern",

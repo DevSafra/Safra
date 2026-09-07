@@ -639,7 +639,13 @@
     "voucherOpen": "Open voucher (PDF)",
     "voucherHint": "It carries a QR code for verification on arrival.",
     "roomsCount": "{count, plural, one {1 room} other {# rooms}}",
-    "bookingRoomsHeading": "Rooms booked"
+    "bookingRoomsHeading": "Rooms booked",
+    "refundsHeading": "Refunds",
+    "refundLine": "{amount} refunded",
+    "refundWalletLine": "{amount} refunded, {walletAmount} of it to your wallet",
+    "refundPending": "In progress — it may take several working days to reach your card.",
+    "refundDone": "Completed on {date}",
+    "refundReason": "Reason"
   },
   "ads": {
     "title": "Nearby, from our partners",

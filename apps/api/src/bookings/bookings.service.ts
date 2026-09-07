@@ -202,6 +202,45 @@ export class BookingsService {
     }
 
     /*
+      THE REFUNDS on this booking — the money that came back.
+
+      ## What was missing
+
+      The platform has written 15,671 `booking.refund_issued` events and the console reads them.
+      The customer's own booking page showed nothing: not the amount, not when, not whether it had
+      completed. Money moved and the person it moved to had no record of it on the platform — the
+      same asymmetry the partner's frozen payout had, on the other side of the transaction.
+
+      ## What it deliberately does NOT carry
+
+      Not `provider_ref` — a payment-processor identifier is operational plumbing, and a customer
+      who quoted it to their bank would be quoting the wrong reference. Not
+      `initiated_by_user_id`: which member of staff issued a refund is not a fact about the
+      customer's booking, and naming an employee on a customer-facing screen is the audit-privacy
+      finding this codebase already carries. The REASON is included — it is why their money came
+      back, and they are owed it.
+    */
+    const refunds = await this.db.execute<{
+      amount: string;
+      wallet_amount: string;
+      status: string;
+      reason: string | null;
+      created_at: string;
+      completed_at: string | null;
+    }>(sql`
+      SELECT r.amount::text        AS amount,
+             r.wallet_amount::text AS wallet_amount,
+             r.status::text        AS status,
+             r.reason,
+             r.created_at::text    AS created_at,
+             r.completed_at::text  AS completed_at
+        FROM refunds r
+       WHERE r.booking_id = ${booking.id}
+         AND r.deleted_at IS NULL
+       ORDER BY r.created_at
+    `);
+
+    /*
       Every room TYPE on the booking, as a second read.
 
       `unit` above is the LEAD line, so a customer's own booking page showed one type on a booking
@@ -216,7 +255,19 @@ export class BookingsService {
       SELECT ${bookingLines(sql`${booking.id}`)} AS lines
     `);
 
-    return { ...booking, rooms: booking.rooms, lines: lines.rows[0]?.lines ?? [] };
+    return {
+      ...booking,
+      rooms: booking.rooms,
+      lines: lines.rows[0]?.lines ?? [],
+      refunds: refunds.rows.map((row) => ({
+        amount: row.amount,
+        walletAmount: row.wallet_amount,
+        status: row.status,
+        reason: row.reason,
+        createdAt: row.created_at,
+        completedAt: row.completed_at,
+      })),
+    };
   }
 
   /**

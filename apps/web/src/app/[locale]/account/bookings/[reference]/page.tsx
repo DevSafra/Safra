@@ -184,6 +184,72 @@ export default async function BookingDetailPage({
             )}
           </span>
         </Row>
+        {/*
+          THE MONEY THAT CAME BACK.
+
+          The platform has issued thousands of refunds and this screen said nothing about any of
+          them: not the amount, not when, not whether it had completed. Money moved and the person
+          it moved to had no record of it — the same asymmetry the partner's frozen payout had, on
+          the other side of the transaction.
+
+          Directly under the total, because that is the figure it modifies. A refund listed at the
+          foot of the page, below the wait notice, would be a fact a reader has to go looking for.
+        */}
+        {booking.refunds.length > 0 ? (
+          <Row label={t('refundsHeading')}>
+            <ul data-refunds className="grid gap-1.5">
+              {booking.refunds.map((refund) => {
+                const currency = booking.currency?.code ?? DEFAULT_MONEY_CURRENCY;
+                const toWallet = Number(refund.walletAmount) > 0;
+
+                return (
+                  <li key={refund.createdAt} className="grid gap-0.5">
+                    <span className="font-semibold text-text">
+                      {/*
+                        `exact`, because this is a figure somebody reconciles against a bank
+                        statement. Trimmed it read «أُعيد $330» under «الإجمالي المدفوع $661.99» —
+                        two precisions for money on one screen, and the imprecise one is the number
+                        a customer will be looking for on their card.
+                      */}
+                      {toWallet
+                        ? t('refundWalletLine', {
+                            amount: formatMoney(refund.amount, currency, locale, {
+                              exact: true,
+                            }),
+                            walletAmount: formatMoney(
+                              refund.walletAmount,
+                              currency,
+                              locale,
+                              { exact: true },
+                            ),
+                          })
+                        : t('refundLine', {
+                            amount: formatMoney(refund.amount, currency, locale, {
+                              exact: true,
+                            }),
+                          })}
+                    </span>
+                    {/*
+                      «قيد التنفيذ» says how long it may take, because that is the question a
+                      customer actually has and the reason they would otherwise write to support.
+                      A completed one says WHEN, which is what they need to find it on a statement.
+                    */}
+                    <span className="text-xs text-faint">
+                      {refund.completedAt === null
+                        ? t('refundPending')
+                        : t('refundDone', { date: refund.completedAt.slice(0, 10) })}
+                    </span>
+                    {refund.reason ? (
+                      <span className="text-xs text-faint2">
+                        {t('refundReason')}: {refund.reason}
+                      </span>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          </Row>
+        ) : null}
         <Row label={t('bookingPlaced')}>
           <span dir="ltr">{booking.createdAt.slice(0, 10)}</span>
         </Row>
