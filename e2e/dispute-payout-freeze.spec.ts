@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 
+import { accrueThroughConsole } from './accrual.js';
 import { PARTNER_BASE, PARTNER_STATE } from './partner-session.js';
 import { STAFF_STATE } from './staff.js';
 
@@ -44,6 +45,22 @@ test('an operator opens a dispute on a booking that is already on a transfer', a
     nothing on it and reported the feature broken. The console shows every partner; only the portal
     shows this one.
   */
+  /*
+    Make the transfer first, through the console control an operator would use.
+
+    `db:testbed` creates no payouts, so on a freshly reset testbed there was nothing to dispute and
+    this spec failed saying so. `accrueThroughConsole` presses «تجميع المستحقات الآن» — the surface
+    added on 2026-09-07 for exactly this gap — rather than reaching into the database, so the
+    provisioning also witnesses that the surface works.
+  */
+  const operator = await browser.newContext({ storageState: STAFF_STATE });
+
+  try {
+    await accrueThroughConsole(await operator.newPage(), CONSOLE);
+  } finally {
+    await operator.close();
+  }
+
   const partner = await browser.newContext({ storageState: PARTNER_STATE });
   const portal = await partner.newPage();
 
@@ -53,22 +70,13 @@ test('an operator opens a dispute on a booking that is already on a transfer', a
     const found = /PYT-\d+/.exec(await portal.locator('main').innerText());
 
     /*
-      The precondition, stated rather than guarded past.
-
-      `db:testbed` creates NO payouts — every one on a dev database was left behind by the hourly
-      `payout-accrual` job or by earlier runs. So on a freshly reset testbed there is nothing to
-      dispute, and this fails saying so, exactly as `payout-accounts.spec.ts` does for the same
-      reason. Provisioning it from here was tried and cannot work: `POST /admin/payouts/accrue`
-      exists but has no reachable surface, and a browser session is not an API token, so the call
-      answers 401.
-
-      Reported rather than worked around, because a spec that skipped here would report coverage of
-      a money-freezing workflow nobody had exercised.
+      Accrual has just run, so a transfer exists unless this partner has nothing due at all —
+      which would itself be worth knowing, so it fails rather than skips.
     */
     expect(
       found,
-      'this partner has a transfer — needs the payout-accrual job to have run; ' +
-        'a freshly reset testbed has none',
+      'this partner has a transfer after accrual ran — if not, no completed paid booking of ' +
+        'theirs was eligible, which is a fixture problem worth looking at rather than skipping',
     ).not.toBeNull();
     payoutReference = found?.[0] ?? '';
   } finally {

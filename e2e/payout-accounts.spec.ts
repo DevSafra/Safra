@@ -8,6 +8,7 @@ import {
   STAFF_STATE,
 } from './staff.js';
 import { PARTNER_BASE as PORTAL, PARTNER_STATE } from './partner-session.js';
+import { accrueThroughConsole } from './accrual.js';
 import { findPartnerReference } from './partner-fixtures.js';
 
 /**
@@ -450,6 +451,18 @@ test.describe('payout accounts, across the portal and the console', () => {
         once. This one finds the payout in whichever of the two states it is in and performs only
         the step that is actually outstanding.
       */
+      /*
+        Make one if there is none, through the console's own control.
+
+        This spec used to fail with a message explaining that payouts come from the hourly
+        `payout-accrual` job and not from `db:testbed` — accurate, and no help to anybody, because
+        there was no way to run that job short of waiting an hour. «تجميع المستحقات الآن» was added
+        on 2026-09-07 for exactly this, so the precondition is now something the spec can satisfy
+        rather than something it reports. Idempotent: with everything already attached it attaches
+        nothing.
+      */
+      await accrueThroughConsole(page);
+
       let found = false;
       let wasAccruing = false;
       let wasScheduled = false;

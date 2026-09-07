@@ -21,6 +21,7 @@ import { fill, label, t } from '@/lib/strings';
 import { listParamsFor } from '@/lib/table-size';
 import { oneOf } from '@/lib/search-params';
 import { refuseSection } from '@/components/section-refusal';
+import { AccrualControl } from '@/components/accrual-control';
 
 /**
  * تحويلات الشركاء — the payout registry (§9.3).
@@ -137,18 +138,32 @@ export default async function PayoutsPage({
           </>
         )}
 
-        <FootNote>
-          {accrual === null
-            ? t.sections.payouts.lastAccrualNever
-            : accrual.status === 'failed'
-              ? fill(t.sections.payouts.lastAccrualFailed, {
-                  when: shortDateTime(accrual.startedAt),
-                })
-              : fill(t.sections.payouts.lastAccrual, {
-                  when: shortDateTime(accrual.startedAt),
-                  n: String(attachedIn(accrual.detail)),
-                })}
-        </FootNote>
+        {/*
+          When it last ran, and the means to run it — together, because they answer one question.
+
+          The timestamp was here on its own so that a job which STOPPED firing became noticeable.
+          What it could not do was let the person who noticed act: `POST /admin/payouts/accrue` had
+          no caller in any of the three applications, so the next step after reading «last accrued
+          three days ago» was to page an engineer. Bashar, 2026-09-07: «I do not want operational
+          workflows that require direct API calls when they should reasonably be available through
+          the Super Admin Console.»
+        */}
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <FootNote>
+            {accrual === null
+              ? t.sections.payouts.lastAccrualNever
+              : accrual.status === 'failed'
+                ? fill(t.sections.payouts.lastAccrualFailed, {
+                    when: shortDateTime(accrual.startedAt),
+                  })
+                : fill(t.sections.payouts.lastAccrual, {
+                    when: shortDateTime(accrual.startedAt),
+                    n: String(attachedIn(accrual.detail)),
+                  })}
+          </FootNote>
+
+          <AccrualControl />
+        </div>
         <FootNote>{t.sections.payouts.note}</FootNote>
       </ConsolePanel>
     </ConsoleShell>

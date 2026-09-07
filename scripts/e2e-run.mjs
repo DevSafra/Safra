@@ -51,31 +51,28 @@
  * numbers MEAN: a run on drifted fixtures is a useful local signal and a misleading overnight
  * report.
  *
- * ## Why it is OPT-IN and not yet the default
+ * ## What it took to make this the default
  *
- * Measured on the day it was built. Resetting first makes the suite WORSE, and the reason is the
- * point: `db:testbed` produces a database on which several workflows cannot be exercised at all.
- * Chromium went from 8 skips to 21 — «no bookable unit to reach checkout with», «no rendered
- * evidence in the queue», «every city is at its photograph cap», and fifteen on an empty media
- * bucket — and three payout and employee specs went from passing to FAILING.
+ * Turning it on the first time made the suite WORSE, which was the useful finding. `db:testbed`
+ * produces a database on which several workflows cannot be exercised at all: chromium's skips rose
+ * from 8 to 21 and three payout and employee specs went from passing to FAILING — they had been
+ * passing on state left behind by earlier runs, which is not coverage, it is luck.
  *
- * `payout-accounts.spec.ts` states the biggest cause itself: «This comes from the hourly
- * payout-accrual job, NOT from db:testbed — a freshly reset testbed has none until that job next
- * fires.» So the payout workflows are untestable from a clean database, and no spec can fix that
- * for itself: `POST /admin/payouts/accrue` exists but has no reachable surface, and a browser
- * session is not an API token, so calling it answers 401.
+ * The payout ones were the blocker. `payout-accounts.spec.ts` said so in its own failure: «This
+ * comes from the hourly payout-accrual job, NOT from db:testbed.» No spec could fix it for itself
+ * either, because `POST /admin/payouts/accrue` existed with no reachable surface and a browser
+ * session is not an API token. So the console grew «تجميع المستحقات الآن» (Bashar, 2026-09-07),
+ * and both specs now provision through the control an operator would press — see `e2e/accrual.ts`.
  *
- * Turning this on by default today would make every unattended run red for reasons that are real
- * but not the platform's, which trains people to stop reading it — the opposite of the point. So
- * the automation is here and off, and what it takes to switch it on is written down in
- * `docs/FUTURE-WORK.md` rather than guessed at.
+ * The remaining fresh-testbed skips are declared and named in `test-budget.json`. They are real
+ * gaps in what the seed provisions rather than anything this runner can decide.
  *
  * ## Output
  *
  * A human summary on stdout and `test-reports/e2e-summary.json` for a machine. Usage:
  *
- *     pnpm e2e:run              # runs everything against the database as it stands
- *     pnpm e2e:run --reset      # resets the testbed first; see the note above before trusting it
+ *     pnpm e2e:run              # resets the testbed, then runs everything
+ *     pnpm e2e:run --no-reset   # against the database as it stands; marked as such in the summary
  */
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -173,7 +170,7 @@ function runProject(project) {
 
 mkdirSync('test-reports', { recursive: true });
 
-const reset = process.argv.includes('--reset');
+const reset = !process.argv.includes('--no-reset');
 const problems = [];
 
 if (reset) {
@@ -210,7 +207,7 @@ if (reset) {
     process.exit(1);
   }
 } else {
-  console.log('\n── testbed not reset (pass --reset to) ──────────────────');
+  console.log('\n── testbed NOT reset (--no-reset) ───────────────────────');
 }
 
 const results = PROJECTS.map(runProject);
@@ -328,7 +325,7 @@ writeFileSync(
         useful local signal and a misleading overnight report, and the difference between the
         two has to survive into the file somebody reads the next morning.
       */
-      reset: reset ? 'done' : 'not requested',
+      reset: reset ? 'done' : 'skipped (--no-reset)',
       counts,
       problems,
     },
@@ -338,9 +335,7 @@ writeFileSync(
 );
 
 console.log('\n════ browser run ════');
-console.log(
-  `  testbed: ${reset ? 'reset before the run' : 'not reset — pass --reset for a known state'}`,
-);
+console.log(`  testbed: ${reset ? 'reset before the run' : 'NOT reset (--no-reset)'}`);
 
 for (const [project, c] of Object.entries(counts)) {
   console.log(
