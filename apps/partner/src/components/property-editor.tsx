@@ -403,13 +403,26 @@ function Field({
   return (
     <label className="grid gap-1">
       <span className="text-[12px] text-muted">{label}</span>
+      {/*
+        The CLASS, not the attribute.
+
+        `dir="ltr"` fixes the ORDER and breaks the PLACEMENT: it makes the element's own start edge
+        the left one, so on an Arabic page the value sits flush left inside a field whose label is
+        on the right. `field-ltr` sets the direction and takes the alignment from the DOCUMENT,
+        which is the one thing a `dir` attribute cannot express — the standing rule in
+        `.claude/CLAUDE.md` is explicit that the attribute alone is always wrong on a field.
+
+        Fixed here rather than at each call site, so the prop keeps meaning «which direction does
+        the VALUE read» and all six callers are corrected at once.
+      */}
       <input
-        dir={dir}
         value={value}
         required={required}
         maxLength={300}
         onChange={(event) => onChange(event.target.value)}
-        className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text lg:min-h-0"
+        className={`min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text lg:min-h-0 ${
+          dir === 'ltr' ? 'field-ltr' : ''
+        }`}
       />
       {hint ? <span className="text-[10.5px] text-faint2">{hint}</span> : null}
     </label>
@@ -430,13 +443,15 @@ function Area({
   return (
     <label className="grid gap-1">
       <span className="text-[12px] text-muted">{label}</span>
+      {/* `field-ltr`, not `dir` — see the note in `Field` above. */}
       <textarea
-        dir={dir}
         value={value}
         rows={4}
         maxLength={4000}
         onChange={(event) => onChange(event.target.value)}
-        className="rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+        className={`rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text ${
+          dir === 'ltr' ? 'field-ltr' : ''
+        }`}
       />
     </label>
   );

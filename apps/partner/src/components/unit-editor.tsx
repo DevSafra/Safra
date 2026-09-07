@@ -506,7 +506,15 @@ function Field({
   );
 }
 
-/** `Number` is taken, and a numeric field wants `dir="ltr"` whatever the page direction is. */
+/**
+ * `Number` is taken, and a numeric field's digits read left to right whatever the page does.
+ *
+ * Through `field-ltr` rather than the `dir` attribute. The comment here used to say the field
+ * «wants `dir="ltr"` whatever the page direction is», which is the belief the standing rule exists
+ * to correct: the attribute fixes the ORDER and breaks the PLACEMENT, moving the element's own
+ * start edge to the left so the caret sits opposite its own label on an Arabic page. The class sets
+ * the direction and takes the alignment from the document.
+ */
 function Number_({
   id,
   label,
@@ -528,12 +536,11 @@ function Number_({
       <input
         id={id}
         type="number"
-        dir="ltr"
         min={min}
         {...(step ? { step } : {})}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text lg:min-h-0"
+        className="field-ltr min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text lg:min-h-0"
       />
     </label>
   );

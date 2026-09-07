@@ -378,12 +378,22 @@ const Field = function Field({
       <label htmlFor={id} className="text-sm text-muted">
         {label}
       </label>
+      {/*
+        `field-ltr` when the caller asks for a left-to-right value, never the `dir` attribute.
+
+        A six-digit code and an XXXX-XXXX-XXXX recovery code are Latin runs whose hyphens are
+        bidi-neutral, so they do need the direction pinned — but pinning it with `dir` also moves
+        the field's start edge, putting the caret on the far side of its own label. The class does
+        the first without the second, which is what the standing rule requires.
+      */}
       <input
         id={id}
         name={name}
         aria-describedby={hint ? `${id}-hint` : undefined}
-        className="rounded-lg border border-line bg-field px-3 py-2.5 text-text"
-        {...rest}
+        className={`rounded-lg border border-line bg-field px-3 py-2.5 text-text ${
+          rest.dir === 'ltr' ? 'field-ltr' : ''
+        }`}
+        {...{ ...rest, dir: rest.dir === 'ltr' ? undefined : rest.dir }}
       />
       {hint ? (
         <span id={`${id}-hint`} className="text-xs text-faint">

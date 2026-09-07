@@ -186,16 +186,20 @@ export function TwoFactorEnrolment() {
         <label htmlFor="code" className="text-[13px] text-muted">
           {t.twoFactor.sixDigitCode}
         </label>
+        {/*
+          `field-ltr`, not the `dir` attribute — the last typed field in the portal still carrying
+          it. Six digits are a Latin run and the direction does need pinning; the attribute also
+          moves the field's start edge, so the caret landed opposite its own label on this RTL page.
+        */}
         <input
           id="code"
           name="code"
-          dir="ltr"
           inputMode="numeric"
           autoComplete="one-time-code"
           pattern="[0-9]{6}"
           required
           disabled={!setup}
-          className="min-h-10 rounded-lg border border-line bg-field px-3 py-2.5 text-text disabled:opacity-60"
+          className="field-ltr min-h-10 rounded-lg border border-line bg-field px-3 py-2.5 text-text disabled:opacity-60"
         />
         <button
           type="submit"

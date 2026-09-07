@@ -197,15 +197,20 @@ export function RangeEditor({
 
         <label className="grid gap-1">
           <span className="text-[12px] text-muted">{t.unitCalendar.price}</span>
+          {/*
+            `field-ltr`, not the `dir` attribute. Both make the digits read left to right; only the
+            class leaves the ALIGNMENT to the document, so the caret and the value stay on the same
+            side as the label above them. The standing rule is explicit that the attribute alone is
+            always wrong on a field.
+          */}
           <input
             type="number"
             min={0}
             step="0.01"
-            dir="ltr"
             value={price === 'clear' ? '' : price}
             placeholder={t.unitCalendar.priceUnchanged}
             onChange={(event) => setPrice(event.target.value)}
-            className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text lg:min-h-0"
+            className="field-ltr min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text lg:min-h-0"
           />
           <button
             type="button"
@@ -225,10 +230,9 @@ export function RangeEditor({
             type="number"
             min={1}
             max={365}
-            dir="ltr"
             value={minNights}
             onChange={(event) => setMinNights(event.target.value)}
-            className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text lg:min-h-0"
+            className="field-ltr min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text lg:min-h-0"
           />
         </label>
       </div>

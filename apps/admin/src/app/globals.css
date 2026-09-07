@@ -442,3 +442,26 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
 }
+
+/**
+ * A field whose VALUE reads left to right, on a page that does not.
+ *
+ * Mirrored from the customer app's stylesheet on 2026-09-07, and the reason is a defect rather than
+ * tidiness: this console already USED `field-ltr` on six fields — the ad campaign's URLs among them
+ * — and the class was defined only in `apps/web`. Each app imports its own `globals.css`, so those
+ * fields carried a class that did not exist and got no direction handling at all. Confirmed against
+ * the BUILT stylesheet, where `.field-ltr` was present in the customer app's CSS and absent here.
+ *
+ * A missing CSS class fails invisibly, which is what let a documented remedy sit in the code doing
+ * nothing. The rule it implements is in `.claude/CLAUDE.md`: `dir="ltr"` fixes the ORDER and breaks
+ * the PLACEMENT — it makes the element's own start edge the left one, so on an Arabic page the value
+ * sits flush left inside a full-width field whose label is on the right. Setting the direction here
+ * and taking the alignment from the DOCUMENT is the one thing a `dir` attribute cannot express.
+ */
+.field-ltr {
+  direction: ltr;
+}
+
+:root[dir='rtl'] .field-ltr {
+  text-align: right;
+}
