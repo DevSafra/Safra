@@ -1,0 +1,76 @@
+{
+  "$comment": [
+    "What the unattended runners are allowed to leave unexecuted.",
+    "",
+    "Bashar, 2026-09-07: \u00abI want the unattended overnight runner to tell the truth about platform",
+    "quality and coverage. A skipped or unexecuted workflow should never look like a passed",
+    "workflow.\u00bb",
+    "",
+    "Every number here is a CEILING that a run must stay under, and lowering one is the point:",
+    "a budget that is never tightened decays in the direction of hiding things, which is the",
+    "failure mode `.claude/CLAUDE.md` names for exemption lists. So the guards also fail when a",
+    "budget sits far ABOVE what actually happens \u2014 a ceiling of forty over five real skips is",
+    "thirty-five future skips nobody will ever be told about.",
+    "",
+    "Raising a number is a reviewed change with a reason in the commit message. That is the",
+    "whole mechanism: the skip stops being a footnote in a log and becomes a line in a diff."
+  ],
+  "vitest": {
+    "maxSkipped": 0,
+    "minTests": 3888,
+    "why": [
+      "Zero, and it is achievable today: the entire suite passes with the database available.",
+      "",
+      "It was 1,724 skipped tests across 128 files \u2014 44% of the suite \u2014 because `pnpm test` did",
+      "not source `.env` and each integration file carries its own",
+      "`DATABASE_URL ? describe : describe.skip`. `pnpm verify` printed \u00ab2164 passed\u00bb and exited",
+      "0 while nearly half of it had not run, and that is the gate this project requires before",
+      "every commit to `main`.",
+      "",
+      "Measured 2026-09-07: 3,888 passed in 30.58s with the database, against 19.74s without it.",
+      "Eleven seconds bought 44% of the coverage back.",
+      "",
+      "`minTests` catches the other direction \u2014 a file that stops being COLLECTED at all, by a",
+      "rename, a bad glob or an exclude. Nothing skips, nothing fails, and the total quietly",
+      "drops. Lowering it is deliberate: tests are sometimes rightly deleted, and then this line",
+      "is where that is recorded."
+    ]
+  },
+  "playwright": {
+    "maxSkipped": {
+      "chromium": 8,
+      "signed-in": 1
+    },
+    "maxSlack": 8,
+    "maxUndeclared": 0,
+    "why": [
+      "Browser skips are not all the same thing, so they are counted in two ways.",
+      "",
+      "A DECLARED skip states its reason \u2014 `test.skip(condition, 'why')` \u2014 and several here",
+      "legitimately depend on fixture state: an empty media bucket, a listing with no photographs,",
+      "a coupon awaiting nobody's decision. Those have a ceiling.",
+      "",
+      "An UNDECLARED skip has no reason attached, which is the dangerous kind: it is",
+      "indistinguishable in a summary from a test that ran. `maxUndeclared` is zero. Note what it",
+      "catches in practice \u2014 Playwright's serial mode skips the rest of a block when one test fails,",
+      "with no annotation, so an undeclared skip is usually the SHADOW of a failure.",
+      "",
+      "`maxSlack` stops the ceilings decaying. If real skips fall well below the budget the guard",
+      "fails and asks for the number to be lowered, so the ceiling keeps describing the suite rather",
+      "than describing history. It did that on its own first run: provisional ceilings of 20 and 12",
+      "were 12 and 11 too loose, and the run failed saying so.",
+      "",
+      "MEASURED 2026-09-07 on the one fully green run \u2014 the database as it stood, no reset:",
+      "chromium 387 passed / 8 skipped of 395, signed-in 108 passed / 1 skipped of 109, nothing",
+      "failed and nothing went unrun. These ceilings are those numbers, so a tenth skip is a",
+      "decision somebody makes in a diff.",
+      "",
+      "KNOWN TO BE EXCEEDED on a freshly reset testbed, and that is the runner telling the truth",
+      "rather than a number needing adjustment. `db:testbed` produces a database on which chromium",
+      "skips 21 and three payout and employee specs FAIL \u2014 the payout ones because accrual is an",
+      "hourly job the reset does not run, which `payout-accounts.spec.ts` says in its own failure",
+      "message. Raising these to match would declare that regression acceptable. See \u00a77 of",
+      "docs/FUTURE-WORK.md for what has to happen before the reset can be the default."
+    ]
+  }
+}

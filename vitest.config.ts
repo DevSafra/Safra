@@ -110,6 +110,10 @@ export default defineConfig({
       // not shipped code. They still get tested — a lint rule that over-reports gets
       // switched off, which is worse than not having it.
       'tools/eslint-rules/*.test.ts',
+      // And the check that the browser suite collects every spec it has. It reads
+      // `playwright.config.ts` rather than booting Playwright, so it is cheap enough to
+      // sit in the gate that runs on every commit — which is the only place it helps.
+      'tools/suite-coverage/*.test.ts',
     ],
     environment: 'node',
     // Security-relevant paths must stay covered as the codebase grows.

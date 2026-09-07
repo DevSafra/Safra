@@ -9,8 +9,8 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run build --filter='./packages/*' && eslint .",
-    "typecheck": "turbo run typecheck && tsc -p e2e/tsconfig.json --noEmit",
-    "test": "turbo run build --filter='./packages/*' && vitest run",
+    "typecheck": "turbo run typecheck && tsc -p e2e/tsconfig.json --noEmit && tsc -p tools/suite-coverage/tsconfig.json --noEmit",
+    "test": "sh -c 'set -a; [ -f ./.env ] && . ./.env; set +a; turbo run build --filter=\"./packages/*\" && node scripts/test-run.mjs'",
     "test:e2e": "turbo run test:e2e",
     "format": "prettier --write \"**/*.{ts,tsx,md,json,yaml,yml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,md,json,yaml,yml}\"",
@@ -37,7 +37,7 @@
     "load:accounts": "pnpm --filter @safra/api load:accounts",
     "load:token": "pnpm --filter @safra/api load:token",
     "worker": "sh -c 'set -a; . ./.env; set +a; pnpm --filter @safra/api start:worker'",
-    "e2e:run": "sh -c 'set -a; . ./.env; set +a; node scripts/e2e-run.mjs'"
+    "e2e:run": "sh -c 'set -a; [ -f ./.env ] && . ./.env; set +a; node scripts/e2e-run.mjs \"$@\"' --"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
