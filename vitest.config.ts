@@ -114,6 +114,9 @@ export default defineConfig({
       // `playwright.config.ts` rather than booting Playwright, so it is cheap enough to
       // sit in the gate that runs on every commit — which is the only place it helps.
       'tools/suite-coverage/*.test.ts',
+      // And the check that no value a super admin can edit is written into a sentence. It reads
+      // the SEED rather than a remembered list, so a new setting is covered the day it is added.
+      'tools/settings-in-copy/*.test.ts',
     ],
     environment: 'node',
     // Security-relevant paths must stay covered as the codebase grows.

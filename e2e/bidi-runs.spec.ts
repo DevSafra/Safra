@@ -98,6 +98,9 @@ const SURFACES = [
       '/ar/terms',
       '/ar/privacy',
       '/ar/find-booking',
+      '/ar/login',
+      '/ar/register',
+      '/ar/partners/join',
     ],
   },
   {
