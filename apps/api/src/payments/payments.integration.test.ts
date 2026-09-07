@@ -1144,27 +1144,39 @@ describeIfDb('payment collection, webhooks and refunds', () => {
     paid, and the API answered 409 for ever. 146 bookings were in that state.
   */
   describe('a capture staff recorded by hand', () => {
+    /*
+      It BUILDS the staff-captured booking rather than hunting for one.
+
+      This searched the database for any booking with an `internal` captured payment and no refund,
+      and then issued a REAL refund against whatever it found. On 2026-09-07 that was a booking a
+      person had just made and was looking at: the customer's own page began reporting «$72.00
+      refunded — in progress» on a stay nobody had cancelled.
+
+      A test that mutates rows it does not own is a hazard on any shared database, and this one
+      moved money. The payout suite in this repository already records the rule — «Each test gets
+      its OWN partner and its own payable bookings… Owning the data is the only way these mean the
+      same thing twice» — and this is the same lesson on the refund side.
+
+      `recordPaymentReceived` with no outstanding intent is exactly how a staff-recorded capture
+      arises, so the fixture is built through the real path rather than assembled by hand.
+    */
     it('can be refunded, and waits for finance rather than claiming to be done', async () => {
-      const booking = await db.execute<{ reference: string }>(sql`
-        SELECT b.reference
-          FROM bookings b
-          JOIN payments p ON p.booking_id = b.id
-         WHERE p.provider = 'internal'
-           AND p.status = 'captured'
-           AND b.wallet_amount = 0
-           AND b.deleted_at IS NULL
-           AND b.base_amount > 0
-           AND NOT EXISTS (SELECT 1 FROM refunds r WHERE r.booking_id = b.id
-                             AND r.deleted_at IS NULL)
-         LIMIT 1
+      const own = await createBooking(db);
+
+      await actions.recordPaymentReceived(own.reference, undefined);
+
+      const captured = await db.execute<{ provider: string }>(sql`
+        SELECT provider FROM payments
+         WHERE booking_id = ${own.id}::uuid AND status = 'captured'
       `);
 
-      const reference = booking.rows[0]?.reference;
-
-      expect(reference, 'the fixture has a staff-captured booking').toBeDefined();
+      expect(
+        captured.rows[0]?.provider,
+        'a staff-recorded capture has no gateway behind it',
+      ).toBe('internal');
 
       const result = await refunds.execute(
-        reference!,
+        own.reference,
         'تحقق من الاسترداد اليدوي',
         undefined,
       );
