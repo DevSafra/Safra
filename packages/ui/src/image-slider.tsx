@@ -40,10 +40,12 @@ export interface SliderLabels {
 /**
  * The project's one ease-out, written out rather than referenced.
  *
- * `--ease-out-strong` is defined in the customer app's `globals.css` and in neither of the other
- * two, so a shared component that used the token would animate correctly on one surface out of
- * three and silently fall back to `linear` on the rest. Same class of mistake as the `text-text2`
- * this file used to carry: a shared package may only spend what all three apps have.
+ * `--ease-out-strong` was defined in the customer app's `globals.css` and in neither of the other
+ * two, so a shared component that used the token animated correctly on one surface out of three and
+ * silently fell back to `linear` on the rest — which is what `Modal` was doing until all three
+ * `@theme` blocks gained it (2026-09-07). Written out here anyway, because this is an inline
+ * `style` and Tailwind resolves no token there; the rule the omission taught still holds — a shared
+ * package may only spend what all three apps have.
  */
 const EASE_OUT = 'cubic-bezier(0.23,1,0.32,1)';
 

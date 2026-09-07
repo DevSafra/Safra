@@ -96,7 +96,17 @@ export function ConfirmDialog({
         {request.title}
       </h2>
 
-      <p id="safra-confirm-message" className="text-[12.5px] leading-relaxed text-muted">
+      {/*
+        `whitespace-pre-line` so a caller can PARAGRAPH a message.
+
+        The partner's accept names the booking on one line and states what accepting commits them
+        to on the next; run together they are a blob nobody reads at the moment they most need to.
+        Only newlines survive — runs of spaces still collapse, so no existing message changes.
+      */}
+      <p
+        id="safra-confirm-message"
+        className="text-[12.5px] leading-relaxed whitespace-pre-line text-muted"
+      >
         {request.message}
       </p>
 

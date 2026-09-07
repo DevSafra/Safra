@@ -63,6 +63,15 @@
    * as `--color-text2` and `--ease-out-strong`.
    */
   --radius-card: 0.875rem;
+  /*
+    The project's one ease-out, so a SHARED component can spend it.
+
+    It lived only in the customer app, which meant `Modal` — and therefore every `useConfirm()`
+    dialog in this app — asked for `ease-out-strong`, got nothing, and animated `linear`. A shared
+    package may only spend what all three apps have; the fix is to give all three the token rather
+    than to write the curve out at each call site. Same lesson as `--color-text2` above.
+  */
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
   --color-sky: #78aee0;
   --color-ok: #6fc792;
   --color-bad: #e06868;
