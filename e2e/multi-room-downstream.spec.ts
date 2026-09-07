@@ -50,18 +50,27 @@ test('a guest books three identical rooms', async ({ page }) => {
 
   await expect(row, 'a type with several rooms free').toBeVisible();
 
-  await row.getByRole('button', { name: 'احجز هذه الوحدة' }).click();
+  await row.getByRole('button', { name: /أضف إلى الحجز|في الحجز/ }).click();
 
   const card = page.locator('aside#booking');
-  const plus = card.getByRole('button', { name: /زيادة/ });
+  const plus = card.locator('[data-basket-line]').first().getByRole('button', {
+    name: /زيادة/,
+  });
 
   await plus.click();
   await plus.click();
 
-  await expect(card.locator('[data-summary-rooms]')).toHaveAttribute(
-    'data-summary-rooms',
-    '3',
-  );
+  /*
+    The stepper lives on the LINE now, not on the card.
+
+    The card held one chosen room and one quantity; it holds a basket of typed lines, each with its
+    own control — so «how many rooms in total» is read off the line rather than off a card-level
+    marker that no longer exists.
+  */
+  await expect(
+    card.locator('[data-basket-line]'),
+    'one line, three rooms of it',
+  ).toHaveCount(1);
 
   const href =
     (await card.getByRole('link', { name: 'احجز الآن' }).getAttribute('href')) ?? '';

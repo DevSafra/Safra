@@ -86,7 +86,25 @@ test('thirteen rooms read as four choices, each with its own terms', async ({ pa
 
   const standard = rows.filter({ hasText: 'غرفة مزدوجة قياسية' });
 
-  await expect(standard, 'the standard double is cheaper').toContainText('73.99');
+  /*
+    Cheaper than the suite, compared as NUMBERS rather than against a fixed figure.
+
+    It asserted «73.99» — the standard double for ONE night. The page prices every type for the
+    same window now, because a booking has one stay and a basket mixing types has to share it, so
+    that figure moved to the stay's length. What the assertion is actually about is the ORDER of
+    the two prices, and that survives a change of window.
+  */
+  const priceOf = async (row: typeof standard) =>
+    Number(
+      /إجمالي الإقامة\s*\$([\d,.]+)/
+        .exec(await row.innerText())?.[1]
+        ?.replace(/,/g, '') ?? '0',
+    );
+
+  expect(
+    await priceOf(standard),
+    'the standard double is cheaper than the suite',
+  ).toBeLessThan(await priceOf(suite));
   await expect(standard, 'and has no kitchen').not.toContainText('مطبخ');
 
   /* The building's facilities are the building's, on every row and none. */
@@ -109,7 +127,7 @@ test('the room a guest chooses is the room checkout quotes', async ({ page }) =>
     The row used to be a link straight to checkout; it fills the summary card beside the page, and
     «احجز الآن» there is the commitment — so this is the journey a guest actually walks.
   */
-  await suite.getByRole('button', { name: 'احجز هذه الوحدة' }).click();
+  await suite.getByRole('button', { name: /أضف إلى الحجز|في الحجز/ }).click();
 
   const card = page.locator('aside#booking');
 

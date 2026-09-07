@@ -100,7 +100,7 @@ async function book(
   const row = page.locator('#units > ul > li').filter({ hasText: typeName });
 
   /* Choose on the row, commit on the card — the two acts a guest performs. */
-  await row.getByRole('button', { name: 'احجز هذه الوحدة' }).click();
+  await row.getByRole('button', { name: /أضف إلى الحجز|في الحجز/ }).click();
 
   const card = page.locator('aside#booking');
   const book = card.getByRole('link', { name: 'احجز الآن' });
@@ -248,5 +248,7 @@ test('a family room is one of a kind and never claims a remainder', async ({ pag
   await expect(again, 'it says so rather than offering a dead link').toContainText(
     'غير متاحة للتواريخ المختارة',
   );
-  await expect(again.getByRole('link', { name: 'احجز هذه الوحدة' })).toHaveCount(0);
+  await expect(again.getByRole('button', { name: /أضف إلى الحجز|في الحجز/ })).toHaveCount(
+    0,
+  );
 });

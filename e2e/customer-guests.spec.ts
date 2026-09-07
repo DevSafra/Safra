@@ -104,7 +104,7 @@ test.describe('عدد الضيوف', () => {
     await page
       .locator('#units > ul > li')
       .first()
-      .getByRole('button', { name: 'احجز هذه الوحدة' })
+      .getByRole('button', { name: /أضف إلى الحجز|في الحجز/ })
       .click();
 
     const book = page.locator('aside#booking').locator('a[href*="/checkout?"]').first();
