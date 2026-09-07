@@ -1,3 +1,5 @@
+import { SLA_EXPIRY_WARNING_MINUTES } from '@safra/contracts';
+
 import { compose } from './bilingual.js';
 import type { OutgoingMail } from './mail.service.js';
 
@@ -846,6 +848,14 @@ export function bookingDeadlineReminderMail(input: {
       checkOut: input.checkOut,
       deadline: input.deadline,
       url: input.url,
+      /*
+        The threshold comes from the constant the SWEEP selects on, not from the subject line.
+
+        «تبقّت 30 دقيقة» was written into the copy while `SLA_EXPIRY_WARNING_MINUTES` decides which
+        bookings this mail is sent about. Two numbers meaning one thing, in two files: change the
+        constant and every partner is told thirty minutes remain while the mail went out at ninety.
+      */
+      minutes: SLA_EXPIRY_WARNING_MINUTES,
     }),
   };
 }

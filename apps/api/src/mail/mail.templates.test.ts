@@ -537,6 +537,28 @@ const RENDERERS: {
   },
 ];
 
+/**
+ * The longest LITERAL run in a subject — the part no placeholder can empty.
+ *
+ * This used to be `subject.split('{')[0]`, the text before the first placeholder, and that has a
+ * hole a template can fall straight into: a subject that OPENS with one yields `''`, `indexOf('')`
+ * is 0, and the ordering assertion becomes `0 < 0` — or, worse, `0 < n`, which passes whatever the
+ * order actually is. A test that reports coverage while checking nothing is the failure this
+ * repository already has a rule about, and it was one reworded subject away.
+ *
+ * Found on 2026-09-07 when «تبقّت 30 دقيقة» became «تبقّت {minutes} دقيقة» and the English subject
+ * began with the count.
+ */
+function marker(subject: string): string {
+  const literals = subject
+    .split(/\{[^}]*\}/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+
+  /* The longest, so a stray «—» or a single word cannot be the thing positions are compared on. */
+  return literals.sort((a, b) => b.length - a.length)[0] ?? '';
+}
+
 describe('every transactional email is Arabic first, English underneath', () => {
   for (const { name, entry, render, shows } of RENDERERS) {
     for (const locale of LOCALES) {
@@ -552,8 +574,8 @@ describe('every transactional email is Arabic first, English underneath', () => 
           const ar = emailMessages('ar')[entry as 'passwordReset'];
           const en = emailMessages('en')[entry as 'passwordReset'];
 
-          const arAt = mail.subject.indexOf(ar.subject.split('{')[0]!.trim());
-          const enAt = mail.subject.indexOf(en.subject.split('{')[0]!.trim());
+          const arAt = mail.subject.indexOf(marker(ar.subject));
+          const enAt = mail.subject.indexOf(marker(en.subject));
 
           expect(arAt, 'no Arabic subject').toBeGreaterThanOrEqual(0);
           expect(enAt, 'no English subject').toBeGreaterThanOrEqual(0);

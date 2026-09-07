@@ -215,7 +215,7 @@ export const ar = {
     body: 'تم استلام دفعتك. هذه فاتورة حجزك.\n\nالمرجع: {reference}\nالعقار: {property}\nالإجمالي المدفوع: {amount} {currency}\n\nافتح الفاتورة أو حمّلها من هنا:\n{url}\n\nفريق سفرة',
   },
   bookingDeadlineReminder: {
-    subject: 'تبقّت 30 دقيقة للردّ على الحجز {reference} — سفرة',
+    subject: 'تبقّت {minutes} دقيقة للردّ على الحجز {reference} — سفرة',
     body: 'تنبيه: مهلة الردّ على هذا الحجز توشك على الانتهاء.\n\nالمرجع: {reference}\nالعقار: {property}\nالوصول: {checkIn}\nالمغادرة: {checkOut}\n\nآخر موعد للردّ: {deadline}. إذا انتهت المهلة دون ردّ يُلغى الحجز تلقائيًا، ويُعاد المبلغ كاملًا للعميل، وتُسجَّل مخالفة «عدم الرد» على حسابك.\n\nافتح الطلب الآن:\n{url}\n\nفريق سفرة',
   },
   bookingNeedsAction: {
