@@ -334,14 +334,55 @@ export class BookingActionsService {
   }
 
   /**
-   * Simulates capture, for exercising the lifecycle before a gateway exists.
+   * Finance recording that the customer's payment arrived.
    *
-   * Deliberately staff-gated and separate from markPaid so that when a real webhook
-   * arrives it calls markPaid directly and this stays a testing affordance rather
-   * than becoming a way to mark bookings paid without money.
+   * ## This is a production path, not a simulation
+   *
+   * It was called `simulateCapture` and described as «a testing affordance», which was true when
+   * no rail existed. It is not true now: `manual_transfer` is the rail the platform actually
+   * operates — the customer is given a remittance reference, transfers the money, and
+   * `ManualTransferProvider`'s own note says «Finance matches the incoming credit and confirms it
+   * through the staff capture endpoint». There is no webhook for a bank; a person IS the webhook.
+   *
+   * Bashar's business flow, 2026-09-07: «The customer pays SAFRA through Visa, Mastercard, Sham
+   * Cash or another supported payment method. SAFRA receives and records the payment.» This is the
+   * recording.
+   *
+   * ## It captures the payment the customer actually made
+   *
+   * The defect this fixes, found by driving a real booking on 2026-09-07: it called `markPaid`
+   * with no payment id, so `createInternalPayment` minted a SECOND row with
+   * `method = 'wallet', provider = 'internal'` and captured that — while the customer's
+   * `bank_transfer` intent, the one carrying the remittance reference finance matched against the
+   * bank statement, stayed `requires_action` for ever.
+   *
+   * Two things were wrong with that. The books recorded a wallet payment for money that arrived by
+   * bank transfer, so the record of HOW the customer paid was false. And a refund «routes back
+   * through whichever provider took the money» — which, on that record, was a rail the money never
+   * came in on.
+   *
+   * So the outstanding intent is captured where there is one. Minting an internal row stays the
+   * fallback for a booking with no intent at all — a stay settled entirely from wallet balance,
+   * where there genuinely is no external payment to capture.
    */
-  async simulateCapture(reference: string, claims: AccessTokenClaims | undefined) {
-    return this.markPaid(reference, claims);
+  async recordPaymentReceived(reference: string, claims: AccessTokenClaims | undefined) {
+    const booking = await this.load(reference, claims);
+
+    /*
+      The NEWEST outstanding intent. A booking can accumulate more than one if a customer
+      abandoned a rail and started another, and the last one is the rail they actually used.
+    */
+    const pending = await this.db.execute<{ id: string }>(sql`
+      SELECT id::text
+        FROM payments
+       WHERE booking_id = ${booking.id}
+         AND status IN ('requires_action', 'initiated', 'authorized')
+         AND deleted_at IS NULL
+       ORDER BY created_at DESC
+       LIMIT 1
+    `);
+
+    return this.markPaid(reference, claims, pending.rows[0]?.id);
   }
 
   /**

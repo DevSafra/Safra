@@ -242,11 +242,15 @@ export class BookingsController {
   }
 
   /**
-   * Marks a booking paid (§6.3 step 5) and posts the ledger entries.
+   * Finance recording that the customer's payment arrived (§6.3 step 5), and the ledger with it.
    *
-   * Staff-gated stand-in for the payment webhook, which does not exist until a
-   * gateway is chosen (ADR 0002). It exists so the lifecycle and the books are
-   * exercisable end to end rather than untested until the entity decision lands.
+   * Described here as a «stand-in for the payment webhook… so the lifecycle is exercisable» —
+   * accurate when nothing could take money, and misleading now. `manual_transfer` IS the rail the
+   * platform operates: the customer gets a remittance reference and transfers the money, and no
+   * bank sends a webhook, so a person confirming the credit is the only mechanism there is.
+   *
+   * Renamed on 2026-09-07 to say what it does, because a production path called `simulateCapture`
+   * is one somebody eventually deletes as test scaffolding.
    */
   @Post(':reference/capture-payment')
   @HttpCode(HttpStatus.OK)
@@ -256,7 +260,7 @@ export class BookingsController {
     @CurrentUser() user: AccessTokenClaims | undefined,
     @Param('reference') reference: string,
   ) {
-    return this.actions.simulateCapture(reference, user);
+    return this.actions.recordPaymentReceived(reference, user);
   }
 
   /**

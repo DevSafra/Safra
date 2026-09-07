@@ -998,6 +998,82 @@ describeIfDb('payment collection, webhooks and refunds', () => {
 
   // ── Routing ──────────────────────────────────────────────────────────────────
 
+  /*
+    Recording that the customer's money arrived — on the payment they actually made.
+
+    Found by driving a real booking through the console on 2026-09-07. The staff capture called
+    `markPaid` with no payment id, so `createInternalPayment` minted a SECOND row with
+    `method = 'wallet', provider = 'internal'` and captured THAT, while the customer's
+    `bank_transfer` intent — the one carrying the remittance reference finance matches against the
+    bank statement — stayed `requires_action` for ever.
+
+    Two things were wrong. The books recorded a wallet payment for money that arrived by bank
+    transfer, so the record of HOW the customer paid was false. And a refund «routes back through
+    whichever provider took the money», which on that record was a rail the money never came in on.
+
+    `manual_transfer` is the rail the platform actually operates today — no bank sends a webhook, so
+    a person confirming the credit is the only mechanism there is. This is the production path.
+  */
+  describe('recording that the payment arrived', () => {
+    it('captures the intent the customer used, not a wallet row invented beside it', async () => {
+      /*
+        A UNIQUE reference per run. `payments_provider_ref_unique` is on (provider, provider_ref),
+        and a fixed literal collides with itself the moment a row outlives a run — which is exactly
+        what happened the first time this was written.
+      */
+      const paymentId = await openPayment(
+        db,
+        booking.id,
+        `SAFRA-TEST-ARRIVED-${crypto.randomUUID()}`,
+      );
+
+      await db.execute(sql`
+        UPDATE payments SET method = 'bank_transfer', provider = 'manual_transfer'
+         WHERE id = ${paymentId}::uuid
+      `);
+
+      await actions.recordPaymentReceived(booking.reference, undefined);
+
+      const rows = await db.execute<{
+        id: string;
+        method: string;
+        provider: string;
+        status: string;
+      }>(sql`
+        SELECT id::text, method::text, provider, status::text
+          FROM payments WHERE booking_id = ${booking.id}::uuid ORDER BY created_at
+      `);
+
+      expect(rows.rows, 'one payment, not two').toHaveLength(1);
+      expect(rows.rows[0]!.id, 'the intent the customer used').toBe(paymentId);
+      expect(rows.rows[0]!.status).toBe('captured');
+      expect(rows.rows[0]!.method, 'the record says how the money actually arrived').toBe(
+        'bank_transfer',
+      );
+      expect(rows.rows[0]!.provider).toBe('manual_transfer');
+
+      /* And the booking moved on, so the capture did its real work too. */
+      expect(await bookingStatus(db, booking.id)).toBe('pending_confirmation');
+    });
+
+    /*
+      The fallback, and the reason it has to stay: a stay settled entirely from wallet balance has
+      no external intent to capture, and refusing to record it would strand the booking.
+    */
+    it('still records a booking that had no payment intent at all', async () => {
+      await actions.recordPaymentReceived(booking.reference, undefined);
+
+      const rows = await db.execute<{ method: string; status: string }>(sql`
+        SELECT method::text, status::text FROM payments
+         WHERE booking_id = ${booking.id}::uuid
+      `);
+
+      expect(rows.rows).toHaveLength(1);
+      expect(rows.rows[0]!.status).toBe('captured');
+      expect(await bookingStatus(db, booking.id)).toBe('pending_confirmation');
+    });
+  });
+
   describe('offered payment methods (§7.1)', () => {
     /**
      * The simulator serves all four approved rails, so with it routed the offered set
