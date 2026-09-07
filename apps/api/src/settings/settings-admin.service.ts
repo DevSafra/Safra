@@ -7,6 +7,7 @@ import { isSanctionsPolicy, type Role } from '@safra/contracts';
 import { actorName } from '../common/actor-name.sql.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
+import { SettingsRevalidationService } from './settings-revalidation.service.js';
 import { SettingsService } from './settings.service.js';
 import { normalise } from './money-settings.service.js';
 import { ERROR } from '@safra/contracts';
@@ -66,6 +67,7 @@ export class SettingsAdminService {
     @Inject(DATABASE) private readonly db: Database,
     private readonly settings: SettingsService,
     private readonly audit: AuditService,
+    private readonly revalidation: SettingsRevalidationService,
   ) {}
 
   async list(): Promise<EditableSetting[]> {
@@ -175,6 +177,17 @@ export class SettingsAdminService {
      * whether the save worked.
      */
     this.settings.invalidate(key);
+
+    /*
+      And the FRONT ENDS, so the change is visible rather than merely in force.
+
+      After the transaction, never inside it: an HTTP call to another service while holding a
+      database transaction open is how a pool gets exhausted by an admin pressing «حفظ». Awaited
+      rather than fired and forgotten, so an integration test can observe it and so a failure is
+      logged before the response goes back — it is bounded at three seconds per app and cannot fail
+      the write, which has already committed.
+    */
+    await this.revalidation.revalidate(key);
 
     this.logger.log(
       `Setting ${key} changed by ${actor.userId ?? 'unknown'}: ` +

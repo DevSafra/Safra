@@ -43,6 +43,29 @@ import {
 
 export { SAME_DAY_CUTOFF_ENABLED_SETTING };
 
+/**
+ * The Next.js cache tag every surface puts on its settings read.
+ *
+ * Bashar, 2026-09-08: *"I would like configuration changes to become visible immediately after a
+ * settings update… the platform should reflect those updates without requiring users to wait
+ * several minutes for caches to expire."*
+ *
+ * Deriving a value from configuration is only half the promise. The other half is that a change
+ * ARRIVES: `/settings/public` was cached for 300 seconds in the customer app and 60 in the console,
+ * and الشروط and the home page are prerendered on top of that — so an admin who changed the fee
+ * watched two screens quote the old one for five minutes and had no way to tell a slow cache from a
+ * failed save.
+ *
+ * A TAG rather than a path, and that is the whole design. `revalidateTag` invalidates the cached
+ * FETCH and every prerendered page whose render consumed it — so a new screen that reads the
+ * settings is covered the day it is written, with no list of paths for somebody to forget to
+ * update. A path list is the shape that decays; this one cannot.
+ *
+ * Spelled here so no app types it. A mistyped tag purges nothing, fails nowhere, and looks exactly
+ * like a cache that is working.
+ */
+export const OPERATING_SETTINGS_TAG = 'safra:operating-settings';
+
 /** `booking.confirmation_window_minutes` — how long a partner has to answer a request (§6.4). */
 export const CONFIRMATION_WINDOW_SETTING = 'booking.confirmation_window_minutes';
 

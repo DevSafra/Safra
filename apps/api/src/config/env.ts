@@ -52,6 +52,19 @@ export const envSchema = z.object({
   */
   METRICS_TOKEN: z.string().min(32).optional(),
 
+  /*
+    The secret the API presents when it asks a front end to drop its cached settings.
+
+    Optional, and absent means the fan-out is SKIPPED with a warning rather than the boot failing:
+    a deployment that forgets it loses immediacy and keeps the TTL floor, which is the safe
+    direction. `min(32)` for the same reason `METRICS_TOKEN` has it — a short shared secret on an
+    endpoint anybody can reach is a guess away from being no secret.
+
+    Both front ends read the same value as `REVALIDATE_SECRET`; a mismatch shows up as a 404 in
+    this app's log rather than as silence, which is why `SettingsRevalidationService` names it.
+  */
+  REVALIDATE_SECRET: z.string().min(32).optional(),
+
   MEDIA_REQUIRE_PUBLIC: z
     .enum(['true', 'false'])
     .default('false')

@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 
 import { FxModule } from '../fx/fx.module.js';
 import { MoneySettingsService } from './money-settings.service.js';
+import { SettingsRevalidationService } from './settings-revalidation.service.js';
 import { SettingsService } from './settings.service.js';
 
 /**
@@ -15,7 +16,7 @@ import { SettingsService } from './settings.service.js';
 @Global()
 @Module({
   imports: [FxModule],
-  providers: [SettingsService, MoneySettingsService],
-  exports: [SettingsService, MoneySettingsService],
+  providers: [SettingsService, MoneySettingsService, SettingsRevalidationService],
+  exports: [SettingsService, MoneySettingsService, SettingsRevalidationService],
 })
 export class SettingsModule {}

@@ -6,6 +6,7 @@ import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { SettingsAdminService } from './settings-admin.service.js';
+import { SettingsRevalidationService } from './settings-revalidation.service.js';
 import { SettingsService } from './settings.service.js';
 
 /**
@@ -49,13 +50,31 @@ describeIfDb('SettingsAdminService', () => {
   const KEY = 'test.settings_admin_fixture';
   const ORIGINAL_VALUE = 120;
   let original: unknown;
+  /** Which keys the write asked the front ends to drop, in order. */
+  let revalidated: string[] = [];
 
   beforeEach(async () => {
     await harness.begin();
 
     db = harness.db;
     settings = new SettingsService(db);
-    admin = new SettingsAdminService(db, settings, new AuditService(db));
+    /*
+      A REAL revalidation service with no secret configured, not a stub.
+
+      With `REVALIDATE_SECRET` absent it warns and returns without making a request, which is the
+      documented behaviour on an unconfigured deployment — so this exercises the real code path and
+      still makes no network call from a test. A stub would have hidden the day somebody made the
+      fan-out throw on a missing secret instead of skipping.
+    */
+    revalidated = [];
+    const revalidation = new SettingsRevalidationService({} as never);
+    const real = revalidation.revalidate.bind(revalidation);
+    revalidation.revalidate = async (key: string) => {
+      revalidated.push(key);
+      await real(key);
+    };
+
+    admin = new SettingsAdminService(db, settings, new AuditService(db), revalidation);
 
     /**
      * Insert-if-absent then reset, rather than `ON CONFLICT`. The unique index on
@@ -295,6 +314,44 @@ describeIfDb('SettingsAdminService', () => {
         db.execute(sql`DELETE FROM settings_history WHERE key = ${KEY}`),
       ).rejects.toSatisfy(isAppendOnlyRefusal);
     });
+  });
+
+  /*
+    A saved setting asks the front ends to drop their cached copy (Bashar, 2026-09-08).
+
+    «I would like configuration changes to become visible immediately after a settings update.»
+    الرئيسية is prerendered with `revalidate = 300` and the console's settings read held sixty
+    seconds of its own, so a fee change was in force and invisible for minutes — and an operator
+    cannot tell a slow cache from a save that did not work.
+
+    Asserted on the write path rather than on the fan-out, because the defect this prevents is
+    somebody removing the call, not the HTTP failing. The fan-out has its own tests beside this.
+  */
+  it('asks the front ends to revalidate after a setting is saved', async () => {
+    await admin.update(KEY, 90, 'اختبار الإبطال الفوري.', {
+      userId: undefined,
+      role: 'super_admin',
+    });
+
+    expect(revalidated, 'the write did not ask anybody to drop the old value').toEqual([
+      KEY,
+    ]);
+  });
+
+  it('does not revalidate when the write is refused', async () => {
+    /*
+      The opposite control, and it is the half that matters: a purge for a change that never
+      happened would make every rejected save look like it took effect for as long as it takes the
+      front end to re-read — which is the exact confusion this feature removes.
+    */
+    await expect(
+      admin.update('commission.partner_rate', 5, 'قيمة خارج النطاق.', {
+        userId: undefined,
+        role: 'super_admin',
+      }),
+    ).rejects.toThrow();
+
+    expect(revalidated).toEqual([]);
   });
 });
 
