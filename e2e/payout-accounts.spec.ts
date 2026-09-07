@@ -475,10 +475,19 @@ test.describe('payout accounts, across the portal and the console', () => {
         }
       }
 
+      /*
+        A precondition, and the old hint named the one command that cannot supply it.
+
+        `pnpm db:testbed` seeds bookings; it does NOT create payouts. Those come from the hourly
+        `payout-accrual` job (`0 * * * *`) reading COMPLETED bookings — so a freshly reset testbed
+        has no payout at all until that job next fires, and «run db:testbed» sent the next reader
+        round in a circle.
+      */
       expect(
         found,
-        `${MONEY_PARTNER_NAME} must have a payout that is accruing or awaiting release — ` +
-          'run `pnpm db:testbed` if this fails',
+        `${MONEY_PARTNER_NAME} must have a payout that is accruing or awaiting release. ` +
+          'This comes from the hourly payout-accrual job, NOT from db:testbed — a freshly reset ' +
+          'testbed has none until that job next fires.',
       ).toBe(true);
 
       const reference = page.url().match(/\/payouts\/(PYT-\d+)/)?.[1] ?? '';
