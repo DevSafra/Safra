@@ -723,10 +723,28 @@ export class PayoutService {
       check_in: string;
       check_out: string;
       property: string;
+      refunded: string;
+      booking_total: string;
     }>(sql`
       SELECT b.reference AS booking_reference, i.amount::text AS amount,
              b.check_in::text, b.check_out::text,
-             coalesce(pr.name_ar, pr.name_en) AS property
+             coalesce(pr.name_ar, pr.name_en) AS property,
+             /*
+               WHAT THE GUEST GOT BACK on this booking.
+
+               A payout line said «$613.80 owed» on a booking whose guest had been refunded $330,
+               and no screen said so. The partner's payable is snapshotted when the booking is made
+               and is never adjusted for a refund, so SAFRA absorbs the difference — which may be
+               the intended commercial rule, but nobody at SAFRA could SEE it happening. This makes
+               the margin question visible; it does not change who is paid.
+             */
+             coalesce((
+               SELECT sum(r.amount) FROM refunds r
+               WHERE r.booking_id = b.id
+                 AND r.status = 'completed'
+                 AND r.deleted_at IS NULL
+             ), 0)::text AS refunded,
+             b.total_amount::text AS booking_total
       FROM partner_payout_items i
       JOIN bookings b    ON b.id = i.booking_id
       JOIN properties pr ON pr.id = b.property_id
@@ -801,6 +819,9 @@ export class PayoutService {
         checkIn: item.check_in,
         checkOut: item.check_out,
         property: item.property,
+        /* Zero on the ordinary line, so a reader can tell «nothing refunded» from «not known». */
+        refunded: item.refunded,
+        bookingTotal: item.booking_total,
       })),
       trail: trail.rows.map((entry) => ({
         action: entry.action,

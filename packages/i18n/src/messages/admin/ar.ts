@@ -1228,6 +1228,17 @@ export const ar = {
      * tell a partner a transfer happened when only an obligation was recorded.
      */
     payouts: {
+      /*
+        What the GUEST got back on a covered booking (Bashar's Stage 3, 2026-09-07).
+
+        A payout line read «$613.80 owed» on a booking whose guest had been refunded $330 and no
+        screen said so. The partner's payable is snapshotted at booking time and never adjusted for
+        a refund, so SAFRA absorbs the difference — which may be the intended rule, but nobody
+        could see it happening.
+      */
+      colRefunded: 'مُسترد للعميل',
+      refundedNote:
+        'المبالغ المستردة للعملاء لا تُخصم من مستحقات الشريك — الفرق تتحمّله سفرة. تُعرض هنا حتى تكون الحالة مرئية للمالية.',
       title: 'تحويلات الشركاء',
       searchPlaceholder: 'بحث بالمرجع أو الشريك أو مرجع الحوالة…',
       allStatuses: 'كل الحالات',

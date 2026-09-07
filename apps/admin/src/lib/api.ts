@@ -2338,6 +2338,9 @@ const payoutDetailSchema = payoutSchema.extend({
       checkIn: z.string(),
       checkOut: z.string(),
       property: z.string().nullable(),
+      /* What the guest got back, and what they paid — the margin question, made visible. */
+      refunded: z.string(),
+      bookingTotal: z.string(),
     }),
   ),
   trail: z.array(

@@ -168,13 +168,14 @@ export default async function PayoutPage({
           <p className="text-sm text-faint">{t.sections.payouts.noBookings}</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] text-sm">
+            <table className="w-full min-w-[680px] text-sm">
               <thead>
                 <tr className="text-start text-[11.5px] text-faint">
                   <Th>{t.sections.payouts.colBooking}</Th>
                   <Th>{t.sections.payouts.colProperty}</Th>
                   <Th>{t.sections.payouts.colStay}</Th>
                   <Th>{t.sections.payouts.colAmount}</Th>
+                  <Th>{t.sections.payouts.colRefunded}</Th>
                 </tr>
               </thead>
               <tbody>
@@ -194,10 +195,41 @@ export default async function PayoutPage({
                         {amount(booking.amount, payout.currencyCode)}
                       </Ltr>
                     </Td>
+                    {/*
+                      What the GUEST got back on this booking.
+
+                      A line read «$613.80 owed» on a booking whose guest had been refunded $330,
+                      and no screen said so. Amber where there IS a refund, because that is the
+                      row a finance reader needs to look at twice; an em dash where there is none,
+                      so «nothing refunded» is legible as a fact rather than as a blank cell.
+                    */}
+                    <Td>
+                      {Number(booking.refunded) > 0 ? (
+                        <Ltr className="font-semibold text-warn">
+                          {amount(booking.refunded, payout.currencyCode)}
+                        </Ltr>
+                      ) : (
+                        <span className="text-faint2">—</span>
+                      )}
+                    </Td>
                   </tr>
                 ))}
               </tbody>
             </table>
+
+            {/*
+              WHY a refund does not reduce the line beside it.
+
+              Without this, an operator reading «$613.80 owed · $330 refunded» would reasonably
+              assume one of the two figures is wrong. The partner's payable is snapshotted at
+              booking time and SAFRA absorbs the refund — stated here so the row is readable
+              rather than alarming.
+            */}
+            {payout.bookings.some((one) => Number(one.refunded) > 0) ? (
+              <p className="mt-2 text-[11.5px] leading-relaxed text-faint2">
+                {t.sections.payouts.refundedNote}
+              </p>
+            ) : null}
           </div>
         )}
       </Section>
