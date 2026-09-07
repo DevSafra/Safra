@@ -1,10 +1,11 @@
-import { getSettings, type EditableSetting } from '@/lib/api';
+import { getSettings, type EditableSetting, getSanctionsStatus } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
 import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
 import { SettingsBoard, type SettingsGroup } from '@/components/settings-board';
 import { ALWAYS_USD_SETTING_KEY } from '@safra/contracts';
 import { t } from '@/lib/strings';
 import { refuseSection } from '@/components/section-refusal';
+import { SanctionsList } from '@/components/sanctions-list';
 
 /**
  * الإعدادات — the Rules Engine (SRS §9.3, P-005, design handoff §8).
@@ -118,7 +119,11 @@ export default async function SettingsPage() {
 
   if (refused) return refused;
 
-  const [result, counts] = await Promise.all([getSettings(), sidebarCounts()]);
+  const [result, counts, sanctions] = await Promise.all([
+    getSettings(),
+    sidebarCounts(),
+    getSanctionsStatus(),
+  ]);
 
   if (result === 'unauthenticated' || result === 'failed') {
     return (
@@ -170,6 +175,22 @@ export default async function SettingsPage() {
   return (
     <ConsoleShell title={t.nav.settings} counts={counts}>
       <SettingsBoard groups={groups} alwaysUsd={alwaysUsd(result.settings)} />
+
+      {/*
+        The sanctions list, and the way to replace it (Bashar, 2026-09-07).
+
+        Not a settings ROW: the others are a key and a value, and this is a state plus an action on
+        a file. It lives on this screen because importing takes `SETTINGS_UPDATE` — the permission
+        this section is already gated by — while the partner detail page, which shows the same
+        status at the moment a reviewer needs it, is read by people who could not press the button.
+
+        A failed read renders nothing rather than an empty panel: a screen claiming «no list» when
+        it simply could not ask would be worse than not drawing it, because the answer it implies
+        is «verification is blocked» and somebody would act on that.
+      */}
+      {sanctions === 'failed' || sanctions === 'unauthenticated' ? null : (
+        <SanctionsList status={sanctions} />
+      )}
     </ConsoleShell>
   );
 }
