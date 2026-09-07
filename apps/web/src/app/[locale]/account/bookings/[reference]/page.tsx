@@ -134,6 +134,37 @@ export default async function BookingDetailPage({
             </>
           ) : null}
         </Row>
+        {/*
+          Every room TYPE, with its quantity and what it cost.
+
+          The row above names the LEAD type, which is the whole truth for a single-type booking and
+          one of several on a mixed one. This is the guest's own record of what they paid for, so a
+          basket has to be legible on it — «مزدوجة قياسية × 2 · $288».
+        */}
+        {booking.lines.length > 1 ? (
+          <Row label={t('bookingRoomsHeading')}>
+            <ul data-booking-lines className="grid gap-0.5">
+              {booking.lines.map((line) => (
+                <li key={line.unitId} className="flex flex-wrap gap-x-2">
+                  <span className="text-text2">
+                    {localisedName(line, locale)} ·{' '}
+                    {t('roomsCount', { count: line.rooms })}
+                  </span>
+                  <span className="tabular-nums text-muted">
+                    {formatMoney(
+                      line.amount,
+                      booking.currency?.code ?? DEFAULT_MONEY_CURRENCY,
+                      locale,
+                      {
+                        exact: true,
+                      },
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Row>
+        ) : null}
         <Row label={t('bookingStay')}>
           <DateRange from={booking.checkIn} to={booking.checkOut} locale={locale} /> ·{' '}
           {t('nights', { count: booking.nights })}

@@ -166,6 +166,22 @@ const bookingDetailSchema = z.object({
     booking is a confident lie about what the guest paid for.
   */
   rooms: z.number().nullable().optional(),
+  /*
+    Every room TYPE on the booking. `.default([])` is safe where a COUNT default would not be: an
+    empty list means «no line information», which renders nothing — it does not claim one room.
+  */
+  lines: z
+    .array(
+      z.object({
+        unitId: z.string(),
+        nameAr: z.string(),
+        nameEn: z.string().nullable(),
+        nameDe: z.string().nullable(),
+        rooms: z.number(),
+        amount: z.string(),
+      }),
+    )
+    .default([]),
   checkIn: z.string(),
   checkOut: z.string(),
   nights: z.number(),
@@ -285,6 +301,22 @@ const pendingReviewSchema = z.object({
     booking is a confident lie about what the guest paid for.
   */
   rooms: z.number().nullable().optional(),
+  /*
+    Every room TYPE on the booking. `.default([])` is safe where a COUNT default would not be: an
+    empty list means «no line information», which renders nothing — it does not claim one room.
+  */
+  lines: z
+    .array(
+      z.object({
+        unitId: z.string(),
+        nameAr: z.string(),
+        nameEn: z.string().nullable(),
+        nameDe: z.string().nullable(),
+        rooms: z.number(),
+        amount: z.string(),
+      }),
+    )
+    .default([]),
   checkIn: z.string(),
   checkOut: z.string(),
 });
@@ -313,6 +345,22 @@ const reviewEligibilitySchema = z.object({
     booking is a confident lie about what the guest paid for.
   */
   rooms: z.number().nullable().optional(),
+  /*
+    Every room TYPE on the booking. `.default([])` is safe where a COUNT default would not be: an
+    empty list means «no line information», which renders nothing — it does not claim one room.
+  */
+  lines: z
+    .array(
+      z.object({
+        unitId: z.string(),
+        nameAr: z.string(),
+        nameEn: z.string().nullable(),
+        nameDe: z.string().nullable(),
+        rooms: z.number(),
+        amount: z.string(),
+      }),
+    )
+    .default([]),
   stayCompleted: z.boolean(),
   alreadyReviewed: z.boolean(),
   eligible: z.boolean(),
@@ -389,6 +437,22 @@ const myReviewSchema = z.object({
     booking is a confident lie about what the guest paid for.
   */
   rooms: z.number().nullable().optional(),
+  /*
+    Every room TYPE on the booking. `.default([])` is safe where a COUNT default would not be: an
+    empty list means «no line information», which renders nothing — it does not claim one room.
+  */
+  lines: z
+    .array(
+      z.object({
+        unitId: z.string(),
+        nameAr: z.string(),
+        nameEn: z.string().nullable(),
+        nameDe: z.string().nullable(),
+        rooms: z.number(),
+        amount: z.string(),
+      }),
+    )
+    .default([]),
 });
 
 export type MyReview = z.infer<typeof myReviewSchema>;
@@ -474,6 +538,26 @@ const invoiceSummarySchema = z.object({
     booking is a confident lie about what the guest paid for.
   */
   rooms: z.number().nullable().optional(),
+  /*
+    Every room TYPE on the booking. `.default([])` is safe where a COUNT default would not be: an
+    empty list means «no line information», which renders nothing — it does not claim one room.
+  */
+  /*
+    Every room TYPE on the receipt. `roomLines`, not `rooms`: `unit.rooms` is a count and this is a
+    list — naming both `rooms` made this schema's `z.number()` meet an array, and the receipts list
+    parsed as nothing while the API answered 200.
+  */
+  roomLines: z
+    .array(
+      z.object({
+        nameAr: z.string(),
+        nameEn: z.string().nullable(),
+        nameDe: z.string().nullable(),
+        rooms: z.number(),
+        amount: z.string(),
+      }),
+    )
+    .default([]),
   city: translatedNameSchema,
   currencyCode: z.string(),
   totalAmount: z.string(),

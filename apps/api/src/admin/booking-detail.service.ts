@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { bookingLines } from '../bookings/booking-lines.js';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
@@ -121,6 +122,9 @@ export class BookingDetailService {
 
       `read_only` is unaffected: `scopeFilter` returns TRUE for it, which is what that mode means.
     */
+    /* Hoisted: a nested sql template terminates the outer literal at its first backtick. */
+    const lines = bookingLines(sql`b.id`);
+
     const rows = await this.db.execute<Record<string, unknown>>(sql`
       SELECT b.id, b.reference, b.status::text AS status,
              b.check_in::text, b.check_out::text, b.nights,
@@ -146,6 +150,8 @@ export class BookingDetailService {
              coalesce(u.name_ar, u.name_en)   AS unit_name,
              b.rooms,
              b.booking_group_reference,
+             -- Every room type and its subtotal — «تركيبة الحجز» on the console.
+             ${lines} AS lines,
              /* Which physical rooms this booking holds — the answer support is asked for. */
              (SELECT string_agg(bu_u.unit_label, ', ' ORDER BY bu_u.unit_label)
                 FROM booking_units bu
@@ -246,6 +252,8 @@ export class BookingDetailService {
           from a screen that names the room TYPE — these two say how many and which doors.
         */
         rooms: booking['rooms'],
+        /* The composition: one entry per room type, with its quantity and subtotal. */
+        lines: booking['lines'] ?? [],
         roomLabels: booking['room_labels'] ?? null,
         city: booking['city_name'],
       },

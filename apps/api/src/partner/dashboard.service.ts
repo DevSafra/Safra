@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { bookingLines, type BookingLine } from '../bookings/booking-lines.js';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
@@ -33,6 +34,9 @@ import type { AccessTokenClaims } from '../auth/token.service.js';
  *
  * The payout line is the sharpest case and has its own rules — see `payoutLine`.
  */
+/* Hoisted: a nested sql template terminates the outer literal at its first backtick. */
+const REQUEST_LINES = bookingLines(sql`b.id`);
+
 @Injectable()
 export class PartnerDashboardService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
@@ -267,6 +271,7 @@ export class PartnerDashboardService {
       currency_code: string;
       deadline_at: string | null;
       rooms: number;
+      lines: BookingLine[];
       room_labels: string | null;
     }>(sql`
       SELECT b.reference,
@@ -284,6 +289,8 @@ export class PartnerDashboardService {
                doubles looked exactly like a request for one.
              */
              b.rooms,
+             -- Every room type being asked for. A partner deciding within two hours needs all of it.
+             ${REQUEST_LINES} AS lines,
              (SELECT string_agg(bu_u.unit_label, ', ' ORDER BY bu_u.unit_label)
                 FROM booking_units bu
                 JOIN units bu_u ON bu_u.id = bu.unit_id
@@ -302,6 +309,7 @@ export class PartnerDashboardService {
       reference: row.reference,
       unitName: row.unit_name,
       rooms: row.rooms,
+      lines: row.lines,
       roomLabels: row.room_labels,
       propertyName: row.property_name,
       checkIn: row.check_in,

@@ -77,6 +77,19 @@ export interface InvoiceUnit extends InvoiceTranslatedName {
   readonly rooms: number;
 }
 
+/**
+ * One room TYPE on the receipt, with its quantity and what it cost.
+ *
+ * `unit` above is the LEAD type, kept because most bookings have one and every existing consumer
+ * reads it. A booking may hold several since 0070, and a receipt naming only the first has a total
+ * with an invisible component — the thing an accounts department cannot reconcile.
+ */
+export interface InvoiceRoomLine extends InvoiceTranslatedName {
+  readonly rooms: number;
+  /** Whole-stay accommodation for this line. The lines sum to the receipt's accommodation. */
+  readonly amount: string;
+}
+
 export interface InvoicePayment {
   readonly reference: string;
   readonly method: string;
@@ -106,6 +119,14 @@ export interface InvoiceSummary {
    * distinguishable only by the figure. Somebody reconciling a card statement cannot do that.
    */
   readonly unit: InvoiceUnit;
+  /**
+   * Every room type on the booking. One entry for the ordinary single-type receipt.
+   *
+   * `roomLines`, not `rooms`: `unit.rooms` is a COUNT and this is a list, and calling both `rooms`
+   * made a consumer's `z.number()` meet an array — the receipts list parsed as nothing and
+   * rendered empty, with the API answering 200 the whole time.
+   */
+  readonly roomLines: readonly InvoiceRoomLine[];
   readonly city: InvoiceTranslatedName;
   readonly currencyCode: string;
   /** `bookings.total_amount`, read verbatim. */

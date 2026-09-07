@@ -10,6 +10,7 @@ import {
   bookingConfirmedMail,
   bookingNeedsActionMail,
 } from '../mail/mail.templates.js';
+import { bookingLines, describeLines, type BookingLine } from './booking-lines.js';
 import { VoucherService } from './voucher.service.js';
 import { describeError } from '../common/errors/safe-error.js';
 import { NotificationService } from '../notifications/notification.service.js';
@@ -625,6 +626,9 @@ export class BookingActionsService {
         having never been sent; and a failure could not be re-driven, because the re-drive sweep
         reads exactly the rows this path did not write.
       */
+      /* Hoisted: a nested sql template terminates the outer literal at its first backtick. */
+      const lines = bookingLines(sql`b.id`);
+
       const rows = await this.db.execute<{
         id: string;
         customer_profile_id: string;
@@ -632,6 +636,7 @@ export class BookingActionsService {
         property: string;
         unit: string;
         rooms: number;
+        lines: BookingLine[];
         check_in: string;
         check_out: string;
         locale: string | null;
@@ -640,6 +645,8 @@ export class BookingActionsService {
                /* The ROOM, which the attached voucher names and this message did not. */
                coalesce(un.name_ar, un.name_en) AS unit,
                b.rooms,
+               -- Every room TYPE, so the message names what the guest actually booked.
+               ${lines} AS lines,
                b.check_in::text AS check_in, b.check_out::text AS check_out,
                u.preferred_locale AS locale,
                b.id, b.customer_profile_id
@@ -663,7 +670,18 @@ export class BookingActionsService {
           to: row.email,
           reference,
           property: row.property,
-          unit: row.unit,
+          /*
+            Every room TYPE, as one sentence — «غرفة مزدوجة قياسية × 2 · جناح تنفيذي × 1».
+
+            It named the LEAD type, so a guest who booked a double and a suite was told about the
+            suite and nothing else, while the voucher attached to the same message listed both.
+            A mail disagreeing with its own attachment is the shape the `unit` field was added to
+            fix, one booking shape later.
+          */
+          unit:
+            row.lines.length > 0
+              ? describeLines(row.lines, (line) => line.nameAr)
+              : row.unit,
           rooms: row.rooms,
           checkIn: row.check_in,
           checkOut: row.check_out,

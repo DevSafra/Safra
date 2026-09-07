@@ -730,6 +730,8 @@ export const ar = {
     arrivalRoomsCount:
       '{count, plural, zero {لا غرف} one {غرفة واحدة} two {غرفتان} few {# غرف} many {# غرفة} other {# غرفة}}',
     arrivalRoomNumbers: 'أرقام الغرف',
+    /* Every room type on the booking — a mixed booking is not its lead type. */
+    arrivalRooms: 'الغرف',
     unitQuantity: 'عدد الغرف المتطابقة',
     unitQuantityHint:
       'إن كان لديك عدة غرف متطابقة من هذا النوع، اكتب عددها هنا بدل تكرار النموذج. تُنشئ سفرة صفًّا لكل غرفة حتى لا تُحجز غرفة واحدة مرتين، وتظهر جميعها للضيف كنوع واحد.',

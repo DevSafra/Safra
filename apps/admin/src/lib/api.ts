@@ -471,6 +471,23 @@ const propertyDetailSchema = z.object({
       isCover: z.boolean(),
     }),
   ),
+  /*
+    The listing as INVENTORY: one entry per room type, how many exist and how many are free
+    tonight. `units` below is still the physical rooms — a moderator reviewing claims reads those.
+  */
+  inventory: z
+    .array(
+      z.object({
+        nameAr: z.string(),
+        maxGuests: z.number(),
+        basePrice: z.string(),
+        currencyCode: z.string(),
+        minNights: z.number(),
+        configured: z.number(),
+        available: z.number(),
+      }),
+    )
+    .default([]),
   units: z.array(
     z.object({
       nameAr: z.string(),
@@ -798,6 +815,19 @@ const bookingDetailSchema = z.object({
     /* How many rooms of that type, and which physical rooms they are. */
     rooms: z.number(),
     roomLabels: z.string().nullable(),
+    /* Every room type on the booking — «تركيبة الحجز». One entry for a single-type booking. */
+    lines: z
+      .array(
+        z.object({
+          unitId: z.string(),
+          nameAr: z.string(),
+          nameEn: z.string().nullable(),
+          nameDe: z.string().nullable(),
+          rooms: z.number(),
+          amount: z.string(),
+        }),
+      )
+      .default([]),
     city: z.string(),
   }),
   money: z.object({

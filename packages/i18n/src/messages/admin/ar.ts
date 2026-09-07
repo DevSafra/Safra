@@ -2694,6 +2694,8 @@ export const ar = {
       roomsCount:
         '{count, plural, zero {لا غرف} one {غرفة واحدة} two {غرفتان} few {# غرف} many {# غرفة} other {# غرفة}}',
       roomNumbers: 'أرقام الغرف',
+      /* «تركيبة الحجز» — every room type on the booking, with its quantity and subtotal. */
+      composition: 'تركيبة الحجز',
       /* The trip — the other bookings this guest made for the same stay. */
       tripReference: 'مرجع الرحلة',
       /**
@@ -2955,6 +2957,13 @@ export const ar = {
       retired: 'موقوف',
     },
     propertyDetail: {
+      /* The listing as INVENTORY — how many of each room type, and how many are free tonight. */
+      inventory: 'المخزون المُعرَّف',
+      inventoryNote:
+        'عدد الغرف من كل نوع كما عرّفه الشريك، والمتاح منها الليلة. «متاح» يعني غير محجوز ولم يُغلقه الشريك على التقويم.',
+      inventoryConfigured: 'مُعرَّف',
+      inventoryAvailable: 'متاح الليلة',
+      inventoryFull: 'لا شيء متاح',
       /* The two amenity levels a moderator reviews (Bashar, 2026-09-06). */
       propertyAmenities: 'مرافق العقار',
       noAmenities: 'لم يحدّد الشريك أي مرافق للعقار.',

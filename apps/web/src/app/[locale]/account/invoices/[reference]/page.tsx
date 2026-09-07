@@ -165,7 +165,20 @@ export default async function AccountInvoicePage({
             {localisedName(invoice.property, locale)}
           </h2>
           <p className="mt-1 text-sm text-muted">
-            {localisedName(invoice.unit, locale)} · {localisedName(invoice.city, locale)}
+            {/*
+              Every room TYPE, with its quantity — «مزدوجة قياسية × 2 · جناح × 1».
+
+              `invoice.unit` is the LEAD type. A receipt naming it alone on a mixed booking has a
+              total whose largest component is invisible, which is precisely what an accounts
+              department cannot reconcile. Falls back to the lead name where there are no lines, so
+              nothing changes for the ordinary single-type receipt.
+            */}
+            {invoice.roomLines.length > 1
+              ? invoice.roomLines
+                  .map((line) => `${localisedName(line, locale)} × ${line.rooms}`)
+                  .join(' · ')
+              : localisedName(invoice.unit, locale)}{' '}
+            · {localisedName(invoice.city, locale)}
           </p>
 
           <dl className="mt-4 grid gap-3 sm:grid-cols-3">

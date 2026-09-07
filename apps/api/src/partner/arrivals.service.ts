@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { bookingLines, type BookingLine } from '../bookings/booking-lines.js';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
@@ -27,6 +28,8 @@ export type Arrival = {
   unitName: string;
   /** How many rooms this booking holds, and which physical rooms — reception hands over keys. */
   rooms: number;
+  /** Every room TYPE with its quantity — a mixed booking is not its lead type. */
+  lines: readonly BookingLine[];
   roomLabels: string | null;
   checkIn: string;
   checkOut: string;
@@ -67,6 +70,10 @@ export type ArrivalPage = {
  * Dates are compared in the CITY's timezone, not the server's. A property in Damascus rolls over to
  * tomorrow three hours before UTC does, and a desk clerk looking at "today" means their today.
  */
+
+/* Every room type on the booking. Hoisted: a nested sql template breaks the outer literal. */
+const LINES = bookingLines(sql`b.id`);
+
 @Injectable()
 export class ArrivalsService {
   private readonly logger = new Logger(ArrivalsService.name);
@@ -109,6 +116,7 @@ export class ArrivalsService {
       property_name: string;
       unit_name: string;
       rooms: number;
+      lines: BookingLine[];
       room_labels: string | null;
       check_in: string;
       check_out: string;
@@ -122,6 +130,8 @@ export class ArrivalsService {
              p.name_ar    AS property_name,
              u.name_ar    AS unit_name,
              b.rooms,
+             -- Every room type, so a mixed booking is not shown as its lead type alone.
+             ${LINES} AS lines,
              /* The doors, for the person handing over keys. See voucher.service.ts. */
              (SELECT string_agg(bu_u.unit_label, ', ' ORDER BY bu_u.unit_label)
                 FROM booking_units bu
@@ -157,6 +167,7 @@ export class ArrivalsService {
         propertyName: row.property_name,
         unitName: row.unit_name,
         rooms: row.rooms,
+        lines: row.lines,
         roomLabels: row.room_labels,
         checkIn: row.check_in,
         checkOut: row.check_out,
@@ -321,6 +332,7 @@ export class ArrivalsService {
     const rows = await this.db.execute<ArrivalRow>(sql`
       SELECT b.reference, cp.full_name AS guest_name,
              p.name_ar AS property_name, u.name_ar AS unit_name, b.rooms,
+             ${LINES} AS lines,
              (SELECT string_agg(bu_u.unit_label, ', ' ORDER BY bu_u.unit_label)
                 FROM booking_units bu
                 JOIN units bu_u ON bu_u.id = bu.unit_id
@@ -357,6 +369,7 @@ export class ArrivalsService {
     const rows = await this.db.execute<ArrivalRow>(sql`
       SELECT b.reference, cp.full_name AS guest_name,
              p.name_ar AS property_name, u.name_ar AS unit_name, b.rooms,
+             ${LINES} AS lines,
              (SELECT string_agg(bu_u.unit_label, ', ' ORDER BY bu_u.unit_label)
                 FROM booking_units bu
                 JOIN units bu_u ON bu_u.id = bu.unit_id
@@ -388,6 +401,7 @@ export interface ArrivalRow extends Record<string, unknown> {
   property_name: string;
   unit_name: string;
   rooms: number;
+  lines: BookingLine[];
   room_labels: string | null;
   check_in: string;
   check_out: string;
@@ -404,6 +418,7 @@ function toArrival(row: ArrivalRow): Arrival {
     propertyName: row.property_name,
     unitName: row.unit_name,
     rooms: row.rooms,
+    lines: row.lines,
     roomLabels: row.room_labels,
     checkIn: row.check_in,
     checkOut: row.check_out,

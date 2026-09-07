@@ -218,6 +218,18 @@ const dashboardSchema = z.object({
       /* How many rooms this booking holds, and which physical rooms — reception hands over keys. */
       rooms: z.number(),
       roomLabels: z.string().nullable(),
+      lines: z
+        .array(
+          z.object({
+            unitId: z.string(),
+            nameAr: z.string(),
+            nameEn: z.string().nullable(),
+            nameDe: z.string().nullable(),
+            rooms: z.number(),
+            amount: z.string(),
+          }),
+        )
+        .default([]),
       propertyName: z.string(),
       checkIn: z.string(),
       checkOut: z.string(),
@@ -970,6 +982,20 @@ const arrivalSchema = z.object({
   /* How many rooms this booking holds, and which physical rooms — reception hands over keys. */
   rooms: z.number(),
   roomLabels: z.string().nullable(),
+  /* Every room type on the booking, with its quantity — a mixed booking is not its lead type. */
+  lines: z
+    .array(
+      z.object({
+        unitId: z.string(),
+        nameAr: z.string(),
+        nameEn: z.string().nullable(),
+        nameDe: z.string().nullable(),
+        rooms: z.number(),
+        amount: z.string(),
+      }),
+    )
+    .default([]),
+
   guestName: z.string(),
   propertyName: z.string(),
   unitName: z.string(),

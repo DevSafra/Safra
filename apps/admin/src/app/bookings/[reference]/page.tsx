@@ -190,10 +190,26 @@ export default async function BookingPage({
             An operator answering «the guest says they booked three» could not see the count at
             all — it was on the booking and on no screen.
           */
+          /*
+            EVERY room type, not the lead one.
+
+            `booking.property.unit` is `bookings.unit_id`'s name — the first line of a basket. An
+            operator answering «what did they book» from that would name a suite on a booking that
+            also holds two double rooms.
+          */
           lines={[
-            booking.property.rooms > 1
-              ? `${booking.property.unit} · ${plural(t.sections.bookingDetail.roomsCount, { count: booking.property.rooms })}`
-              : booking.property.unit,
+            ...(booking.property.lines.length > 1
+              ? booking.property.lines.map(
+                  (line: { nameAr: string; rooms: number; amount: string }) =>
+                    `${line.nameAr} · ${plural(t.sections.bookingDetail.roomsCount, {
+                      count: line.rooms,
+                    })} · ${amount(line.amount, booking.money.currencyCode)}`,
+                )
+              : [
+                  booking.property.rooms > 1
+                    ? `${booking.property.unit} · ${plural(t.sections.bookingDetail.roomsCount, { count: booking.property.rooms })}`
+                    : booking.property.unit,
+                ]),
             ...(booking.property.roomLabels === null
               ? []
               : [

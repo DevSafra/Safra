@@ -245,6 +245,18 @@ function Row({ arrival }: { arrival: PartnerArrival }) {
               </>
             ) : null}
           </p>
+          {/*
+            Every room TYPE, where there is more than one.
+
+            `unitName` above is the LEAD type. A guest arriving on «مزدوجة × 2 + جناح × 1» was
+            shown as a suite, so the person preparing rooms prepared one.
+          */}
+          {arrival.lines.length > 1 ? (
+            <p data-arrival-lines className="text-[11.5px] text-text2">
+              {t.editProperty.arrivalRooms}:{' '}
+              {arrival.lines.map((line) => `${line.nameAr} × ${line.rooms}`).join(' · ')}
+            </p>
+          ) : null}
           {arrival.roomLabels && arrival.rooms > 1 ? (
             <p className="text-[11.5px] text-faint">
               {t.editProperty.arrivalRoomNumbers}: <Ltr>{arrival.roomLabels}</Ltr>

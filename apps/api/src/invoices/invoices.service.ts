@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { bookingLines, type BookingLine } from '../bookings/booking-lines.js';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
@@ -41,6 +42,13 @@ const REFERENCE_PATTERN = /^[A-Za-z0-9-]{4,64}$/;
  */
 const RECEIPTABLE = sql`b.status <> 'draft'`;
 
+/*
+  Every room TYPE on the booking, as JSON. A module constant rather than an expression inside the
+  projection: a nested sql template terminates the outer literal at its first backtick, which is a
+  documented trap here and has cost several builds.
+*/
+const LINES = bookingLines(sql`b.id`);
+
 type BookingRow = {
   reference: string;
   status: string;
@@ -54,6 +62,7 @@ type BookingRow = {
   name_en: string | null;
   name_de: string | null;
   rooms: number;
+  lines: BookingLine[];
   unit_name_ar: string;
   unit_name_en: string;
   unit_name_de: string;
@@ -140,6 +149,9 @@ export class InvoicesService {
         page says why.
       */
       b.rooms,
+      -- Every room TYPE with its own subtotal. An invoice naming the lead type on a mixed booking
+      -- is a document whose total has an invisible component — the thing accounts cannot reconcile.
+      ${LINES} AS lines,
       un.name_ar AS unit_name_ar,
       un.name_en AS unit_name_en,
       un.name_de AS unit_name_de,
@@ -188,6 +200,18 @@ export class InvoicesService {
         nameDe: row.unit_name_de,
         rooms: row.rooms,
       },
+      /*
+        The accommodation as LINES. `unit` above is the lead type and stays for the ordinary
+        single-type invoice; this is what a mixed one has to render, and the amounts sum to the
+        accommodation the total is built from.
+      */
+      roomLines: row.lines.map((line) => ({
+        nameAr: line.nameAr,
+        nameEn: line.nameEn,
+        nameDe: line.nameDe,
+        rooms: line.rooms,
+        amount: line.amount,
+      })),
       city: {
         nameAr: row.city_name_ar,
         nameEn: row.city_name_en,

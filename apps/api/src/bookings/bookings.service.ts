@@ -18,6 +18,7 @@ import {
   assertReadable,
   resolveBookingScope,
 } from '../rbac/ownership.js';
+import { bookingLines, type BookingLine } from './booking-lines.js';
 import { badRequest, notFound } from '../common/errors/app-error.js';
 
 /** The projection any authenticated caller may see. */
@@ -200,7 +201,22 @@ export class BookingsService {
       throw notFound(ERROR.BOOKING_NOT_FOUND);
     }
 
-    return booking;
+    /*
+      Every room TYPE on the booking, as a second read.
+
+      `unit` above is the LEAD line, so a customer's own booking page showed one type on a booking
+      holding several. A separate query rather than a relation because the lines are GROUPED by
+      room identity — «مزدوجة × 2» is one line, not two rooms listed — and Drizzle's relational
+      loader returns rows, not groups.
+
+      Scoped by nothing extra: the booking was already found under the caller's own ownership
+      condition, so this cannot reach a booking they could not read.
+    */
+    const lines = await this.db.execute<{ lines: BookingLine[] }>(sql`
+      SELECT ${bookingLines(sql`${booking.id}`)} AS lines
+    `);
+
+    return { ...booking, rooms: booking.rooms, lines: lines.rows[0]?.lines ?? [] };
   }
 
   /**

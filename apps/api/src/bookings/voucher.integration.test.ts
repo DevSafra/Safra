@@ -119,6 +119,50 @@ describeIfDb('the booking voucher', () => {
     expect(single, 'no «× 1» beside the room name').not.toContain('× 1');
   });
 
+  /**
+   * A voucher for a MIXED booking names every type it holds.
+   *
+   * `bookings.unit_id` is the LEAD line, so a voucher reading that column alone described one type
+   * on a booking holding several — and reception would hand over one room's key to a family
+   * sleeping in three. Nothing in the single-type fixture above can see that: it has one type, so
+   * «the first» and «all of them» are the same answer.
+   */
+  it('names every room type on a mixed booking, in both languages', async () => {
+    /* A SECOND type on the same property, and one of its rooms added to the booking. */
+    const second = await db.execute<{ id: string }>(sql`
+      WITH other AS (
+        INSERT INTO units (property_id, name_ar, name_en, name_de, max_guests, base_price,
+                           currency_id, room_type_code, unit_label)
+        SELECT u.property_id, 'جناح القسيمة', 'Voucher Suite', 'Voucher Suite', 4, '250.00',
+               u.currency_id, 'voucher_suite', 'S1'
+        FROM units u
+        WHERE u.id = (SELECT unit_id FROM bookings WHERE reference = ${reference})
+        RETURNING id
+      )
+      INSERT INTO booking_units (booking_id, unit_id, check_in, check_out, status,
+                                 accommodation_amount)
+      SELECT b.id, other.id, b.check_in, b.check_out, 'confirmed', '750.00'
+      FROM bookings b, other
+      WHERE b.reference = ${reference}
+      RETURNING unit_id::text AS id
+    `);
+
+    expect(second.rows[0], 'the second type joined the booking').toBeDefined();
+
+    const html = voucherHtml(await vouchers.load(reference), 'data:,');
+
+    /* BOTH types, in the Arabic block and in the English one. */
+    expect(html, 'the Arabic block names the suite').toContain('جناح القسيمة');
+    expect(html, 'and still names the double').toContain('وحدة القسيمة');
+    expect(html, 'the English block names it too').toContain('Voucher Suite');
+
+    /* And the QR carries both, so a scanner is not told about one of three things. */
+    const payload = await decode(await vouchers.qr(reference));
+
+    expect(payload).toContain('جناح القسيمة');
+    expect(payload).toContain('وحدة القسيمة');
+  });
+
   it('reveals no payment data', async () => {
     const payload = await decode(await vouchers.qr(reference));
 

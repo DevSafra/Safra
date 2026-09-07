@@ -6,6 +6,7 @@ import type { Database } from '@safra/db';
 import { ERROR } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
+import { bookingLines, describeLines, type BookingLine } from './booking-lines.js';
 import { notFound } from '../common/errors/app-error.js';
 import { renderContractPdf } from '../admin/contract-pdf.js';
 
@@ -107,6 +108,12 @@ export class VoucherService {
       A booking that fails this answers exactly as one that does not exist, so nobody can learn a
       reference is real by watching which refusal they get.
     */
+    /*
+      Hoisted. A nested sql template inside another one terminates the outer literal at its first
+      backtick — a documented trap in this codebase, and the sixth time it has cost a build today.
+    */
+    const lines = bookingLines(sql`b.id`);
+
     const rows = await this.db.execute<VoucherRow>(sql`
       SELECT b.reference, b.status::text AS status,
              b.check_in::text AS check_in, b.check_out::text AS check_out,
@@ -118,6 +125,10 @@ export class VoucherService {
                accident.
              */
              b.rooms,
+             -- Every room TYPE on the booking, with its quantity. bookings.unit_id names only
+             -- the first, so a voucher for «مزدوجة × 2، جناح × 1» would have described a suite
+             -- and said nothing about the two rooms the family is also sleeping in.
+             ${lines} AS lines,
              cp.full_name AS customer_name,
              coalesce(pr.name_ar, pr.name_en) AS property_name,
              coalesce(u.name_ar, u.name_en)   AS unit_name,
@@ -149,6 +160,8 @@ export interface VoucherRow extends Record<string, unknown> {
   check_out: string;
   nights: number;
   rooms: number;
+  /** Every room type on the booking. See `bookingLines`. */
+  lines: BookingLine[];
   guests_adults: number;
   guests_children: number;
   customer_name: string;
@@ -176,7 +189,11 @@ export function voucherQrPayload(booking: VoucherRow): string {
     `ref:${booking.reference}`,
     `guest:${booking.customer_name}`,
     `property:${booking.property_name}`,
-    `unit:${booking.unit_name}`,
+    /*
+      Every room TYPE, not the lead one. A scanner reading «unit:جناح تنفيذي» on a booking that also
+      holds two double rooms told a clerk about one of three things the guest is owed.
+    */
+    `unit:${describeLines(booking.lines, (line) => line.nameAr) || booking.unit_name}`,
     /*
       The COUNT, and deliberately not the room numbers.
 
@@ -200,6 +217,37 @@ export function voucherQrPayload(booking: VoucherRow): string {
     `guests:${booking.guests_adults + booking.guests_children}`,
     `status:${booking.status}`,
   ].join('\n');
+}
+
+/**
+ * One row per room TYPE, in the language the block is written in.
+ *
+ * A single row naming `unit_name` was right while a booking held one type. It now holds several,
+ * and a voucher describing the first of them is a document reception cannot act on: they would
+ * hand over one room's key for a family sleeping in three.
+ *
+ * Falls back to the lead unit's name when a booking has no lines — every booking this platform
+ * writes has them, and a blank row would be worse than a slightly stale one.
+ */
+function rowsFor(booking: VoucherRow, label: string): string {
+  const english = label !== 'الوحدة';
+  const name = (line: BookingLine) =>
+    english ? (line.nameEn ?? line.nameAr) : line.nameAr;
+
+  if (booking.lines.length === 0) {
+    return `<div class="row"><span class="label">${label}</span><span class="value">${esc(
+      booking.unit_name,
+    )}</span></div>`;
+  }
+
+  return booking.lines
+    .map(
+      (line) =>
+        `<div class="row"><span class="label">${label}</span><span class="value">${esc(
+          name(line),
+        )}${line.rooms > 1 ? ` × ${line.rooms}` : ''}</span></div>`,
+    )
+    .join('\n      ');
 }
 
 /** HTML-escaped, because every value here is somebody's typed name. */
@@ -263,7 +311,7 @@ export function voucherHtml(booking: VoucherRow, qrDataUri: string): string {
     <div class="fields">
       <div class="row"><span class="label">العميل</span><span class="value">${esc(booking.customer_name)}</span></div>
       <div class="row"><span class="label">العقار</span><span class="value">${esc(booking.property_name)}</span></div>
-      <div class="row"><span class="label">الوحدة</span><span class="value">${esc(booking.unit_name)}${booking.rooms > 1 ? ` × ${booking.rooms}` : ''}</span></div>
+      ${rowsFor(booking, 'الوحدة')}
       <div class="row"><span class="label">المدينة</span><span class="value">${esc(booking.city_name)}</span></div>
       <div class="row"><span class="label">الوصول</span><span class="value ltr">${esc(booking.check_in)}</span></div>
       <div class="row"><span class="label">المغادرة</span><span class="value ltr">${esc(booking.check_out)}</span></div>
@@ -281,7 +329,7 @@ export function voucherHtml(booking: VoucherRow, qrDataUri: string): string {
   <div class="en">
     <div class="row"><span class="label">Guest</span><span class="value">${esc(booking.customer_name)}</span></div>
     <div class="row"><span class="label">Property</span><span class="value">${esc(booking.property_name)}</span></div>
-    <div class="row"><span class="label">Unit</span><span class="value">${esc(booking.unit_name)}${booking.rooms > 1 ? ` × ${booking.rooms}` : ''}</span></div>
+    ${rowsFor(booking, 'Unit')}
     <div class="row"><span class="label">City</span><span class="value">${esc(booking.city_name)}</span></div>
     <div class="row"><span class="label">Check-in</span><span class="value">${esc(booking.check_in)}</span></div>
     <div class="row"><span class="label">Check-out</span><span class="value">${esc(booking.check_out)}</span></div>

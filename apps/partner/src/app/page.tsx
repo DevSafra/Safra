@@ -310,6 +310,21 @@ function Requests({
                           count: request.rooms,
                         })}
                       </span>
+                    ) : null}
+                    {/*
+                      And WHICH types.
+
+                      A partner has two hours to accept, and «3 غرف» does not say whether that is
+                      three doubles or a double, a family room and a suite — those are different
+                      rooms to prepare. The line above names only the LEAD type.
+                    */}
+                    {request.lines.length > 1 ? (
+                      <span data-request-lines className="text-text2">
+                        {' · '}
+                        {request.lines
+                          .map((line) => `${line.nameAr} × ${line.rooms}`)
+                          .join(' · ')}
+                      </span>
                     ) : null}{' '}
                     · {request.checkIn} ← {request.checkOut} ·{' '}
                     {fill(t.dashboard.requestsNights, { n: count(request.nights) })} ·{' '}
