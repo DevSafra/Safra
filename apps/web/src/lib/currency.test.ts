@@ -43,12 +43,44 @@ describe('rateBetween', () => {
     expect(rateBetween('USD', 'SYP', [])).toBeNull();
   });
 
-  /** A pair nobody recorded is reachable through the pivot when both legs exist. */
-  it('goes through USD when it can', () => {
-    const withEuro = [...RATES, { base: 'USD', quote: 'EUR', rate: '0.92' }];
+  /**
+   * A pair nobody recorded, derived through the pivot — and the pivot is SYP.
+   *
+   * This test used to invent a `USD → EUR` rate and route SYP → USD → EUR through it. That is a
+   * shape the platform never stores: `FxRateService` completes every pair with the ACCOUNTING
+   * currency, so `fx_rates` is a star with SYP at the centre and every row is `base → SYP`.
+   *
+   * The old assumption was load-bearing in the wrong direction. With USD as the pivot,
+   * `rateBetween` hit its own recursion guard on the first step of every USD price — `from ===
+   * PIVOT` — and returned null, so a USD listing could only ever be displayed in SYP. A guest
+   * selecting EUR saw dollars, unchanged and unremarked, and entering a EUR rate did not help
+   * because the arithmetic could not reach it.
+   *
+   * So the fixture is now the shape the database actually holds, and the derivation is the one the
+   * customer app actually needs: a listing priced in USD, shown in euros.
+   */
+  it('derives a cross-rate through SYP, which is what every rate is quoted in', () => {
+    const withEuro = [...RATES, { base: 'EUR', quote: 'SYP', rate: '14250.5' }];
 
-    /* SYP → USD → EUR. */
-    expect(rateBetween('SYP', 'EUR', withEuro)).toBeCloseTo(0.92 / 13_000, 12);
+    /* USD → SYP → EUR: 13,000 SYP per dollar, 14,250.5 per euro. */
+    expect(rateBetween('USD', 'EUR', withEuro)).toBeCloseTo(13_000 / 14_250.5, 12);
+
+    /* And back, so neither direction depends on which side was recorded. */
+    expect(rateBetween('EUR', 'USD', withEuro)).toBeCloseTo(14_250.5 / 13_000, 12);
+  });
+
+  /**
+   * A leg missing means null, still — the property the design turns on.
+   *
+   * TRY is an ACTIVE currency with no rate on this platform, which is exactly the state that made
+   * the switcher appear to do nothing. Deriving anything here would put a figure on screen that
+   * came from nowhere.
+   */
+  it('returns null when only one leg of the cross-rate exists', () => {
+    const withEuro = [...RATES, { base: 'EUR', quote: 'SYP', rate: '14250.5' }];
+
+    expect(rateBetween('USD', 'TRY', withEuro)).toBeNull();
+    expect(rateBetween('EUR', 'TRY', withEuro)).toBeNull();
   });
 
   /** A rate of zero cannot be inverted, and dividing by it would produce Infinity as a price. */

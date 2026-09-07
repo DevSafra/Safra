@@ -1,5 +1,6 @@
 import type { Locale } from '@/i18n/routing';
 import { formatMoney } from '@/lib/localise';
+import { ACCOUNTING_CURRENCY } from '@safra/contracts';
 
 /**
  * Converting a price into the currency somebody asked to read it in.
@@ -22,8 +23,25 @@ export interface FxRate {
   readonly rate: string;
 }
 
-/** The pivot every derived rate goes through. Listings are priced in it. */
-const PIVOT = 'USD';
+/**
+ * The pivot every derived cross-rate goes through — the currency every rate is QUOTED IN.
+ *
+ * `SYP`, not USD, and the difference is the whole reason cross-currency display never worked.
+ *
+ * `fx_rates` stores one shape: `base → SYP`. `FxRateService` completes every pair with the
+ * accounting currency — «Base currency, ISO 4217. The pair is completed with SYP» — so the rate
+ * graph is a star with SYP at the centre and nothing else in it.
+ *
+ * This said `USD`, on the reasoning that listings are priced in USD. That conflates what a listing
+ * is priced IN with what the rates are quoted AGAINST. With USD as the pivot, `rateBetween` reached
+ * the guard below on its first step for every USD price — `from === PIVOT` — and returned null, so
+ * the only currency a USD listing could ever be shown in was SYP, the one it had a direct rate to.
+ *
+ * Measured on 2026-09-07: a guest selecting EUR or TRY saw `$201.99`, unchanged, with no notice.
+ * Entering a EUR rate through the new console screen did not fix it, because the arithmetic could
+ * not use the rate — which is why the screen alone would have looked like a success.
+ */
+const PIVOT = ACCOUNTING_CURRENCY;
 
 function finite(value: string): number | null {
   const parsed = Number(value);
