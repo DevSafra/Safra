@@ -25,6 +25,52 @@ import { defineConfig, devices } from '@playwright/test';
  * block was considered and rejected: it would rebuild and restart both Next apps on
  * every run, turning a ten-second check into minutes.
  */
+/**
+ * The specs that need a PARTNER SESSION, and therefore run in `signed-in` rather than `chromium`.
+ *
+ * ONE list, because it is used twice and in OPPOSITE senses: `chromium` ignores these and
+ * `signed-in` matches them. Written out twice — which it was until 2026-09-07 — a spec added to
+ * one and not the other either runs NOWHERE (in the ignore list, absent from the match) or runs
+ * TWICE, once without the session it needs. The first of those is silent: no skip, no failure,
+ * just a spec that never executed, which is the coverage hole `scripts/e2e-run.mjs` exists to
+ * make impossible.
+ *
+ * `e2e/spec-coverage.test.ts` holds the other half: every spec file is collected by exactly one
+ * project, so a NEW file cannot fall between them either.
+ */
+const NEEDS_PARTNER_SESSION = new RegExp(
+  `(${[
+    'partner',
+    'partner-arrivals',
+    'partner-images',
+    'partner-screens',
+    'partner-sidebar',
+    'partner-calendars',
+    'partner-employees',
+    'partner-suspension',
+    'customer-review',
+    'customer-invoices',
+    'customer-gifts',
+    'partner-support',
+    'auth-throttle',
+    'three-apps-together',
+    'payout-accounts',
+    'star-rating',
+    'property-submission',
+    'partner-responsive',
+    'partner-settings',
+    'amenities-end-to-end',
+    'property-amenities-chain',
+    'multi-unit-downstream',
+    'booking-confirmation-journey',
+    'partner-room-quantity',
+    'multi-room-downstream',
+    'dispute-payout-freeze',
+    'mixed-booking-downstream',
+    'refund-visibility',
+  ].join('|')})\\.spec\\.ts`,
+);
+
 export default defineConfig({
   testDir: './e2e',
   // Not parallel: these share one database and one set of accounts, and the login tests
@@ -70,8 +116,7 @@ export default defineConfig({
         in a project that depends on this one, so a partner spec collected here would read a state
         file that does not exist yet.
       */
-      testIgnore:
-        /(partner|partner-arrivals|partner-images|partner-screens|partner-sidebar|partner-calendars|partner-employees|partner-suspension|customer-review|customer-invoices|customer-gifts|partner-support|auth-throttle|three-apps-together|payout-accounts|star-rating|property-submission|partner-responsive|partner-settings|amenities-end-to-end|property-amenities-chain|multi-unit-downstream|booking-confirmation-journey|partner-room-quantity|multi-room-downstream|dispute-payout-freeze|mixed-booking-downstream|refund-visibility)\.spec\.ts/,
+      testIgnore: NEEDS_PARTNER_SESSION,
     },
     /**
      * Everything that SIGNS IN, run after everything else.
@@ -130,8 +175,7 @@ export default defineConfig({
       name: 'signed-in',
       use: { ...devices['Desktop Chrome'] },
       dependencies: ['signed-in-setup'],
-      testMatch:
-        /(partner|partner-arrivals|partner-images|partner-screens|partner-sidebar|partner-calendars|partner-employees|partner-suspension|customer-review|customer-invoices|customer-gifts|partner-support|auth-throttle|three-apps-together|payout-accounts|star-rating|property-submission|partner-responsive|partner-settings|amenities-end-to-end|property-amenities-chain|multi-unit-downstream|booking-confirmation-journey|partner-room-quantity|multi-room-downstream|dispute-payout-freeze|mixed-booking-downstream|refund-visibility)\.spec\.ts/,
+      testMatch: NEEDS_PARTNER_SESSION,
     },
   ],
 });
