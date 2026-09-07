@@ -846,6 +846,53 @@ One full-suite run failed a sidebar-badge comparison immediately after the conso
 and passed on every run since. The runner must wait for the applications to be _serving correctly_,
 not merely accepting connections, or it will report environment noise as product failure.
 
+### The unattended harness — three findings that matter before launch (2026-09-07)
+
+These came out of running the browser suite repeatedly during Stage 3. All three make the suite
+report something other than the truth, which is worse than a red build.
+
+**1. Specs that create durable financial holds did not lift them.** A live dispute freezes a
+partner's whole payout — `release` answers `PAYOUT_FROZEN_BY_DISPUTE`. `customer-gifts.spec.ts`
+raises a real dispute on every run and its own comment said a spec «cannot tidy up after itself
+here», which was true of the CUSTOMER (they have no way to close one) and not of the SUITE (closing
+is a staff action and the staff session is already captured). Once a leftover landed on the payout
+`payout-accounts.spec.ts` releases, that spec answered «frozen_by_dispute» where it expects
+«no_verified_account» and reported a working rule broken. Both specs now close what they open, and
+23 leftovers from earlier runs were closed through the real lifecycle.
+
+**2. Specs that create bookings progressively consume the fixture hotel.** The testbed hotel has
+one family room and two executive suites. Specs booking at pseudo-random future windows erode
+availability across a day of iteration until any spec needing a small room type fails
+intermittently — `multi-unit-journey` failed in a full run and passed alone, with
+`suite_executive` down from 2 to 1 at its own window. **The unattended runner should reset the
+testbed before a full run.** It does not today.
+
+**3. A fresh testbed silently SKIPS 21 chromium tests, up from 8.** Coverage currently depends on
+accumulated state. Of the 21: about fifteen are the known media blocker (no property photographs in
+the bucket, so every `image-preview` test skips), and the rest are data-state — an applicable
+coupon, a customer record, a dispute with evidence, a treasury lifecycle. A skip reads exactly like
+a pass, and `scripts/e2e-run.mjs` fails on «did not run» but tolerates any number of skips. **It
+should carry a skip BUDGET and fail when it grows.**
+
+**And one misleading message, fixed.** `payout-accounts.spec.ts` said «run `pnpm db:testbed` if this
+fails» about a missing payout. `db:testbed` seeds bookings and creates no payouts at all — those
+come from the hourly `payout-accrual` job reading completed bookings, so a freshly reset testbed
+has none until it next fires. The hint sent the next reader round in a circle.
+
+### Refunds — the reason field is INTERNAL (2026-09-07)
+
+The customer's refund view first included `refunds.reason`, and that was wrong. The console
+describes the field as «saved with the financial movement» — internal — and 15,671 reasons already
+exist, written by staff under exactly that assumption; publishing them retroactively would surface
+internal prose to customers. `applied_refund_percent` goes instead, which answers the question a
+customer actually has («why did I get half back») from the cancellation policy rather than from
+somebody's typing, and contains nothing that was never meant to be read.
+
+A second trap on the same field: `applied_refund_percent` is `numeric`, and pg returns numerics as
+STRINGS. Typing it as a number compiled fine, failed the consumer's `z.number()` at runtime, and the
+customer's whole booking payload stopped parsing — the page rendered nothing with the API answering 200. That is the second numeric-as-string failure in this codebase in one day; the other named an
+invoice's line array `rooms` beside a `rooms` count and emptied the receipts list the same way.
+
 ### Stage 3 — refunds, 2026-09-07
 
 **A customer could not see their own refunds.** The platform had written 15,671
