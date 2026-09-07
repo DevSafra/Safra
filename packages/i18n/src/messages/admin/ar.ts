@@ -3763,6 +3763,8 @@ export const ar = {
     'booking.payment_captured': 'تحصيل دفعة حجز',
     /* The partner accepting inside the two-hour window — see the note in `audit-actions.ts`. */
     'booking.confirmed': 'تأكيد الحجز من الشريك',
+    /* And refusing it. «رفض الشريك للحجز» is the timeline's wording for the same act, kept in step. */
+    'booking.rejected': 'رفض الحجز من الشريك',
     'booking.checked_in': 'تسجيل وصول الضيف',
     'booking.check_in_undone': 'التراجع عن تسجيل الوصول',
     /* The ACT, not its content: the note itself never reaches the audit log — see the action. */

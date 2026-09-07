@@ -63,6 +63,17 @@ export const AUDIT_ACTIONS = [
     platform had never managed to perform. Fixing the transition is what surfaced it.
   */
   'booking.confirmed',
+  /*
+    The other half of the same decision, and absent for the same shape of reason as its twin above.
+
+    `booking-actions.service.ts` has always written this when a partner refuses a request, and no
+    row had ever been written in this database — a partner rejection is the branch nothing had
+    exercised, so the catalogue could not be caught missing it. Driving finding 215's control
+    through a browser on 2026-09-07 produced the first one, and `audit-catalogue.integration.test.ts`
+    named it within the minute: the console would have shown an operator the raw «booking.rejected»
+    on the one screen where every other action reads in Arabic.
+  */
+  'booking.rejected',
   'booking.sla_expired',
   'booking.exported',
   'booking.export_requested',
