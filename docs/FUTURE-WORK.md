@@ -846,6 +846,58 @@ One full-suite run failed a sidebar-badge comparison immediately after the conso
 and passed on every run since. The runner must wait for the applications to be _serving correctly_,
 not merely accepting connections, or it will report environment noise as product failure.
 
+### Stage 3 — refunds, 2026-09-07
+
+**A customer could not see their own refunds.** The platform had written 15,671
+`booking.refund_issued` timeline events and the console read them; the customer's own booking page
+said nothing about any of them — not the amount, not when, not whether it had completed. Money moved
+and the person it moved to had no record of it on the platform, which is the same asymmetry the
+partner's frozen payout had, on the other side of the transaction. Their booking page now states
+each refund, whether part of it went to their wallet, whether it has completed (and if not, that a
+card may take days), and why. Deliberately NOT the provider reference — the wrong thing for a
+customer to quote to their bank — and not the member of staff who issued it. Driven end to end: an
+operator refunds through the console, the customer signs in and reads it.
+
+**A refund figure was trimmed.** «أُعيد $330» rendered under «الإجمالي المدفوع $661.99» — two
+precisions for money on one screen, and the imprecise one is the figure a customer goes looking for
+on a card statement. Exact now, and asserted.
+
+### OPEN DECISION — does a refund reduce what the partner is owed? (2026-09-07)
+
+**This needs Bashar's answer; it is a commercial rule, not a defect I should decide.**
+
+A partner's `partner_payable_amount` is snapshotted when a booking is made and is NEVER adjusted
+when the guest is refunded. So on this database:
+
+|                       | bookings | owed to partner | refunded to guest      |
+| --------------------- | -------- | --------------- | ---------------------- |
+| real                  | 3        | $1,092.75       | $587.50 (~50% each)    |
+| `BKG-TEST-*` fixtures | 127      | $23,622.00      | $25,400.00 (~99% each) |
+
+A guest refunded 50% under the cancellation policy leaves the partner owed 100% of their payable,
+and SAFRA absorbs the difference. Two models are coherent and only one can be right:
+
+(a) the payable shrinks with the refund — the partner shares the loss;
+(b) SAFRA absorbs refunds — the partner is paid regardless.
+
+Bashar's commission decision (2026-09-05) said SAFRA must not keep recognising partner commission
+«when the underlying booking value has been fully returned and **the partner ultimately earned
+nothing**», which implies (a) at least for FULL refunds. Nothing has been said about partial ones.
+
+**What is protected today.** No FULLY refunded booking reaches a payout — not by a rule, but because
+such bookings are `cancelled` and only `completed` ones accrue. That is a coincidence of the
+lifecycle rather than a guarantee, and a stay that completes and is then fully refunded (a dispute
+upheld after departure) would accrue. Worth a guard once the rule above is decided.
+
+**What was fixed without deciding.** Finance could not SEE any of this. The console's payout detail
+now shows what the guest got back on each covered booking — amber where there is a refund, an em
+dash where there is not — with a line saying the payable is not reduced, so «$613.80 owed · $330
+refunded» reads as a policy rather than as an error. It changes who is paid: nothing.
+
+**Noted, not chased.** 27,653 `BKG-TEST-*` bookings sit in the development database and 166 of them
+are attached to real payout records, which skews any figure read off the console there. That is
+dev-database hygiene from integration tests writing outside a rollback, not a product defect.
+
 ### The booking basket — several room types on one booking, 2026-09-07
 
 «غرفة مزدوجة × 2، جناح تنفيذي × 1، غرفة عائلية × 1» is one family's trip and was three bookings.
