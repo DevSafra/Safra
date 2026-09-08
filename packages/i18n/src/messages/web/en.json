@@ -651,7 +651,13 @@
     "refundWalletLine": "{amount} refunded, {walletAmount} of it to your wallet",
     "refundPending": "In progress — it may take several working days to reach your card.",
     "refundDone": "Completed on {date}",
-    "refundPolicy": "{percent}% under the cancellation policy on this booking"
+    "refundPolicy": "{percent}% under the cancellation policy on this booking",
+    "bookingTotalDue": "Amount due",
+    "bookingPaymentDeadline": "Payment window closes",
+    "unpaidTitle": "We have not received your payment yet",
+    "unpaidBody": "Your booking is held until the time above. Transfer the amount and quote the reference; if the window closes before the transfer arrives the booking is cancelled and the dates are released.",
+    "unpaidRemittanceLabel": "Transfer reference",
+    "unpaidHowTo": "Transfer details"
   },
   "ads": {
     "title": "Nearby, from our partners",

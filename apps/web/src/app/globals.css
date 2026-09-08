@@ -767,3 +767,24 @@ body {
 :root[data-menu-open] header {
   z-index: 70;
 }
+
+/**
+ * The warning ink on a wash of itself, readable in BOTH themes.
+ *
+ * `--color-warn` is tuned for a status PILL — a short word on a chip, where #9e6e15 at 11px is
+ * fine. The unpaid-booking panel puts the same amber on a 10%-of-itself wash over the card, and
+ * measured off the rendered pixels that comes to **3.30:1** — under the 4.5 floor, on «لم تصلنا
+ * دفعتك بعد», which is the sentence telling somebody their booking is about to be cancelled. The
+ * dark theme's #e8a54b on a dark panel measures 9.29:1 and is left alone.
+ *
+ * Scoped to this ink rather than darkening the token: `--color-warn` paints every warning pill in
+ * the app, and moving it to fix one panel would restyle screens this change never touched. #7a5410
+ * measures 5.00:1 on the same wash.
+ */
+.warn-ink {
+  color: var(--color-warn);
+}
+
+:root:not([data-theme='dark']) .warn-ink {
+  color: #7a5410;
+}

@@ -36,7 +36,7 @@ const TONES: Record<Tone, string> = {
 };
 
 /**
- * The three states a CUSTOMER is shown, from the eight the database keeps.
+ * The states a CUSTOMER is shown, from the eight the database keeps.
  *
  * Bashar, 2026-08-18: حجوزاتي shows ملغى, قيد التأكيد and مؤكد, and nothing else. The eight-value
  * enum is an operational vocabulary — `checked_in` and `disputed` are things SAFRA and the partner
@@ -64,7 +64,23 @@ const CUSTOMER_STATES: Readonly<Record<string, string>> = {
   cancelled: 'cancelled',
 
   draft: 'pending_confirmation',
-  pending_payment: 'pending_confirmation',
+  /*
+    `pending_payment` is its OWN state now, and the reason is the rail (2026-09-08).
+
+    It was collapsed into «قيد التأكيد» on Bashar's «حجوزاتي shows ملغى, قيد التأكيد and مؤكد, and
+    nothing else» — correct while every payment was a card, because a card settles inside the
+    checkout session and «not yet paid» lasted seconds.
+
+    `manual_transfer` is the only rail checkout can offer, so an unpaid booking is now a state that
+    lasts and that the CUSTOMER must act on. «قيد التأكيد» means «somebody else is deciding», so the
+    collapse told a customer to wait while their own booking counted down to cancellation. Read on
+    BKG-2026-450171: «قيد التأكيد», «الإجمالي المدفوع $196.99», and a partner-response deadline, on
+    a booking the partner cannot see and for which no money had arrived.
+
+    The word already existed — `account.status.pending_payment` = «بانتظار الدفع» — and nothing
+    reached it. `statusTone` colours it separately too, so this does not put one word in two colours.
+  */
+  pending_payment: 'pending_payment',
   pending_confirmation: 'pending_confirmation',
 
   confirmed: 'confirmed',

@@ -3,20 +3,44 @@ import { describe, expect, it } from 'vitest';
 import { customerBookingStatus } from './booking-status-pill';
 
 /**
- * The collapse from eight operational statuses to the three a customer reads.
+ * The collapse from eight operational statuses to the four a customer reads.
  *
- * Asserted value by value rather than "returns one of three", because the interesting failures are
- * not shape failures — they are a booking that stands being shown as ملغى, or one that never
- * completed being shown as مؤكد. Both would be this function quietly telling somebody something
- * untrue about their own trip.
+ * Asserted value by value rather than "returns one of four", because the interesting failures are
+ * not shape failures — they are a booking that stands being shown as ملغى, one that never completed
+ * being shown as مؤكد, or one that is UNPAID being shown as though somebody else were deciding.
+ * Each would be this function quietly telling somebody something untrue about their own trip.
+ *
+ * ## Why four, when Bashar said three
+ *
+ * «حجوزاتي shows ملغى, قيد التأكيد and مؤكد, and nothing else» (2026-08-18) was correct while every
+ * payment was a card: a card settles inside the checkout session, so `pending_payment` lasted
+ * seconds and «قيد التأكيد» was true a moment later.
+ *
+ * `manual_transfer` is now the only rail checkout can offer, so an unpaid booking is a state that
+ * LASTS and that the customer must act on — and «قيد التأكيد» says the opposite, that somebody else
+ * is deciding. Read on BKG-2026-450171 on 2026-09-08: «قيد التأكيد», «الإجمالي المدفوع $196.99» and
+ * a partner-response deadline, on a booking the partner could not see, for which no money had
+ * arrived, and which the EC-001 sweep was about to cancel. The word «بانتظار الدفع» was already in
+ * the catalogue and nothing reached it.
  */
 describe('customerBookingStatus', () => {
   it.each([
     ['draft', 'pending_confirmation'],
-    ['pending_payment', 'pending_confirmation'],
     ['pending_confirmation', 'pending_confirmation'],
   ])('shows %s as awaiting confirmation', (status, expected) => {
     expect(customerBookingStatus(status)).toBe(expected);
+  });
+
+  /*
+    The state the CUSTOMER must act on keeps its own word.
+
+    Not folded in above: «قيد التأكيد» means «somebody else is deciding», and an unpaid booking is
+    waiting on the reader. Asserted as `not.toBe` as well, because the defect this replaces was a
+    collapse — a future tidy-up that folds it back would otherwise pass.
+  */
+  it('shows an unpaid booking as awaiting PAYMENT, not awaiting a partner', () => {
+    expect(customerBookingStatus('pending_payment')).toBe('pending_payment');
+    expect(customerBookingStatus('pending_payment')).not.toBe('pending_confirmation');
   });
 
   it.each([
@@ -50,8 +74,8 @@ describe('customerBookingStatus', () => {
     }
   });
 
-  /* Whatever it returns must be a key the catalogue can label — the three, and only the three. */
-  it('returns only the three states the customer vocabulary carries', () => {
+  /* Whatever it returns must be a key the catalogue can label — the four, and only the four. */
+  it('returns only the four states the customer vocabulary carries', () => {
     const every = [
       'draft',
       'pending_payment',
@@ -64,7 +88,7 @@ describe('customerBookingStatus', () => {
     ];
 
     expect(new Set(every.map(customerBookingStatus))).toStrictEqual(
-      new Set(['pending_confirmation', 'confirmed', 'cancelled']),
+      new Set(['pending_payment', 'pending_confirmation', 'confirmed', 'cancelled']),
     );
   });
 });

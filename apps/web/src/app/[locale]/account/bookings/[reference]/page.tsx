@@ -96,6 +96,19 @@ export default async function BookingDetailPage({
   const shown = customerBookingStatus(booking.status);
   /* The steps and the guarantee describe a wait. Past that, they would describe nothing. */
   const awaiting = shown === 'pending_confirmation';
+  /*
+    Nothing has been received yet, and this screen used to say the opposite.
+
+    Read on BKG-2026-450171 while it sat at `pending_payment`: «قيد التأكيد», «الإجمالي المدفوع
+    $196.99», «مهلة رد الشريك تنتهي 07:53», and three steps describing SAFRA contacting the partner.
+    Four statements, none true — the partner could not see the booking, no money had arrived, and
+    07:53 was the customer's OWN payment deadline, after which the sweep cancels the booking and
+    releases the dates (EC-001, `system.payment_expired`).
+
+    The console said «تحتاج إجراء» about the same booking on the same data. This is the screen that
+    was wrong, and it is the one the person who owes the money reads.
+  */
+  const unpaid = booking.status === 'pending_payment';
 
   const query = await searchParams;
   /* `ref` is what lets «رجوع» land on the RECEIPT a reader came from, not on الفواتير. */
@@ -179,7 +192,13 @@ export default async function BookingDetailPage({
             children: String(booking.guestsChildren ?? 0),
           })}
         </Row>
-        <Row label={t('bookingTotal')}>
+        {/*
+          «المطلوب دفعه» while unpaid, «الإجمالي المدفوع» once it is.
+
+          One label for both states called money paid that had not been — the plainest kind of
+          untrue statement a screen about somebody's own payment can make.
+        */}
+        <Row label={t(unpaid ? 'bookingTotalDue' : 'bookingTotal')}>
           <span dir="ltr">
             {formatMoney(
               booking.totalAmount,
@@ -262,8 +281,17 @@ export default async function BookingDetailPage({
         <Row label={t('bookingPlaced')}>
           <span dir="ltr">{booking.createdAt.slice(0, 10)}</span>
         </Row>
-        {awaiting && booking.confirmationDeadlineAt ? (
-          <Row label={t('bookingDeadline')}>
+        {/*
+          ONE column, TWO deadlines, and the label has to say which.
+
+          `confirmation_deadline_at` is the PAYMENT window while a booking is `pending_payment`
+          (`BookingCreationService` sets it to `booking.pending_payment_timeout_minutes`) and is
+          reset to the partner's confirmation window once payment lands
+          (`booking-actions.service.ts`). Labelling it «مهلة رد الشريك» in both states named the
+          wrong party for the one deadline that costs the customer their booking.
+        */}
+        {(awaiting || unpaid) && booking.confirmationDeadlineAt ? (
+          <Row label={t(unpaid ? 'bookingPaymentDeadline' : 'bookingDeadline')}>
             <span dir="ltr">
               {booking.confirmationDeadlineAt.slice(0, 16).replace('T', ' ')}
             </span>
@@ -277,6 +305,34 @@ export default async function BookingDetailPage({
         This copy is `bookingPending`'s, reused rather than re-written: it is the same promise the
         holding page makes, and two wordings of one guarantee are two things to keep in step.
       */}
+      {/*
+        What to DO, on the screen of somebody who still owes money.
+
+        The three steps below describe waiting for a partner; they are correct once SAFRA holds the
+        money and describe nothing that is happening before that. So an unpaid booking gets its own
+        panel: the reference to quote — derived here rather than carried, since it is
+        `SAFRA-<reference>` by construction in `ManualTransferProvider` — and what happens if the
+        window closes first.
+
+        `role="status"` and `border-warn`, matching the pill: this is the state the reader has to
+        act on, and it is the only thing on the page that asks anything of them.
+      */}
+      {unpaid ? (
+        <section
+          role="status"
+          className="mt-6 rounded-card border border-warn/40 bg-warn/10 p-5"
+        >
+          <h2 className="warn-ink text-sm font-bold">{t('unpaidTitle')}</h2>
+          <p className="mt-2 text-sm text-muted">{t('unpaidBody')}</p>
+
+          <p className="mt-4 text-xs text-faint">{t('unpaidRemittanceLabel')}</p>
+          {/* Selectable and monospaced: it is copied by hand into a bank form. */}
+          <p className="mt-1 select-all font-mono text-lg text-text">
+            {ltrIsolate(`SAFRA-${booking.reference}`)}
+          </p>
+        </section>
+      ) : null}
+
       {awaiting ? (
         <>
           <ol className="mt-6 space-y-3">
