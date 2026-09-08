@@ -47,15 +47,23 @@ import { refuseSection } from '@/components/section-refusal';
  */
 export const dynamic = 'force-dynamic';
 
-/** The design's `grid-template-columns`, verbatim. */
 /*
-  الحالة is the widest track, and that is deliberate (Bashar, 2026-08-27).
+  The design's `grid-template-columns`, with the MONEY column held at a floor.
 
-  It carries four things — the pill, how long is left, the window's dates, and two controls — and at
-  `.9fr` the pair of buttons could not sit on one line, so they wrapped and the column drove the
-  height of every row on the screen. The width comes off المعلن, which is a name and wraps happily.
+  A money cell is `whitespace-nowrap` and the table is `table-fixed`, so the column's width is a
+  PERCENTAGE and the amount cannot wrap out of trouble: when the text is wider than the cell it
+  overlaps its neighbour, which is what `e2e/table-overflow.spec.ts` measures.
+
+  The handoff's proportions were drawn for 12.5px table text. Money went to 14px on 2026-09-08 when
+  Bashar asked for the type to be readable, and «496.99 USD» then needed 84px in an 81px cell.
+
+  **The floor is 1.05fr on every table that shows money**, not a value tuned to the widest amount
+  the database happened to hold when the test last ran — that was the first fix here and it passed
+  on `/payments` and `/giftcards` while `/bookings` failed the next run on three-digit amounts a
+  later spec created. A price is the value on the row an operator is there to read, and the table
+  already scrolls inside its own box, so the column costs nothing the layout has not agreed to pay.
 */
-const TEMPLATE = '1fr 1.15fr .8fr .85fr .9fr .75fr .75fr 1.2fr';
+const TEMPLATE = '1fr 1.15fr .8fr .85fr .9fr 1.05fr .75fr 1.2fr';
 
 /** فواتير الإعلانات — seven columns, seven tracks. */
 const INVOICE_TEMPLATE = '1fr .9fr 1.1fr 1.1fr .9fr .9fr 1fr';

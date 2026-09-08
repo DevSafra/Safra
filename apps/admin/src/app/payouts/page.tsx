@@ -39,8 +39,23 @@ import { AccrualControl } from '@/components/accrual-control';
  */
 export const dynamic = 'force-dynamic';
 
-/** The design's `grid-template-columns`, verbatim. */
-const TEMPLATE = '1.1fr 1.3fr 1.1fr .7fr 1fr .9fr 1fr';
+/*
+  The design's `grid-template-columns`, with the MONEY column held at a floor.
+
+  A money cell is `whitespace-nowrap` and the table is `table-fixed`, so the column's width is a
+  PERCENTAGE and the amount cannot wrap out of trouble: when the text is wider than the cell it
+  overlaps its neighbour, which is what `e2e/table-overflow.spec.ts` measures.
+
+  The handoff's proportions were drawn for 12.5px table text. Money went to 14px on 2026-09-08 when
+  Bashar asked for the type to be readable, and «496.99 USD» then needed 84px in an 81px cell.
+
+  **The floor is 1.05fr on every table that shows money**, not a value tuned to the widest amount
+  the database happened to hold when the test last ran — that was the first fix here and it passed
+  on `/payments` and `/giftcards` while `/bookings` failed the next run on three-digit amounts a
+  later spec created. A price is the value on the row an operator is there to read, and the table
+  already scrolls inside its own box, so the column costs nothing the layout has not agreed to pay.
+*/
+const TEMPLATE = '1.1fr 1.3fr 1.1fr .7fr 1.05fr .9fr 1fr';
 
 export default async function PayoutsPage({
   searchParams,
