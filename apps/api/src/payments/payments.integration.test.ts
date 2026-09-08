@@ -18,6 +18,8 @@ import { PaymentProviderUnavailableError } from './payment-provider.port.js';
 import { PaymentWebhookService } from './payment-webhook.service.js';
 import { RefundService } from './refund.service.js';
 import { PaymentProviderRegistry } from './providers/provider.registry.js';
+import { codeOf } from '../common/errors/app-error.js';
+import { ERROR } from '@safra/contracts';
 import { ManualTransferProvider } from './providers/manual-transfer.provider.js';
 // Only the signer is imported: the registry constructs the simulator itself when
 // PAYMENT_SIMULATOR_ENABLED is set, which is exactly the behaviour under test.
@@ -1202,6 +1204,184 @@ describeIfDb('payment collection, webhooks and refunds', () => {
       */
       expect(result.status, 'recorded and waiting for finance').toBe('processing');
       expect(Number(result.amount)).toBeGreaterThan(0);
+    });
+
+    /**
+     * What the LEDGER says is still owed and still earned on one booking.
+     *
+     * Credits minus debits per account, which is the only honest way to read a reversal: the
+     * capture's credit stays on the record for ever — `ledger_entries` is append-only — and the
+     * reversal is a debit beside it. Summing one side would report the original figure and call the
+     * reversal missing.
+     */
+    const ledgerNet = async (bookingId: string) => {
+      const rows = await db.execute<{ payable: string; commission: string }>(sql`
+        SELECT
+          coalesce(sum(CASE WHEN account = 'partner_payable' AND direction = 'credit' THEN amount
+                            WHEN account = 'partner_payable' AND direction = 'debit'  THEN -amount
+                            ELSE 0 END), 0)::text AS payable,
+          coalesce(sum(CASE WHEN account = 'safra_commission_partner' AND direction = 'credit' THEN amount
+                            WHEN account = 'safra_commission_partner' AND direction = 'debit'  THEN -amount
+                            ELSE 0 END), 0)::text AS commission
+        FROM ledger_entries WHERE booking_id = ${bookingId}::uuid
+      `);
+
+      return rows.rows[0] ?? { payable: '0', commission: '0' };
+    };
+
+    /*
+      And finance can then confirm it was actually sent (finding 222, Bashar 2026-09-08).
+
+      «An offline refund must have an equivalent completion step, just like a payment capture.» The
+      test above proves the refund correctly WAITS; these prove the waiting ends, and that the
+      accounting the wait was deferring actually posts.
+
+      What made this a launch blocker is that nothing ended the wait: `refund()` on an offline rail
+      can only report `processing`, `parseWebhook()` returns null, and only the webhook path and the
+      wallet-only path ever set `completed`. 236 refunds worth $47,326.37 were pending for ever, and
+      decision 198's proportional reduction never happened on those bookings.
+    */
+    it('settling an offline refund reverses the payable and the commission', async () => {
+      const own = await createBooking(db);
+
+      await actions.recordPaymentReceived(own.reference, undefined);
+
+      const refund = await refunds.execute(own.reference, 'اختبار التسوية', undefined);
+
+      const before = await ledgerNet(own.id);
+      const row = await db.execute<{ id: string }>(sql`
+        SELECT id::text AS id FROM refunds WHERE booking_id = ${own.id}::uuid LIMIT 1
+      `);
+      const refundId = row.rows[0]!.id;
+
+      const settled = await refunds.settle(refundId, undefined);
+
+      expect(settled.status).toBe('completed');
+
+      const after = await ledgerNet(own.id);
+
+      /*
+        The DIRECTION and the PROPORTION, not merely «something changed».
+
+        A full refund of the accommodation reverses the whole payable and the whole commission; a
+        partial one reverses in proportion. Asserting only that the numbers moved would pass against
+        a reversal of the wrong amount, which on a balance sheet is not half right.
+      */
+      expect(
+        Number(after.payable),
+        'the partner is no longer owed for a stay that was returned',
+      ).toBeLessThan(Number(before.payable));
+      expect(
+        Number(after.commission),
+        'and SAFRA gave up the commission with it',
+      ).toBeLessThan(Number(before.commission));
+
+      const finished = await db.execute<{
+        status: string;
+        completed_at: string | null;
+      }>(sql`
+        SELECT status::text AS status, completed_at::text AS completed_at
+          FROM refunds WHERE id = ${refundId}::uuid
+      `);
+
+      expect(finished.rows[0]?.status).toBe('completed');
+      expect(
+        finished.rows[0]?.completed_at,
+        'a completed refund carries WHEN it completed',
+      ).not.toBeNull();
+      expect(Number(refund.amount)).toBeGreaterThan(0);
+    });
+
+    it('settling twice reverses once', async () => {
+      /*
+        Two operators pressing at the same moment must not debit the partner twice. The status
+        update carries its own `WHERE status = 'processing'`, so the second call finds no row and
+        conflicts — and `reverseForRefund` is idempotent underneath that, deriving every figure from
+        the ledger minus what is already reversed. Both guards are real; this proves the outer one.
+      */
+      const own = await createBooking(db);
+
+      await actions.recordPaymentReceived(own.reference, undefined);
+      await refunds.execute(own.reference, 'اختبار التكرار', undefined);
+
+      const row = await db.execute<{ id: string }>(sql`
+        SELECT id::text AS id FROM refunds WHERE booking_id = ${own.id}::uuid LIMIT 1
+      `);
+      const refundId = row.rows[0]!.id;
+
+      await refunds.settle(refundId, undefined);
+      const afterFirst = await ledgerNet(own.id);
+
+      await expect(refunds.settle(refundId, undefined)).rejects.toThrow();
+
+      expect(await ledgerNet(own.id), 'the second attempt posted nothing').toStrictEqual(
+        afterFirst,
+      );
+    });
+
+    it('refuses a refund that is already settled or was never pending', async () => {
+      const own = await createBooking(db);
+
+      await actions.recordPaymentReceived(own.reference, undefined);
+      await refunds.execute(own.reference, 'اختبار الحالة', undefined);
+
+      const row = await db.execute<{ id: string }>(sql`
+        SELECT id::text AS id FROM refunds WHERE booking_id = ${own.id}::uuid LIMIT 1
+      `);
+
+      await db.execute(sql`
+        UPDATE refunds SET status = 'completed'::refund_status
+         WHERE id = ${row.rows[0]!.id}::uuid
+      `);
+
+      /*
+        The CODE, not the message. An app error carries a code for the client and an English
+        sentence for the log; asserting the sentence would make this test fail on a reword and pass
+        on a wrong code — the opposite of what it is for.
+      */
+      await expect(refunds.settle(row.rows[0]!.id, undefined)).rejects.toSatisfy(
+        (error: unknown) => codeOf(error) === ERROR.REFUND_NOT_PENDING,
+      );
+    });
+
+    it('refuses a refund on a rail the provider confirms itself', async () => {
+      /*
+        THE opposite control, and the reason the route is restricted at all.
+
+        A gateway refund is confirmed by its webhook. Letting a person settle one would post a
+        reversal asserting money moved when no bank had said so — the exact error the deferral
+        exists to prevent, arriving through a button. The simulator is `isOffline = false`, which is
+        what makes it the right fixture here.
+      */
+      const started = await intents.start({
+        reference: booking.reference,
+        accessToken: await access.mint(db, booking.id, minutesFromNow(60)),
+        method: 'visa',
+        locale: 'ar',
+      });
+
+      expect(started.status).toBe('requires_action');
+
+      const online = await db.execute<{ id: string }>(sql`
+        INSERT INTO refunds (payment_id, booking_id, amount, currency_id, status, reason,
+                             applied_refund_percent)
+        SELECT p.id, p.booking_id, 10, b.currency_id, 'processing'::refund_status,
+               'اختبار سكة المزوّد', 100
+          FROM payments p JOIN bookings b ON b.id = p.booking_id
+         WHERE p.booking_id = ${booking.id}::uuid AND p.provider = 'simulator'
+         ORDER BY p.created_at DESC LIMIT 1
+        RETURNING id::text AS id
+      `);
+
+      await expect(refunds.settle(online.rows[0]!.id, undefined)).rejects.toSatisfy(
+        (error: unknown) => codeOf(error) === ERROR.REFUND_NOT_OFFLINE,
+      );
+    });
+
+    it('refuses a refund that does not exist', async () => {
+      await expect(
+        refunds.settle('00000000-0000-4000-8000-000000000000', undefined),
+      ).rejects.toSatisfy((error: unknown) => codeOf(error) === ERROR.REFUND_NOT_FOUND);
     });
 
     /* Resolvable for refunds must not mean chargeable. */
