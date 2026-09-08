@@ -199,3 +199,104 @@ describe('a status pill carries only its status', () => {
     ).toBeGreaterThan(10);
   });
 });
+
+/**
+ * A status WORD is never painted by a hand-written condition.
+ *
+ * The customer's النزاعات list chose its pill colour with three branches — `resolved` green,
+ * `rejected` in `faint`, everything else amber — and two of them disagreed with the rest of the
+ * platform. `statusTone` gives `open` **crimson**, which read as amber, and `rejected` **bad**,
+ * which read as `faint`: the tone this rule reserves for a status nobody has mapped. So a dispute
+ * decided in the host's favour was red on the console and grey to the guest whose complaint it was,
+ * under a correct Arabic word — «محسوم لصالح الشريك» — that the colour then contradicted.
+ *
+ * `e2e/navigation.spec.ts` holds «one status, one colour» across the console's twenty sections and
+ * **cannot see the other two apps**, which is how three branches drifted there unnoticed. This is
+ * the half of that rule a unit test can hold: the SOURCE shape, in every app.
+ *
+ * The floor is a status label rendered in the same expression as a hand-written tone class. A
+ * colour assembled far from its label walks past, the same way it walks past the browser sweep.
+ */
+describe('a status word is coloured by statusTone, never by a condition', () => {
+  const ROOT2 = new URL('../../../', import.meta.url).pathname;
+  const APPS2 = ['apps/admin/src', 'apps/web/src', 'apps/partner/src'];
+
+  function tsx(dir: string): string[] {
+    const out: string[] = [];
+
+    for (const entry of readdirSync(join(ROOT2, dir))) {
+      const relative = `${dir}/${entry}`;
+
+      if (statSync(join(ROOT2, relative)).isDirectory()) {
+        out.push(...tsx(relative));
+      } else if (entry.endsWith('.tsx')) {
+        out.push(relative);
+      }
+    }
+
+    return out;
+  }
+
+  /** The words that RESOLVE a status value to its label, in any of the three apps. */
+  const LABELLERS = /\b(localStatus|statusWord|bookingStatus|customerBookingStatus)\s*\(/;
+  const TONE_CLASS =
+    /\b(?:border|bg|text)-(?:ok|bad|warn|pend|teal|orange|crimson|sky|indigo|lime|slate|stone|faint)\b/;
+
+  it('never picks a tone class beside the label it paints', () => {
+    const painted: string[] = [];
+
+    for (const app of APPS2) {
+      for (const file of tsx(app)) {
+        const body = readFileSync(join(ROOT2, file), 'utf8').replace(
+          /\/\*[\s\S]*?\*\//g,
+          ' ',
+        );
+
+        /* One JSX element at a time: `<span … >` up to its closing bracket, plus its children. */
+        for (const [whole] of body.matchAll(
+          /<(?:span|p|div|em|strong)\b[^>]*>[\s\S]{0,400}?<\/(?:span|p|div|em|strong)>/g,
+        )) {
+          if (!LABELLERS.test(whole)) continue;
+          if (!TONE_CLASS.test(whole)) continue;
+          if (!/\?/.test(whole)) continue;
+
+          painted.push(`${file}: ${whole.replace(/\s+/g, ' ').slice(0, 110)}`);
+        }
+      }
+    }
+
+    expect(
+      painted.sort(),
+      'these paint a status word with a hand-written condition',
+    ).toEqual([]);
+  });
+
+  /*
+    The control. This is a regex over JSX and would pass on an empty read, so it asserts that it
+    FOUND status labels to check in the first place.
+  */
+  it('reads the status labels it is meant to be checking', () => {
+    let labels = 0;
+
+    for (const app of APPS2) {
+      for (const file of tsx(app)) {
+        const body = readFileSync(join(ROOT2, file), 'utf8').replace(
+          /\/\*[\s\S]*?\*\//g,
+          ' ',
+        );
+
+        labels += [...body.matchAll(new RegExp(LABELLERS.source, 'g'))].length;
+      }
+    }
+
+    /*
+      `label(t.enums.…)` is the console's resolver and `localStatus` / `customerBookingStatus` the
+      customer's — 107 calls between them at the time of writing. Twenty is a floor a real
+      regression in this sweep would fall through and ordinary churn would not.
+    */
+    expect(
+      labels,
+      'the sweep found no status labels at all, so it is reading nothing',
+    ).toBeGreaterThan(20);
+  });
+});
