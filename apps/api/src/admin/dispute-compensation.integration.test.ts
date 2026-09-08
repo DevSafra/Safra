@@ -155,7 +155,7 @@ describeIfDb('compensation paid on a resolved dispute', () => {
       JOIN wallets w     ON w.id = t.wallet_id
       JOIN currencies c  ON c.id = t.currency_id
       WHERE w.customer_profile_id = ${profileId}::uuid
-      ORDER BY t.created_at DESC LIMIT 1
+      ORDER BY t.created_at DESC, t.id DESC LIMIT 1
     `);
 
     const move = rows.rows[0];
@@ -281,7 +281,7 @@ describeIfDb('compensation paid on a resolved dispute', () => {
       FROM wallet_transactions wt
       JOIN wallets w ON w.id = wt.wallet_id
       WHERE w.customer_profile_id = ${profileId}::uuid AND wt.direction = 'credit'
-      ORDER BY wt.created_at DESC LIMIT 1
+      ORDER BY wt.created_at DESC, wt.id DESC LIMIT 1
     `);
 
     const row = movement.rows[0];

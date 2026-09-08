@@ -240,7 +240,7 @@ describeIfDb('FxRateService', () => {
       const rows = await db.execute<{ source: string }>(sql`
         SELECT f.source FROM fx_rates f
         JOIN currencies base ON base.id = f.base_currency_id
-        WHERE base.code = 'USD' ORDER BY f.created_at DESC LIMIT 1
+        WHERE base.code = 'USD' ORDER BY f.created_at DESC, f.id DESC LIMIT 1
       `);
 
       expect(rows.rows[0]?.source).toBe('central_bank');
@@ -258,7 +258,7 @@ describeIfDb('FxRateService', () => {
 
       const rows = await db.execute<{ before: unknown; after: unknown }>(sql`
         SELECT before, after FROM audit_log
-        WHERE action = 'fx_rate.set' ORDER BY created_at DESC LIMIT 1
+        WHERE action = 'fx_rate.set' ORDER BY created_at DESC, id DESC LIMIT 1
       `);
 
       const before = rows.rows[0]?.before as { rate?: string } | null;
@@ -275,7 +275,7 @@ describeIfDb('FxRateService', () => {
 
       const rows = await db.execute<{ before: unknown }>(sql`
         SELECT before FROM audit_log
-        WHERE action = 'fx_rate.set' ORDER BY created_at DESC LIMIT 1
+        WHERE action = 'fx_rate.set' ORDER BY created_at DESC, id DESC LIMIT 1
       `);
 
       expect((rows.rows[0]?.before as { rate?: string | null }).rate).toBeNull();

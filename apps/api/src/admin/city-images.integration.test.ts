@@ -120,7 +120,7 @@ describeIfDb('managing a city photograph', () => {
 
     const logged = await db.execute<{ actor: string | null }>(sql`
       SELECT actor_user_id AS actor FROM audit_log
-      WHERE action = 'city_image.updated' ORDER BY created_at DESC LIMIT 1
+      WHERE action = 'city_image.updated' ORDER BY created_at DESC, id DESC LIMIT 1
     `);
 
     expect(logged.rows[0]?.actor).toBe(staffId);

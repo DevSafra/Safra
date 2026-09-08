@@ -77,7 +77,7 @@ describeIfDb('CatalogueService', () => {
   const auditFor = async (action: string) => {
     const rows = await db.execute<{ action: string; after: Record<string, unknown> }>(sql`
       SELECT action, after FROM audit_log WHERE action = ${action}
-      ORDER BY created_at DESC LIMIT 1
+      ORDER BY created_at DESC, id DESC LIMIT 1
     `);
 
     return rows.rows[0];

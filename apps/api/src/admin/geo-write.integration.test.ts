@@ -60,7 +60,7 @@ describeIfDb('creating and correcting geography', () => {
     (
       await db.execute<{ actor: string | null; after: unknown; before: unknown }>(sql`
         SELECT actor_user_id AS actor, after, before FROM audit_log
-        WHERE action = ${action} ORDER BY created_at DESC LIMIT 1
+        WHERE action = ${action} ORDER BY created_at DESC, id DESC LIMIT 1
       `)
     ).rows[0];
 

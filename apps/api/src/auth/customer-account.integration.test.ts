@@ -243,7 +243,7 @@ describeIfDb('CustomerAccountService.summary', () => {
       const rows = await db.execute<{ action: string; after: unknown }>(sql`
         SELECT action, after FROM audit_log
         WHERE actor_user_id = ${USER_ID}::uuid AND action = 'customer.profile_updated'
-        ORDER BY created_at DESC LIMIT 1`);
+        ORDER BY created_at DESC, id DESC LIMIT 1`);
 
       expect(rows.rows[0]?.action).toBe('customer.profile_updated');
       expect(JSON.stringify(rows.rows[0]?.after)).not.toContain('963900000097');

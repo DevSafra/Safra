@@ -357,7 +357,7 @@ describeIfDb('partner two-factor authentication', () => {
       }>(sql`
         SELECT action, after FROM audit_log
         WHERE subject_id = ${partnerUserId} AND action = 'partner.two_factor_reset'
-        ORDER BY created_at DESC LIMIT 1
+        ORDER BY created_at DESC, id DESC LIMIT 1
       `);
 
       expect(entry.rows[0]?.action).toBe('partner.two_factor_reset');
@@ -375,7 +375,7 @@ describeIfDb('partner two-factor authentication', () => {
       const entry = await db.execute<{ after: unknown }>(sql`
         SELECT after FROM audit_log
         WHERE subject_id = ${partnerUserId} AND action = 'partner.two_factor_reset'
-        ORDER BY created_at DESC LIMIT 1
+        ORDER BY created_at DESC, id DESC LIMIT 1
       `);
 
       expect(JSON.stringify(entry.rows[0]?.after)).not.toContain(secret);
@@ -443,7 +443,7 @@ describeIfDb('partner two-factor authentication', () => {
       const entry = await db.execute<{ after: Record<string, unknown> }>(sql`
         SELECT after FROM audit_log
         WHERE subject_id = ${partnerUserId} AND action = 'partner.two_factor_reset'
-        ORDER BY created_at DESC LIMIT 1
+        ORDER BY created_at DESC, id DESC LIMIT 1
       `);
 
       expect(entry.rows[0]?.after).toMatchObject({ wasEnrolled: false });

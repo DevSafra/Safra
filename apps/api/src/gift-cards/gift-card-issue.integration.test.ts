@@ -202,7 +202,7 @@ describeIfDb('a gift card issued by staff', () => {
       SELECT reason, after::text AS after, actor_user_id::text AS actor
       FROM audit_log
       WHERE action = 'gift_card.issued'
-      ORDER BY created_at DESC LIMIT 1
+      ORDER BY created_at DESC, id DESC LIMIT 1
     `);
 
     const entry = rows.rows[0];

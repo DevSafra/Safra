@@ -45,7 +45,7 @@ describeIfDb('managing city categories', () => {
     (
       await db.execute<{ actor: string | null; before: unknown }>(sql`
         SELECT actor_user_id AS actor, before FROM audit_log
-        WHERE action = ${action} ORDER BY created_at DESC LIMIT 1
+        WHERE action = ${action} ORDER BY created_at DESC, id DESC LIMIT 1
       `)
     ).rows[0];
 
@@ -209,7 +209,7 @@ describeIfDb('managing city categories', () => {
 
     const logged = await db.execute<{ after: unknown }>(sql`
       SELECT after FROM audit_log
-      WHERE action = 'city_category.updated' ORDER BY created_at DESC LIMIT 1
+      WHERE action = 'city_category.updated' ORDER BY created_at DESC, id DESC LIMIT 1
     `);
 
     expect(JSON.stringify(logged.rows[0]?.after)).toContain('"isActive":false');

@@ -214,7 +214,7 @@ describeIfDb('SettingsAdminService', () => {
       const audit = await db.execute<{ after: { value: number } }>(sql`
         SELECT after FROM audit_log
         WHERE action = 'setting.updated' AND after->>'key' = ${KEY}
-        ORDER BY created_at DESC LIMIT 1
+        ORDER BY created_at DESC, id DESC LIMIT 1
       `);
 
       expect(audit.rows[0]?.after.value).toBe(91);

@@ -247,7 +247,7 @@ describeIfDb('the O-sec-13 sweep, in behaviour', () => {
       FROM bookings b
       WHERE b.city_id = ${cityId}::uuid AND b.deleted_at IS NULL
         AND b.customer_profile_id IS NOT NULL
-      ORDER BY b.created_at DESC
+      ORDER BY b.created_at DESC, b.id DESC
       LIMIT 1
     `);
   }

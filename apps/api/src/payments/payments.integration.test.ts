@@ -582,7 +582,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
 
       const rows = await db.execute<{ status: string }>(sql`
         SELECT status::text AS status FROM payments
-        WHERE booking_id = ${booking.id}::uuid ORDER BY created_at DESC LIMIT 1
+        WHERE booking_id = ${booking.id}::uuid ORDER BY created_at DESC, id DESC LIMIT 1
       `);
 
       expect(['refunded', 'partially_refunded']).toContain(rows.rows[0]?.status);
@@ -628,7 +628,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
       // And the gateway is asked for exactly that, not the full total.
       const rows = await db.execute<{ amount: string }>(sql`
         SELECT amount::text AS amount FROM payments
-        WHERE booking_id = ${booking.id}::uuid ORDER BY created_at DESC LIMIT 1`);
+        WHERE booking_id = ${booking.id}::uuid ORDER BY created_at DESC, id DESC LIMIT 1`);
 
       expect(rows.rows[0]?.amount).toBe('151.990');
       expect(await balanceOf(wallet)).toBe('0.000');
@@ -1369,7 +1369,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
                'اختبار سكة المزوّد', 100
           FROM payments p JOIN bookings b ON b.id = p.booking_id
          WHERE p.booking_id = ${booking.id}::uuid AND p.provider = 'simulator'
-         ORDER BY p.created_at DESC LIMIT 1
+         ORDER BY p.created_at DESC, p.id DESC LIMIT 1
         RETURNING id::text AS id
       `);
 
@@ -1411,7 +1411,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
 
         const rows = await db.execute<{ method: string }>(sql`
           SELECT method::text AS method FROM payments
-          WHERE booking_id = ${booking.id}::uuid ORDER BY created_at DESC LIMIT 1
+          WHERE booking_id = ${booking.id}::uuid ORDER BY created_at DESC, id DESC LIMIT 1
         `);
 
         expect(rows.rows[0]?.method).toBe(chosen);
@@ -1427,7 +1427,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
 
       const rows = await db.execute<{ method: string }>(sql`
         SELECT method::text AS method FROM payments
-        WHERE booking_id = ${booking.id}::uuid ORDER BY created_at DESC LIMIT 1
+        WHERE booking_id = ${booking.id}::uuid ORDER BY created_at DESC, id DESC LIMIT 1
       `);
 
       // Whatever it is, it must be something the simulator actually serves.

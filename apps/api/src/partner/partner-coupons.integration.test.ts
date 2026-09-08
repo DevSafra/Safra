@@ -141,7 +141,7 @@ describeIfDb('a partner’s coupon decisions', () => {
 
     const logged = await db.execute<{ actor: string | null; after: unknown }>(sql`
       SELECT actor_user_id AS actor, after FROM audit_log
-      WHERE action = 'coupon.partner_accepted' ORDER BY created_at DESC LIMIT 1
+      WHERE action = 'coupon.partner_accepted' ORDER BY created_at DESC, id DESC LIMIT 1
     `);
 
     expect(logged.rows[0]?.actor).toBe(userId);

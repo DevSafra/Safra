@@ -93,7 +93,7 @@ describeIfDb('a dispute opened on a booking', () => {
       SELECT d.reference FROM disputes d
       JOIN bookings b ON b.id = d.booking_id
       WHERE b.reference = ${reference}
-      ORDER BY d.created_at DESC LIMIT 1
+      ORDER BY d.created_at DESC, d.id DESC LIMIT 1
     `);
 
     const only = rows.rows[0];
@@ -115,7 +115,7 @@ describeIfDb('a dispute opened on a booking', () => {
       FROM disputes d
       JOIN bookings b ON b.id = d.booking_id
       WHERE b.reference = ${reference}
-      ORDER BY d.created_at DESC LIMIT 1
+      ORDER BY d.created_at DESC, d.id DESC LIMIT 1
     `);
 
     const only = rows.rows[0];

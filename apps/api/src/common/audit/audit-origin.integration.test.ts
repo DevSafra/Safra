@@ -55,7 +55,7 @@ describeIfDb('the origin on an audit row', () => {
   async function written(): Promise<{ ip: string | null; agent: string | null }> {
     const rows = await db.execute<{ ip: string | null; agent: string | null }>(sql`
       SELECT ip_address AS ip, user_agent AS agent FROM audit_log
-      WHERE action = ${action} ORDER BY created_at DESC LIMIT 1
+      WHERE action = ${action} ORDER BY created_at DESC, id DESC LIMIT 1
     `);
 
     const row = rows.rows[0];

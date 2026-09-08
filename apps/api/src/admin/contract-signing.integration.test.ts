@@ -656,7 +656,7 @@ describeIfDb('contract signing', () => {
       /*
         Counted, not ordered. Every row this test writes shares one `created_at` — the harness runs
         the whole test inside a single transaction and `now()` is transaction START time — so
-        `ORDER BY created_at DESC LIMIT 1` picks an arbitrary row rather than the newest.
+        `ORDER BY created_at DESC, id DESC LIMIT 1` picks an arbitrary row rather than the newest.
       */
       expect(await countersignedCarryingTheFlag()).toBe(1);
     });

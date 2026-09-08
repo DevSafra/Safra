@@ -496,7 +496,7 @@ describeIfDb('evidence on a dispute', () => {
     const logged = await db.execute<{ actor: string | null; before: unknown }>(sql`
       SELECT actor_user_id AS actor, before FROM audit_log
       WHERE action = 'dispute.evidence_removed' AND subject_id = ${disputeId}::uuid
-      ORDER BY created_at DESC LIMIT 1
+      ORDER BY created_at DESC, id DESC LIMIT 1
     `);
 
     expect(logged.rows[0]?.actor).toBe(staffId);

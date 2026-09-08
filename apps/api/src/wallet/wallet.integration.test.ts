@@ -580,7 +580,7 @@ describeIfDb('customer wallet', () => {
       const rows = await db.execute<{ before: unknown; after: unknown }>(sql`
         SELECT before, after FROM audit_log
         WHERE action = 'wallet.adjusted' AND actor_user_id = ${ACTOR_ID}::uuid
-        ORDER BY created_at DESC LIMIT 1`);
+        ORDER BY created_at DESC, id DESC LIMIT 1`);
 
       const before = rows.rows[0]?.before as { balance?: string } | null;
       const after = rows.rows[0]?.after as { balance?: string; note?: string } | null;

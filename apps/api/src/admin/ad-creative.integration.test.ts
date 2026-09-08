@@ -240,7 +240,7 @@ describeIfDb('a campaign creative', () => {
 
     const entry = await db.execute<{ actor: string; after: string }>(sql`
       SELECT actor_user_id::text AS actor, after::text AS after FROM audit_log
-      WHERE action = 'ad_campaign.creative_uploaded' ORDER BY created_at DESC LIMIT 1
+      WHERE action = 'ad_campaign.creative_uploaded' ORDER BY created_at DESC, id DESC LIMIT 1
     `);
 
     expect(entry.rows[0]?.actor).toBe(staffId);
@@ -337,7 +337,7 @@ describeIfDb('a campaign creative', () => {
       SELECT a.before FROM audit_log a
       JOIN ad_campaigns c ON c.id = a.subject_id
       WHERE a.action = 'ad_campaign.creative_removed' AND c.reference = ${reference}
-      ORDER BY a.created_at DESC LIMIT 1
+      ORDER BY a.created_at DESC, a.id DESC LIMIT 1
     `);
 
     expect(

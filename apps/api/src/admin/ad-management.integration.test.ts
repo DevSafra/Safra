@@ -311,7 +311,7 @@ describeIfDb('creating and billing a campaign', () => {
 
     const entry = await db.execute<{ actor: string; reason: string; after: string }>(sql`
       SELECT actor_user_id::text AS actor, reason, after::text AS after
-      FROM audit_log WHERE action = 'ad_invoice.paid' ORDER BY created_at DESC LIMIT 1
+      FROM audit_log WHERE action = 'ad_invoice.paid' ORDER BY created_at DESC, id DESC LIMIT 1
     `);
 
     expect(entry.rows[0]?.actor).toBe(staffId);

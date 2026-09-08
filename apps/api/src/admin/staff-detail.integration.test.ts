@@ -340,7 +340,7 @@ describeIfDb('one staff member', () => {
       const rows = await db.execute<{ ip: string | null; agent: string | null }>(sql`
         SELECT ip_address AS ip, user_agent AS agent FROM audit_log
         WHERE action = ${action} AND subject_id = ${userId}::uuid
-        ORDER BY created_at DESC LIMIT 1
+        ORDER BY created_at DESC, id DESC LIMIT 1
       `);
 
       return rows.rows[0];

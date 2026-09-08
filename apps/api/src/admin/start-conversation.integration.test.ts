@@ -159,7 +159,7 @@ describeIfDb('starting a conversation from the console', () => {
         FROM conversations c
         LEFT JOIN LATERAL (
           SELECT sender_kind, body FROM messages
-          WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1
+          WHERE conversation_id = c.id ORDER BY created_at DESC, id DESC LIMIT 1
         ) m ON TRUE
         WHERE c.reference = ${reference}
       `)

@@ -316,7 +316,7 @@ describeIfDb('cancelling a gift card', () => {
     }>(sql`
       SELECT actor_user_id::text AS actor, reason, before::text AS before, after::text AS after
       FROM audit_log WHERE action = 'gift_card.cancelled'
-      ORDER BY created_at DESC LIMIT 1
+      ORDER BY created_at DESC, id DESC LIMIT 1
     `);
 
     const entry = rows.rows[0];
