@@ -657,7 +657,8 @@
     "unpaidTitle": "We have not received your payment yet",
     "unpaidBody": "Your booking is held until the time above. Transfer the amount and quote the reference; if the window closes before the transfer arrives the booking is cancelled and the dates are released.",
     "unpaidRemittanceLabel": "Transfer reference",
-    "unpaidHowTo": "Transfer details"
+    "unpaidHowTo": "Transfer details",
+    "bookingTotalNeutral": "Booking total"
   },
   "ads": {
     "title": "Nearby, from our partners",

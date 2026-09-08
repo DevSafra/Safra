@@ -657,7 +657,8 @@
     "unpaidTitle": "Ihre Zahlung ist noch nicht eingegangen",
     "unpaidBody": "Ihre Buchung ist bis zum oben genannten Zeitpunkt reserviert. Überweisen Sie den Betrag und geben Sie den Verwendungszweck an; geht die Überweisung nicht rechtzeitig ein, wird die Buchung storniert und die Daten werden freigegeben.",
     "unpaidRemittanceLabel": "Verwendungszweck",
-    "unpaidHowTo": "Überweisungsdaten"
+    "unpaidHowTo": "Überweisungsdaten",
+    "bookingTotalNeutral": "Buchungssumme"
   },
   "ads": {
     "title": "In der Nähe, von unseren Partnern",

@@ -193,12 +193,29 @@ export default async function BookingDetailPage({
           })}
         </Row>
         {/*
-          «المطلوب دفعه» while unpaid, «الإجمالي المدفوع» once it is.
+          Three labels, because there are three truths and one of them the page cannot know.
 
-          One label for both states called money paid that had not been — the plainest kind of
-          untrue statement a screen about somebody's own payment can make.
+          «المطلوب دفعه» while unpaid and «الإجمالي المدفوع» once money is in — one label for both
+          called money paid that had not been. The third case is a CANCELLED booking: it may have
+          been paid and refunded, or cancelled for non-payment and never paid at all, and this
+          payload carries no capture signal to tell them apart. Read on BKG-2026-450171 after the
+          EC-001 sweep killed it: «الإجمالي المدفوع $196.99» on a booking cancelled BECAUSE nothing
+          was ever paid.
+
+          So a cancelled booking gets the neutral «إجمالي الحجز», which is true either way, and the
+          refunds list below says what actually came back when anything did. Naming the state
+          precisely would need a captured-at field in the payload — recorded as a follow-up rather
+          than guessed at from the status.
         */}
-        <Row label={t(unpaid ? 'bookingTotalDue' : 'bookingTotal')}>
+        <Row
+          label={t(
+            unpaid
+              ? 'bookingTotalDue'
+              : booking.status === 'cancelled'
+                ? 'bookingTotalNeutral'
+                : 'bookingTotal',
+          )}
+        >
           <span dir="ltr">
             {formatMoney(
               booking.totalAmount,
