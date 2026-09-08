@@ -498,15 +498,33 @@ test('panning moves the magnified picture and stops at its edge', async ({ page 
   expect(await shift()).toBe(0);
 
   /* 600px of travel, entirely inside the viewport — a drag that leaves it is pinned by the driver. */
+  /*
+    Dragged FAR PAST the edge, deliberately.
+
+    This dragged 600px and asserted the picture moved less than 600 — «it stopped». That only holds
+    if 600px is more than the picture has left to give, and at 1600×1067 magnified three steps it is
+    not: the picture followed the whole drag, `moved` came back as exactly 600, and the clamp under
+    test never engaged. The assertion was a statement about the FIXTURE's dimensions wearing the
+    clothes of a statement about behaviour.
+
+    Nothing here can pan three thousand pixels, so a drag that long reaches the edge whatever the
+    photograph is, and «moved less than dragged» then means the clamp did its job rather than that
+    the image happened to be small.
+
+    It was invisible until now: these tests skipped for want of a photograph in the bucket, and a
+    skip made a real failure look like a pass.
+  */
+  const DRAG = 3000;
+
   await page.mouse.move(1100, 425);
   await page.mouse.down();
-  for (let step = 1; step <= 12; step += 1) await page.mouse.move(1100 - step * 50, 425);
+  for (let step = 1; step <= 60; step += 1) await page.mouse.move(1100 - step * 50, 425);
   await page.mouse.up();
 
   const moved = Math.abs(await shift());
 
   expect(moved, 'the picture followed the drag').toBeGreaterThan(100);
-  expect(moved, 'and stopped before its own edge left the frame').toBeLessThan(600);
+  expect(moved, 'and stopped before its own edge left the frame').toBeLessThan(DRAG);
 
   /* And it panned rather than stepping: a drag on a magnified picture is not a page turn. */
   await expect(
