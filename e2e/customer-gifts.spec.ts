@@ -404,6 +404,34 @@ test.describe('بطاقات الهدايا', () => {
     await page.goto('/en/account/disputes', { waitUntil: 'domcontentloaded' });
 
     /*
+      ── the guest is told, BEFORE the form, that the host reads their words ──
+
+      Added 2026-09-08. Until finding 223 there was nothing to disclose, because the host was never
+      shown a complaint. They are now — the model Bashar specified gives them the title and the
+      description so they can answer, since SAFRA cannot adjudicate having heard one side.
+
+      Asserted here rather than trusted because the ORDER is the whole point: a disclosure that
+      appears after the form has been submitted is not a disclosure. `legal.privacy.shareBody` and
+      the Terms carry the same statement — the policy still said the partner gets «your name, your
+      stay dates, and what they need to receive you — NO MORE» on the morning of the day the
+      partner's dispute screen shipped, which made it false.
+    */
+    const disclosure = page.getByText(en.account.disputesBothSides, { exact: false });
+    const form = page.locator('select[name=bookingReference]');
+
+    await expect(
+      disclosure,
+      'the guest is told who will read their complaint',
+    ).toBeVisible();
+
+    const [saidAt, formAt] = await Promise.all([
+      disclosure.evaluate((node) => node.getBoundingClientRect().top),
+      form.evaluate((node) => node.getBoundingClientRect().top),
+    ]);
+
+    expect(saidAt, 'and told BEFORE the box they type it into').toBeLessThan(formAt);
+
+    /*
       Scoped to the ACCOUNT NAV, which is what this assertion is about.
 
       The footer's الدعم column links to النزاعات too, so the unscoped role selector now matches

@@ -252,6 +252,66 @@ describeIfDb('a dispute, from the partner’s side', () => {
   });
 
   /**
+   * The payload's SHAPE is a written allow-list, and adding to it has to be deliberate.
+   *
+   * ## Why a shape assertion and not only the PII walk above
+   *
+   * The walk catches a field that happens to carry today's fixture values. It cannot catch a field
+   * that carries something private this fixture does not set — a guest's address, their wallet
+   * balance, an internal note — because there is nothing to compare against. Listing the keys
+   * turns «what may the partner see» into a decision somebody makes rather than a consequence of a
+   * SELECT somebody widened.
+   *
+   * ## And it is tied to a DISCLOSURE, which is the part that would otherwise rot
+   *
+   * The privacy policy tells the customer exactly what reaches the partner. On 2026-09-08 it still
+   * read «your name, your stay dates, and what they need to receive you — NO MORE» while this
+   * payload had started carrying the guest's own title and description; the sentence became false
+   * the moment the partner got a dispute screen. `legal.privacy.shareBody` and
+   * `legal.terms.disputesBody` in `messages/web/*.json` were corrected the same day.
+   *
+   * So a key added here means the policy needs a sentence, and this failing test is where somebody
+   * finds that out. A test that only asked «is the guest's email absent» would never have said so.
+   */
+  it('returns only the fields the privacy policy says reach the partner', () => {
+    const allowed = [
+      /* The case itself. */
+      'reference',
+      'kind',
+      'status',
+      'openedAt',
+      'closedAt',
+      /* The guest's OWN WORDS, disclosed in `legal.privacy.shareBody`. */
+      'title',
+      'description',
+      /* SAFRA's decision — «the reasoning that can be shared with them». */
+      'resolution',
+      /* Their booking, and their money. */
+      'booking',
+      'frozenAmount',
+      'currencyCode',
+      /* Their own side of it. */
+      'responses',
+      'evidence',
+      'withheldEvidenceCount',
+    ].sort();
+
+    return service.detail(reference, owner()).then((view) => {
+      expect(
+        Object.keys(view).sort(),
+        'A key here is a field about a guest that a host can read. Add it to this list only ' +
+          'with a decision, and say so in legal.privacy.shareBody — the policy tells the ' +
+          'customer what reaches the partner, and it has been wrong once already.',
+      ).toStrictEqual(allowed);
+
+      /* The nested booking object is part of the same promise, so it is listed too. */
+      expect(Object.keys(view.booking).sort()).toStrictEqual(
+        ['checkIn', 'checkOut', 'reference', 'unitName'].sort(),
+      );
+    });
+  });
+
+  /**
    * The frozen amount is withheld from an employee, and shown to the owner.
    *
    * Both halves, because «withheld» and «absent» are indistinguishable without the second: an

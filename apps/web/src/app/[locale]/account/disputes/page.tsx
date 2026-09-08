@@ -87,6 +87,24 @@ export default async function AccountDisputesPage({
     >
       <p className="text-sm text-muted">{t('disputesIntro')}</p>
 
+      {/*
+        ── the guest is told that the host reads their words ────────────────────
+
+        Added 2026-09-08, with finding 223. Until that day nothing was disclosed here because there
+        was nothing to disclose: the host was never shown the complaint. They are now — Bashar's
+        model gives them the title and the description so they can answer, because SAFRA cannot
+        adjudicate having heard one side.
+    
+        That makes this sentence part of the change rather than an addition to it. A guest writing
+        an account of their night is entitled to know who will read it, and to know the boundary:
+        their photographs, their contact details and their payment and wallet data are not shared,
+        and a file of theirs crosses over only by an explicit staff decision. Told BEFORE the form
+        rather than after the fact, which is the only order in which it is a disclosure.
+      */}
+      <p className="mt-2 rounded-card border border-line bg-field px-4 py-3 text-sm leading-relaxed text-text2">
+        {t('disputesBothSides')}
+      </p>
+
       <section className="mt-4 rounded-card border border-line bg-card p-5">
         <h2 className="font-display text-lg text-text">{t('disputesOpenTitle')}</h2>
 
