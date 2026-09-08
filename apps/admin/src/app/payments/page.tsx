@@ -37,8 +37,20 @@ import { refuseSection } from '@/components/section-refusal';
  */
 export const dynamic = 'force-dynamic';
 
-/** The design's `grid-template-columns`, verbatim. */
-const TEMPLATE = '1fr 1.1fr 1fr .9fr .8fr 1fr';
+/*
+  The design's `grid-template-columns`, with the MONEY column widened.
+
+  It was `'1fr 1.1fr 1fr .9fr .8fr 1fr'` — the handoff's string verbatim, which is what the note on
+  `AdminColumn` asks for so a fidelity review can compare the two without re-deriving anything.
+  Those proportions were drawn for 12.5px table text. Bashar asked for the type to be readable on
+  2026-09-08 and money went to 14px, at which point `the amount at .8fr` measured 82px of «201.99 USD»
+  into a 79px cell and `table-overflow.spec.ts` caught the overlap at 1024px.
+
+  Widened rather than shrinking the money back: a price is the value on the row an operator is
+  there to read, and the table already scrolls inside its own box, so the column costs nothing
+  the layout has not already agreed to pay.
+*/
+const TEMPLATE = '1fr 1.1fr 1fr .9fr 1.05fr 1fr';
 
 export default async function PaymentsPage({
   searchParams,
