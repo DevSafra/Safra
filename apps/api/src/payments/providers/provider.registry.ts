@@ -138,40 +138,6 @@ export class PaymentProviderRegistry {
   }
 
   /**
-   * Whether a payment started here will be settled OFF the checkout session.
-   *
-   * Finding 214: checkout said «no online payment method is available yet, our team will contact
-   * you» and the button under it said «continue to payment», which landed on a page giving bank
-   * details and a reference to quote. One screen said wait, the next said act — and the first was
-   * simply out of date, because `manual_transfer` IS the rail the platform runs on.
-   *
-   * An empty method list therefore means two completely different things, and checkout could not
-   * tell them apart: no rail at all, or a rail the customer does not CHOOSE because there is only
-   * one. This answers that question, so each state gets its own true sentence.
-   *
-   * Deliberately mirrors `resolveForCountry`'s candidate walk with no method, since that is the
-   * call the button actually makes; a separate rule here would drift from the behaviour it
-   * describes.
-   */
-  async offlineRailForCountry(countryCode: string): Promise<boolean> {
-    const routing = await this.settings.get<RoutingTable>(ROUTING_KEY, DEFAULT_ROUTING);
-
-    const candidates = [
-      ...(routing[countryCode.toUpperCase()] ?? []),
-      ...(routing['*'] ?? []),
-    ];
-
-    for (const slug of candidates) {
-      const provider = this.providers.get(slug);
-      if (!provider || provider.acceptsNewPayments === false) continue;
-
-      return provider.isOffline === true;
-    }
-
-    return false;
-  }
-
-  /**
    * Picks the provider for a new payment.
    *
    * Country comes from the PROPERTY, not the customer: the constraint being routed

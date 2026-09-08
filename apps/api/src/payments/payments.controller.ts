@@ -58,16 +58,18 @@ export class PaymentsController {
     const code = /^[A-Za-z]{2}$/.test(country ?? '') ? (country as string) : '*';
 
     /*
-      `offline` travels with the list because an EMPTY list is ambiguous on its own — it is both
-      «nothing can take money» and «one rail serves everyone, so there is nothing to choose». The
-      checkout screen has to say a different true thing in each case (finding 214).
-    */
-    const [methods, offline] = await Promise.all([
-      this.registry.availableMethodsForCountry(code),
-      this.registry.offlineRailForCountry(code),
-    ]);
+      The list alone again (Bashar, 2026-09-08).
 
-    return { methods, offline };
+      It answered `offline` alongside `methods` so checkout could tell «nothing can take money»
+      from «one rail serves everyone, so there is nothing to choose» — the ambiguity behind finding
+      214. Removing the bank-transfer journey removes the ambiguity: from the customer's side
+      nothing can take money, and one sentence is true again.
+
+      Kept where it is still read: `StartPaymentResult.offline` decides whether the checkout form
+      follows a provider's redirect, and `BookingDetailService` decides from the same flag whether
+      finance is offered «تأكيد استلام الحوالة».
+    */
+    return { methods: await this.registry.availableMethodsForCountry(code) };
   }
 
   /**
