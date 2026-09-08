@@ -66,7 +66,15 @@ const UNTRANSLATABLE = new Set<string>([
   /*
     City-CATEGORY codes and amenity codes, for the same reason one layer down: both are rows a
     super admin creates with their own `name_ar`, and `city_category.updated` audits the code
-    because the code is the thing that changed.
+    because the code is the thing that changed. `amenity.created` proves the point — it writes
+    `{"code": "family_friendly", "nameAr": "مناسب للعائلات", …}`, so the row states its own word on
+    the line below the code.
+
+    `facilities` used to be in this list and has been REMOVED. It was filed here as an amenity code
+    and it is not one: it appears only under `category`, which is `AMENITY_CATEGORIES` — a closed
+    set of three that a catalogue can name and now does. An exemption decays in the direction of
+    hiding things, and this one was excusing a translatable value by sitting under a true comment
+    about a different kind of value.
   */
   'coastal',
   'mountain',
@@ -74,7 +82,7 @@ const UNTRANSLATABLE = new Set<string>([
   'rural',
   'historic',
   'wifi',
-  'facilities',
+  'family_friendly',
 
   /*
     A payment PROVIDER's name. `simulator` is the development gateway and the real ones will be

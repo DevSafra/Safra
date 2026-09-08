@@ -4583,6 +4583,22 @@ export const ar = {
         joint: 'نسخة موقّعة من الطرفين',
       },
 
+      /*
+        The amenity's sidebar group — all three of `AMENITY_CATEGORIES`, which is a CLOSED set.
+        `accessibility` has not been written to the log yet and is named anyway: the guard only
+        checks values already present, so naming just the two that exist would leave the third to
+        print raw on the day somebody files an amenity under it.
+
+        The same three words the الكتالوج screen puts in its own select — `t.sections.catalogue`
+        `groupFacilities` / `groupRules` / `groupAccessibility`. One state, one word: an operator
+        who reads «قواعد» on the catalogue must not meet «rules» on the audit row for the same edit.
+      */
+      category: {
+        facilities: 'مرافق',
+        rules: 'قواعد',
+        accessibility: 'إتاحة',
+      },
+
       /* Who filed a piece of dispute evidence — three parties since 223. */
       filedBy: {
         customer: 'العميل',
