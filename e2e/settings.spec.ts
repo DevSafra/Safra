@@ -171,7 +171,13 @@ test.describe('الإعدادات — finding a setting', () => {
   test('the filter reaches across every card, and clearing restores them', async ({
     page,
   }) => {
-    await page.goto('/settings');
+    /*
+      Every setting on ONE page. The screen defaults to ten rows and the platform holds eighteen
+      settings, six of which have never been changed — and on the day this was written all six were
+      on page two, so a search of the first page found nothing and reported it as «every setting has
+      been changed». `?size=` is the documented, clamped way to ask for more.
+    */
+    await page.goto('/settings?size=100');
 
     const rows = page.locator('[data-setting-row]');
     const all = await rows.count();
@@ -533,15 +539,52 @@ test.describe('الإعدادات — the details drawer', () => {
     await expect(rate).not.toContainText('commission.partner_rate');
   });
 
+  /*
+    The setting is FOUND, not named.
+
+    This pinned `commission.customer_fee_mode` and asserted its history was empty. A session on
+    2026-09-07 changed that setting from a test and left the change behind — «السبب: اختبار: اشتقاق
+    القيم من الإعدادات» is still in its drawer — so the premise stopped being true and the spec
+    failed on a console that was rendering correctly. `pnpm db:testbed` restores bookings, payments,
+    the ledger, messages, notifications and disputes; it does NOT restore `settings` or
+    `settings_history`, and resetting those wholesale would wipe whatever a developer had
+    deliberately configured locally. Recorded as a testbed-hygiene gap rather than fixed there.
+
+    So the spec looks for a setting with no history instead of asserting which one that is. It still
+    proves the thing worth proving — that the drawer says so PLAINLY, in those words, where the
+    history would be — and it cannot be invalidated by somebody changing an unrelated value.
+  */
   test('says so plainly when a setting has never been changed', async ({ page }) => {
     await page.goto('/settings');
 
-    const fee = row(page, 'commission.customer_fee_mode');
+    const rows = page.locator('[data-setting-row]');
+    const total = await rows.count();
 
-    await fee.getByRole('button', { name: t.sections.settings.details }).click();
+    expect(total, 'the settings screen lists something to inspect').toBeGreaterThan(9);
 
-    await expect(fee).toContainText(t.sections.settings.historyTitle);
-    await expect(fee).toContainText(t.sections.settings.historyEmpty);
+    let pristine = 0;
+
+    for (let index = 0; index < total; index += 1) {
+      const candidate = rows.nth(index);
+
+      await candidate.getByRole('button', { name: t.sections.settings.details }).click();
+      await expect(candidate).toContainText(t.sections.settings.historyTitle);
+
+      if (await candidate.getByText(t.sections.settings.historyEmpty).isVisible()) {
+        pristine += 1;
+        break;
+      }
+
+      await candidate
+        .getByRole('button', { name: t.sections.settings.detailsHide })
+        .click();
+    }
+
+    expect(
+      pristine,
+      'no setting on this screen reports an empty history — either every one has been changed, ' +
+        'or the drawer has stopped saying so. Restore with `pnpm db:testbed` and re-read.',
+    ).toBe(1);
   });
 
   /**
