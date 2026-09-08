@@ -427,6 +427,16 @@ const withheldSchema = z.object({
   amount: z.string(),
   currencyCode: z.string(),
   disputeReference: z.string(),
+  /*
+    WHY it is held and WHAT must happen next (finding 209, Bashar 2026-09-08).
+
+    The reference alone made the answer a lookup: a partner read «DSP-034388» and had to go and find
+    out what it alleged and whether anybody had picked it up. `responseCount` is the part they can
+    act on — nought means the decision is waiting on their account of the night.
+  */
+  disputeKind: z.string(),
+  disputeStatus: z.string(),
+  responseCount: z.number(),
   openedAt: z.string(),
   /* The transfer this stay is blocking, where it is already on one. Null before it accrues. */
   payoutReference: z.string().nullable(),

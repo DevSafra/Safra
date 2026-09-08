@@ -1004,6 +1004,9 @@ export class PayoutService {
       amount: string;
       currency_code: string;
       dispute_reference: string;
+      dispute_kind: string;
+      dispute_status: string;
+      responses: number;
       opened_at: string;
       payout_reference: string | null;
     }>(sql`
@@ -1013,6 +1016,20 @@ export class PayoutService {
              b.partner_payable_amount::text AS amount,
              cur.code AS currency_code,
              d.reference AS dispute_reference,
+             /*
+               WHY the money is held, and WHAT has to happen before it moves (Bashar, 2026-09-08:
+               «I want the partner to be able to understand … why the money is frozen. What event
+               must occur before the funds are released.»).
+
+               The reference alone was a lookup task: a partner read «DSP-034388» and had to go and
+               find out what it alleged and how far along it was. The kind says what the complaint
+               is, the status says whether anybody has picked it up, and the response COUNT says
+               whether the release is waiting on THEM — which is the one part of this they can act
+               on. (No backticks in this comment: they would end the sql template.)
+             */
+             d.kind::text   AS dispute_kind,
+             d.status::text AS dispute_status,
+             (SELECT count(*)::int FROM dispute_responses r WHERE r.dispute_id = d.id) AS responses,
              d.created_at::text AS opened_at,
              /*
                The payout this booking is BLOCKING, where there is one. That is the fact the
@@ -1040,6 +1057,9 @@ export class PayoutService {
 
     return rows.rows.map((row) => ({
       reference: row.reference,
+      disputeKind: row.dispute_kind,
+      disputeStatus: row.dispute_status,
+      responseCount: row.responses,
       checkIn: row.check_in,
       checkOut: row.check_out,
       amount: row.amount,
@@ -1503,9 +1523,34 @@ const HELD_BY_DISPUTE = sql`
       AND d.deleted_at IS NULL
   )
   AND (
-    /* (1) Would have accrued, and did not. Conditions lifted verbatim from the accrual above. */
+    /*
+      (1) Would have accrued, and did not.
+      
+      Keyed on completed_at, NOT on status = 'completed' — and that difference was a live defect.
+      
+      Opening a dispute sets bookings.status to 'disputed' (SS6.2 gives SAFRA that transition), so a
+      completed stay that gets disputed stops matching status = 'completed' — which is the exact
+      case this list exists for. The money is held, the accrual has correctly refused it, and the
+      panel that explains the hold cannot see it.
+
+      Found while building finding 209 on 2026-09-08. Proved by the test rather than by a row: the
+      development database's two live disputes are both on stays that have not finished, so nothing
+      was being hidden there and the panel was right to be empty — an earlier note in this comment
+      claimed $130.20 was invisible and that was a misreading of the same query. What demonstrates
+      it is partner-disputes.integration.test.ts, whose fixture is a stay that finished and was then
+      disputed: with status = 'completed' here it vanishes from the list, with completed_at it does
+      not.
+      
+      completed_at is the column the dispute's own close path trusts to put the booking back
+      (restoreBookingStatus: completed_at IS NOT NULL then 'completed'), so it is the platform's
+      existing answer to "had this stay finished" rather than a new one. It also cannot over-report:
+      a booking disputed mid-stay has no completed_at, and its payable is not yet earned.
+      
+      The ACCRUAL above still keys on status = 'completed', which is correct there: a disputed
+      booking must not accrue, and it excludes live disputes separately anyway.
+    */
     (
-      b.status = 'completed'
+      b.completed_at IS NOT NULL
       AND b.paid_at IS NOT NULL
       AND NOT EXISTS (SELECT 1 FROM partner_payout_items i WHERE i.booking_id = b.id)
     )

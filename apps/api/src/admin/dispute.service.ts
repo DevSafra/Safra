@@ -134,6 +134,16 @@ export interface DisputeRow {
   readonly closedAt: string | null;
   /** True while this dispute is holding the partner's payout for its booking. */
   readonly freezesPayout: boolean;
+  /**
+   * HOW MUCH of the partner's money this dispute is holding, and in which currency.
+   *
+   * The console had a COUNT of frozen payouts and no figure anywhere (finding 209), while the
+   * partner's own screen has shown them the amount all along — so an operator taking their call
+   * could not confirm the number the partner was reading. Null on a closed dispute, where nothing
+   * is held.
+   */
+  readonly frozenAmount: string | null;
+  readonly frozenCurrency: string | null;
 }
 
 export interface DisputeCounters {
@@ -292,6 +302,9 @@ export class DisputeService {
       LEFT JOIN partners p          ON p.id = d.partner_id
       LEFT JOIN customer_profiles c ON c.id = d.customer_profile_id
       LEFT JOIN currencies cur      ON cur.id = d.compensation_currency_id
+      -- The BOOKING's currency, which is not the compensation's: a JOD stay can be compensated in
+      -- USD, and «مجمّد 93.00» wearing the wrong code is worse than no figure at all.
+      LEFT JOIN currencies bcur     ON bcur.id = b.currency_id
       -- At most one, and unique in practice: openDisputeThread (no backticks: they would end this
       -- sql template) runs once inside the transaction that creates the dispute. LIMIT 1 rather
       -- than a plain join so a hand-inserted second row
@@ -359,6 +372,11 @@ export class DisputeService {
              d.resolution,
              floor(extract(epoch FROM (now() - d.created_at)) / 3600)::int AS age_hours,
              (d.status IN ('open','investigating')) AS freezes_payout,
+             -- The held figure, and only while it is actually held. See the row type.
+             CASE WHEN d.status IN ('open','investigating')
+                  THEN b.partner_payable_amount::text END AS frozen_amount,
+             CASE WHEN d.status IN ('open','investigating')
+                  THEN bcur.code END AS frozen_currency,
              to_char(d.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS opened_at,
              to_char(d.closed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS closed_at,
              d.created_at
@@ -426,6 +444,8 @@ export class DisputeService {
         openedAt: row.opened_at,
         closedAt: row.closed_at,
         freezesPayout: row.freezes_payout,
+        frozenAmount: row.frozen_amount,
+        frozenCurrency: row.frozen_currency,
       })),
       total,
       query,
@@ -1027,6 +1047,8 @@ interface DisputeRowSql extends Record<string, unknown> {
   resolution: string | null;
   age_hours: number;
   freezes_payout: boolean;
+  frozen_amount: string | null;
+  frozen_currency: string | null;
   opened_at: string;
   closed_at: string | null;
   created_at: string;

@@ -222,7 +222,27 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
                 held payout reads as cold rather than as an alarm. Same shape as the sanctions pill
                 on الشركاء, which takes teal/orange for exactly this reason.
               */
-              <StatusPill tone="indigo">{t.sections.disputes.frozen}</StatusPill>
+              <StatusPill tone="indigo">
+                {t.sections.disputes.frozen}
+                {/*
+                  ── with the FIGURE, since finding 209 ────────────────────────
+
+                  Bashar, 2026-09-08, about the partner's side of this: «If a partner has frozen
+                  funds, I want the partner to be able to understand … how much money is frozen.»
+                  The partner's own screen has shown them the amount all along; the console showed
+                  a COUNT and no figure anywhere, so an operator taking that partner's call could
+                  not confirm the number they were reading.
+
+                  `amount()` and not `money()`: the booking's own currency, never the platform's
+                  default. A JOD stay and a USD stay differ by a factor a reader cannot infer.
+                */}
+                {dispute.frozenAmount && dispute.frozenCurrency ? (
+                  <>
+                    {' · '}
+                    <Ltr>{amount(dispute.frozenAmount, dispute.frozenCurrency)}</Ltr>
+                  </>
+                ) : null}
+              </StatusPill>
             ) : null}
           </div>
 

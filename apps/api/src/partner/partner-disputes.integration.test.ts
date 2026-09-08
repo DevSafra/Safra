@@ -7,6 +7,9 @@ import { ERROR, PERMISSIONS as P } from '@safra/contracts';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
+import { LedgerService } from '../ledger/ledger.service.js';
+import { PayoutService } from '../payouts/payout.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { PartnerDisputesService } from './partner-disputes.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
@@ -35,6 +38,20 @@ describeIfDb('a dispute, from the partner’s side', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   const db: Database = harness.db;
   const service = new PartnerDisputesService(db, new AuditService(db));
+
+  /*
+    The real payout service, for the one assertion that crosses into مستحقاتي.
+
+    Its `withheldForPartner` is a read, so the ledger and settings collaborators are never reached —
+    but they are the real classes rather than stubs, because a stub is a claim about which methods a
+    read touches and that claim goes stale exactly the way five notifier stubs did on 2026-09-08.
+  */
+  const payouts = new PayoutService(
+    db,
+    new AuditService(db),
+    new LedgerService(db),
+    new SettingsService(db),
+  );
 
   let reference = '';
   let disputeId = '';
@@ -137,16 +154,22 @@ describeIfDb('a dispute, from the partner’s side', () => {
                               base_amount, customer_fee_value, customer_fee_amount,
                               partner_commission_rate, partner_commission_amount,
                               total_amount, partner_payable_amount, currency_id,
-                              fx_rate_to_syp, total_syp, cancellation_policy_snapshot, paid_at)
+                              fx_rate_to_syp, total_syp, cancellation_policy_snapshot, paid_at,
+                              -- A stay that FINISHED and was then disputed, which is the case the
+                              -- frozen-funds panel exists for. With no completed_at this is a
+                              -- future stay whose payable is not yet earned, and HELD_BY_DISPUTE
+                              -- is right not to list it. (No backticks: they end this template.)
+                              completed_at)
         SELECT cp.id, un.id, pr.id, pr.partner_id, ref.city_id,
-               current_date + 2500, current_date + 2502, 2, 'disputed'::booking_status,
+               current_date - 6, current_date - 4, 2, 'disputed'::booking_status,
                '100.00', '9.00', '9.00', '0.0700', '7.00', '109.00', '93.00',
-               ref.currency_id, '13000.00000000', '1417000.00', '{"code":"flex"}'::jsonb, now()
+               ref.currency_id, '13000.00000000', '1417000.00', '{"code":"flex"}'::jsonb, now(),
+               now() - interval '4 days'
         FROM cp, un, pr, ref RETURNING id
       ), bu AS (
         INSERT INTO booking_units (booking_id, unit_id, check_in, check_out, status,
                                    accommodation_amount)
-        SELECT bk.id, un.id, current_date + 2500, current_date + 2502, 'disputed', '100.00'
+        SELECT bk.id, un.id, current_date - 6, current_date - 4, 'disputed', '100.00'
         FROM bk, un
         ON CONFLICT (booking_id, unit_id) DO NOTHING
         RETURNING booking_id
@@ -443,6 +466,22 @@ describeIfDb('a dispute, from the partner’s side', () => {
     const view = await service.detail(reference, owner());
 
     expect(view.responses, 'and it appears on their own screen').toHaveLength(1);
+
+    /*
+      And مستحقاتي stops asking for it.
+
+      The frozen-funds panel tells a partner what has to happen before the money moves, and while
+      nobody has answered, the answer is «you» (finding 209). That line must disappear the moment
+      they DO answer, or the screen nags for something already done — so the count behind it is
+      asserted here, in the suite that writes the response, rather than in the payouts suite, where
+      `dispute_responses` is append-only by trigger and the row could not be cleaned up.
+    */
+    const held = await payouts.withheldForPartner(owner());
+    const row = held.find((one) => one.disputeReference === reference);
+
+    expect(row, 'the held booking is on مستحقاتي').toBeDefined();
+    expect(row?.responseCount, 'and the answer is counted').toBe(1);
+    expect(row?.disputeKind, 'beside why it is held').toBe('not_as_described');
   });
 
   /**

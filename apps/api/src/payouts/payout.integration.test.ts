@@ -362,6 +362,81 @@ describeIfDb('PayoutService', () => {
   });
 
   /**
+   * The partner can understand WHY their money is held and WHAT releases it.
+   *
+   * ## Bashar's five questions, 2026-09-08
+   *
+   * *«If a partner has frozen funds, I want the partner to be able to understand: which bookings
+   * are affected. Which disputes are responsible. How much money is frozen. Why the money is
+   * frozen. What event must occur before the funds are released.»*
+   *
+   * Three of the five were already answered — the booking, the dispute reference and the amount.
+   * The other two were not: the reference was a lookup task rather than a reason, and «what has to
+   * happen» was a general sentence at the foot of the page. So the payload now carries the
+   * complaint's KIND and STATUS, and the count of the partner's own responses — which is the part
+   * they can act on, because a dispute nobody has answered is waiting on them.
+   *
+   * ## Asserted as a SET, not field by field
+   *
+   * Listing the keys is the form that fails when somebody removes one. A per-field assertion would
+   * pass with `disputeKind` quietly dropped, and the partner would be back to reading a reference.
+   */
+  it('tells the partner why the money is held and what releases it', async () => {
+    const booking = bookingIds[0];
+
+    if (!booking) return;
+
+    await db.execute(sql`
+      INSERT INTO disputes (booking_id, partner_id, customer_profile_id, kind, status, title)
+      SELECT b.id, b.partner_id, b.customer_profile_id, 'not_as_described', 'investigating',
+             'Withheld reasoning test'
+      FROM bookings b WHERE b.id = ${booking}
+    `);
+
+    const owner = {
+      sub: '00000000-0000-0000-0000-000000000000',
+      role: 'partner',
+      partnerId,
+      permissions: ['payout.read_own'],
+    } as unknown as AccessTokenClaims;
+
+    const withheld = await service.withheldForPartner(owner);
+    const row = withheld.find((one) => one.disputeReference.startsWith('DSP-'));
+
+    expect(row, 'the held booking is listed at all').toBeDefined();
+
+    expect(
+      Object.keys(row ?? {}).sort(),
+      'every one of Bashar’s five questions has a field behind it',
+    ).toStrictEqual(
+      [
+        'reference',
+        'checkIn',
+        'checkOut',
+        'amount',
+        'currencyCode',
+        'disputeReference',
+        'disputeKind',
+        'disputeStatus',
+        'responseCount',
+        'openedAt',
+        'payoutReference',
+      ].sort(),
+    );
+
+    /* And the two that were missing carry real values rather than being present and empty. */
+    expect(row?.disputeKind, 'why: the complaint’s own category').toBe(
+      'not_as_described',
+    );
+    expect(row?.disputeStatus, 'how far along it is').toBe('investigating');
+    expect(row?.responseCount, 'and whether the release waits on them').toBe(0);
+    expect(Number(row?.amount), 'how much').toBeGreaterThan(0);
+    expect(row?.currencyCode, 'never an amount without its currency').toBeTruthy();
+
+    await db.execute(sql`DELETE FROM disputes WHERE title = 'Withheld reasoning test'`);
+  });
+
+  /**
    * A SUSPENDED partner's payout will not release (Bashar, 2026-08-24).
    *
    * ## Why this had no test until now

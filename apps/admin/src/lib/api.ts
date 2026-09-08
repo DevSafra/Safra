@@ -2020,6 +2020,15 @@ const disputeItemSchema = z.object({
   openedAt: z.string(),
   closedAt: z.string().nullable(),
   freezesPayout: z.boolean(),
+  /*
+    How much is held, and in the BOOKING's currency (finding 209).
+
+    Nullable rather than optional: a closed dispute holds nothing, and `.nullable()` says that,
+    where `.optional()` would let an API that stopped sending the figure look like a dispute that
+    holds nothing. That distinction cost this project a screen once.
+  */
+  frozenAmount: z.string().nullable(),
+  frozenCurrency: z.string().nullable(),
 });
 
 const disputesSchema = offsetPage(disputeItemSchema).extend({

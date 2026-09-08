@@ -18,7 +18,15 @@ import { SectionRefusal } from '@/components/section-refusal';
 import { Ltr } from '@/components/ltr';
 import { amount, count } from '@/lib/format';
 import { addMoney } from '@/lib/money';
-import { fill, payoutStatus, plural, t, violationKind } from '@/lib/strings';
+import {
+  disputeKind,
+  disputeStatus,
+  fill,
+  payoutStatus,
+  plural,
+  t,
+  violationKind,
+} from '@/lib/strings';
 import { TONES } from '@/lib/tones';
 import { payoutIsSettled } from '@safra/contracts';
 import { statusTone } from '@safra/ui';
@@ -594,10 +602,53 @@ function Withheld({
             </div>
             <p className="text-[11px] text-faint">
               {t.payouts.withheldStay}: <Ltr>{row.checkIn}</Ltr> ←{' '}
-              <Ltr>{row.checkOut}</Ltr> · {t.payouts.withheldDispute}:{' '}
-              <Ltr>{row.disputeReference}</Ltr> · {t.payouts.withheldOpened}:{' '}
+              <Ltr>{row.checkOut}</Ltr> · {t.payouts.withheldOpened}:{' '}
               <Ltr>{row.openedAt.slice(0, 10)}</Ltr>
             </p>
+
+            {/*
+              ── why, and what has to happen (finding 209) ─────────────────────
+
+              The reference used to sit in the line above as plain text, so «which dispute» was
+              answered and «what is it about» was a navigation task. It is a LINK now — the dispute
+              has its own screen since 223 — and it carries the complaint's kind and its state, so
+              the row says what the money is waiting on rather than only that it is waiting.
+            */}
+            <p className="text-[11px] text-muted">
+              {t.payouts.withheldWhy}: {disputeKind(row.disputeKind)} ·{' '}
+              {disputeStatus(row.disputeStatus)} ·{' '}
+              <Link
+                href={`/disputes/${row.disputeReference}`}
+                className="text-sky hover:underline"
+              >
+                <Ltr>{row.disputeReference}</Ltr>
+              </Link>
+            </p>
+
+            {/*
+              The release condition, and the ACTION where the action is theirs.
+
+              A partner who has not answered is the reason the decision has not been taken — «the
+              partner should not need to translate» applies to their own next step too. Once they
+              have answered, the honest statement is that it is with SAFRA, which is also the
+              reassurance they came to the page for.
+            */}
+            {row.responseCount === 0 ? (
+              <p className="text-[11px] font-semibold leading-relaxed text-warn">
+                {t.payouts.withheldReleaseNeedsYou}{' '}
+                <Link
+                  href={`/disputes/${row.disputeReference}`}
+                  className="text-sky hover:underline"
+                >
+                  {t.payouts.withheldOpen}
+                </Link>
+              </p>
+            ) : (
+              <p className="text-[11px] leading-relaxed text-faint">
+                {plural(t.payouts.withheldResponded, { count: row.responseCount })}{' '}
+                {t.payouts.withheldRelease}
+              </p>
+            )}
           </li>
         ))}
       </ul>
