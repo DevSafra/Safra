@@ -405,7 +405,16 @@ export class BookingDetailService {
       FROM booking_internal_notes n
       LEFT JOIN users us ON us.id = n.author_user_id
       WHERE n.booking_id = ${bookingId}
-      ORDER BY n.created_at ASC
+      -- By id as well as by the timestamp.
+      --
+      -- Two notes written inside one transaction share now() to the microsecond, so
+      -- created_at alone leaves «oldest first» to the planner. The section is read as a
+      -- HISTORY downwards, and a history that reorders itself between page loads is worse
+      -- than an unordered list. The id is a uuidv7, which sorts by time.
+      --
+      -- Found by booking-notes.integration.test.ts failing inside a full run on 2026-09-08
+      -- and passing when run alone — the signature of exactly this.
+      ORDER BY n.created_at ASC, n.id ASC
     `);
 
     return rows.rows.map((row) => ({
