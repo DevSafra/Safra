@@ -117,6 +117,10 @@ export default defineConfig({
       // And the check that no value a super admin can edit is written into a sentence. It reads
       // the SEED rather than a remembered list, so a new setting is covered the day it is added.
       'tools/settings-in-copy/*.test.ts',
+      // And the check that every /api/… a browser fetches has a route handler behind it. It reads
+      // the SOURCE and the route tree, because a missing handler answers 404 and is invisible to
+      // the type checker — which is how a finished control came to report a generic failure.
+      'tools/client-routes/*.test.ts',
     ],
     environment: 'node',
     // Security-relevant paths must stay covered as the codebase grows.

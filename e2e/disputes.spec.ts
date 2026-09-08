@@ -117,13 +117,8 @@ test.describe('النزاعات', () => {
       .getByText(t.sections.disputes.kpiFrozen, { exact: true })
       .locator('xpath=following-sibling::p[1]');
 
-    await expect(badge, 'the queue has a backlog to work from').toBeVisible();
-
     const numeric = async (locator: typeof badge): Promise<number> =>
       Number(((await locator.textContent()) ?? '').replace(/[^\d]/g, ''));
-
-    const before = await numeric(badge);
-    const frozenBefore = await numeric(frozen);
 
     /*
       ── the skip has to be narrower than «no button» ─────────────────────────
@@ -144,6 +139,24 @@ test.describe('النزاعات', () => {
       (await untaken.count()) === 0,
       'Every dispute here has already been taken.',
     );
+
+    /*
+      ── the badge is asserted AFTER the skip, and that ordering is the point ──
+
+      It used to be the first assertion in the test, above the count of untaken disputes. The badge
+      counts what nobody has taken, so it is ABSENT when the number is zero — and a run in which
+      every dispute had already been taken (which is the ordinary state after this test has run
+      once, since it takes one and nothing puts it back) failed here with «the queue has a backlog
+      to work from» instead of skipping for the reason the skip below already describes.
+      Ambient-data dependence, and the guard was downstream of the assertion it was meant to guard.
+
+      Once there IS an untaken dispute the badge must be there, so nothing is lost by asking in
+      this order — and the skip stays as narrow as its own note argues it must be.
+    */
+    await expect(badge, 'a backlog is counted on the sidebar').toBeVisible();
+
+    const before = await numeric(badge);
+    const frozenBefore = await numeric(frozen);
 
     const take = page
       .getByRole('button', { name: t.sections.disputes.acknowledge })
@@ -379,5 +392,123 @@ test.describe('النزاعات', () => {
 
     await expect(main).toContainText(t.sections.disputes.kpiFrozen);
     await expect(main).toContainText(t.sections.disputes.kpiOpen);
+  });
+
+  /**
+   * Releasing one of the guest's photographs to the partner, and taking it back.
+   *
+   * ## Why this is a browser test
+   *
+   * `dispute-evidence.integration.test.ts` holds the boundary: withheld answers as «not found»,
+   * released opens, withdrawn refuses again. All three of those would go on passing with a console
+   * that draws no control at all — which is this codebase's most common defect and the reason the
+   * rule «built is not driven» exists. The question here is whether an operator can make the
+   * decision Bashar asked to be explicit.
+   *
+   * ## The BADGE is the assertion, not the button
+   *
+   * A button labelled «حجب» proves the click landed; «مرئي للشريك» printed over the thumbnail is
+   * what an operator scanning eight files reads, and it is the thing that would be missing if the
+   * refresh after the write did not happen.
+   */
+  test('releases a guest’s photograph to the partner, and withdraws it', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+
+    await page.goto('/disputes?size=5');
+    await page.waitForSelector('article');
+
+    const card = page.locator('article').first();
+
+    await expect(
+      card.getByRole('button', { name: t.sections.disputes.evidenceAdd }),
+      'an open dispute is needed for this',
+    ).toBeVisible();
+
+    const before = await card.locator('[data-evidence]').count();
+
+    await page.setInputFiles('input[type=file]', 'e2e/fixtures/room-one.jpg');
+
+    await expect
+      .poll(async () => card.locator('[data-evidence]').count(), {
+        timeout: 60_000,
+        message: 'the photograph reaches the card',
+      })
+      .toBeGreaterThan(before);
+
+    const file = card.locator('[data-evidence]').last();
+    const id = await file.getAttribute('data-evidence');
+
+    /* Private by DEFAULT — the whole model is in this assertion. */
+    await expect(
+      card.locator(`[data-evidence-shared="${id}"]`),
+      'a fresh file is not shared with anybody',
+    ).toHaveCount(0);
+
+    await card.locator(`[data-evidence-share="${id}"]`).click();
+
+    /*
+      The system's dialog, never the browser's. Its confirm label is the caller's own word, which is
+      the cheapest proof that this is `useConfirm()` and not a grey box captioned «localhost:3001».
+    */
+    await page
+      .getByRole('button', { name: t.sections.disputes.evidenceShareConfirm })
+      .click();
+
+    await expect(
+      card.locator(`[data-evidence-shared="${id}"]`),
+      'and the thumbnail now says the partner can see it',
+    ).toBeVisible();
+
+    /* Reversible, because an operator who releases the wrong file must be able to take it back. */
+    await card.locator(`[data-evidence-share="${id}"]`).click();
+    await page
+      .getByRole('button', { name: t.sections.disputes.evidenceUnshareConfirm })
+      .click();
+
+    await expect(
+      card.locator(`[data-evidence-shared="${id}"]`),
+      'withdrawn, and the badge goes with it',
+    ).toHaveCount(0);
+  });
+
+  /**
+   * The PARTNER's answer is on the screen where the dispute is closed.
+   *
+   * Bashar, 2026-09-08: *«I do not want SAFRA deciding disputes while only one side of the dispute
+   * has a voice in the workflow.»* A response that reaches the API and not the card is the same as
+   * no response — so this asserts the words, and asserts that their absence is SAID rather than
+   * left blank on an open case.
+   */
+  test('puts the partner’s answer beside the allegation, or says there is none', async ({
+    page,
+  }) => {
+    await page.goto('/disputes?size=25');
+    await page.waitForSelector('article');
+
+    const blocks = page.locator('[data-partner-responses]');
+
+    /*
+      Every open card carries one or the other. Counted rather than checked on the first row: a
+      single card rendering it while the projection dropped it for the rest is exactly the shape a
+      first-row assertion cannot see.
+    */
+    expect(
+      await blocks.count(),
+      'the operator is told whether the host has answered — a zero here means the responses ' +
+        'never reached the screen the decision is made on',
+    ).toBeGreaterThan(0);
+
+    const texts = await blocks.allInnerTexts();
+
+    expect(
+      texts.every(
+        (text) =>
+          text.includes(t.sections.disputes.partnerResponses) ||
+          text.includes(t.sections.disputes.partnerResponsesNone),
+      ),
+      'and each block either shows an answer or states that none arrived',
+    ).toBe(true);
   });
 });

@@ -64,6 +64,7 @@ const NEEDS_PARTNER_SESSION = new RegExp(
     'multi-unit-downstream',
     'booking-confirmation-journey',
     'partner-room-quantity',
+    'partner-disputes',
     'multi-room-downstream',
     'dispute-payout-freeze',
     'mixed-booking-downstream',

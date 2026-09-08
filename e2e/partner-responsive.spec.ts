@@ -41,6 +41,12 @@ const SCREENS = [
   '/calendars',
   '/arrivals',
   '/contracts',
+  /*
+    Added with finding 223. The DETAIL screen is the one that matters — it carries a photograph
+    gallery, a textarea and an amount on one line — and it is reachable only from the list, so the
+    sub-page sweep below covers it the way the property sub-pages are covered.
+  */
+  '/disputes',
   '/coupons',
   '/employees',
   '/employee-roles',
@@ -125,6 +131,35 @@ test('the property sub-screens fit every width', async ({ page }) => {
 
       if (result) broken.push(`${width}px ${suffix} ${result}`);
     }
+  }
+
+  expect(broken).toEqual([]);
+});
+
+/**
+ * A dispute's DETAIL screen at every width — reachable only from the list, so a crawl would miss it.
+ *
+ * It carries the widest mixture in the portal after تعديل: a frozen amount on the same line as a
+ * reference and two status words, a photograph gallery, and a textarea. 1024px is the one that
+ * regresses silently, because it is wide enough to look right in a screenshot.
+ */
+test('a dispute’s own screen fits every width', async ({ page }) => {
+  await page.goto('/disputes', { waitUntil: 'domcontentloaded' });
+
+  const rows = page.locator('[data-dispute]');
+
+  test.skip((await rows.count()) === 0, 'No disputes against this partner.');
+
+  const reference = await rows.first().getAttribute('data-dispute');
+  const broken: string[] = [];
+
+  for (const width of WIDTHS) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(`/disputes/${reference!}`, { waitUntil: 'domcontentloaded' });
+
+    const result = await overflow(page);
+
+    if (result) broken.push(`${width}px ${result}`);
   }
 
   expect(broken).toEqual([]);
