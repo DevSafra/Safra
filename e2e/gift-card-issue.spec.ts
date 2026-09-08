@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 
+import { statusWord } from '../packages/i18n/src/statuses.js';
 import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
 
 /**
@@ -138,7 +139,17 @@ test.describe('issuing a gift card', () => {
     const row = page.locator('tbody tr').first();
 
     await expect(row, 'the card just issued is on top').toContainText('31.00');
-    await expect(row.locator('[data-status-pill]')).toHaveText('نشطة');
+    /*
+      The CATALOGUE's word, not a literal.
+
+      This said «نشطة» and the console renders «سارية» — decision 225 gave every state one
+      canonical word and this assertion kept the one it replaced, so the test failed on copy that
+      was correct. A literal here is a second copy of a word whose whole point is that there is
+      only one; `statusWord` reads the same catalogue the pill does, so the two cannot drift.
+    */
+    await expect(row.locator('[data-status-pill]')).toHaveText(
+      statusWord('giftCardStatus', 'active', 'ar'),
+    );
 
     await row.getByRole('button', { name: 'إلغاء البطاقة' }).click();
 
