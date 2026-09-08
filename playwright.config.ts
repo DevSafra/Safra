@@ -72,6 +72,8 @@ const NEEDS_PARTNER_SESSION = new RegExp(
     'refund-visibility',
     'checkout-and-acceptance',
     'bidi-runs',
+    /* Sweeps all three apps in one spec, so it needs the partner session too. */
+    'contrast',
   ].join('|')})\\.spec\\.ts`,
 );
 
