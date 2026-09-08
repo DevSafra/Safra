@@ -68,7 +68,7 @@ export async function bookableStay(
      * Narrow the search to one city, which a named `slug` needs in practice.
      *
      * Search is RANKED, and this database holds **846** `rev-test-*` properties left behind by
-     * review specs. They fill the first sixty results, so a named fixture is not on the page even
+     * review specs. left before that test gained its rollback harness. They fill the first sixty results, so a named fixture is not on the page even
      * at `limit=60` — `citySlug=damascus` returns four items and the fixture is one of them. The
      * pollution is a testbed-hygiene problem in its own right; this keeps the helper working while
      * it stands.
