@@ -40,6 +40,8 @@ mkdirSync('test-reports', { recursive: true });
 /* A stale report from a crashed run must never be read as this run's result. */
 if (existsSync(REPORT)) rmSync(REPORT);
 
+const startedAt = new Date();
+
 const run = spawnSync(
   'npx',
   ['vitest', 'run', '--reporter=default', '--reporter=json', `--outputFile=${REPORT}`],
@@ -139,7 +141,36 @@ console.log(
   `  budget: at most ${BUDGET.maxSkipped} skipped, at least ${BUDGET.minTests} collected`,
 );
 
+/*
+  ── Why a failure might have nothing to do with the code ──────────────────────────────────────
+
+  Several suites drive a SWEEP — the SLA expiry, the system refunds, the notification redrive — and
+  each sweep takes a per-job PostgreSQL advisory lock so two replicas cannot process one batch
+  twice. The development WORKERS run those same jobs on a schedule against the same database. When
+  a worker holds the lock at the moment a test drives the sweep, the sweep skips, the test sees
+  «nothing happened», and the failure looks like a bug in the code under test.
+
+  It rotates between files, never reproduces alone, and was mis-diagnosed as «a test reading data it
+  does not own» twice in `docs/FUTURE-WORK.md` — findings 216 and 224. `scheduled_job_runs` records
+  every skip, so the evidence is always there; nobody had looked. This prints it, and only when
+  there is a failure to explain, so a green run says nothing extra.
+
+  It never CHANGES the verdict. A failing test is a failing test; this only says what else was
+  happening.
+*/
 if (problems.length > 0) {
+  const during = sweepsDuring(startedAt);
+
+  if (during.length > 0) {
+    console.error(
+      '\nNOTE: the scheduled workers were active during this run. A suite that drives a sweep ' +
+        'shares an advisory lock with them, and a contended lock makes the sweep SKIP — which ' +
+        'reads as «nothing happened» in a test. Pause them with ' +
+        '`pkill -STOP -f dist/worker.js` and re-run before believing a sweep-driven failure:',
+    );
+    for (const line of during) console.error(`  ${line}`);
+  }
+
   console.error(`\n${problems.length} problem(s):`);
   for (const line of problems.slice(0, 40)) console.error(`  ${line}`);
   if (problems.length > 40) console.error(`  …and ${problems.length - 40} more`);
@@ -156,3 +187,45 @@ if (run.status !== 0) {
 }
 
 console.log(`\nEverything ran. Written to ${SUMMARY}`);
+
+/**
+ * Which scheduled jobs ran or skipped while the suite was running.
+ *
+ * Run through `packages/db` rather than from here, because `pg` is that package's dependency and
+ * does not resolve at the repository root. A first version shelled out to `psql`, which is absent
+ * on the machine this was written on — so the diagnostic could not be driven, and a control nobody
+ * has watched work is not a control.
+ *
+ * Every failure is swallowed. A diagnostic that can break the gate is worse than no diagnostic.
+ */
+function sweepsDuring(since) {
+  if (!process.env.DATABASE_URL) return [];
+
+  const script = `
+    import { Client } from 'pg';
+    const c = new Client({ connectionString: process.env.DATABASE_URL });
+    await c.connect();
+    const r = await c.query(
+      "SELECT job, status, started_at FROM scheduled_job_runs WHERE started_at >= $1::timestamptz ORDER BY started_at",
+      [${JSON.stringify(since.toISOString())}],
+    );
+    for (const row of r.rows) {
+      console.log(row.job + ' ' + row.status + ' at ' + row.started_at.toISOString());
+    }
+    await c.end();
+  `;
+
+  const out = spawnSync('node', ['--input-type=module', '-e', script], {
+    cwd: 'packages/db',
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+    env: process.env,
+  });
+
+  if (out.status !== 0 || typeof out.stdout !== 'string') return [];
+
+  return out.stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '');
+}
