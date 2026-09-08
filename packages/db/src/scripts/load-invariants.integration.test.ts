@@ -9,29 +9,45 @@ import { INVARIANTS } from './load-invariants.js';
  *
  * ## Why this test exists
  *
- * Scenario 2 of `docs/load-testing.md` drives concurrent bookings at a handful of units and asks one
- * question: did two customers get sold the same room? `pnpm load:invariants` is the only thing that
- * can answer it — two requests can both reply 201 and only the database knows where they landed.
+ * Scenario 2 of `docs/load-testing.md` drives concurrent bookings at a handful of units and asks
+ * one question: did two customers get sold the same room? `pnpm load:invariants` is the only thing
+ * that can answer it — two requests can both reply 201 and only the database knows where they
+ * landed.
  *
  * The check was written as `GROUP BY unit_id, check_in HAVING count(*) > 1`, which finds only the
  * case where two live bookings share an IDENTICAL check-in date. The constraint it stands for
  * forbids any OVERLAP, so Aug 1–5 against Aug 3–7 on one unit — two customers, two shared nights,
  * precisely the failure — returned no rows and printed `ok`.
  *
- * A check that cannot fail is worse than no check, because it is believed. So the query is now
- * tested the only way that means anything: take the constraint away, write the row it would have
- * refused, and require the invariant to find it.
+ * A check that cannot fail is worse than no check, because it is believed. So the query is tested
+ * the only way that means anything: write the row the constraint would have refused, and require
+ * the invariant to find it.
  *
- * ## Why the constraint is dropped inside the transaction
+ * ## How the invalid row is written, and why this changed
  *
- * There is no other way to create the state. `bookings_no_overlapping_stays_v3` refuses the INSERT,
- * which is exactly right and exactly why a passing invariant proves nothing on its own — the
- * database, not the query, is what keeps the data clean today. The rollback harness makes the DDL
- * disposable: PostgreSQL rolls back `ALTER TABLE … DROP CONSTRAINT` like anything else, so the
- * constraint is back before the next test and the development database is untouched.
+ * By SHADOWING `bookings` with a temporary table of the same shape, and running the invariant's own
+ * SQL — verbatim, unqualified — against that. PostgreSQL searches `pg_temp` before `public`, so
+ * `FROM bookings` inside the invariant resolves to the shadow; `LIKE … INCLUDING DEFAULTS` copies
+ * the columns and their defaults and NOT the constraints, so the overlapping pair simply inserts.
  *
- * That also states the dependency plainly: this suite proves the DETECTOR works. The constraint
- * itself is proved by `bookings.integration.test.ts` and by scenario 2's own run.
+ * It used to drop the two exclusion constraints inside the harness's transaction. That was correct
+ * about rollback and wrong about LOCKS: `ALTER TABLE … DROP CONSTRAINT` takes ACCESS EXCLUSIVE on
+ * `bookings` and `booking_units` and holds it until the transaction ends, so every other suite
+ * running in parallel that touched a booking blocked behind this one. Measured on 2026-09-08: five
+ * assertions in `sla-expiry.integration.test.ts`, one in the payments suite, and this file's own
+ * tests failed on different runs — always in a full run, never alone. Recorded as finding 224 and
+ * mis-diagnosed twice as ambient data.
+ *
+ * A temp shadow takes no lock on anything shared, needs no DDL on a real table, and needs no
+ * fixture — no users, partners, properties or currencies, because the invariant reads five columns.
+ *
+ * ## What this does and does not prove
+ *
+ * It proves the DETECTOR: given overlapping live stays, the SQL reports them; given a same-day
+ * changeover, it does not. That the real table cannot hold such a row is a different guarantee,
+ * proved by the exclusion constraint and by `bookings.integration.test.ts`. Both are asserted
+ * below — the shadow's shape is compared against the real table's so a column rename cannot leave
+ * this passing over a table that no longer resembles the one the invariant runs against.
  */
 const DATABASE_URL = process.env['DATABASE_URL'];
 const describeIfDb = DATABASE_URL ? describe : describe.skip;
@@ -66,24 +82,22 @@ describeIfDb('the double-booking invariant detects an overlap', () => {
     db = harness.db;
 
     /*
-      BOTH guarantees have to go before the overlapping row can exist, and so does the trigger that
-      feeds the second one. Inside the harness's transaction, so all three return on rollback.
-
-      There are two since 2026-09-06: a booking may hold several rooms, so the exclusion constraint
-      was copied onto `booking_units`, and `bookings_hold_lead_room` writes a row there for every
-      booking whatever created it. Dropping only the original left this suite unable to write the
-      invalid row it exists to detect — which read as the DETECTOR being broken rather than as the
-      guarantee having got stronger.
+      The shadow. `pg_temp` is searched first, so the invariant's unqualified `FROM bookings` reads
+      this and not the real table — and `LIKE` without `INCLUDING CONSTRAINTS` is exactly the
+      point: the columns are the same, the guarantees are not.
     */
     await db.execute(
-      sql`ALTER TABLE bookings DROP CONSTRAINT bookings_no_overlapping_stays_v3`,
-    );
-    await db.execute(
-      sql`ALTER TABLE booking_units DROP CONSTRAINT booking_units_no_overlapping_stays`,
+      sql`CREATE TEMP TABLE bookings (LIKE public.bookings INCLUDING DEFAULTS)`,
     );
   });
 
   afterEach(async () => {
+    /*
+      Dropped explicitly as well as by the rollback. A temp table created inside a transaction goes
+      when the transaction does — but the harness keeps ONE connection for the file, and a leftover
+      shadow would silently shadow the next test's real table too.
+    */
+    await db.execute(sql`DROP TABLE IF EXISTS bookings`);
     await harness.rollback();
   });
 
@@ -92,81 +106,87 @@ describeIfDb('the double-booking invariant detects an overlap', () => {
   });
 
   /**
-   * Two live bookings on one unit, staggered rather than identical.
+   * Two live stays on one unit, staggered rather than identical.
    *
-   * `offsetNights` is what the old query could not see: at 0 the two stays start on the same day and
-   * a GROUP BY on `check_in` catches them; at anything else it does not, and the room is still sold
-   * twice.
+   * `offsetNights` is what the old query could not see: at 0 the two start on the same day and a
+   * GROUP BY on `check_in` catches them; at anything else it does not, and the room is still sold
+   * twice. At 5 the second begins on the day the first ends, which is a normal changeover.
    */
   async function overlappingPair(offsetNights: number): Promise<string> {
-    const tag = `inv-${Math.random().toString(36).slice(2, 10)}`;
+    const unit = crypto.randomUUID();
 
     await db.execute(sql`
-      WITH ref AS (
-        SELECT (SELECT id FROM cities WHERE deleted_at IS NULL LIMIT 1) AS city_id,
-               (SELECT id FROM currencies WHERE code = 'USD')           AS currency_id,
-               (SELECT id FROM property_types LIMIT 1)                  AS type_id,
-               (SELECT id FROM partner_types LIMIT 1)                   AS partner_type_id,
-               (SELECT id FROM cancellation_policies LIMIT 1)           AS policy_id
-      ), cu AS (
-        INSERT INTO users (email, phone, role, status)
-        VALUES (${tag} || '-c@safra.test', '+963900000180', 'customer', 'active')
-        RETURNING id
-      ), pu AS (
-        INSERT INTO users (email, phone, role, status)
-        VALUES (${tag} || '-p@safra.test', '+963900000181', 'partner', 'active')
-        RETURNING id
-      ), cp AS (
-        INSERT INTO customer_profiles (user_id, full_name, email, phone, is_guest)
-        SELECT cu.id, 'ثابت', ${tag} || '-cp@safra.test', '+963900000180', false
-        FROM cu RETURNING id
-      ), pa AS (
-        INSERT INTO partners (user_id, partner_type_id, legal_name, display_name, city_id,
-                              address, phone, email, verification)
-        SELECT pu.id, ref.partner_type_id, 'Invariant Test', 'ثابت', ref.city_id, 'x',
-               '+963900000181', ${tag} || '-pa@safra.test', 'approved'
-        FROM pu, ref RETURNING id, city_id
-      ), pr AS (
-        INSERT INTO properties (partner_id, city_id, property_type_id, cancellation_policy_id,
-                                slug, name_ar, name_en, name_de, address, status)
-        SELECT pa.id, ref.city_id, ref.type_id, ref.policy_id,
-               ${tag}, ${tag}, 'Invariant', 'Invariant', 'x', 'published'
-        FROM pa, ref RETURNING id, partner_id
-      ), un AS (
-        INSERT INTO units (property_id, name_ar, name_en, name_de, max_guests, base_price,
-                           currency_id)
-        SELECT pr.id, 'وحدة', 'Unit', 'Einheit', 2, '100.00', ref.currency_id
-        FROM pr, ref RETURNING id
-      )
-      INSERT INTO bookings (customer_profile_id, unit_id, property_id, partner_id, city_id,
-                            check_in, check_out, guests_adults, status,
-                            base_amount, customer_fee_value, customer_fee_amount,
+      INSERT INTO bookings (unit_id, reference, check_in, check_out, status,
+                            customer_profile_id, property_id, partner_id, city_id,
+                            guests_adults, base_amount, customer_fee_value, customer_fee_amount,
                             partner_commission_rate, partner_commission_amount,
                             total_amount, partner_payable_amount, currency_id,
                             fx_rate_to_syp, total_syp, cancellation_policy_snapshot)
-      SELECT cp.id, un.id, pr.id, pr.partner_id, ref.city_id,
+      SELECT ${unit}::uuid,
+             'INV-' || leg::text,
              current_date + 400 + (leg * ${offsetNights}::int),
              current_date + 405 + (leg * ${offsetNights}::int),
-             2, 'confirmed'::booking_status,
-             '200.00', '1.99', '1.99', '0.0700', '14.00', '201.99', '186.00',
-             ref.currency_id, '13000.00000000', '2625870.00', '{"code":"flex"}'::jsonb
-      FROM cp, un, pr, ref, generate_series(0, 1) AS leg
+             'confirmed'::booking_status,
+             gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), gen_random_uuid(),
+             2, '200.00', '1.99', '1.99', '0.0700', '14.00', '201.99', '186.00',
+             gen_random_uuid(), '13000.00000000', '2625870.00', '{"code":"flex"}'::jsonb
+      FROM generate_series(0, 1) AS leg
     `);
 
-    return tag;
+    return unit;
   }
 
-  /** The invariant's own SQL, run the way the CLI runs it. */
+  /** The invariant's own SQL, run the way the CLI runs it — over the shadow. */
   async function violations(): Promise<Record<string, unknown>[]> {
     const found = await db.execute<Record<string, unknown>>(sql.raw(DOUBLE_BOOKING_SQL));
 
     return found.rows;
   }
 
-  it('finds two stays that start on the same day', async () => {
-    await overlappingPair(0);
+  /**
+   * The shadow has the columns the invariant reads, under the names it reads them by.
+   *
+   * The control that makes every assertion below mean something. A shadow is only a fair stand-in
+   * while it resembles the real table; a renamed column would leave the invariant failing against
+   * production and passing here, which is the vacuous green this whole file exists to prevent.
+   */
+  it('shadows the real table faithfully', async () => {
+    const columns = await db.execute<{ column_name: string; table_schema: string }>(sql`
+      SELECT column_name, table_schema
+      FROM information_schema.columns
+      WHERE table_name = 'bookings'
+        AND column_name IN ('unit_id', 'reference', 'check_in', 'check_out', 'status')
+      ORDER BY table_schema, column_name
+    `);
 
-    expect(await violations()).not.toHaveLength(0);
+    const schemas = new Set(columns.rows.map((row) => row.table_schema));
+
+    expect(schemas.size, 'the shadow and the real table both exist').toBe(2);
+    expect(
+      [...schemas].some((schema) => schema.startsWith('pg_temp')),
+      'and one of them is the temporary shadow',
+    ).toBe(true);
+    expect(
+      columns.rows.length,
+      'five columns in each — a rename would show up as a smaller number',
+    ).toBe(10);
+
+    /* And the shadow is what the unqualified name reaches, which is the whole mechanism. */
+    const reached = await db.execute<{ schema: string }>(sql`
+      SELECT n.nspname AS schema
+      FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE c.oid = 'bookings'::regclass
+    `);
+
+    expect(reached.rows[0]?.schema).toMatch(/^pg_temp/);
+  });
+
+  it('finds two stays that start on the same day', async () => {
+    const unit = await overlappingPair(0);
+    const found = await violations();
+
+    expect(found).not.toHaveLength(0);
+    expect(found.every((row) => row['unit'] === unit)).toBe(true);
   });
 
   /**
@@ -192,6 +212,10 @@ describeIfDb('the double-booking invariant detects an overlap', () => {
    * morning, the next arrives in the afternoon. `daterange(check_in, check_out, '[)')` excludes the
    * checkout day for exactly this reason. An invariant that flagged it would fire on a healthy
    * database every day, and an alarm that always sounds gets switched off.
+   *
+   * Over the shadow this is now a statement about the QUERY rather than about the seed: it used to
+   * assert that the whole database held no overlap anywhere, so one stray row from a load fixture
+   * read as the invariant over-reporting.
    */
   it('leaves a same-day changeover alone', async () => {
     await overlappingPair(5);
