@@ -6,6 +6,7 @@ import { AuthModule } from '../auth/auth.module.js';
 
 import { CalendarService } from './calendar.service.js';
 import { PartnerDashboardService } from './dashboard.service.js';
+import { DisputeEvidenceService } from '../disputes/dispute-evidence.service.js';
 import { PartnerDisputesService } from './partner-disputes.service.js';
 import { PartnerCouponsController } from './coupons.controller.js';
 import { PartnerCouponsService } from './partner-coupons.service.js';
@@ -67,6 +68,13 @@ import { PropertyImageService } from './property-images.service.js';
     PropertyImageService,
     PartnerDashboardService,
     PartnerDisputesService,
+    /*
+      Provided here as well as in `DisputeModule` and `AdminModule` — one class holding three
+      authorisations for the same table, which is the point: the customer's «my own dispute», the
+      console's city scope, and the partner's «against me, and released to me» are three predicates
+      over one pipeline rather than three implementations of it.
+    */
+    DisputeEvidenceService,
     CalendarService,
     PartnerApplicationService,
     PartnerContractReadService,

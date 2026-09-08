@@ -88,12 +88,29 @@ describeIfDb('evidence on a dispute', () => {
   let customerUserId = '';
   let staffId = '';
   let cityId = '';
+  let partnerId = '';
+  let partnerUserId = '';
 
   const customer = (): AccessTokenClaims =>
     ({
       sub: customerUserId,
       role: 'customer',
       permissions: [],
+    }) as unknown as AccessTokenClaims;
+
+  /**
+   * The host, as the token actually arrives.
+   *
+   * `partnerId` and `dispute.respond_own` — never the staff `dispute.manage`. One permission name
+   * meaning «every dispute on the platform» for an operator and «mine» for a host is how a scope
+   * leak gets written, so the partner routes are gated on their own.
+   */
+  const partner = (id?: string): AccessTokenClaims =>
+    ({
+      sub: partnerUserId,
+      role: 'partner',
+      partnerId: id ?? partnerId,
+      permissions: ['dispute.respond_own'],
     }) as unknown as AccessTokenClaims;
 
   const staff = (scope?: string[]): AccessTokenClaims =>
@@ -116,6 +133,8 @@ describeIfDb('evidence on a dispute', () => {
       customer_user: string;
       staff: string;
       city_id: string;
+      partner_id: string;
+      partner_user: string;
     }>(sql`
       WITH ref AS (
         SELECT (SELECT id FROM cities WHERE deleted_at IS NULL ORDER BY id LIMIT 1) AS city_id,
@@ -174,7 +193,11 @@ describeIfDb('evidence on a dispute', () => {
       RETURNING id, reference,
                 (SELECT id::text FROM cu) AS customer_user,
                 (SELECT id::text FROM st) AS staff,
-                (SELECT city_id::text FROM ref) AS city_id
+                (SELECT city_id::text FROM ref) AS city_id,
+                -- The third party (finding 223). Both ids: the partner the token claims to be,
+                -- and the user row an upload is attributed to.
+                (SELECT id::text FROM pa) AS partner_id,
+                (SELECT id::text FROM pu) AS partner_user
     `);
 
     const row = made.rows[0];
@@ -186,6 +209,8 @@ describeIfDb('evidence on a dispute', () => {
     customerUserId = row.customer_user;
     staffId = row.staff;
     cityId = row.city_id;
+    partnerId = row.partner_id;
+    partnerUserId = row.partner_user;
   });
 
   afterEach(() => harness.rollback());
@@ -572,6 +597,199 @@ describeIfDb('evidence on a dispute', () => {
     /* The control: the operator whose city it is can. */
     await expect(service.remove(staff([cityId]), added.id)).resolves.toEqual({
       removed: true,
+    });
+  });
+
+  /* ── The third party, and the wall between them and the guest's files (223) ─ */
+
+  /**
+   * The partner may file their own photograph, and it reads as THEIRS.
+   *
+   * The boolean this replaced could only say customer-or-staff, so a host's own picture arrived in
+   * the case file labelled «قدّمه فريق سفرة» — an operator deciding the dispute would have believed
+   * SAFRA produced the evidence for one side of it.
+   */
+  it('takes a photograph from the partner, filed as the partner’s', async () => {
+    const added = await service.addAsPartner(partner(), reference, {
+      buffer: PHOTO,
+      originalname: 'the-room-as-it-is.jpg',
+    });
+
+    expect(added.filedBy, 'their own, not SAFRA’s').toBe('partner');
+    expect(added.sharedWithPartner, 'and no sharing decision was needed').toBe(false);
+
+    const listed = await service.forDispute(disputeId);
+
+    expect(
+      listed.map((one) => one.filedBy),
+      'and the read agrees with the write',
+    ).toStrictEqual(['partner']);
+  });
+
+  /**
+   * A dispute against ANOTHER partner is not there.
+   *
+   * 404 rather than 403, for the reason every reference-scoped read here gives: `DSP-` references
+   * are sequential, so «exists and is not yours» must be indistinguishable from «does not exist».
+   */
+  it('refuses a dispute that is not this partner’s, as if it were not there', async () => {
+    const other = await db.execute<{ id: string }>(sql`
+      WITH pu AS (
+        INSERT INTO users (email, phone, role, status)
+        VALUES (${`ev-p2-${randomUUID()}@safra.test`}, '+963900000165', 'partner', 'active')
+        RETURNING id, email
+      )
+      INSERT INTO partners (user_id, partner_type_id, legal_name, display_name, city_id,
+                            address, phone, email, verification)
+      SELECT pu.id, (SELECT id FROM partner_types LIMIT 1), 'Other', 'شريك آخر',
+             ${cityId}::uuid, 'x', '+963900000165', pu.email, 'approved'
+      FROM pu RETURNING id
+    `);
+
+    await expect(
+      service.addAsPartner(partner(other.rows[0]?.id), reference, {
+        buffer: PHOTO,
+        originalname: 'not-mine.jpg',
+      }),
+    ).rejects.toMatchObject({ response: { code: ERROR.DISPUTE_NOT_FOUND } });
+  });
+
+  /**
+   * THE privacy boundary, asserted with its opposite control.
+   *
+   * Bashar, 2026-09-08: *«Do not expose customer-private files, photos or other evidence directly
+   * to the partner… If staff determine that a customer image or file is necessary for a fair
+   * resolution, then that should be an explicit staff decision and not the default behaviour.»*
+   *
+   * Three states in one test on purpose, because two of them are worthless alone:
+   *
+   * 1. Withheld — the partner asking for a guest's file gets «not found», identical to an id that
+   *    was never issued. That is the boundary.
+   * 2. Released — the SAME id, after an operator's explicit act, is served. Without this the first
+   *    assertion would pass against a route that refuses everybody, including a partner looking at
+   *    a file SAFRA deliberately shared. «Withheld» and «broken» are indistinguishable without it.
+   * 3. Withdrawn — released and then taken back is refused again, so the flag is read on every
+   *    request rather than being a one-way door.
+   */
+  it('withholds a guest’s file from the partner until staff release it, and again if withdrawn', async () => {
+    const guests = await service.addAsCustomer(customer(), reference, {
+      buffer: PHOTO,
+      originalname: 'the-room-that-night.jpg',
+    });
+
+    /* The worker has run, so «not rendered» cannot be the reason for any refusal below. */
+    await db.execute(sql`
+      UPDATE dispute_evidence SET variant_widths = ARRAY[400, 800]
+      WHERE id = ${guests.id}::uuid
+    `);
+
+    await expect(
+      service.readFile(guests.id, partner(), 'partner'),
+      'private by default',
+    ).rejects.toMatchObject({ response: { code: ERROR.DISPUTE_NOT_FOUND } });
+
+    /* And the customer still sees their own, so the refusal above is about the READER. */
+    await expect(
+      service.readFile(guests.id, customer(), 'customer'),
+    ).resolves.toMatchObject({ contentType: 'image/avif' });
+
+    const shared = await service.share(staff(), guests.id, true);
+
+    expect(shared, 'an explicit act, and it changed something').toStrictEqual({
+      shared: true,
+      changed: true,
+    });
+
+    await expect(
+      service.readFile(guests.id, partner(), 'partner'),
+      'released, so it opens',
+    ).resolves.toMatchObject({ contentType: 'image/avif' });
+
+    /* Pressing it again changes nothing and is not an error — the control can be double-clicked. */
+    expect(await service.share(staff(), guests.id, true)).toStrictEqual({
+      shared: true,
+      changed: false,
+    });
+
+    await service.share(staff(), guests.id, false);
+
+    await expect(
+      service.readFile(guests.id, partner(), 'partner'),
+      'withdrawn, so it is gone again',
+    ).rejects.toMatchObject({ response: { code: ERROR.DISPUTE_NOT_FOUND } });
+  });
+
+  /**
+   * Sharing is recorded, in both directions, with the file it was about.
+   *
+   * «The partner could see this between 14:02 and 14:03» has to stay answerable — which is why the
+   * withdrawal writes its own row rather than clearing the first one.
+   */
+  it('records the release and the withdrawal, naming the file', async () => {
+    const guests = await service.addAsCustomer(customer(), reference, {
+      buffer: PHOTO,
+      originalname: 'balcony.jpg',
+    });
+
+    await service.share(staff(), guests.id, true);
+    await service.share(staff(), guests.id, false);
+
+    const rows = await db.execute<{ before: unknown; after: unknown }>(sql`
+      SELECT before, after FROM audit_log
+      WHERE action = 'dispute.evidence_shared' AND subject_id = ${disputeId}::uuid
+      -- By id, because the harness writes both rows in one transaction and now() ties.
+      ORDER BY id
+    `);
+
+    expect(rows.rows.map((row) => row.after)).toStrictEqual([
+      { sharedWithPartner: true, uploadedAs: 'balcony.jpg' },
+      { sharedWithPartner: false, uploadedAs: 'balcony.jpg' },
+    ]);
+    expect(rows.rows.map((row) => row.before)).toStrictEqual([
+      { sharedWithPartner: false },
+      { sharedWithPartner: true },
+    ]);
+  });
+
+  /**
+   * A partner's own upload has no sharing decision to make, and says so.
+   *
+   * Refused rather than accepted-and-ignored: a control that reports success while changing nothing
+   * is the defect class this codebase keeps finding, and the console draws its button from the same
+   * `filedBy` this refuses on.
+   */
+  it('refuses to «share» a file the partner filed themselves', async () => {
+    const theirs = await service.addAsPartner(partner(), reference, {
+      buffer: PHOTO,
+      originalname: 'mine-already.jpg',
+    });
+
+    await expect(service.share(staff(), theirs.id, true)).rejects.toMatchObject({
+      response: { code: ERROR.EVIDENCE_ALREADY_PARTNERS },
+    });
+  });
+
+  /** Releasing somebody's photograph is a WRITE, so it obeys the same city scope as every other. */
+  it('refuses a release from a city this staff member cannot see', async () => {
+    const guests = await service.addAsCustomer(customer(), reference, {
+      buffer: PHOTO,
+      originalname: 'out-of-scope.jpg',
+    });
+
+    const elsewhere = await db.execute<{ id: string }>(sql`
+      SELECT id FROM cities WHERE id <> ${cityId}::uuid AND deleted_at IS NULL LIMIT 1
+    `);
+    const other = elsewhere.rows[0]?.id;
+
+    if (other) {
+      await expect(service.share(staff([other]), guests.id, true)).rejects.toMatchObject({
+        response: { code: ERROR.DISPUTE_NOT_FOUND },
+      });
+    }
+
+    /* The control: the same call from a reader whose scope covers it succeeds. */
+    await expect(service.share(staff([cityId]), guests.id, true)).resolves.toMatchObject({
+      shared: true,
     });
   });
 });

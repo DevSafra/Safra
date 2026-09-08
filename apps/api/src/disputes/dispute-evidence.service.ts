@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm';
 import type { Queue } from 'bullmq';
 
 import type { Database } from '@safra/db';
-import { ERROR } from '@safra/contracts';
+import { ERROR, PERMISSIONS as P } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
@@ -15,6 +15,7 @@ import { MEDIA_QUEUE } from '../queue/queue.tokens.js';
 import { badRequest, notFound } from '../common/errors/app-error.js';
 import { describeError } from '../common/errors/safe-error.js';
 import { scopeFilter, assertCanWrite } from '../rbac/scope.sql.js';
+import { requirePartnerId } from '../rbac/ownership.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
 /** What a photograph on a dispute looks like to whoever is allowed to see it. */
@@ -200,6 +201,47 @@ export class DisputeEvidenceService {
     if (dispute) assertCanWrite(claims, dispute.city_id);
 
     return this.add(dispute, reference, file, claims, claims?.sub ?? null);
+  }
+
+  /**
+   * A photograph filed by the PARTNER on a dispute against them.
+   *
+   * ## Why the host gets to file anything at all
+   *
+   * Bashar, 2026-09-08: *«The partner should be able to upload supporting evidence and documents…
+   * I want SAFRA to function as a proper adjudicator that hears both sides.»* A complaint that «the
+   * room did not match the photographs» is settled by looking at photographs, and until now only
+   * one side of that comparison could produce any.
+   *
+   * ## The dispute is resolved WITHIN their own partner id
+   *
+   * One query, `partner_id` in the predicate — the same shape as the customer's route and for the
+   * same reason: a fetch-then-compare answers differently for «exists and is not yours» than for
+   * «does not exist», and `DSP-` references are sequential enough to walk. `requirePartnerId`
+   * throws before any of it if the token carries no partner or lacks the permission.
+   *
+   * ## And it goes through the same pipeline
+   *
+   * `add` — so `ImageService.inspect` refuses anything that is not a photograph, the worker
+   * re-encodes every byte, and EXIF including GPS is destroyed. A host photographs their own
+   * property from inside it; the coordinates in that frame are their home as much as the guest's.
+   */
+  async addAsPartner(
+    claims: AccessTokenClaims | undefined,
+    reference: string,
+    file: { buffer: Buffer; originalname: string } | undefined,
+  ): Promise<DisputeEvidence> {
+    const partnerId = requirePartnerId(claims, P.DISPUTE_RESPOND_OWN);
+
+    const found = await this.db.execute<{ id: string; status: string }>(sql`
+      SELECT d.id, d.status::text AS status
+      FROM disputes d
+      WHERE d.reference = ${reference} AND d.deleted_at IS NULL
+        AND d.partner_id = ${partnerId}
+      LIMIT 1
+    `);
+
+    return this.add(found.rows[0], reference, file, claims, claims?.sub ?? null);
   }
 
   /**
@@ -394,6 +436,116 @@ export class DisputeEvidenceService {
   }
 
   /**
+   * Releasing ONE customer file to the partner — «مشاركة مع الشريك».
+   *
+   * ## Why this is a staff act and not a default
+   *
+   * Bashar, 2026-09-08, in the same breath as asking for the partner's side: *«Do not expose
+   * customer-private files, photos or other evidence directly to the partner… If staff determine
+   * that a customer image or file is necessary for a fair resolution, then that should be an
+   * explicit staff decision and not the default behaviour.»*
+   *
+   * So the column defaults to false, this is the only writer, and every call leaves a
+   * `dispute.evidence_shared` row naming the operator. A photograph taken inside a room by a guest
+   * is theirs; SAFRA may need to show it to answer the complaint fairly, and that need is a
+   * judgement a person makes and signs for.
+   *
+   * ## Sharing is reversible, and the reversal is recorded too
+   *
+   * `shared: false` un-shares, because an operator who releases the wrong file must be able to take
+   * it back within the second it takes to notice. It is NOT a way to rewrite history: the audit log
+   * holds both events, so «the partner could see this between 14:02 and 14:03» stays answerable.
+   *
+   * ## A partner's own upload is not shareable
+   *
+   * There is nothing to decide — they filed it. Refused rather than silently ignored, because a
+   * control that appears to do something and does nothing is the defect class this codebase keeps
+   * finding.
+   *
+   * ## Scoped, and idempotent
+   *
+   * `scopeFilter` in the predicate so an id outside this operator's cities answers exactly as one
+   * that does not exist, then `assertCanWrite` so a read-only member cannot release a customer's
+   * photograph. Setting the state it is already in changes nothing and writes no audit row.
+   */
+  async share(
+    claims: AccessTokenClaims | undefined,
+    evidenceId: string,
+    shared: boolean,
+  ): Promise<{ shared: boolean; changed: boolean }> {
+    const found = await this.db.execute<{
+      id: string;
+      dispute_id: string;
+      city_id: string | null;
+      file_name: string;
+      already: boolean;
+      filed_by: 'customer' | 'staff' | 'partner';
+    }>(sql`
+      SELECT e.id, e.dispute_id, b.city_id, e.file_name,
+             e.shared_with_partner AS already,
+             CASE
+               WHEN e.uploaded_by_user_id IS NULL THEN 'customer'
+               WHEN u.role = 'partner' THEN 'partner'
+               ELSE 'staff'
+             END AS filed_by
+      FROM dispute_evidence e
+      JOIN disputes d      ON d.id = e.dispute_id AND d.deleted_at IS NULL
+      LEFT JOIN bookings b ON b.id = d.booking_id
+      LEFT JOIN users u    ON u.id = e.uploaded_by_user_id
+      WHERE e.id = ${evidenceId}::uuid AND e.deleted_at IS NULL
+        AND ${scopeFilter(claims, 'b.city_id')}
+      LIMIT 1
+    `);
+
+    const evidence = found.rows[0];
+
+    if (!evidence) throw notFound(ERROR.DISPUTE_NOT_FOUND);
+
+    assertCanWrite(claims, evidence.city_id);
+
+    /* Their own file. Nothing to release, so nothing to pretend about. */
+    if (evidence.filed_by === 'partner')
+      throw badRequest(ERROR.EVIDENCE_ALREADY_PARTNERS);
+
+    if (evidence.already === shared) return { shared, changed: false };
+
+    await this.db.transaction(async (tx) => {
+      /*
+        `shared_at` moves with the flag because the CHECK requires it to — shared implies a
+        timestamp and a timestamp implies shared, so a single UPDATE has to set both or neither.
+      */
+      await tx.execute(sql`
+        UPDATE dispute_evidence
+        SET shared_with_partner = ${shared},
+            shared_at = ${shared ? sql`now()` : sql`NULL`},
+            shared_by_user_id = ${shared ? sql`${claims?.sub ?? null}::uuid` : sql`NULL`}
+        WHERE id = ${evidence.id}::uuid
+      `);
+
+      await this.audit.record(
+        {
+          actorUserId: claims?.sub,
+          actorRole: claims?.role,
+          action: 'dispute.evidence_shared',
+          subjectType: 'dispute',
+          subjectId: evidence.dispute_id,
+          before: { sharedWithPartner: evidence.already },
+          /* WHICH photograph, by the name it was filed under, and to whose benefit. */
+          after: { sharedWithPartner: shared, uploadedAs: evidence.file_name },
+        },
+        tx as unknown as Database,
+      );
+    });
+
+    this.logger.log(
+      `Evidence ${evidence.id} on dispute ${evidence.dispute_id} ` +
+        `${shared ? 'released to' : 'withdrawn from'} the partner.`,
+    );
+
+    return { shared, changed: true };
+  }
+
+  /**
    * The photographs on one dispute, oldest first.
    *
    * No scope check of its own: both callers have already resolved the dispute under their own
@@ -449,15 +601,56 @@ export class DisputeEvidenceService {
    *
    * ## Who may look
    *
-   * The customer whose dispute it is, and staff within their cities holding `dispute.manage`. The
-   * check is the same query that authorises writing, so there is no second definition of «yours» to
-   * drift — and an id that is not yours answers exactly as one that does not exist.
+   * The customer whose dispute it is, staff within their cities holding `dispute.manage`, and — new
+   * with finding 223 — the PARTNER, under the narrowest predicate of the three: a file on a dispute
+   * against them that they either filed themselves or that an operator has deliberately released.
+   * The check is the same query that authorises writing, so there is no second definition of
+   * «yours» to drift, and an id that is not yours answers exactly as one that does not exist.
+   *
+   * ## The partner's predicate is where the privacy boundary actually lives
+   *
+   * Not in the screen that decides which thumbnails to draw. A partner who reads an evidence id out
+   * of the page source and asks for it directly gets the same answer as one who guesses: the
+   * `shared_with_partner OR u.role = 'partner'` clause is a WHERE, so «not released to you» is
+   * indistinguishable from «does not exist». The list withholds the id as well, which is a courtesy
+   * on top rather than the control.
    */
   async readFile(
     evidenceId: string,
     claims: AccessTokenClaims | undefined,
-    as: 'customer' | 'staff',
+    as: 'customer' | 'staff' | 'partner',
   ): Promise<{ bytes: Buffer; contentType: string; fileName: string }> {
+    /*
+      The partner's id is resolved BEFORE the query and throws if the token carries none, so an
+      employee without `dispute.respond_own` never reaches a predicate at all.
+    */
+    const partnerId =
+      as === 'partner' ? requirePartnerId(claims, P.DISPUTE_RESPOND_OWN) : null;
+
+    const customerQuery = sql`
+      SELECT e.storage_key, e.file_name, e.variant_widths, b.city_id
+      FROM dispute_evidence e
+      JOIN disputes d           ON d.id = e.dispute_id AND d.deleted_at IS NULL
+      JOIN customer_profiles c  ON c.id = d.customer_profile_id
+      LEFT JOIN bookings b      ON b.id = d.booking_id
+      WHERE e.id = ${evidenceId}::uuid AND e.deleted_at IS NULL
+        AND c.user_id = ${claims?.sub}::uuid
+      LIMIT 1
+    `;
+
+    const partnerQuery = sql`
+      SELECT e.storage_key, e.file_name, e.variant_widths, b.city_id
+      FROM dispute_evidence e
+      JOIN disputes d      ON d.id = e.dispute_id AND d.deleted_at IS NULL
+      LEFT JOIN bookings b ON b.id = d.booking_id
+      LEFT JOIN users u    ON u.id = e.uploaded_by_user_id
+      WHERE e.id = ${evidenceId}::uuid AND e.deleted_at IS NULL
+        AND d.partner_id = ${partnerId}
+        -- Their own upload, or one an operator released to them. Nothing else, ever.
+        AND (e.shared_with_partner OR u.role = 'partner')
+      LIMIT 1
+    `;
+
     const found = await this.db.execute<{
       storage_key: string;
       file_name: string;
@@ -465,17 +658,10 @@ export class DisputeEvidenceService {
       city_id: string | null;
     }>(
       as === 'customer'
-        ? sql`
-            SELECT e.storage_key, e.file_name, e.variant_widths, b.city_id
-            FROM dispute_evidence e
-            JOIN disputes d           ON d.id = e.dispute_id AND d.deleted_at IS NULL
-            JOIN customer_profiles c  ON c.id = d.customer_profile_id
-            LEFT JOIN bookings b      ON b.id = d.booking_id
-            WHERE e.id = ${evidenceId}::uuid AND e.deleted_at IS NULL
-              AND c.user_id = ${claims?.sub}::uuid
-            LIMIT 1
-          `
-        : sql`
+        ? customerQuery
+        : as === 'partner'
+          ? partnerQuery
+          : sql`
             SELECT e.storage_key, e.file_name, e.variant_widths, b.city_id
             FROM dispute_evidence e
             JOIN disputes d      ON d.id = e.dispute_id AND d.deleted_at IS NULL

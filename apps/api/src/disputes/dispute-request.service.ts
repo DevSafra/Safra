@@ -14,6 +14,7 @@ import {
 } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
+import { DisputeNotifier } from '../admin/dispute-notifier.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { REDACTION_MARKERS } from '@safra/i18n';
 
@@ -69,7 +70,10 @@ type DisputeRow = {
 export class DisputeRequestService {
   private readonly logger = new Logger(DisputeRequestService.name);
 
-  constructor(@Inject(DATABASE) private readonly db: Database) {}
+  constructor(
+    @Inject(DATABASE) private readonly db: Database,
+    private readonly notifier: DisputeNotifier,
+  ) {}
 
   /** The caller's own customer profile, or a refusal. Partners do not come through here. */
   private profileOf(claims: AccessTokenClaims | undefined): string {
@@ -278,6 +282,16 @@ export class DisputeRequestService {
     });
 
     const reference = created.reference;
+
+    /*
+      The partner is told, AFTER the commit and outside the transaction.
+
+      Opening a dispute freezes their payout for this booking the moment this row exists, and until
+      2026-09-08 nothing said so — a host noticed the money had gone quiet, or did not. `opened`
+      swallows its own failure: a dispute that was recorded correctly must not look like it failed
+      because a mail server was down, and the freeze is in force either way.
+    */
+    await this.notifier.opened(claims, created.id);
 
     /*
       The reference and the reason only. A dispute's description is the customer's own account of

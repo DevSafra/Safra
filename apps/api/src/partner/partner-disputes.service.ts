@@ -9,6 +9,7 @@ import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
 import { badRequest, notFound } from '../common/errors/app-error.js';
 import { redactContactDetails } from '../messaging/redaction.js';
+import { evidenceVariant } from '../disputes/dispute-evidence.service.js';
 import { requirePartnerId } from '../rbac/ownership.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
@@ -200,10 +201,11 @@ export class PartnerDisputesService {
       file_name: string;
       kind: string;
       created_at: string;
+      variant_widths: number[] | null;
       mine: boolean;
       shared: boolean;
     }>(sql`
-      SELECT e.id::text, e.file_name, e.kind, e.created_at::text,
+      SELECT e.id::text, e.file_name, e.kind, e.created_at::text, e.variant_widths,
              (u.role = 'partner') AS mine,
              e.shared_with_partner AS shared
         FROM dispute_evidence e
@@ -241,6 +243,15 @@ export class PartnerDisputesService {
         fileName: row.file_name,
         kind: row.kind,
         uploadedAt: row.created_at,
+        /*
+          Whether the worker has produced anything to LOOK at — never an address.
+
+          The bytes are private and are served by an authorised route, so there is one path for
+          every file and nothing to hand out. Without this the portal would render an `img` at a
+          row whose variants do not exist yet and the host would meet a broken picture seconds
+          after their own upload succeeded.
+        */
+        rendered: evidenceVariant(row.variant_widths) !== null,
         mine: row.mine,
       })),
       withheldEvidenceCount: evidence.rows.length - visible.length,

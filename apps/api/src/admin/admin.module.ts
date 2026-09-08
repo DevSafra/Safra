@@ -144,6 +144,17 @@ import { StaffScopeService } from './staff-scope.service.js';
     what `awaiting_partner_signature` means. AdminModule does not import PartnerModule, so there
     is no cycle to create.
   */
-  exports: [ReviewService, BookingExportService, PartnerContractService, AdExpiryService],
+  exports: [
+    ReviewService,
+    BookingExportService,
+    PartnerContractService,
+    AdExpiryService,
+    /*
+      Exported for `DisputeModule`: the CUSTOMER's open path has to tell the partner a dispute
+      exists, and the message is the same message the staff path sends. Two notifiers would be two
+      places for «the partner was never told» to become true.
+    */
+    DisputeNotifier,
+  ],
 })
 export class AdminModule {}

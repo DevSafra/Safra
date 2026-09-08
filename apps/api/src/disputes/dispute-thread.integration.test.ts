@@ -7,6 +7,7 @@ import { createRollbackDatabase, type Database } from '@safra/db';
 import { AuditService } from '../common/audit/audit.service.js';
 import { DisputeRequestService } from './dispute-request.service.js';
 import { DisputeService } from '../admin/dispute.service.js';
+import { silentDisputeNotifier } from '../admin/dispute-notifier.testing.js';
 import { FxRateService } from '../fx/fx-rate.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { MessagingService } from '../admin/messaging.service.js';
@@ -67,15 +68,15 @@ describeIfDb('the conversation a dispute opens with', () => {
   mailQueue.autoRun = (job) =>
     notifications.deliver(job.notificationId, job.templateKey, job.mail);
 
-  const requests = new DisputeRequestService(db);
+  /* This suite is about the THREAD; the partner announcement is exercised by its own suite. */
+  const requests = new DisputeRequestService(db, silentDisputeNotifier());
   const staffDisputes = new DisputeService(
     db,
     new AuditService(db),
     new WalletService(db, new FxRateService(db, new AuditService(db))),
     new LedgerService(db),
     new FxRateService(db, new AuditService(db)),
-    /* The notifier only announces a closure; this suite is about the thread. */
-    { closed: () => Promise.resolve() } as never,
+    silentDisputeNotifier(),
   );
   const messaging = new MessagingService(db, new AuditService(db), notifications, {
     APP_URL: 'http://localhost:3000',

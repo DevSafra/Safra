@@ -63,8 +63,23 @@ export const de = {
   },
   disputePayoutReleased: {
     subject: 'Der Vorgang zur Buchung {booking} ist abgeschlossen',
-    body: 'Der zur Buchung {booking} eröffnete Vorgang wurde abgeschlossen, und die Sperre Ihrer Auszahlung dafür wurde aufgehoben.\n\nVorgangsnummer: {reference}\nAbgeschlossen am: {date}\n\nWas das bedeutet: Die Auszahlung für diese Buchung war gesperrt, solange der Vorgang offen war, und befindet sich nun im üblichen Überweisungslauf. Durch die Eröffnung des Vorgangs wurde nichts storniert.\n\nDie Buchung finden Sie in Ihrer Partner-Konsole:\n{url}\n\nIhr SAFRA-Team',
+    body: 'Der zur Buchung {booking} eröffnete Vorgang wurde abgeschlossen, und die Sperre Ihrer Auszahlung dafür wurde aufgehoben.\n\nVorgangsnummer: {reference}\nEntscheidung: {decision}\nAbgeschlossen am: {date}\n\nBegründung:\n{resolution}\n\nWas das bedeutet: Die Auszahlung für diese Buchung war gesperrt, solange der Vorgang offen war, und befindet sich nun im üblichen Überweisungslauf. Durch die Eröffnung des Vorgangs wurde nichts storniert. Sollte sich daraus eine Strafe oder eine Rückerstattung ergeben, erhalten Sie dazu eine gesonderte Mitteilung mit dem Betrag.\n\nDie Buchung finden Sie in Ihrer Partner-Konsole:\n{url}\n\nIhr SAFRA-Team',
   },
+  /* ── Die Sicht des Partners auf einen Streitfall (Bashar, 2026-09-08). ── */
+  partnerDisputeOpened: {
+    subject: 'Streitfall zur Buchung {booking} eröffnet',
+    body: 'Zur Buchung {booking} wurde ein Streitfall eröffnet. Vor einer Entscheidung benötigen wir Ihre Schilderung.\n\nStreitfall-Nummer: {reference}\nGegenstand der Beschwerde: {title}\nEröffnet am: {date}\n\nWas das bedeutet: Ihre Auszahlung für diese Buchung ist zurückgehalten, solange der Streitfall offen ist; storniert wurde nichts. Ihre übrigen Buchungen und Ihre aktuellen Gäste sind nicht betroffen.\n\nWorum wir Sie bitten: Öffnen Sie den Streitfall im Partnerportal, lesen Sie die vollständige Beschwerde und schildern Sie den Vorgang aus Ihrer Sicht. Sie können außerdem Fotos oder Dokumente hochladen, die Ihre Schilderung stützen. Es wird keine Entscheidung getroffen, bevor Ihre Antwort gelesen wurde.\n\n{url}\n\nIhr SAFRA-Team',
+  },
+  partnerDisputeUnderReview: {
+    subject: 'Streitfall {reference} wird geprüft',
+    body: 'Streitfall {reference} zur Buchung {booking} wird nun vom SAFRA-Team geprüft.\n\nAktualisiert am: {date}\n\nWas das bedeutet: Ein Teammitglied prüft die Beschwerde. Sie können bis zur Entscheidung weiterhin eine Antwort oder ein Dokument hinzufügen. Ihre Auszahlung für diese Buchung bleibt bis zum Abschluss zurückgehalten — storniert wurde nichts.\n\n{url}\n\nIhr SAFRA-Team',
+  },
+
+  /* Das Wort für die Entscheidung, in der Sprache des jeweiligen Blocks. */
+  disputeDecisions: {
+    resolved: 'die Beschwerde des Gastes war berechtigt',
+    rejected: 'die Beschwerde des Gastes war nicht berechtigt',
+  } as Record<string, string>,
   partnerWarned: {
     subject: 'Eine Verwarnung wurde für Ihr Konto ausgesprochen',
     body: 'Für Ihr SAFRA-Partnerkonto wurde eine formelle Verwarnung ausgesprochen.\n\nDatum der Verwarnung: {date}\n\nDie Verwarnung:\n{note}\n\nEine Verwarnung ist ein Eintrag in Ihrem Konto. Sie ist mit keiner Zahlung verbunden und hat keinen Einfluss darauf, wie Ihre Inserate in der Suche platziert werden. Bestätigte Buchungen bleiben bestehen, Ihre Gäste sind nicht betroffen.\n\nDen Verstoß und alle Einzelheiten finden Sie im Partnerportal:\n{url}\n\nFür Einsprüche oder Rückfragen wenden Sie sich über den Support im Partnerportal an das SAFRA-Team.\n\nIhr SAFRA-Team',

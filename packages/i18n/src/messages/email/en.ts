@@ -63,8 +63,23 @@ export const en = {
   },
   disputePayoutReleased: {
     subject: 'The dispute on booking {booking} is closed',
-    body: 'The dispute opened on booking {booking} has been closed, and the hold on your payout for it has been lifted.\n\nDispute reference: {reference}\nClosed on: {date}\n\nWhat this means: the payout for this booking was held while the dispute was open, and it is now in the ordinary transfer cycle. Nothing was cancelled because the dispute was opened.\n\nThe booking is in your partner console:\n{url}\n\nThe SAFRA team',
+    body: 'The dispute on booking {booking} has been closed and the hold on your payout for it is lifted.\n\nDispute reference: {reference}\nDecision: {decision}\nClosed: {date}\n\nThe reasoning:\n{resolution}\n\nWhat this means: your payout for this booking was held while the dispute was open and is now in the ordinary transfer cycle. Nothing was cancelled because a dispute existed. If a fine or a refund follows from this decision, it reaches you as a separate notice stating the amount.\n\nThe dispute and the decision in the partner portal:\n{url}\n\nThe SAFRA team',
   },
+  /* ── The partner's side of a dispute (Bashar, 2026-09-08) — see the Arabic note. ── */
+  partnerDisputeOpened: {
+    subject: 'A dispute was opened on booking {booking}',
+    body: 'A dispute has been opened on booking {booking}, and we need your account of it before deciding.\n\nDispute reference: {reference}\nThe complaint: {title}\nOpened: {date}\n\nWhat this means: your payout for this booking is held while the dispute is open, and nothing has been cancelled. Your other bookings and your current guests are unaffected.\n\nWhat we are asking: open the dispute in the partner portal, read the full complaint, and write what happened from your side. You can also upload photographs or documents that support your account. No decision is taken before your response is read.\n\n{url}\n\nThe SAFRA team',
+  },
+  partnerDisputeUnderReview: {
+    subject: 'Dispute {reference} is under review',
+    body: 'Dispute {reference} on booking {booking} is now under review by the SAFRA team.\n\nUpdated: {date}\n\nWhat this means: a member of the team is examining the complaint. You can still add a response or a document until a decision is made, and your payout for this booking stays held until it closes — nothing has been cancelled.\n\n{url}\n\nThe SAFRA team',
+  },
+
+  /* The word for what was decided, in the language of the block being rendered. */
+  disputeDecisions: {
+    resolved: 'the guest’s complaint was upheld',
+    rejected: 'the guest’s complaint was not upheld',
+  } as Record<string, string>,
   partnerWarned: {
     subject: 'A warning has been issued on your account',
     body: 'A formal warning has been issued on your SAFRA partner account.\n\nDate of warning: {date}\n\nThe warning:\n{note}\n\nA warning is a record on your account. It carries no charge, and it does not affect where your listings rank in search. Confirmed bookings stand and your guests are unaffected.\n\nYou can read the violation and its full detail in the partner portal:\n{url}\n\nTo appeal or ask a question, contact the SAFRA team through support in the partner portal.\n\nThe SAFRA team',

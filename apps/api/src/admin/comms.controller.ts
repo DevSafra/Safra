@@ -27,12 +27,14 @@ import {
   advertiserCreateSchema,
   campaignCreateSchema,
   campaignUpdateSchema,
+  evidenceShareSchema,
   pageQuerySchema,
   staffDisputeOpenSchema,
   type AdInvoicePayInput,
   type AdvertiserCreateInput,
   type CampaignCreateInput,
   type CampaignUpdateInput,
+  type EvidenceShareInput,
   type StaffDisputeOpenInput,
 } from '@safra/contracts';
 
@@ -233,6 +235,32 @@ export class CommsController {
     @Param('evidenceId', ParseUUIDPipe) evidenceId: string,
   ) {
     return this.disputeEvidence.remove(user, evidenceId);
+  }
+
+  /**
+   * Releasing one customer file to the partner — «مشاركة مع الشريك».
+   *
+   * ## Why the console has a control for this at all
+   *
+   * Bashar, 2026-09-08: *«If staff determine that a customer image or file is necessary for a fair
+   * resolution, then that should be an explicit staff decision and not the default behaviour.»*
+   * The partner can now answer a complaint; some complaints cannot be answered without seeing what
+   * they are about. The default stays private and this is the exception, made by a named person.
+   *
+   * `DISPUTE_MANAGE`, the same permission that closes a dispute: deciding what the other side may
+   * see is part of deciding the case, and `assertCanWrite` inside the service still refuses a
+   * `read_only` member who may read the queue.
+   */
+  @Post('disputes/evidence/:evidenceId/share')
+  @RequirePermissions(P.DISPUTE_MANAGE)
+  @AuditExempt('DisputeEvidenceService records dispute.evidence_shared transactionally.')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  async shareDisputeEvidence(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('evidenceId', ParseUUIDPipe) evidenceId: string,
+    @Body(new ZodValidationPipe(evidenceShareSchema)) body: EvidenceShareInput,
+  ) {
+    return this.disputeEvidence.share(user, evidenceId, body.shared);
   }
 
   @Post('disputes/:reference/acknowledge')

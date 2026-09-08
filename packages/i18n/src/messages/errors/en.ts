@@ -145,6 +145,8 @@ export const en = {
   'contract.not_awaiting_signature': 'Only a contract awaiting signature can be signed.',
   'dispute.not_found': 'Dispute not found.',
   'dispute.already_closed': 'This dispute is already closed.',
+  'evidence.already_partners':
+    'The partner filed this file themselves, so there is nothing to share.',
   'dispute.booking_not_disputable':
     'This booking cannot be disputed. Only a paid booking can be.',
   'dispute.already_open':

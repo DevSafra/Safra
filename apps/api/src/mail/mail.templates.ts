@@ -1102,7 +1102,94 @@ export function disputeRejectedMail(input: {
  * What the partner is owed is the fact about their money — the freeze is lifted and nothing was
  * cancelled by the dispute having existed, which is the assumption a partner otherwise makes.
  */
+/**
+ * "The dispute is closed, here is what was decided, and your payout is released."
+ *
+ * ## Why the partner is now told the OUTCOME
+ *
+ * They were not, until 2026-09-08, and the reasoning at the time was defensible: the resolution is
+ * between SAFRA and the customer, and forwarding a complaint's verdict to the party complained
+ * about puts the guest's words in front of them unasked. Bashar overruled it in the same decision
+ * that gave the partner a voice in the case — *«The partner should see the final decision and the
+ * reasoning that can be shared with them»* — and he is right that the old shape was incoherent: a
+ * party who is asked to answer an allegation and then told only that their money moved has been
+ * consulted, not heard.
+ *
+ * `resolution` is the sentence a staff member wrote KNOWING it would be read — the contracts note
+ * on that field has always said it is "the record a customer, a partner or an insurer asks to
+ * see". Internal notes live on the booking and are not joined by anything that builds this.
+ *
+ * ## `decision` is a function of the block's own language
+ *
+ * The outcome is a WORD, and a word cannot be chosen once for three language blocks — passing
+ * «قُبلت شكوى الضيف» as a fixed value would put Arabic inside the English paragraph, which is the
+ * exact defect the bilingual rule exists to prevent, one layer down. `compose`'s function form
+ * resolves it per block; see `Values` in `bilingual.ts`.
+ */
 export function disputePayoutReleasedMail(input: {
+  to: string;
+  locale: string;
+  booking: string;
+  reference: string;
+  outcome: 'resolved' | 'rejected';
+  resolution: string;
+  date: string;
+  url: string;
+}): OutgoingMail {
+  return {
+    to: input.to,
+    ...compose(
+      (m) => m.disputePayoutReleased,
+      input.locale,
+      (m) => ({
+        booking: input.booking,
+        reference: input.reference,
+        decision: m.disputeDecisions[input.outcome] ?? '',
+        resolution: input.resolution,
+        date: input.date,
+        url: input.url,
+      }),
+    ),
+  };
+}
+
+/**
+ * "A dispute was opened against this booking, and we need your account of it."
+ *
+ * The first message a partner has ever had about a complaint before it was decided. `title` is the
+ * customer's own one-line allegation — redacted at rest — and the description deliberately stays
+ * behind the sign-in: a guest's paragraph about their night should not be sitting in a forwarded
+ * email, and the title is what makes the message actionable.
+ */
+export function partnerDisputeOpenedMail(input: {
+  to: string;
+  locale: string;
+  booking: string;
+  reference: string;
+  title: string;
+  date: string;
+  url: string;
+}): OutgoingMail {
+  return {
+    to: input.to,
+    ...compose((m) => m.partnerDisputeOpened, input.locale, {
+      booking: input.booking,
+      reference: input.reference,
+      title: input.title,
+      date: input.date,
+      url: input.url,
+    }),
+  };
+}
+
+/**
+ * "Somebody is looking at it now, and you can still add to the file."
+ *
+ * The one status change between opening and closing — `investigating`, written when an operator
+ * takes the case. It carries no new fact about the money on purpose: nothing about the hold changes
+ * here, and saying so is the point, because silence after «your payout is held» reads as movement.
+ */
+export function partnerDisputeUnderReviewMail(input: {
   to: string;
   locale: string;
   booking: string;
@@ -1112,7 +1199,7 @@ export function disputePayoutReleasedMail(input: {
 }): OutgoingMail {
   return {
     to: input.to,
-    ...compose((m) => m.disputePayoutReleased, input.locale, {
+    ...compose((m) => m.partnerDisputeUnderReview, input.locale, {
       booking: input.booking,
       reference: input.reference,
       date: input.date,

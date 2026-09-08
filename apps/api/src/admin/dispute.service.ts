@@ -98,7 +98,32 @@ export interface DisputeRow {
     readonly id: string;
     readonly rendered: boolean;
     readonly fileName: string;
-    readonly byStaff: boolean;
+    /**
+     * Which of the three parties filed it.
+     *
+     * It was `byStaff: uploaded_by_user_id IS NOT NULL`, which was sound while only two parties
+     * could file: null meant the customer. A partner can file now (finding 223), and that boolean
+     * would have labelled every host's photograph «قدّمه فريق سفرة» — an operator deciding the case
+     * would believe SAFRA had produced the evidence for one side of it.
+     */
+    readonly filedBy: 'customer' | 'staff' | 'partner';
+    /** Whether an operator has released this file to the partner. Never true by default. */
+    readonly sharedWithPartner: boolean;
+  }[];
+  /**
+   * The PARTNER's account of the night, oldest first — the other half of the adjudication.
+   *
+   * Bashar, 2026-09-08: *«I do not want SAFRA deciding disputes while only one side of the dispute
+   * has a voice in the workflow.»* The partner can write here since 223, and a response nobody
+   * decides against is the same thing as no response: it has to be on the screen where the operator
+   * closes the case, beside the allegation it answers.
+   *
+   * Bodies arrive already redacted — `redactContactDetails` runs before the insert — so what is
+   * rendered here has had contact details removed at rest, not on the way out.
+   */
+  readonly partnerResponses: readonly {
+    readonly body: string;
+    readonly at: string;
   }[];
   readonly compensationAmount: string | null;
   readonly compensationCurrency: string | null;
@@ -277,14 +302,34 @@ export class DisputeService {
         ORDER BY created_at ASC LIMIT 1
       ) conv ON TRUE
       LEFT JOIN (
-      SELECT dispute_id, count(*) AS n,
+      SELECT e.dispute_id, count(*) AS n,
              jsonb_agg(jsonb_build_object(
-               'id', id, 'storageKey', storage_key, 'fileName', file_name,
-               'variantWidths', variant_widths,
-               'byStaff', uploaded_by_user_id IS NOT NULL)
-               ORDER BY created_at, id) AS items
-      FROM dispute_evidence WHERE deleted_at IS NULL GROUP BY dispute_id
+               'id', e.id, 'storageKey', e.storage_key, 'fileName', e.file_name,
+               'variantWidths', e.variant_widths,
+               -- Three parties, from the uploader's ROLE. Was 'byStaff', a boolean that could only
+               -- say customer-or-staff and therefore said staff about the host's own photograph.
+               'filedBy', CASE
+                            WHEN e.uploaded_by_user_id IS NULL THEN 'customer'
+                            WHEN u.role = 'partner' THEN 'partner'
+                            ELSE 'staff'
+                          END,
+               'sharedWithPartner', e.shared_with_partner)
+               ORDER BY e.created_at, e.id) AS items
+      FROM dispute_evidence e
+      LEFT JOIN users u ON u.id = e.uploaded_by_user_id
+      WHERE e.deleted_at IS NULL GROUP BY e.dispute_id
       ) ev ON ev.dispute_id = d.id
+      -- The partner's responses, aggregated in the same round trip for the reason the evidence is:
+      -- twenty-five rows would otherwise be twenty-five more queries for a thing most of them
+      -- have none of.
+      LEFT JOIN (
+      SELECT r.dispute_id,
+             jsonb_agg(jsonb_build_object(
+               'body', r.body,
+               'at', to_char(r.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'))
+               ORDER BY r.created_at, r.id) AS items
+      FROM dispute_responses r GROUP BY r.dispute_id
+      ) resp ON resp.dispute_id = d.id
       WHERE ${sql.join(conditions, sql` AND `)}`;
 
     const [result, total] = await Promise.all([
@@ -308,6 +353,7 @@ export class DisputeService {
              -- query rather than fetched per row: twenty-five disputes would otherwise be
              -- twenty-five round trips for a picture most of them do not have.
              coalesce(ev.items, '[]'::jsonb)  AS evidence,
+             coalesce(resp.items, '[]'::jsonb) AS partner_responses,
              d.compensation_amount::text    AS compensation_amount,
              cur.code                       AS compensation_currency,
              d.resolution,
@@ -366,7 +412,12 @@ export class DisputeService {
           */
           rendered: evidenceVariant(one.variantWidths) !== null,
           fileName: one.fileName,
-          byStaff: one.byStaff,
+          filedBy: one.filedBy,
+          sharedWithPartner: one.sharedWithPartner,
+        })),
+        partnerResponses: (row.partner_responses ?? []).map((one) => ({
+          body: one.body,
+          at: one.at,
         })),
         compensationAmount: row.compensation_amount,
         compensationCurrency: row.compensation_currency,
@@ -493,6 +544,14 @@ export class DisputeService {
         tx as unknown as Database,
       );
     });
+
+    /*
+      «Somebody is looking at it now» — after the commit, failure swallowed.
+
+      It carries no new fact about the money on purpose: nothing about the hold changes here. Saying
+      so is the point, because silence after «your payout is held» reads as movement.
+    */
+    await this.notifier.underReview(actor, dispute.id);
 
     return { acknowledged: true };
   }
@@ -789,7 +848,7 @@ export class DisputeService {
     const title = redactIncomingMessage(input.title);
     const description = redactIncomingMessage(input.description);
 
-    const reference = await this.db.transaction(async (tx) => {
+    const created = await this.db.transaction(async (tx) => {
       const created = await tx.execute<{ id: string; reference: string }>(sql`
         INSERT INTO disputes
           (booking_id, partner_id, customer_profile_id, kind, status, title, description,
@@ -846,8 +905,16 @@ export class DisputeService {
         tx as unknown as Database,
       );
 
-      return row.reference;
+      return row;
     });
+
+    /*
+      Told after the commit, on the same reasoning the customer's path gives: the freeze is already
+      in force, and `opened` cannot fail this call.
+    */
+    await this.notifier.opened(actor, created.id);
+
+    const reference = created.reference;
 
     const reread = await this.list({ limit: 1, page: 1, q: reference });
     const view = reread.items[0];
@@ -951,8 +1018,10 @@ interface DisputeRowSql extends Record<string, unknown> {
     storageKey: string;
     fileName: string;
     variantWidths: number[] | null;
-    byStaff: boolean;
+    filedBy: 'customer' | 'staff' | 'partner';
+    sharedWithPartner: boolean;
   }[];
+  partner_responses: { body: string; at: string }[];
   compensation_amount: string | null;
   compensation_currency: string | null;
   resolution: string | null;

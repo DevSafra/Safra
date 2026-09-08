@@ -1,4 +1,19 @@
-import { Body, Controller, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Put,
+  Query,
+  Res,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import type { Response } from 'express';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 
 import {
@@ -29,6 +44,7 @@ import { RequireVerifiedPartner } from '../rbac/verified-partner.guard.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { CalendarService } from './calendar.service.js';
 import { PartnerDashboardService } from './dashboard.service.js';
+import { DisputeEvidenceService } from '../disputes/dispute-evidence.service.js';
 import { PartnerDisputesService } from './partner-disputes.service.js';
 import { PropertiesService } from './properties.service.js';
 
@@ -58,6 +74,7 @@ export class PartnerController {
     private readonly calendar: CalendarService,
     private readonly dashboardService: PartnerDashboardService,
     private readonly partnerDisputes: PartnerDisputesService,
+    private readonly disputeEvidence: DisputeEvidenceService,
   ) {}
 
   /**
@@ -100,6 +117,27 @@ export class PartnerController {
     return this.dashboardService.overview(user);
   }
 
+  /*
+    ── the dispute routes carry NEITHER partner guard, and that is deliberate ──────────────────────
+
+    `@RefusedWhileSuspended()` and `@RequireVerifiedPartner()` are opt-in per route, so their
+    absence below reads like an oversight unless it is written down.
+
+    **A SUSPENDED partner may still read and answer a dispute against them.** Suspension is
+    frequently the CONSEQUENCE of complaints, and a host who cannot answer the case that froze
+    their money — because the case got them suspended — has been judged with no voice, which is
+    precisely what Bashar's 2026-09-08 decision forbids. The suspension notice already tells them
+    confirmed bookings stand; the dispute they are being asked about must stay answerable too.
+
+    **An UNVERIFIED partner cannot reach these routes anyway**: no verification means no published
+    listing, no booking, and therefore no dispute — every read here is scoped to their own
+    `partner_id`, so the answer is an empty list or a 404. Adding the guard would replace that
+    truthful answer with «your account is not verified», which is a different and misleading
+    statement about a complaint that does not exist.
+
+    Neither of these is a permission relaxation: `DISPUTE_RESPOND_OWN` still gates every route and
+    the partner id still comes from the verified token.
+  */
   /**
    * النزاعات — every dispute against this partner (Bashar, 2026-09-08).
    *
@@ -149,6 +187,65 @@ export class PartnerController {
     @CurrentUser() user: AccessTokenClaims | undefined,
   ) {
     return this.partnerDisputes.respond(reference, body.body, user);
+  }
+
+  /**
+   * A photograph the partner files on a dispute against them — «إضافة صورة».
+   *
+   * ## Why the host gets to file evidence
+   *
+   * Bashar, 2026-09-08: *«The partner should be able to upload supporting evidence and documents.»*
+   * «الغرفة لا تطابق الصور المنشورة» is settled by comparing photographs, and until this route
+   * existed only one side of that comparison could produce any.
+   *
+   * Multipart, in memory, 10MB, one file — the same shape and the same ceiling as the customer's
+   * and the console's, because the security is in `ImageService.inspect` and the re-encoding worker
+   * rather than in the handler. A second set of limits here would be a second place to get them
+   * wrong.
+   *
+   * Ten a minute: a host answering a complaint sends several pictures at once, and none of it moves
+   * money.
+   */
+  @Post('disputes/:reference/evidence')
+  @RequirePermissions(P.DISPUTE_RESPOND_OWN)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @AuditExempt('DisputeEvidenceService records dispute.evidence_added transactionally.')
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024, files: 1 } }),
+  )
+  async addDisputeEvidence(
+    @Param('reference') reference: string,
+    @UploadedFile() file: { buffer: Buffer; originalname: string } | undefined,
+    @CurrentUser() user: AccessTokenClaims | undefined,
+  ) {
+    return this.disputeEvidence.addAsPartner(user, reference, file);
+  }
+
+  /**
+   * The bytes of one photograph the partner is entitled to see.
+   *
+   * Entitlement is the SERVICE's `WHERE`, not this route's: their own upload, or a customer file an
+   * operator has deliberately released. A partner who reads an id out of the page and asks for
+   * something withheld gets «not found», identical to an id that was never issued — see
+   * `readFile`'s note on where the privacy boundary lives.
+   */
+  @Get('disputes/evidence/:evidenceId/file')
+  @RequirePermissions(P.DISPUTE_RESPOND_OWN)
+  @AuditExempt('Reading evidence on one’s own dispute changes nothing.')
+  async disputeEvidenceFile(
+    @Param('evidenceId', ParseUUIDPipe) evidenceId: string,
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Res() response: Response,
+  ) {
+    const file = await this.disputeEvidence.readFile(evidenceId, user, 'partner');
+
+    response
+      .setHeader('Content-Type', file.contentType)
+      .setHeader('Content-Disposition', 'inline')
+      .setHeader('X-Content-Type-Options', 'nosniff')
+      /* Private to one reader: never a shared cache, never surviving a sign-out. */
+      .setHeader('Cache-Control', 'private, no-store')
+      .send(file.bytes);
   }
 
   /**

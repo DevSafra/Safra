@@ -154,3 +154,17 @@ export const partnerDisputeResponseSchema = z
   .strict();
 
 export type PartnerDisputeResponseInput = z.infer<typeof partnerDisputeResponseSchema>;
+
+/**
+ * Releasing — or withdrawing — one customer file to the partner (Bashar, 2026-09-08).
+ *
+ * A boolean rather than a bare POST because the reversal matters as much as the act: an operator
+ * who releases the wrong photograph must be able to take it back in the second it takes to notice,
+ * and «un-share» over the same route keeps one audited writer rather than two.
+ *
+ * `.strict()`, so a body cannot smuggle a `sharedAt` past the CHECK that keeps the flag and the
+ * timestamp in step — both are the server's to write.
+ */
+export const evidenceShareSchema = z.object({ shared: z.boolean() }).strict();
+
+export type EvidenceShareInput = z.infer<typeof evidenceShareSchema>;

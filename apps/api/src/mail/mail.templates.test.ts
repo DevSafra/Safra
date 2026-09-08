@@ -497,8 +497,52 @@ const RENDERERS: {
   {
     name: 'disputePayoutReleasedMail',
     entry: 'disputePayoutReleased',
+    /*
+      `shows` is the REASONING, not the reference.
+
+      The partner is told the outcome and why since 2026-09-08, and the reasoning is the half that
+      would be catastrophic to lose in one language: a host reading «the hold is lifted» with no
+      decision beside it has been told their money moved and not what SAFRA concluded about their
+      property. The reference is asserted by the sweep's own reference check.
+    */
     render: (locale) =>
       templates.disputePayoutReleasedMail({
+        to: SAMPLE.to,
+        locale,
+        url: SAMPLE.url,
+        booking: 'BKG-2026-000431',
+        reference: 'DSP-000112',
+        outcome: 'resolved',
+        resolution: SAMPLE.reason,
+        date: SAMPLE.date,
+      }),
+    shows: SAMPLE.reason,
+  },
+  {
+    name: 'partnerDisputeOpenedMail',
+    entry: 'partnerDisputeOpened',
+    /*
+      `shows` is the customer's TITLE — the allegation. A partner asked to answer a complaint in a
+      language where the complaint itself went missing has been told to defend themselves against
+      nothing.
+    */
+    render: (locale) =>
+      templates.partnerDisputeOpenedMail({
+        to: SAMPLE.to,
+        locale,
+        url: SAMPLE.url,
+        booking: 'BKG-2026-000431',
+        reference: 'DSP-000112',
+        title: 'الغرفة لا تطابق الصور المنشورة',
+        date: SAMPLE.date,
+      }),
+    shows: 'الغرفة لا تطابق الصور المنشورة',
+  },
+  {
+    name: 'partnerDisputeUnderReviewMail',
+    entry: 'partnerDisputeUnderReview',
+    render: (locale) =>
+      templates.partnerDisputeUnderReviewMail({
         to: SAMPLE.to,
         locale,
         url: SAMPLE.url,

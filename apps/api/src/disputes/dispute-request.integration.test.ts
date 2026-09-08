@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 
 import { createRollbackDatabase, type Database } from '@safra/db';
 
+import { silentDisputeNotifier } from '../admin/dispute-notifier.testing.js';
 import { DisputeRequestService } from './dispute-request.service.js';
 import { DisputeService } from '../admin/dispute.service.js';
 import { AuditService } from '../common/audit/audit.service.js';
@@ -40,7 +41,7 @@ const ACCOUNT =
 describeIfDb('DisputeRequestService', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   const db: Database = harness.db;
-  const disputes = new DisputeRequestService(db);
+  const disputes = new DisputeRequestService(db, silentDisputeNotifier());
   /*
     The real one the payout path uses, so the freeze is asserted rather than assumed.
 

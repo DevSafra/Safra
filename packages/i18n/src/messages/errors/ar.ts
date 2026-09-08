@@ -136,6 +136,7 @@ export const ar = {
   'contract.not_awaiting_signature': 'لا يمكن تسجيل التوقيع إلا على عقد بانتظار التوقيع.',
   'dispute.not_found': 'لم يُعثر على هذا النزاع.',
   'dispute.already_closed': 'هذا النزاع مغلق بالفعل.',
+  'evidence.already_partners': 'هذا الملف قدّمه الشريك بنفسه، ولا حاجة لمشاركته معه.',
   'dispute.booking_not_disputable':
     'لا يمكن فتح نزاع على هذا الحجز. النزاع متاح للحجوزات المدفوعة فقط.',
   'dispute.already_open': 'لديك نزاع مفتوح على هذا الحجز للسبب نفسه.',

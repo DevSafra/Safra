@@ -11,6 +11,8 @@ import {
   disputePayoutReleasedMail,
   disputeRejectedMail,
   disputeResolvedMail,
+  partnerDisputeOpenedMail,
+  partnerDisputeUnderReviewMail,
 } from '../mail/mail.templates.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
@@ -27,10 +29,22 @@ import type { AccessTokenClaims } from '../auth/token.service.js';
  * ## Two messages, because two people need two different facts
  *
  * The CUSTOMER is told the decision and the sentence it was decided in. The PARTNER is told the
- * hold on their money is lifted and that nothing was cancelled by the dispute existing — and is
- * deliberately NOT told the resolution. The outcome is between SAFRA and the customer, and
- * forwarding a complaint's verdict to the party complained about would put a customer's words in
- * front of them without their asking.
+ * hold on their money is lifted, that nothing was cancelled by the dispute existing, and — since
+ * 2026-09-08 — WHAT WAS DECIDED and why.
+ *
+ * That last part reverses what this file used to do. It withheld the resolution on the reasoning
+ * that the verdict is between SAFRA and the customer; Bashar overruled it in the decision that
+ * gave the partner a voice in the case, and the old shape was incoherent once they had one: a
+ * party asked to answer an allegation and then told only that their money moved has been
+ * consulted rather than heard. `resolution` is the sentence a staff member wrote knowing a
+ * customer, a partner or an insurer would ask to see it.
+ *
+ * ## And two messages BEFORE the closure
+ *
+ * `opened` and `underReview`. A partner used to learn of a complaint against their property from a
+ * payout that had gone quiet — the hold is applied the moment a dispute opens, and nothing told
+ * them why. Both are the same shape as `closed`: after the commit, failure swallowed, audited
+ * either way.
  *
  * ## Nothing here can fail the closure
  *
@@ -49,6 +63,156 @@ export class DisputeNotifier {
     private readonly notifications: NotificationService,
     private readonly audit: AuditService,
   ) {}
+
+  /**
+   * Tells the PARTNER that a dispute has been opened against one of their bookings.
+   *
+   * ## Why this exists
+   *
+   * Because opening a dispute freezes their payout for that booking, and until 2026-09-08 nothing
+   * said so. A host noticed money had gone quiet, or did not notice. Bashar: *«The partner should
+   * receive dispute-opened and dispute-status notifications.»*
+   *
+   * ## It runs after the commit and cannot fail the opening
+   *
+   * Both open paths — a customer through the app and a staff member taking a complaint by telephone
+   * — call this once the dispute row is committed, and every error below is swallowed and logged.
+   * A dispute that was recorded correctly must not appear to have failed because a mail server was
+   * down, and the frozen payout is already in force whether or not the message went.
+   *
+   * ## The customer's TITLE travels, the description does not
+   *
+   * The title is the allegation in one line and it is what makes the message actionable. The full
+   * account stays behind the portal's sign-in: a guest's paragraph about their night should not be
+   * sitting in an email that gets forwarded.
+   */
+  async opened(actor: AccessTokenClaims | undefined, disputeId: string): Promise<void> {
+    await this.announceToPartner(actor, disputeId, 'opened');
+  }
+
+  /**
+   * Tells the partner an operator has picked the case up — «قيد المراجعة».
+   *
+   * The only status between opening and closing, and it deliberately carries no new fact about the
+   * money: nothing changes about the hold here. Saying so is the point, because silence after «your
+   * payout is held» reads as movement.
+   */
+  async underReview(
+    actor: AccessTokenClaims | undefined,
+    disputeId: string,
+  ): Promise<void> {
+    await this.announceToPartner(actor, disputeId, 'under_review');
+  }
+
+  /**
+   * The two pre-closure messages, which differ only in which template they render.
+   *
+   * One reader, one query, one audit shape — so «was the partner told» is answerable the same way
+   * for both events. The template key is still written out as a LITERAL at each `notify` call:
+   * `notification-catalogue.test.ts` reads the source for `notify('key',` and a key assembled into
+   * a variable would be invisible to it, which is how a catalogue comes to claim a message nothing
+   * sends.
+   */
+  private async announceToPartner(
+    actor: AccessTokenClaims | undefined,
+    disputeId: string,
+    event: 'opened' | 'under_review',
+  ): Promise<void> {
+    let partner: 'queued' | 'failed' = 'failed';
+
+    try {
+      const found = await this.db.execute<{
+        reference: string;
+        title: string;
+        at: string;
+        booking_reference: string | null;
+        partner_email: string | null;
+        partner_locale: string | null;
+        partner_id: string;
+      }>(sql`
+        SELECT d.reference, d.title,
+               to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS at,
+               b.reference AS booking_reference,
+               pu.email    AS partner_email,
+               coalesce(pu.preferred_locale, 'ar') AS partner_locale,
+               d.partner_id
+        FROM disputes d
+        LEFT JOIN bookings b ON b.id = d.booking_id
+        LEFT JOIN partners p ON p.id = d.partner_id
+        LEFT JOIN users pu   ON pu.id = p.user_id
+        WHERE d.id = ${disputeId}::uuid
+        LIMIT 1
+      `);
+
+      const row = found.rows[0];
+
+      if (!row) {
+        this.logger.error(
+          `Dispute ${disputeId} vanished before the partner could be told.`,
+        );
+
+        return;
+      }
+
+      const booking = row.booking_reference ?? '—';
+      const common = {
+        to: row.partner_email ?? '',
+        locale: row.partner_locale ?? 'ar',
+        booking,
+        reference: row.reference,
+        date: row.at,
+        url: `${this.env.PARTNER_URL}/disputes/${row.reference}`,
+      };
+      const subject = { disputeId, partnerId: row.partner_id };
+      const locale = row.partner_locale ?? 'ar';
+
+      try {
+        if (event === 'opened') {
+          await this.notifications.notify(
+            'partner.dispute_opened',
+            partnerDisputeOpenedMail({ ...common, title: row.title }),
+            locale,
+            subject,
+          );
+        } else {
+          await this.notifications.notify(
+            'partner.dispute_under_review',
+            partnerDisputeUnderReviewMail(common),
+            locale,
+            subject,
+          );
+        }
+
+        partner = 'queued';
+      } catch (error) {
+        this.logger.error(
+          `Could not tell partner ${row.partner_id} that dispute ${row.reference} is ${event}.`,
+          error instanceof Error ? error.stack : undefined,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        `Could not announce dispute ${disputeId} (${event}) to its partner.`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
+
+    try {
+      await this.audit.record({
+        actorUserId: actor?.sub,
+        actorRole: actor?.role,
+        action: 'dispute.notified',
+        subjectType: 'dispute',
+        subjectId: disputeId,
+        after: { event, partner },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Could not record that dispute ${disputeId} (${event}) was announced.`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
+  }
 
   /**
    * Announces a closure to the customer and to the partner.
@@ -170,8 +334,12 @@ export class DisputeNotifier {
               locale: row.partner_locale ?? 'ar',
               booking,
               reference: row.reference,
+              outcome,
+              /* The shareable reasoning, quoted rather than summarised — as the customer gets it. */
+              resolution: row.resolution ?? '',
               date: row.closed_at,
-              url: `${this.env.PARTNER_URL}/bookings`,
+              /* The dispute itself now, not the booking: there is something to read there. */
+              url: `${this.env.PARTNER_URL}/disputes/${row.reference}`,
             }),
             row.partner_locale ?? 'ar',
             { disputeId, partnerId: row.partner_id },

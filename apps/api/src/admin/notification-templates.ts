@@ -107,6 +107,29 @@ export const NOTIFICATION_TEMPLATES: readonly NotificationTemplate[] = [
     locales: ALL_LOCALES,
     implemented: true,
   },
+  /*
+    ── The partner's side of a dispute (Bashar, 2026-09-08) ──────────────────────────────────────
+
+    Two keys, because سجل واتساب والبريد lists what was sent BY KEY and «did the host know there was
+    a complaint before we decided it» is the question this whole decision turns on. One «dispute
+    notice» would make it unanswerable from the log.
+
+    The closure notice keeps its own key, `dispute.payout_released`, and now carries the decision and
+    the reasoning in its body — one event, one message. Renaming it would orphan every delivery row
+    already recorded under it.
+  */
+  {
+    key: 'partner.dispute_opened',
+    channels: ['email'],
+    locales: ALL_LOCALES,
+    implemented: true,
+  },
+  {
+    key: 'partner.dispute_under_review',
+    channels: ['email'],
+    locales: ALL_LOCALES,
+    implemented: true,
+  },
   {
     key: 'partner.deadline_reminder',
     channels: ['whatsapp', 'email'],

@@ -156,13 +156,15 @@ describeIfDb('announcing a closed dispute', () => {
   afterAll(() => harness.close());
 
   /** The audit row this notifier always writes, whatever happened. */
-  const audited = async (): Promise<
-    { customer: string; partner: string } | undefined
-  > => {
-    const rows = await db.execute<{ after: { customer: string; partner: string } }>(sql`
+  const audited = async (): Promise<Record<string, unknown> | undefined> => {
+    const rows = await db.execute<{ after: Record<string, unknown> }>(sql`
       SELECT after FROM audit_log
       WHERE action = 'dispute.notified' AND subject_id = ${disputeId}::uuid
-      ORDER BY created_at DESC LIMIT 1
+      -- Ordered by id as well, not by the timestamp alone (no backticks here: they would end
+      -- this sql template). The rollback harness runs the whole suite in ONE transaction, so
+      -- now() is identical for every row it writes and «the latest» is whatever the planner
+      -- returns. The audit id is a uuidv7, which sorts by time.
+      ORDER BY created_at DESC, id DESC LIMIT 1
     `);
 
     return rows.rows[0]?.after;
@@ -198,30 +200,97 @@ describeIfDb('announcing a closed dispute', () => {
   });
 
   /**
-   * The customer is told WHAT WAS DECIDED, verbatim — and the partner is not.
+   * BOTH parties are told what was decided, verbatim.
    *
-   * The resolution is the sentence a staff member wrote knowing it would be read, and §10 makes it
-   * the record a customer asks to see. Forwarding it to the party complained ABOUT would put a
-   * customer's words in front of them without their asking, so the partner's message carries the
-   * fact about their money and nothing else.
+   * ## This assertion used to say the opposite, and was changed on instruction
+   *
+   * It read «quotes the decision to the customer and withholds it from the partner», on the
+   * reasoning that the resolution is between SAFRA and the customer and forwarding a verdict to
+   * the party complained about puts a guest's words in front of them unasked. Bashar overruled it
+   * on 2026-09-08, in the decision that gave the partner a voice in the case: *«The partner should
+   * see the final decision and the reasoning that can be shared with them.»*
+   *
+   * He is right that the old shape was incoherent once they had one. A party who is asked to answer
+   * an allegation and then told only that their money moved has been consulted, not heard — and
+   * `resolution` was always documented as "the record a customer, a partner or an insurer asks to
+   * see". What stays withheld is elsewhere and is asserted elsewhere: the customer's files, their
+   * contact details, their wallet, and the internal notes, none of which any query here selects.
    */
-  it('quotes the decision to the customer and withholds it from the partner', async () => {
+  it('quotes the decision to both the customer and the partner', async () => {
     await notifier.closed(staff, disputeId, 'resolved');
 
     const toCustomer = sent.find((one) => one.key === 'dispute.resolved');
     const toPartner = sent.find((one) => one.key === 'dispute.payout_released');
 
-    expect(toCustomer?.text, 'the decision reaches the person it was made for').toContain(
+    expect(toCustomer?.text, 'the decision reaches the person who complained').toContain(
       'قُبلت الشكوى بعد مراجعة الصور.',
     );
-    expect(toPartner?.text, 'and not the party it was made about').not.toContain(
+    expect(toPartner?.text, 'and the party it was made about').toContain(
       'قُبلت الشكوى بعد مراجعة الصور.',
     );
 
-    /* The control: the partner IS told which dispute, so the message is not simply empty. */
-    expect(toPartner?.text, 'the partner is told which dispute closed').toContain(
-      reference,
+    /*
+      The OUTCOME as a word, in the partner's own language — «the guest's complaint was upheld».
+
+      The reasoning alone is not the decision: a resolution reading «the photographs were reviewed»
+      leaves a host unable to tell which way it went. And it is asserted in ENGLISH because this
+      partner chose English, which is what proves the per-block lookup works rather than pasting
+      one language into three blocks.
+    */
+    expect(toPartner?.text, 'and says which way it went').toContain(
+      'the guest’s complaint was upheld',
     );
+
+    expect(toPartner?.text, 'and which dispute closed').toContain(reference);
+  });
+
+  /**
+   * The two messages BEFORE a closure, which nobody sent until 223 was completed.
+   *
+   * A partner used to learn of a complaint against their property from a payout that had gone
+   * quiet — the hold is applied the moment a dispute opens. Both events are the partner's alone:
+   * the customer already knows they complained, and told twice is noise.
+   */
+  it('tells the partner a dispute was opened, and that somebody is looking at it', async () => {
+    await notifier.opened(staff, disputeId);
+
+    expect(sent.map((one) => one.key)).toStrictEqual(['partner.dispute_opened']);
+    /* The ALLEGATION travels, because a message to answer a complaint must name the complaint. */
+    expect(sent[0]?.text, 'the partner is told what they are answering').toContain(
+      'الغرفة لا تطابق الوصف',
+    );
+    expect(sent[0]?.locale, 'in the language the partner chose').toBe('en');
+    expect(await audited(), 'and it is recorded').toMatchObject({
+      event: 'opened',
+      partner: 'queued',
+    });
+
+    sent.length = 0;
+
+    await notifier.underReview(staff, disputeId);
+
+    expect(sent.map((one) => one.key)).toStrictEqual(['partner.dispute_under_review']);
+    expect(sent[0]?.text, 'and which dispute it is').toContain(reference);
+    expect(await audited()).toMatchObject({ event: 'under_review', partner: 'queued' });
+  });
+
+  /**
+   * A failed pre-closure message does not throw, and the audit says it failed.
+   *
+   * The same rule the closure follows and for the same reason: the dispute is already recorded and
+   * the payout is already frozen by the time this runs. A caller that saw an error here would
+   * reasonably open the dispute again.
+   */
+  it('swallows a failure telling the partner, and records that it failed', async () => {
+    refuse = 'partner.dispute_opened';
+
+    await expect(notifier.opened(staff, disputeId)).resolves.toBeUndefined();
+
+    expect(sent, 'nothing went').toStrictEqual([]);
+    expect(await audited(), 'and the record says so').toMatchObject({
+      event: 'opened',
+      partner: 'failed',
+    });
   });
 
   /** A rejection is a different message, not the same one with a different word. */

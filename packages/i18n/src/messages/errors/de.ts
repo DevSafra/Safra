@@ -168,6 +168,8 @@ export const de = {
     'Nur ein Vertrag, der auf die Signatur wartet, kann als signiert markiert werden.',
   'dispute.not_found': 'Streitfall nicht gefunden.',
   'dispute.already_closed': 'Dieser Streitfall ist bereits geschlossen.',
+  'evidence.already_partners':
+    'Diese Datei hat der Partner selbst eingereicht; es gibt nichts zu teilen.',
   'dispute.booking_not_disputable':
     'Für diese Buchung kann kein Streitfall eröffnet werden. Das ist nur bei einer bezahlten Buchung möglich.',
   'dispute.already_open':

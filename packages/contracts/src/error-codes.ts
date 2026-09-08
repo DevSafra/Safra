@@ -306,6 +306,14 @@ export const ERROR = {
   DISPUTE_ALREADY_CLOSED: 'dispute.already_closed',
   /** A booking nobody has paid for has nothing at stake, so there is nothing to dispute. */
   DISPUTE_BOOKING_NOT_DISPUTABLE: 'dispute.booking_not_disputable',
+  /**
+   * A partner's own upload cannot be «shared with the partner» — they filed it.
+   *
+   * Refused rather than accepted-and-ignored: the console's sharing control is drawn per file, and
+   * a button that reports success while changing nothing is how this codebase's worst defects have
+   * looked.
+   */
+  EVIDENCE_ALREADY_PARTNERS: 'evidence.already_partners',
   /** One open dispute per booking per reason. A second would freeze the payout twice over. */
   DISPUTE_ALREADY_OPEN: 'dispute.already_open',
   CONVERSATION_NOT_FOUND_OR_CLOSED: 'conversation.not_found_or_closed',

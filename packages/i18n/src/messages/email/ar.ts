@@ -91,8 +91,34 @@ export const ar = {
   },
   disputePayoutReleased: {
     subject: 'أُغلق النزاع على الحجز {booking}',
-    body: 'أُغلق النزاع المفتوح على الحجز {booking}، ورُفع التجميد عن مستحقاتك عنه.\n\nرقم النزاع: {reference}\nتاريخ الإغلاق: {date}\n\nما يعنيه ذلك: كانت مستحقات هذا الحجز محجوزة ما دام النزاع مفتوحاً، وهي الآن ضمن دورة التحويل المعتادة. لم يُلغَ شيء من المستحقات بسبب فتح النزاع.\n\nتفاصيل الحجز في لوحة الشريك:\n{url}\n\nفريق سفرة',
+    body: 'أُغلق النزاع المفتوح على الحجز {booking}، ورُفع التجميد عن مستحقاتك عنه.\n\nرقم النزاع: {reference}\nالقرار: {decision}\nتاريخ الإغلاق: {date}\n\nتعليل القرار:\n{resolution}\n\nما يعنيه ذلك: كانت مستحقات هذا الحجز محجوزة ما دام النزاع مفتوحاً، وهي الآن ضمن دورة التحويل المعتادة. لم يُلغَ شيء من المستحقات بسبب فتح النزاع. إن ترتّبت غرامة أو استرداد فستصلك بإشعار منفصل يوضّح المبلغ.\n\nتفاصيل النزاع والقرار في لوحة الشريك:\n{url}\n\nفريق سفرة',
   },
+  /* ── The partner's side of a dispute (Bashar, 2026-09-08) ──────────────────
+
+     Three messages, because before them the partner learnt of a complaint against their property
+     from a payout that had gone quiet. His instruction: «I do not want SAFRA deciding disputes
+     while only one side of the dispute has a voice in the workflow.» A voice needs first to be
+     told there is something to answer.
+
+     The customer's TITLE travels; the description does not. The title is the allegation in one
+     line and it is what makes the message actionable — «الغرفة لا تطابق الصور المنشورة» tells a
+     host what to photograph. The full account waits in the portal behind a sign-in, because a
+     guest's paragraph about their night should not be sitting in a forwarded email.
+  */
+  partnerDisputeOpened: {
+    subject: 'نزاع مفتوح على الحجز {booking}',
+    body: 'فُتح نزاع على الحجز {booking}، ونحن بحاجة إلى روايتك قبل البتّ فيه.\n\nرقم النزاع: {reference}\nموضوع الشكوى: {title}\nتاريخ الفتح: {date}\n\nما يعنيه ذلك: مستحقاتك عن هذا الحجز محجوزة ما دام النزاع مفتوحاً، ولم يُلغَ منها شيء. الحجوزات الأخرى وضيوفك الحاليون لم يتأثروا.\n\nما نطلبه منك: افتح النزاع في لوحة الشريك، اقرأ الشكوى كاملة، واكتب ما حدث من طرفك. يمكنك أيضاً رفع صور أو مستندات تدعم روايتك. لن يُتخذ القرار قبل قراءة ردّك.\n\n{url}\n\nفريق سفرة',
+  },
+  partnerDisputeUnderReview: {
+    subject: 'النزاع {reference} قيد المراجعة',
+    body: 'النزاع {reference} على الحجز {booking} أصبح قيد المراجعة لدى فريق سفرة.\n\nتاريخ التحديث: {date}\n\nما يعنيه ذلك: أحد أعضاء الفريق يدرس الشكوى الآن. ما زال بإمكانك إضافة ردّ أو مستند حتى صدور القرار، ومستحقاتك عن هذا الحجز تبقى محجوزة حتى الإغلاق ولم يُلغَ منها شيء.\n\n{url}\n\nفريق سفرة',
+  },
+
+  /* The word for what was decided, in the language of the block being rendered. */
+  disputeDecisions: {
+    resolved: 'قُبلت شكوى الضيف',
+    rejected: 'لم تُقبل شكوى الضيف',
+  } as Record<string, string>,
   partnerWarned: {
     subject: 'إنذار على حسابك في سفرة',
     body: 'صدر إنذار رسمي على حساب الشراكة الخاص بك على سفرة.\n\nتاريخ الإنذار: {date}\n\nنص الإنذار:\n{note}\n\nالإنذار قيد مسجّل على حسابك ولا يترتب عليه أي خصم مالي، ولا يؤثر على ترتيب إعلاناتك في البحث. الحجوزات المؤكدة قائمة كما هي وضيوفك لم يتأثروا.\n\nيمكنك مراجعة المخالفة وتفاصيلها كاملة في لوحة الشريك:\n{url}\n\nللاعتراض أو الاستفسار، تواصل مع فريق سفرة عبر الدعم في لوحة الشريك.\n\nفريق سفرة',
