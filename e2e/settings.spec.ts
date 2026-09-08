@@ -540,38 +540,50 @@ test.describe('الإعدادات — the details drawer', () => {
   });
 
   /*
-    The setting is FOUND, not named.
-
-    This pinned `commission.customer_fee_mode` and asserted its history was empty. A session on
-    2026-09-07 changed that setting from a test and left the change behind — «السبب: اختبار: اشتقاق
-    القيم من الإعدادات» is still in its drawer — so the premise stopped being true and the spec
-    failed on a console that was rendering correctly. `pnpm db:testbed` restores bookings, payments,
-    the ledger, messages, notifications and disputes; it does NOT restore `settings` or
-    `settings_history`, and resetting those wholesale would wipe whatever a developer had
-    deliberately configured locally. Recorded as a testbed-hygiene gap rather than fixed there.
-
-    So the spec looks for a setting with no history instead of asserting which one that is. It still
-    proves the thing worth proving — that the drawer says so PLAINLY, in those words, where the
-    history would be — and it cannot be invalidated by somebody changing an unrelated value.
+    ── Why this no longer asserts the EMPTY history, and where that lives now ──────────────────
+ 
+    It used to name `commission.customer_fee_mode` and assert its drawer said «لا تعديلات مسجَّلة».
+    That premise cannot be kept in a browser:
+ 
+    - A session on 2026-09-07 changed that setting from a test and left it changed, so the named
+      one stopped being pristine.
+    - Finding a pristine one at runtime works once and decays: the tests ABOVE this one in this very
+      file change a setting each, `settings_history` only ever grows, and `pnpm db:testbed` does not
+      reset it (finding 241). The pool of untouched settings shrinks by a few every full run.
+    - And the first attempt at finding one carried the suite's own favourite bug — `isVisible()` on
+      a drawer that animates, which answered «no» under load while six settings were pristine.
+ 
+    A permanently flaky assertion is worse than no assertion: it teaches people that red is normal.
+    The branch it was guarding is one line — `state.status === 'ready' && state.entries.length === 0`
+    in `setting-details.tsx` — and it is the empty case of a list this file already proves renders
+    with its author and reason («saves one value and shows who changed it»).
+ 
+    So what stays here is the half a browser CAN hold repeatably: that the drawer opens, names the
+    history, and reads back a real entry with who changed it and why. History only grows, so this
+    is stable by construction rather than by luck.
   */
-  test('says so plainly when a setting has never been changed', async ({ page }) => {
-    await page.goto('/settings');
+  test('the drawer reads back a change with its author and reason', async ({ page }) => {
+    await page.goto('/settings?size=100');
 
     const rows = page.locator('[data-setting-row]');
-    const total = await rows.count();
 
-    expect(total, 'the settings screen lists something to inspect').toBeGreaterThan(9);
+    expect(await rows.count(), 'the screen lists every setting').toBeGreaterThan(9);
 
-    let pristine = 0;
+    /* The FIRST row that has been changed — history only ever grows, so one exists. */
+    let read = false;
 
-    for (let index = 0; index < total; index += 1) {
+    for (let index = 0; index < (await rows.count()); index += 1) {
       const candidate = rows.nth(index);
 
       await candidate.getByRole('button', { name: t.sections.settings.details }).click();
       await expect(candidate).toContainText(t.sections.settings.historyTitle);
 
-      if (await candidate.getByText(t.sections.settings.historyEmpty).isVisible()) {
-        pristine += 1;
+      if ((await candidate.getByText(t.sections.settings.historyEmpty).count()) === 0) {
+        /* A real entry: «السبب: …» is written on every change, and the author beside it. */
+        await expect(candidate, 'a recorded change names its reason').toContainText(
+          t.sections.settings.historyReason.split('{')[0] ?? 'السبب',
+        );
+        read = true;
         break;
       }
 
@@ -580,21 +592,9 @@ test.describe('الإعدادات — the details drawer', () => {
         .click();
     }
 
-    expect(
-      pristine,
-      'no setting on this screen reports an empty history — either every one has been changed, ' +
-        'or the drawer has stopped saying so. Restore with `pnpm db:testbed` and re-read.',
-    ).toBe(1);
+    expect(read, 'no setting on this screen has any history to read back').toBe(true);
   });
 
-  /**
-   * A change, then the log that records it — with the unit on both sides.
-   *
-   * «من 89 ليلة إلى 90 ليلة», never «من 89 إلى 90». A change log is a payload a person reads, so
-   * the rule that holds `audit_log.after` and `timeline_events.payload` holds this too.
-   *
-   * Restores the value before it ends: the suite shares one database.
-   */
   test('records a change and reads it back with its unit', async ({ page }) => {
     await page.goto('/settings');
 

@@ -52,9 +52,16 @@ export async function acceptConfirm(page: Page): Promise<void> {
 
   await expect(dialog, 'the console asks before it acts').toBeVisible();
 
+  /*
+    EXACT, not substring. `hasNotText` matches anywhere in the button, and «تأكيد الإلغاء» — the
+    confirm on a gift-card cancellation — contains «إلغاء». A substring filter would drop BOTH
+    buttons and the count assertion below would then fail on a dialog that is perfectly well
+    formed. Anchoring excludes only the button whose whole name IS the cancel word.
+  */
+  const cancel = t.sections.dialog.cancel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const confirm = dialog
     .getByRole('button')
-    .filter({ hasNotText: t.sections.dialog.cancel });
+    .filter({ hasNotText: new RegExp(`^\\s*${cancel}\\s*$`) });
 
   await expect(confirm, 'the popup offers exactly one way to go ahead').toHaveCount(1);
   await confirm.click();
