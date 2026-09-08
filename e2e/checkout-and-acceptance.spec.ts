@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import { partnerAr } from '../packages/i18n/src/partner.js';
 import { PARTNER_STATE } from './partner-session.js';
 import { STAFF_STATE } from './staff.js';
+import { bookableStay, type Bookable } from './free-nights.js';
 
 /**
  * Findings 213, 214 and 215, driven end to end (Bashar, 2026-09-07).
@@ -33,8 +34,6 @@ const PASSWORD = process.env['TESTBED_PASSWORD'] ?? 'a-testbed-password-1';
 const CUSTOMER = 'customer@safra.test';
 
 /** A unit belonging to the fixture partner, so the request lands in THEIR queue. */
-const UNIT = '01a07c0e-0986-764c-8252-b54663195f67';
-const PROPERTY = 'qasr-al-sharq-malki';
 
 /**
  * Nights nothing else in the suite books.
@@ -43,28 +42,29 @@ const PROPERTY = 'qasr-al-sharq-malki';
  * shared testbed: fixed dates make the second run of the day collide with the first and fail as a
  * 409, which reads as a broken checkout rather than as a spent fixture.
  */
-function nights(offsetDays: number): { checkIn: string; checkOut: string } {
-  const from = new Date(Date.UTC(2028, 0, 1));
 
-  from.setUTCDate(from.getUTCDate() + (Date.now() % 250) + offsetDays);
+const API = 'http://localhost:4000/api/v1';
 
-  const to = new Date(from);
-  to.setUTCDate(to.getUTCDate() + 2);
+/** The testbed partner's own property, so a booking lands in the queue this spec watches. */
+const SLUG = 'qasr-al-sharq-malki';
+const CITY = 'damascus';
 
-  return {
-    checkIn: from.toISOString().slice(0, 10),
-    checkOut: to.toISOString().slice(0, 10),
-  };
-}
-
-const checkoutUrl = (stay: { checkIn: string; checkOut: string }) =>
-  `${WEB}/ar/checkout?property=${PROPERTY}&unitId=${UNIT}&rooms=1` +
-  `&checkIn=${stay.checkIn}&checkOut=${stay.checkOut}&adults=2&children=0&infants=0`;
+/**
+ * The checkout URL for whatever search says is bookable.
+ *
+ * The property slug and the unit id used to be constants here. `pnpm db:testbed` reseeds units,
+ * so the id stopped existing and every date reported «هذه الوحدة غير متاحة لهذه التواريخ» — the
+ * product being right, read as a booked-out calendar. See `free-nights.ts`.
+ */
+const checkoutUrl = (at: Bookable) =>
+  `${WEB}/ar/checkout?property=${at.slug}&unitId=${at.unitId}&rooms=1` +
+  `&checkIn=${at.checkIn}&checkOut=${at.checkOut}&adults=2&children=0&infants=0`;
 
 test.describe.configure({ mode: 'serial' });
 
 test('213: a signed-in customer meets their own details, and the email is stated not asked', async ({
   browser,
+  request,
 }) => {
   const context = await browser.newContext();
   const page = await context.newPage();
@@ -76,7 +76,9 @@ test('213: a signed-in customer meets their own details, and the email is stated
     await page.locator('form button[type="submit"]').first().click();
     await page.waitForURL(/\/ar\/account/, { timeout: 25_000 });
 
-    await page.goto(checkoutUrl(nights(0)));
+    await page.goto(
+      checkoutUrl(await bookableStay(request, API, { slug: SLUG, citySlug: CITY })),
+    );
 
     /*
       Asserted as «carries the profile's values», not «is non-empty». A field that arrives with
@@ -104,7 +106,7 @@ test('213: a signed-in customer meets their own details, and the email is stated
   }
 });
 
-test('213: guest checkout still collects all three', async ({ browser }) => {
+test('213: guest checkout still collects all three', async ({ browser, request }) => {
   /*
     The opposite control, and the reason it is a separate test rather than a second assertion: §4
     keeps guest checkout open, and a prefill that also LOCKED a guest's email would make booking
@@ -117,7 +119,9 @@ test('213: guest checkout still collects all three', async ({ browser }) => {
   const page = await context.newPage();
 
   try {
-    await page.goto(checkoutUrl(nights(1)));
+    await page.goto(
+      checkoutUrl(await bookableStay(request, API, { slug: SLUG, citySlug: CITY })),
+    );
 
     expect(await page.locator('[name="fullName"]').inputValue()).toBe('');
     expect(await page.locator('[name="email"]').inputValue()).toBe('');
@@ -129,6 +133,7 @@ test('213: guest checkout still collects all three', async ({ browser }) => {
 
 test('214: the payment panel describes the rail that will actually serve the booking', async ({
   browser,
+  request,
 }) => {
   const context = await browser.newContext({
     storageState: { cookies: [], origins: [] },
@@ -136,7 +141,9 @@ test('214: the payment panel describes the rail that will actually serve the boo
   const page = await context.newPage();
 
   try {
-    await page.goto(checkoutUrl(nights(2)));
+    await page.goto(
+      checkoutUrl(await bookableStay(request, API, { slug: SLUG, citySlug: CITY })),
+    );
 
     const panel = page.locator('fieldset').filter({ hasText: 'طريقة الدفع' });
     const said = await panel.innerText();
@@ -170,12 +177,14 @@ test('214: the payment panel describes the rail that will actually serve the boo
 /** Carries the booking from the customer test to the partner one. */
 let reference = '';
 
-test('215: a booking reaches the partner queue', async ({ browser }) => {
+test('215: a booking reaches the partner queue', async ({ browser, request }) => {
   const guest = await browser.newContext({ storageState: { cookies: [], origins: [] } });
   const page = await guest.newPage();
 
   try {
-    await page.goto(checkoutUrl(nights(3)));
+    await page.goto(
+      checkoutUrl(await bookableStay(request, API, { slug: SLUG, citySlug: CITY })),
+    );
     await page.locator('[name="fullName"]').fill('ضيف اختبار القبول');
     await page.locator('[name="email"]').fill('accept-spec@example.test');
     await page.locator('#field-phone').fill('944100500');
