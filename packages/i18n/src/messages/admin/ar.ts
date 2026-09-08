@@ -5016,6 +5016,14 @@ export const ar = {
       admin_adjustment: 'تعديل إداري',
       gift_card_transfer: 'تحويل بطاقة هدية',
       profile_claim: 'ضم حساب ضيف',
+      /*
+        The reason exists before the feature does (Bashar, 2026-09-01) — it anchors the CHECK that
+        refuses a withdrawal consuming restricted money. So no row carries it yet, no screen has
+        ever shown it, and the browser sweep could not see the gap. `wallet-copy.integration.test.ts`
+        reads `pg_enum` instead, which is why this is here before the first withdrawal rather than
+        after somebody reads «withdrawal» on محفظتي.
+      */
+      withdrawal: 'سحب إلى حساب العميل',
     } as Record<string, string>,
 
     /*

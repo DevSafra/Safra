@@ -5,7 +5,7 @@ import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
 import { TablePagination } from '@/components/table-pagination';
 import { AdminTable, Ltr, type AdminColumn } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
-import { t, auditAction, auditSubject, roleName } from '@/lib/strings';
+import { t, auditAction, auditReason, auditSubject, roleName } from '@/lib/strings';
 import { returnQuery, pageNumber } from '@/lib/search-params';
 import { resolvePageSize } from '@/lib/table-size';
 import { refuseSection } from '@/components/section-refusal';
@@ -278,7 +278,9 @@ const columnsFor = (back: string): readonly AdminColumn<AuditEntry>[] => [
         </a>
 
         {row.reason ? (
-          <span className="text-[10.5px] leading-relaxed text-faint">{row.reason}</span>
+          <span className="text-[10.5px] leading-relaxed text-faint">
+            {auditReason(row.reason)}
+          </span>
         ) : null}
       </div>
     ),

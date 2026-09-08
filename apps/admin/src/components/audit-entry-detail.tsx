@@ -8,6 +8,7 @@ import { Ltr } from '@/components/admin-table';
 import { shortDateTime } from '@/lib/format';
 import {
   auditAction,
+  auditReason,
   auditSubject,
   payloadChanges,
   roleName,
@@ -146,7 +147,7 @@ export function AuditEntryDetail({ entry }: { entry: AuditEntry }) {
         {entry.reason ? (
           <p className="mt-3 text-[12.5px] text-text2">
             <span className="text-faint">{t.sections.staff.activityReason}: </span>
-            {entry.reason}
+            {auditReason(entry.reason)}
           </p>
         ) : null}
       </ConsolePanel>

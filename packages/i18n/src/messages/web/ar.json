@@ -463,7 +463,9 @@
       "refund": "مبلغ مسترد",
       "booking_payment": "خُصم من حجز",
       "admin_adjustment": "تعديل من سفرة",
-      "gift_card_transfer": "بطاقة هدية"
+      "gift_card_transfer": "بطاقة هدية",
+      "profile_claim": "ضُمّ من حساب ضيف بعد تأكيد بريدك",
+      "withdrawal": "سحب إلى حسابك"
     },
     "navHeading": "حسابي",
     "navOverview": "نظرة عامة",

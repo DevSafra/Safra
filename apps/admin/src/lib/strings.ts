@@ -99,6 +99,30 @@ export function cancellationReason(reason: string): string {
 }
 
 /**
+ * An audit row's «السبب» — the platform's own code, or a person's own sentence.
+ *
+ * ## The defect this closes
+ *
+ * سجل التدقيق printed `reason` verbatim, and `system.partner_no_response` is on **11,646 rows** —
+ * the single most common value in that column. An operator reading the trail met a technical code
+ * where a sentence belongs, while the sentence for that exact code — «لم يرد الشريك خلال مهلة
+ * التأكيد (§6.4).» — had been in the catalogue since the cancellation work. Found by sweeping every
+ * console screen for identifier-shaped text on 2026-09-08, on Bashar's instruction that no reader
+ * should meet a technical code where a human-readable value belongs.
+ *
+ * ## The duality, and why it must not be resolved by prettifying
+ *
+ * Every OTHER value in that column is a person's own words — «أُلغي بطلب العميل بعد تعذّر السفر»,
+ * «حوالة E2E» — and translating somebody's sentence is not this function's business. So a known
+ * code resolves and everything else prints as written, which is exactly what `walletNote` does one
+ * function below and for the same reason. Prettifying an unknown value into Title Case is how a
+ * missing entry hides, which cost this project 43 of them once.
+ */
+export function auditReason(reason: string): string {
+  return t.enums.cancellationReason[reason] ?? reason;
+}
+
+/**
  * A wallet movement's «السبب» — the platform's own code, or a person's own sentence.
  *
  * The same duality as `cancellationReason`, and resolved the same way. What the PLATFORM writes is

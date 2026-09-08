@@ -463,7 +463,9 @@
       "refund": "Erstattung",
       "booking_payment": "Auf eine Buchung angerechnet",
       "admin_adjustment": "Anpassung durch SAFRA",
-      "gift_card_transfer": "Geschenkkarte"
+      "gift_card_transfer": "Geschenkkarte",
+      "profile_claim": "Von einer Gastbuchung übertragen, nachdem Ihre E-Mail bestätigt wurde",
+      "withdrawal": "Auf Ihr Konto ausgezahlt"
     },
     "navHeading": "Mein Konto",
     "navOverview": "Übersicht",

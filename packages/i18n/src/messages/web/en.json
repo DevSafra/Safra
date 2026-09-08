@@ -463,7 +463,9 @@
       "refund": "Refund",
       "booking_payment": "Applied to a booking",
       "admin_adjustment": "Adjustment by SAFRA",
-      "gift_card_transfer": "Gift card"
+      "gift_card_transfer": "Gift card",
+      "profile_claim": "Moved from a guest booking after your email was confirmed",
+      "withdrawal": "Withdrawn to your account"
     },
     "navHeading": "My account",
     "navOverview": "Overview",

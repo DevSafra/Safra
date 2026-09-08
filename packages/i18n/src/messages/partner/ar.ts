@@ -1711,6 +1711,16 @@ export const ar = {
       'review.read_own': 'قراءة التقييمات',
       'review.respond_own': 'الرد على التقييمات',
       'violation.read': 'قراءة المخالفات',
+      /*
+        Added with 223, and MISSING from this list until a browser sweep found it on 2026-09-08.
+
+        The comment above this map says an unlabelled capability «renders as its raw identifier and
+        announces itself» — it did exactly that: a partner choosing what a receptionist may do read
+        «dispute.respond_own» in a checkbox list beside eleven Arabic phrases. Announcing itself is
+        the right fallback and a poor outcome, which is why `partner-employee.test.ts` now asserts
+        that every grantable capability has a word.
+      */
+      'dispute.respond_own': 'الرد على النزاعات',
     } as Record<string, string>,
   },
   /**
