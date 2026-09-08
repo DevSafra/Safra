@@ -235,9 +235,31 @@ async function unreadable(page: Page): Promise<Failure[]> {
       */
       const grounds = (element: Element): string[] | null => {
         let node: Element | null = element;
+        /*
+          Whether this text is LIFTED out of the flow on its way up. A scrim over a photograph is
+          `absolute inset-0 bg-black/55 text-white` — the accessible way to put a label on a
+          picture — and walking past a 55% scrim to the page behind it scored «عرض كل الصور (10)»
+          as white on the page's near-white at 1.08:1. Nothing is wrong with that control.
+
+          Position is what separates it from a card TITLE, which sits in the flow beneath its own
+          image and is measured normally. So the skip needs both: the text floats, and there is
+          media in the layer it floats over.
+        */
+        let floating = false;
 
         while (node && node !== document.documentElement) {
           const style = getComputedStyle(node);
+
+          if (style.position === 'absolute' || style.position === 'fixed')
+            floating = true;
+
+          if (floating) {
+            for (const media of Array.from(
+              node.querySelectorAll('img, picture, video'),
+            )) {
+              if (!media.contains(element)) return null;
+            }
+          }
 
           if (style.backgroundImage !== 'none') {
             const stops = style.backgroundImage.match(/rgba?\([^)]*\)/g);
