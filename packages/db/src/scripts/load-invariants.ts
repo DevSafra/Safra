@@ -101,6 +101,43 @@ export const INVARIANTS: readonly Invariant[] = [
           LIMIT 20`,
   },
   {
+    name: 'every captured payment is in the books',
+    consequence:
+      'Money was captured and no ledger movement records where it went. §13.3 requires the entries ' +
+      'to be written in the SAME transaction as the capture, so this cannot happen by timing — it ' +
+      'means a capture path exists that does not post, and the partner payable, the SAFRA ' +
+      'commission and the customer fee for that booking are all unrecorded.',
+    /*
+      Why this is scoped to the last day, when «every ledger group balances» is not.
+
+      Because the alarm has to be able to sound. Measured on 2026-09-08: 53 of 677 captured payments
+      on the development database have no ledger movement, and 51 of them have no timeline event on
+      their booking either — they are SEEDER rows, written straight into `payments` and `bookings`
+      without going through `markPaid`. The remaining two were written in the same millisecond burst
+      and only acquired events later, when an e2e dispute spec used those bookings.
+
+      An invariant that reported 53 rows of known fixture noise on every run is an alarm that always
+      sounds, and `docs/load-testing.md` is explicit that those get switched off. Twenty-four hours
+      is the window a load scenario finishes inside, so this asks about what the RUN captured — which
+      is the question scenario 2 exists to answer — and says nothing about the fixture it ran on top
+      of. `notifications all terminal` above is scoped the same way for the same reason.
+
+      The seeded backlog is a fixture property and is recorded as such in `docs/FUTURE-WORK.md`
+      rather than left to look like an unbacked liability.
+    */
+    sql: `SELECT p.reference AS payment, p.provider, p.amount::text AS amount,
+                 p.captured_at::text AS captured_at, b.reference AS booking
+          FROM payments p
+          JOIN bookings b ON b.id = p.booking_id
+          WHERE p.status = 'captured'
+            AND p.captured_at > now() - interval '24 hours'
+            AND NOT EXISTS (
+              SELECT 1 FROM ledger_entries l WHERE l.payment_id = p.id
+            )
+          ORDER BY p.captured_at DESC
+          LIMIT 20`,
+  },
+  {
     name: 'notifications all terminal',
     consequence:
       'A notification is still queued after the run. Either a send is stuck, or the delivery log is ' +

@@ -210,6 +210,54 @@ describeIfDb('internal notes on a booking', () => {
     expect(shown.notes, 'the control: a reader who may see them, does').toHaveLength(1);
   });
 
+  /**
+   * `payment.read` withholds the PAYMENTS block, and shows it to a reader who holds it.
+   *
+   * ## Why this was missing
+   *
+   * `docs/FUTURE-WORK.md` finding 211 said «`payment.read` gates nothing». Re-checked on
+   * 2026-09-08 and it is no longer true — `BookingDetailService` reads it and omits the block
+   * entirely for a caller without it. What was still true is that NOTHING HELD IT SHUT: a
+   * capability enforced by one `includes()` and watched by no test is a capability nobody would
+   * notice losing, and this one decides whether a support agent reads a customer's card
+   * transactions.
+   *
+   * ## Both halves, and the payload walked
+   *
+   * «Withheld» and «this booking has no payments» are indistinguishable without the control, which
+   * is the lesson `audit-anonymity` and the notes test above both record. And the check is not
+   * `hidden.payments === undefined` alone: the block is omitted, so the question is whether a
+   * payment REFERENCE reaches the reader through any other field. Walking the serialised payload
+   * asks the general question instead of protecting the one key that was named.
+   *
+   * A booking with no payment rows would make this vacuous, so the fixture's own payment is
+   * asserted present through the permitted reader first.
+   */
+  it('withholds payments from a reader without payment.read, and shows them to one with it', async () => {
+    await db.execute(sql`
+      INSERT INTO payments (booking_id, reference, provider, method, status,
+                            amount, currency_id)
+      SELECT b.id, 'PAY-NOTES-TEST', 'internal', 'bank_transfer', 'captured',
+             b.total_amount, b.currency_id
+      FROM bookings b WHERE b.reference = ${reference}
+    `);
+
+    const shown = await bookings.detail(reference, WITHOUT_NOTES(staffId));
+    const hidden = await bookings.detail(reference, WITH_NOTES(staffId));
+
+    /* The control FIRST: without it, every assertion below passes over a booking with no payments. */
+    expect(
+      shown.payments?.attempts,
+      'the reader who holds payment.read sees the attempt',
+    ).toHaveLength(1);
+
+    expect(hidden.payments, 'absent, not an empty array').toBeUndefined();
+    expect(
+      JSON.stringify(hidden),
+      'and the reference reaches them through no other field either',
+    ).not.toContain('PAY-NOTES-TEST');
+  });
+
   /** A booking that is not there answers the same way a booking nobody may read does. */
   it('refuses a note against a reference that does not exist', async () => {
     await expect(
