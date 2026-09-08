@@ -4557,6 +4557,101 @@ export const ar = {
      * Only codes belong here. A `reason` a person typed is their own words and falls through
      * unchanged, exactly like a typed cancellation reason.
      */
+    /*
+      ── Codes that mean two things, resolved by the FIELD they appear under (اكتشاف 226) ────────
+
+      `payloadValue` below is keyed by VALUE alone, which is right for the great majority: `captured`
+      means one thing wherever it appears. It cannot express a code whose meaning depends on its
+      field — `partner` is «نسخة الشريك الموقّعة» under `party` on a contract and «الشريك» under
+      `filedBy` on a dispute's evidence — so four contract codes were left printing as stored
+      identifiers, and an operator reading «الطرف: original» met a technical code where a word
+      belongs. باشار، 2026-09-08: «لا أريد أن يرى المستخدمون أو الشركاء أو الإداريون رموزًا تقنية
+      في موضع القيم المقروءة.»
+
+      Consulted BEFORE the flat map, so an entry here is a deliberate override and nothing else
+      changes. Keep it small: a code that means one thing everywhere belongs below, not here.
+    */
+    payloadValueByKey: {
+      /*
+        Which COPY of a contract — the generated original, either side's signed scan, or the one
+        sheet both parties signed. The console's own download buttons use these words.
+      */
+      party: {
+        original: 'النسخة الأصلية',
+        safra: 'نسخة سفرة الموقّعة',
+        partner: 'نسخة الشريك الموقّعة',
+        joint: 'نسخة موقّعة من الطرفين',
+      },
+
+      /* Who filed a piece of dispute evidence — three parties since 223. */
+      filedBy: {
+        customer: 'العميل',
+        staff: 'فريق سفرة',
+        partner: 'الشريك',
+      },
+
+      /* A dispute's outcome, in the words the three applications now share. */
+      outcome: {
+        resolved: 'محسوم لصالح العميل',
+        rejected: 'محسوم لصالح الشريك',
+      },
+
+      /* Which notification reached the partner, as an EVENT rather than as a state. */
+      event: {
+        opened: 'فتح النزاع',
+        under_review: 'بدء مراجعة النزاع',
+      },
+
+      /*
+        The enforcement ladder read as a STAGE. The same words the canonical catalogue gives, named
+        here as well because `recorded` and `warned` are ordinary English words that could plausibly
+        appear under another field one day; under `stage` they are unambiguous.
+      */
+      stage: statusWords('violationStage', 'ar'),
+
+      /*
+        `kind` is the busiest field in the log: six vocabularies write to it.
+
+        Measured from `audit_log` on 2026-09-08 — a staff SCOPE (`all_cities`), a partner DOCUMENT
+        (`identity`), a CONTRACT (`base`), a VIOLATION (`no_response`), a DISPUTE
+        (`not_as_described`) and an ADVERTISER (`restaurant`) all arrive under this one name, from
+        six different actions. None of their values collide, so one merged map resolves every one
+        of them; if two ever did, this is where the collision would have to be decided rather than
+        silently taken by whichever came first.
+
+        The dispute kinds come from the CANONICAL catalogue rather than from `enums.disputeKind`
+        beside it: that one appends «(EC-007)» for an operator cross-referencing §10, and an audit
+        row's «قبل / بعد» column is not the place for a specification reference.
+      */
+      kind: {
+        /* Staff scope — the two `STAFF_SCOPE_KINDS`. */
+        all_cities: 'كل المدن',
+        cities: 'مدن محددة',
+
+        /* Partner documents, all five of `PARTNER_DOCUMENT_KINDS`. */
+        identity: 'وثيقة هوية',
+        commercial_register: 'سجل تجاري',
+        ownership_proof: 'إثبات ملكية',
+        management_contract: 'عقد إدارة',
+        bank_confirmation: 'تأكيد مصرفي',
+
+        /* Contract kinds. `base` was the last value in the log with no word at all. */
+        base: 'عقد شراكة أساسي',
+        commission_annex: 'ملحق تعديل عمولة',
+        renewal: 'تجديد سنوي',
+
+        /* Advertiser kinds — `restaurant` here is an ADVERTISER, not a property type. */
+        restaurant: 'مطعم',
+        activity: 'نشاط',
+        shop: 'متجر',
+        transport: 'نقل',
+        other: 'أخرى',
+
+        ...statusWords('violationKind', 'ar'),
+        ...statusWords('disputeKind', 'ar'),
+      },
+    } as Record<string, Record<string, string>>,
+
     payloadValue: {
       ...unambiguousStatusWords('ar'),
 

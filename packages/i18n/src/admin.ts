@@ -1,4 +1,5 @@
 import type { Locale } from './locales.js';
+import { statusWords, type StatusVocabulary } from './statuses.js';
 import { ar } from './messages/admin/ar.js';
 import type { Translated } from './shape.js';
 
@@ -52,3 +53,70 @@ export const ADMIN_LOCALES = Object.keys(CATALOGUES) as readonly Locale[];
 export function adminMessages(locale: Locale): AdminMessages {
   return CATALOGUES[locale] ?? ar;
 }
+
+/**
+ * The Arabic word for a coded payload value, resolved the way سجل التدقيق resolves it.
+ *
+ * ## Why this lives here rather than in the console
+ *
+ * Because two things read it and they must not disagree: the console's `payloadValue`, which draws
+ * the «قبل» and «بعد» columns, and `audit-catalogue.integration.test.ts`, which walks every value
+ * the platform has actually WRITTEN and fails when one has no word. A guard that resolved codes
+ * differently from the screen it guards would pass over exactly the identifiers a reader meets.
+ *
+ * ## Field first, then the general map
+ *
+ * A code whose meaning depends on its field — `partner` is «نسخة الشريك الموقّعة» under `party` and
+ * «الشريك» under `filedBy` — is resolved by `payloadValueByKey`. Everything else, which is most of
+ * it, comes from the flat map. `null` when neither knows it, so a caller can tell «no word» from a
+ * word that happens to equal the code.
+ */
+export function payloadWord(
+  key: string,
+  value: string,
+  subjectType?: string,
+): string | null {
+  const messages = adminMessages('ar');
+
+  /*
+    `status` is the one field a per-field map cannot resolve, and the SUBJECT settles it.
+
+    Seven vocabularies write to it — a booking's, a listing's, a dispute's, a payout's, a payout
+    account's, a gift card's, a payment's — and `rejected` means «مرفوض» for a listing and «محسوم
+    لصالح الشريك» for a dispute. A field-keyed entry would have to choose one and be confidently
+    wrong on six screens, which is worse than printing the code. The audit row knows what it is
+    ABOUT, so the vocabulary is decided by that and the answer is right on all seven.
+
+    Only for `status`: every other field either means one thing or is listed in `payloadValueByKey`.
+  */
+  if (key === 'status' && subjectType !== undefined) {
+    const vocabulary = STATUS_BY_SUBJECT[subjectType];
+    const word = vocabulary ? statusWords(vocabulary, 'ar')[value] : undefined;
+
+    if (word !== undefined) return word;
+  }
+
+  return (
+    messages.enums.payloadValueByKey[key]?.[value] ??
+    messages.enums.payloadValue[value] ??
+    null
+  );
+}
+
+/**
+ * Which canonical vocabulary a subject's `status` belongs to.
+ *
+ * Written out rather than derived from the type name: `partner_contract` would need a convention
+ * and `gift_card` another, and a convention nobody can see is one nobody maintains. A subject not
+ * listed here falls through to the general map, which is today's behaviour — it prints something
+ * rather than nothing.
+ */
+const STATUS_BY_SUBJECT: Readonly<Record<string, StatusVocabulary>> = {
+  booking: 'bookingStatus',
+  dispute: 'disputeStatus',
+  property: 'propertyStatus',
+  payout: 'payoutStatus',
+  payout_account: 'payoutAccountStatus',
+  gift_card: 'giftCardStatus',
+  payment: 'paymentStatus',
+};

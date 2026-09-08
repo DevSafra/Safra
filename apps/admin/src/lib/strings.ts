@@ -1,6 +1,13 @@
 import IntlMessageFormat from 'intl-messageformat';
 
-import { adminAr, errorFromBody, errorMessage, fill, type Locale } from '@safra/i18n';
+import {
+  adminAr,
+  errorFromBody,
+  errorMessage,
+  fill,
+  payloadWord,
+  type Locale,
+} from '@safra/i18n';
 
 /**
  * The staff console's copy, and the lookups that read it.
@@ -175,7 +182,9 @@ export function payloadEntries(
         return {
           key,
           label: t.enums.payloadKey[key] ?? key,
-          value: currency ? `${payloadValue(value)} ${currency}` : payloadValue(value),
+          value: currency
+            ? `${payloadValue(value, key)} ${currency}`
+            : payloadValue(value, key),
         };
       })
   );
@@ -279,11 +288,25 @@ function currencyOf(
  * by nothing — the one outcome this rendering exists to prevent. Lint flags it; the fix is to say
  * what a string, a number and a boolean each become, and to let everything else keep its JSON.
  */
-function payloadValue(value: unknown): string {
+function payloadValue(value: unknown, key?: string, subjectType?: string): string {
   if (value === null || value === undefined) return t.admin.noData;
 
-  // Only a string can be a code, so only a string is looked up.
-  if (typeof value === 'string') return t.enums.payloadValue[value] ?? value;
+  /*
+    Only a string can be a code, so only a string is looked up — and it is looked up under its own
+    FIELD first (finding 226).
+
+    The flat `{value: word}` map cannot express a code that means two things. `party: partner` is
+    «نسخة الشريك الموقّعة» on a contract and `filedBy: partner` is «الشريك» on a dispute's evidence,
+    so a single entry for `partner` had to pick one and be wrong on the other screen — which is why
+    four contract codes were left printing as stored identifiers, and why an operator reading
+    «الطرف: original» met a technical code where a word belongs.
+
+    Field first, then the general map, then the raw value. The general map keeps every code that
+    means one thing everywhere, which is most of them; only genuinely ambiguous fields need an
+    entry in `payloadValueByKey`, so this does not become a second copy of the first.
+  */
+  if (typeof value === 'string')
+    return payloadWord(key ?? '', value, subjectType) ?? value;
 
   /*
     A boolean is a WORD, not a literal. `String(value)` printed `true`/`false` — English, on an
@@ -310,7 +333,7 @@ function payloadValue(value: unknown): string {
     if (value.length === 0) return t.admin.noData;
 
     if (value.every((item) => typeof item !== 'object' || item === null)) {
-      return value.map((item) => payloadValue(item)).join(' · ');
+      return value.map((item) => payloadValue(item, key, subjectType)).join(' · ');
     }
   }
 
@@ -351,6 +374,14 @@ export interface PayloadChange {
 export function payloadChanges(
   before: unknown,
   after: unknown,
+  /*
+    What the entry is ABOUT, so a `status` resolves in its own vocabulary.
+
+    Optional because `payloadEntries` on a booking timeline has no subject to pass — every event
+    there is already about that booking — and an omitted subject falls back to exactly today's
+    behaviour rather than to nothing.
+  */
+  subjectType?: string,
 ): readonly PayloadChange[] {
   const from = plainObject(before);
   const to = plainObject(after);
@@ -372,8 +403,8 @@ export function payloadChanges(
     changes.push({
       key,
       label: t.enums.payloadKey[key] ?? key,
-      before: from && key in from ? payloadValue(left) : undefined,
-      after: to && key in to ? payloadValue(right) : undefined,
+      before: from && key in from ? payloadValue(left, key, subjectType) : undefined,
+      after: to && key in to ? payloadValue(right, key, subjectType) : undefined,
     });
   }
 

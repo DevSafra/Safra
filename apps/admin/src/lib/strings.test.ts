@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import { count } from './format';
-import { cancellationReason, payloadEntries, plural, roleName, t } from './strings';
+import {
+  cancellationReason,
+  payloadChanges,
+  payloadEntries,
+  plural,
+  roleName,
+  t,
+} from './strings';
 import { ROLES } from '@safra/contracts';
 
 /**
@@ -357,5 +364,94 @@ describe('roleName', () => {
   /* The fallback is still the raw key: a missing translation must LOOK like one. */
   it('falls back to the raw value for a role that does not exist', () => {
     expect(roleName('not_a_role')).toBe('not_a_role');
+  });
+});
+
+/**
+ * One code, two meanings, resolved by the field it appears under and the subject it is about.
+ *
+ * ## The defect this pins
+ *
+ * `payloadValue` was a flat `{value: word}` map, so a code that means two things had to pick one.
+ * Four contract codes were therefore left printing as stored identifiers — an operator reading an
+ * audit row met «الطرف: original», a technical code where a word belongs — and `restaurant` was
+ * excused as «an operator-editable property type» when the value in the log is an advertiser kind.
+ * Recorded as finding 226 and closed on Bashar's instruction of 2026-09-08: *«I do not want users,
+ * partners or administrators seeing technical codes where human-readable values should be
+ * displayed.»*
+ *
+ * ## Why the assertions come in PAIRS
+ *
+ * Because «it resolves» is not the claim. The claim is that the SAME code resolves DIFFERENTLY in
+ * two places, which is the whole point of keying by field and subject — a test that only checked
+ * one side would pass against a map that had simply picked that side, which is what it replaced.
+ */
+describe('a payload code reads as the thing it means', () => {
+  it('tells a contract copy from a party', () => {
+    const contract = payloadChanges(null, { party: 'partner' })[0];
+    const evidence = payloadChanges(null, { filedBy: 'partner' })[0];
+
+    expect(contract?.after).toBe('نسخة الشريك الموقّعة');
+    expect(evidence?.after).toBe('الشريك');
+    expect(contract?.after).not.toBe(evidence?.after);
+  });
+
+  it('leaves no contract copy printing as an identifier', () => {
+    for (const [value, word] of [
+      ['original', 'النسخة الأصلية'],
+      ['safra', 'نسخة سفرة الموقّعة'],
+      ['joint', 'نسخة موقّعة من الطرفين'],
+    ] as const) {
+      expect(payloadChanges(null, { party: value })[0]?.after).toBe(word);
+    }
+  });
+
+  /**
+   * `status` is the field a per-field map cannot settle, so the SUBJECT settles it.
+   *
+   * `rejected` is a refused listing and a dispute decided for the partner. Both are asserted,
+   * because a resolver that answered either one for both would satisfy half of this.
+   */
+  it('reads one status in the vocabulary of its own subject', () => {
+    const listing = payloadChanges(null, { status: 'rejected' }, 'property')[0];
+    const dispute = payloadChanges(null, { status: 'rejected' }, 'dispute')[0];
+
+    expect(listing?.after).toBe('مرفوض');
+    expect(dispute?.after).toBe('محسوم لصالح الشريك');
+    expect(listing?.after).not.toBe(dispute?.after);
+  });
+
+  /** And with no subject it falls back rather than guessing — today's behaviour, kept. */
+  it('falls back to the general word when the subject is unknown', () => {
+    expect(payloadChanges(null, { status: 'rejected' })[0]?.after).toBe('مرفوض');
+    expect(payloadChanges(null, { status: 'rejected' }, 'nonesuch')[0]?.after).toBe(
+      'مرفوض',
+    );
+  });
+
+  /**
+   * `kind` carries six vocabularies, and every value in the log resolves.
+   *
+   * Six actions write to this one field — a staff scope, a document, a contract, a violation, a
+   * dispute and an advertiser. `base` was the last value in `audit_log` with no word at all.
+   */
+  it('names every vocabulary that writes to kind', () => {
+    for (const [value, word] of [
+      ['base', 'عقد شراكة أساسي'],
+      ['identity', 'وثيقة هوية'],
+      ['restaurant', 'مطعم'],
+      ['all_cities', 'كل المدن'],
+      ['no_response', 'عدم الرد على طلب حجز'],
+      ['not_as_described', 'غير مطابق للوصف'],
+    ] as const) {
+      expect(payloadChanges(null, { kind: value })[0]?.after, value).toBe(word);
+    }
+  });
+
+  /** An unknown code still prints as itself — a missing word must look like a missing word. */
+  it('prints an unknown code rather than inventing one', () => {
+    expect(payloadChanges(null, { party: 'no_such_party' })[0]?.after).toBe(
+      'no_such_party',
+    );
   });
 });

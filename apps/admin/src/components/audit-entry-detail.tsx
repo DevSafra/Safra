@@ -51,7 +51,11 @@ import {
  * handful of high-traffic actions could be added ON TOP of it later; it must never replace it.
  */
 export function AuditEntryDetail({ entry }: { entry: AuditEntry }) {
-  const changes = payloadChanges(entry.before, entry.after);
+  /*
+    The SUBJECT is passed, so `status: rejected` reads «مرفوض» on a listing and «محسوم لصالح
+    الشريك» on a dispute. One field, seven vocabularies — see `payloadWord`.
+  */
+  const changes = payloadChanges(entry.before, entry.after, entry.subjectType);
   const subject = entry.subject ?? null;
 
   return (

@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { AUDIT_ACTIONS } from '@safra/contracts';
-import { adminMessages } from '@safra/i18n';
+import { adminMessages, payloadWord } from '@safra/i18n';
 import { createDatabase, type Database } from '@safra/db';
 
 /**
@@ -34,6 +34,14 @@ const describeIfDb = DATABASE_URL ? describe : describe.skip;
 
 /**
  * Codes a compile-time catalogue cannot translate, and why not.
+ *
+ * **Five entries left this list on 2026-09-08**, when `payloadValue` gained a per-FIELD map
+ * (finding 226). `original`, `joint` and `safra` are contract copies and now read as such under
+ * `party`; `base` is a contract kind and reads under `kind`; and `restaurant` was excused as «an
+ * operator-editable property type» when the value in the log is an ADVERTISER kind, which is a
+ * fixed enum with a word. Four of the five were not untranslatable at all — they were unresolvable
+ * by a map keyed on the value alone, which is a different thing, and the difference had been
+ * recorded as a decision for eleven days.
  *
  * Not a convenience list. Each group is something the console is RIGHT to print as it is stored,
  * and `payloadValue`'s own note already says so of one of them: «a list of slugs stays as slugs,
@@ -68,27 +76,11 @@ const UNTRANSLATABLE = new Set<string>([
   'wifi',
   'facilities',
 
-  /* A property type, also an operator-editable row carrying its own Arabic name. */
-  'restaurant',
-
   /*
     A payment PROVIDER's name. `simulator` is the development gateway and the real ones will be
     Visa, Mastercard and Sham Cash — brand names, which are not translated on any surface.
   */
   'simulator',
-
-  /*
-    Contract file parties, and the one group here that is a REAL GAP rather than a decision.
-    `payloadValue` is keyed by value alone, so `partner` cannot mean «شريك» under `filedBy` and
-    «نسخة الشريك الموقّعة» under `party` at the same time — and naming `original`/`joint`/`safra`
-    globally would put a contract word on unrelated rows. Recorded for a decision on whether the
-    map should be keyed by (key, value); until then these four print as stored, which is
-    comprehensible rather than wrong.
-  */
-  'original',
-  'joint',
-  'safra',
-  'base',
 
   /* Fixture noise from the testbed seed, which is not a code at all. */
   'test',
@@ -210,9 +202,17 @@ describeIfDb('what the platform has written, the console can name', () => {
    *    value on this platform is longer than a couple of words.
    */
   it('names every coded payload value present in audit_log', async () => {
-    const catalogue = adminMessages('ar').enums.payloadValue;
-    const rows = await db.execute<{ v: string }>(sql`
-      SELECT DISTINCT e.value #>> '{}' AS v
+    /*
+      Walked as (FIELD, value) pairs, and resolved through `payloadWord` — the same function the
+      console's `payloadValue` calls (finding 226).
+
+      It compared values against the flat map alone, which could not see a code whose word depends
+      on its field: `party: original` had no entry and was exempted as untranslatable, when in
+      truth it simply needed resolving under `party`. Asking the pair, through the screen's own
+      resolver, is the only form of this check that cannot pass over an identifier a reader meets.
+    */
+    const rows = await db.execute<{ k: string; v: string }>(sql`
+      SELECT DISTINCT e.key AS k, e.value #>> '{}' AS v
       FROM audit_log,
            LATERAL jsonb_each(
              coalesce(before, '{}'::jsonb) || coalesce(after, '{}'::jsonb)
@@ -220,12 +220,12 @@ describeIfDb('what the platform has written, the console can name', () => {
       WHERE jsonb_typeof(e.value) = 'string'
         AND e.value #>> '{}' ~ '^[a-z][a-z0-9]*(_[a-z0-9]+)*$'
         AND length(e.value #>> '{}') <= 24
-      ORDER BY 1
+      ORDER BY 1, 2
     `);
 
     const unknown = rows.rows
-      .map((row) => row.v)
-      .filter((code) => !(code in catalogue) && !UNTRANSLATABLE.has(code));
+      .filter((row) => payloadWord(row.k, row.v) === null && !UNTRANSLATABLE.has(row.v))
+      .map((row) => `${row.k}: ${row.v}`);
 
     expect(
       unknown,
