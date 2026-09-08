@@ -189,6 +189,7 @@ export const SECTION_PATH: Record<PartnerSection, string> = {
   reviews: '/reviews',
   arrivals: '/arrivals',
   violations: '/violations',
+  disputes: '/disputes',
   payouts: '/payouts',
   payoutAccounts: '/settings',
   contracts: '/contracts',

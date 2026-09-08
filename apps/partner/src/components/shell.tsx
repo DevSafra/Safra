@@ -55,6 +55,7 @@ export async function Shell({
     | 'calendars'
     | 'arrivals'
     | 'violations'
+    | 'disputes'
     | 'payouts'
     | 'reviews'
     | 'contracts'
@@ -305,6 +306,20 @@ export async function Shell({
                   href="/violations"
                   label={t.nav.violations}
                   current={active === 'violations'}
+                />
+              ) : null}
+              {/*
+                النزاعات, immediately after المخالفات.
+
+                Both are charges against the business that somebody has to answer, and a host
+                looking for «why is my money held» reads them together. It is NOT under مستحقاتي,
+                which answers «what am I owed» — a different question, and already crowded.
+              */}
+              {opens('disputes') ? (
+                <Item
+                  href="/disputes"
+                  label={t.nav.disputes}
+                  current={active === 'disputes'}
                 />
               ) : null}
               {/*

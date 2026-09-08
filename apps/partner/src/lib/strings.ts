@@ -66,6 +66,21 @@ export function propertyType(code: string | null): string {
 }
 
 /** A violation kind in Arabic, falling back to the raw enum rather than blank. */
+/**
+ * A dispute's kind and status, in Arabic.
+ *
+ * Falls back to the RAW key rather than prettifying it, exactly as `violationKind` does: a value
+ * added to the enum and not to the catalogue has to LOOK missing, or forty-three of them go
+ * unnoticed — which is what happened when a fallback prettified underscores.
+ */
+export function disputeKind(kind: string): string {
+  return t.disputeKind[kind] ?? kind;
+}
+
+export function disputeStatus(status: string): string {
+  return t.disputeStatus[status] ?? status;
+}
+
 export function violationKind(kind: string): string {
   return t.violationKind[kind] ?? kind.replace(/_/g, ' ');
 }

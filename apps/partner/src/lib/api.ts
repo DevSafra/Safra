@@ -1257,3 +1257,82 @@ export async function getMyCoupons() {
     z.object({ coupons: z.array(partnerCouponSchema) }),
   );
 }
+
+// ─── النزاعات (finding 223) ───────────────────────────────────────────────────
+
+/**
+ * One dispute as it appears on the list.
+ *
+ * `frozenAmount` and `currencyCode` are NULLABLE because the API drops them for a reader without
+ * `payout.read_own` — the same withholding المخالفات does, at the SELECT rather than in a spread.
+ * Nullable and not defaulted: «hidden» has to stay distinguishable from «zero», which on a frozen
+ * payable is the opposite fact.
+ */
+const disputeRowSchema = z.object({
+  reference: z.string(),
+  kind: z.string(),
+  status: z.string(),
+  title: z.string(),
+  openedAt: z.string(),
+  closedAt: z.string().nullable(),
+  bookingReference: z.string(),
+  frozenAmount: z.string().nullable(),
+  currencyCode: z.string().nullable(),
+  responseCount: z.number(),
+});
+
+export type PartnerDispute = z.infer<typeof disputeRowSchema>;
+
+export async function getMyDisputes() {
+  return partnerFetch(
+    '/partner/disputes',
+    z.object({ disputes: z.array(disputeRowSchema) }),
+  );
+}
+
+const disputeDetailSchema = z.object({
+  reference: z.string(),
+  kind: z.string(),
+  status: z.string(),
+  title: z.string(),
+  /* The guest may have filed a title and no body — `.nullable()`, never a default sentence. */
+  description: z.string().nullable(),
+  resolution: z.string().nullable(),
+  openedAt: z.string(),
+  closedAt: z.string().nullable(),
+  booking: z.object({
+    reference: z.string(),
+    checkIn: z.string(),
+    checkOut: z.string(),
+    unitName: z.string().nullable(),
+  }),
+  frozenAmount: z.string().nullable(),
+  currencyCode: z.string().nullable(),
+  responses: z.array(z.object({ body: z.string(), submittedAt: z.string() })),
+  evidence: z.array(
+    z.object({
+      id: z.string(),
+      fileName: z.string(),
+      kind: z.string(),
+      uploadedAt: z.string(),
+      mine: z.boolean(),
+    }),
+  ),
+  /*
+    How many of the guest's files this reader may NOT open.
+    
+    A count, never a list: a filename can carry as much as the photograph. Required rather than
+    optional — an API that stopped sending it would make the screen read as though there were
+    nothing withheld, which is the one thing this number exists to prevent.
+  */
+  withheldEvidenceCount: z.number(),
+});
+
+export type PartnerDisputeDetail = z.infer<typeof disputeDetailSchema>;
+
+export async function getMyDispute(reference: string) {
+  return partnerFetch(
+    `/partner/disputes/${encodeURIComponent(reference)}`,
+    disputeDetailSchema,
+  );
+}
