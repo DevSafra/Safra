@@ -1,3 +1,5 @@
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { statusTone, VOCABULARIES, type Tone } from './status.js';
@@ -108,4 +110,92 @@ describe('statusTone', () => {
       expect(statusTone(key)).toBe('faint');
     },
   );
+});
+
+/**
+ * A pill's text is its STATUS, and nothing else goes in it.
+ *
+ * «المستحقات مجمّدة · $181.35» — one status with the frozen amount appended, added for finding 209
+ * so an operator could confirm a figure a partner was reading down the phone. It broke the status
+ * system in two ways at once. A pill's width is supposed to be its word, so a figure stretched the
+ * chip; and a pill's TEXT is how every check identifies the status, so three disputes with three
+ * amounts read as **three different statuses sharing one colour** — which is the thing
+ * «no two statuses on one screen share a colour» exists to forbid.
+ *
+ * `e2e/navigation.spec.ts` does catch it, and did. But only once the database happened to hold two
+ * frozen disputes with different amounts: with a single one the pill text is unique and the run is
+ * green. A rule that holds only on a lucky fixture is the shape of defect this file exists to make
+ * deterministic, so the source is swept as well.
+ *
+ * An amount belongs BESIDE the pill, which is what every other screen already did — the customer
+ * record's booking line has had `<StatusPill>` and a separate `<Ltr>` amount all along.
+ */
+describe('a status pill carries only its status', () => {
+  const ROOT = new URL('../../../', import.meta.url).pathname;
+  const APPS = ['apps/admin/src', 'apps/web/src', 'apps/partner/src', 'packages/ui/src'];
+
+  function sources(dir: string): string[] {
+    const out: string[] = [];
+
+    for (const entry of readdirSync(join(ROOT, dir))) {
+      const relative = `${dir}/${entry}`;
+
+      if (statSync(join(ROOT, relative)).isDirectory()) {
+        out.push(...sources(relative));
+      } else if (entry.endsWith('.tsx')) {
+        out.push(relative);
+      }
+    }
+
+    return out;
+  }
+
+  it('never renders money inside one', () => {
+    const inside: string[] = [];
+
+    for (const app of APPS) {
+      for (const file of sources(app)) {
+        const body = readFileSync(join(ROOT, file), 'utf8').replace(
+          /\/\*[\s\S]*?\*\//g,
+          ' ',
+        );
+
+        /* Every `<StatusPill …>` up to its closing tag, which is the text a reader sees. */
+        for (const [whole] of body.matchAll(/<StatusPill[\s\S]*?<\/StatusPill>/g)) {
+          if (/(?<![\w.])(amount|money)\s*\(/.test(whole)) {
+            inside.push(`${file}: ${whole.replace(/\s+/g, ' ').slice(0, 96)}`);
+          }
+        }
+      }
+    }
+
+    expect(
+      inside,
+      'an amount inside a status pill makes one status read as one per value',
+    ).toEqual([]);
+  });
+
+  /*
+    The control: a sweep that found no pills at all would pass while proving nothing, and this one
+    is a regex over JSX — the easiest kind to write inert.
+  */
+  it('reads the pills it is meant to be checking', () => {
+    let pills = 0;
+
+    for (const app of APPS) {
+      for (const file of sources(app)) {
+        const body = readFileSync(join(ROOT, file), 'utf8').replace(
+          /\/\*[\s\S]*?\*\//g,
+          ' ',
+        );
+
+        pills += [...body.matchAll(/<StatusPill[\s\S]*?<\/StatusPill>/g)].length;
+      }
+    }
+
+    expect(
+      pills,
+      'the sweep matched no status pills, so it is reading nothing',
+    ).toBeGreaterThan(10);
+  });
 });
