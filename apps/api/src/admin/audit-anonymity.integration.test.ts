@@ -77,6 +77,31 @@ describeIfDb('a super admin acts under a pseudonym', () => {
     return [];
   }
 
+  /**
+   * This test's OWN entry, found by the subject it created.
+   *
+   * Every assertion here used to read `list({ limit: 5, page: 1 }).items[0]`, or walk the first
+   * five rows — which assumes the newest audit row in the database is this test's. It usually is,
+   * and on 2026-09-08 it was not: a suite running in parallel committed rows in the same moment and
+   * «still names an ordinary staff member as the subject» failed against somebody else's entry.
+   * Passed alone, passed on the next full run — the signature of a race, and the third of this
+   * shape found in one day.
+   *
+   * `subjectId` is the service's own filter, so this asks the same read the console asks and gets
+   * exactly the row the fixture wrote. The count is asserted too: a filter that matched nothing
+   * would make `entry` undefined and every `not.toContain` below pass vacuously.
+   */
+  async function ownEntry(userId: string) {
+    const page = await audit.list({ limit: 5, page: 1, subjectId: userId });
+
+    expect(
+      page.items,
+      'the fixture wrote exactly one entry for its own subject',
+    ).toHaveLength(1);
+
+    return page.items[0];
+  }
+
   beforeEach(async () => {
     await harness.begin();
     run += 1;
@@ -92,10 +117,9 @@ describeIfDb('a super admin acts under a pseudonym', () => {
 
   it('carries neither the name nor the address of a super admin, in any field', async () => {
     const name = `اسم-حقيقي-${run}`;
-    const [, email] = await actor('super_admin', name, 'super');
+    const [userId, email] = await actor('super_admin', name, 'super');
 
-    const page = await audit.list({ limit: 5, page: 1 });
-    const values = strings(page.items);
+    const values = strings([await ownEntry(userId)]);
 
     expect(values).not.toContain(name);
     expect(values).not.toContain(email);
@@ -111,9 +135,9 @@ describeIfDb('a super admin acts under a pseudonym', () => {
    */
   it('names an ordinary staff member', async () => {
     const name = `موظف-${run}`;
-    const [, email] = await actor('support_agent', name, 'agent');
+    const [userId, email] = await actor('support_agent', name, 'agent');
 
-    const values = strings(await audit.list({ limit: 5, page: 1 }).then((p) => p.items));
+    const values = strings([await ownEntry(userId)]);
 
     expect(values).toContain(name);
     expect(values).toContain(email);
@@ -128,9 +152,8 @@ describeIfDb('a super admin acts under a pseudonym', () => {
    */
   it('pseudonymises a super admin named as the SUBJECT, not only as the actor', async () => {
     const name = `اسم-حقيقي-${run}`;
-    const [, email] = await actor('super_admin', name, 'self');
-
-    const entry = (await audit.list({ limit: 5, page: 1 })).items[0];
+    const [userId, email] = await actor('super_admin', name, 'self');
+    const entry = await ownEntry(userId);
 
     expect(entry?.subject).toBeDefined();
     expect(entry?.subject?.label).toBe(ADMIN_DISPLAY_NAME);
@@ -147,9 +170,8 @@ describeIfDb('a super admin acts under a pseudonym', () => {
    */
   it('still names an ordinary staff member as the subject', async () => {
     const name = `موظف-هدف-${run}`;
-    await actor('support_agent', name, 'subject-agent');
-
-    const entry = (await audit.list({ limit: 5, page: 1 })).items[0];
+    const [userId] = await actor('support_agent', name, 'subject-agent');
+    const entry = await ownEntry(userId);
 
     expect(entry?.subject?.label).toBe(name);
   });
@@ -157,10 +179,17 @@ describeIfDb('a super admin acts under a pseudonym', () => {
   /** The narrow read is held to the same rule — it shares `pageOf`, and that is worth proving. */
   it('holds the same rule on the staff activity list', async () => {
     const name = `اسم-حقيقي-${run}`;
-    await actor('super_admin', name, 'super-activity');
+    const [userId] = await actor('super_admin', name, 'super-activity');
 
+    /*
+      `staffActivity` takes no subject filter, so this one still reads a page — but it is a
+      NEGATIVE assertion, and a wider page can only add other suites' strings, never remove this
+      fixture's name. The control is the presence of the entry itself, asserted through the
+      filtered read beside it.
+    */
     const page = await audit.staffActivity({ limit: 5, page: 1 });
 
+    expect(await ownEntry(userId), 'the fixture wrote its entry').toBeDefined();
     expect(strings(page.items)).not.toContain(name);
   });
 });

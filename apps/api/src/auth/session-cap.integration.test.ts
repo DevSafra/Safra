@@ -171,15 +171,26 @@ describeIfDb('the concurrent-session cap', () => {
    * newest-first would sign somebody out at the moment they signed in.
    */
   it('never retires the session it has just issued', async () => {
-    for (let i = 0; i < CAP; i += 1) await signIn();
+    /*
+      `signInLater`, not `signIn` — every row needs a DISTINCT `created_at` for «newest» to mean
+      anything.
 
-    const newest = await signIn();
+      This used plain `signIn()`, so all CAP+1 rows carried the transaction's single timestamp and
+      the read below picked an arbitrary one of them. Adding an `id DESC` tie-break to that read on
+      2026-09-08 made it fail: the genuinely last-inserted row WAS revoked, because with no order
+      to go on the retirement query had retired whatever the planner handed it — including the row
+      just written. That is the toothlessness this file's own `ageExistingRows` docblock describes,
+      surviving in the one test it calls «THE assertion».
+    */
+    for (let i = 0; i < CAP; i += 1) await signInLater();
+
+    const newest = await signInLater();
 
     const rows = await db.execute<{ revoked: boolean }>(sql`
       SELECT revoked_at IS NOT NULL AS revoked
       FROM refresh_tokens
       WHERE user_id = ${userId}::uuid
-      ORDER BY created_at DESC
+      ORDER BY created_at DESC, id DESC
       LIMIT 1
     `);
 
