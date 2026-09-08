@@ -30,6 +30,18 @@ import {
  */
 
 /** Skipped rather than failed where the testbed has not been seeded — see `pnpm db:testbed`. */
+/**
+ * A catalogue template as a pattern that matches it RENDERED.
+ *
+ * `«مهلة {window} — الغرامة {fine} عند عدم الرد»` becomes `/مهلة .+ — الغرامة .+ عند عدم الرد/`,
+ * so the assertion is about the sentence the reader meets rather than about the source string.
+ */
+function filled(template: string): RegExp {
+  return new RegExp(
+    template.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\{\w+\\\}/g, '.+'),
+  );
+}
+
 test.describe('the partner dashboard', () => {
   test.use({ storageState: PARTNER_STATE });
 
@@ -115,7 +127,21 @@ test.describe('the partner dashboard', () => {
     await expect(
       page.getByRole('heading', { name: t.dashboard.requestsTitle }),
     ).toBeVisible();
-    await expect(page.getByText(t.dashboard.requestsRule)).toBeVisible();
+    /*
+      The FILLED sentence, not the template.
+
+      This asserted `t.dashboard.requestsRule` verbatim — «مهلة {window} — الغرامة {fine} عند عدم
+      الرد», placeholders and all — so it could only ever pass on a page that printed raw template
+      text. The page fills them («مهلة ساعتين — الغرامة $10.00 عند عدم الرد»), so the assertion
+      failed, and everything BELOW it stopped running: the alerts heading, the sign-out, and the
+      payout-line check whose own comment calls it «the assertion the whole payout ledger exists to
+      make possible». One wrong matcher disabled the rest of the test for as long as it stood.
+
+      Matched as a pattern with the values wild, which is the shape the payout line two assertions
+      down already uses — the VALUES are proven in `dashboard.integration.test.ts`, and a raw
+      template reaching a screen is `partner-no-raw-codes.spec.ts`'s job rather than this one's.
+    */
+    await expect(page.getByText(filled(t.dashboard.requestsRule))).toBeVisible();
     await expect(
       page.getByRole('heading', { name: t.dashboard.alertsTitle }),
     ).toBeVisible();
