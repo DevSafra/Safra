@@ -27,6 +27,19 @@ const POLL_ATTEMPTS = 20;
  * why a placeholder appears first and the picture replaces it — the same contract the ad creative
  * has, and the reason neither ever displays a client's own upload.
  */
+/**
+ * Who filed a piece of evidence, as a word.
+ *
+ * A MAP rather than a ternary: it was `one.byStaff ? staff : customer`, which had exactly two
+ * answers because only two parties could file. The partner is the third (finding 223), and a
+ * nested ternary is where the fourth would go wrong silently.
+ */
+const FILED_BY_LABEL: Record<'customer' | 'staff' | 'partner', string> = {
+  customer: t.sections.disputes.evidenceFiledByCustomer,
+  staff: t.sections.disputes.evidenceFiledByStaff,
+  partner: t.sections.disputes.evidenceFiledByPartner,
+};
+
 export function DisputeEvidence({
   reference,
   closed,
@@ -39,7 +52,8 @@ export function DisputeEvidence({
     readonly id: string;
     readonly rendered: boolean;
     readonly fileName: string;
-    readonly byStaff: boolean;
+    readonly filedBy: 'customer' | 'staff' | 'partner';
+    readonly sharedWithPartner: boolean;
   }[];
 }) {
   const router = useRouter();
@@ -212,7 +226,14 @@ export function DisputeEvidence({
       thumb: fileHref(one.id),
       full: fileHref(one.id),
       caption: one.fileName,
-      badge: one.byStaff ? c.evidenceFiledByStaff : c.evidenceFiledByCustomer,
+      /*
+        Three badges, because there are three parties now (finding 223).
+
+        A ternary on a boolean had to call a partner's own photograph «من موظف» — an operator
+        reading the case file would have believed SAFRA produced it. `FILED_BY_LABEL` is a map so a
+        fourth party, if there is ever one, is a line here rather than a nested ternary.
+      */
+      badge: FILED_BY_LABEL[one.filedBy],
     }));
 
   if (closed && evidence.length === 0) return null;
@@ -254,9 +275,9 @@ export function DisputeEvidence({
                   alt=""
                   loading="lazy"
                   className={`h-16 w-20 rounded-lg border object-cover transition-colors ${
-                    one.byStaff
-                      ? 'border-[rgba(var(--skyA),0.5)]'
-                      : 'border-line hover:border-[rgba(var(--goldA),0.5)]'
+                    one.filedBy === 'customer'
+                      ? 'border-line hover:border-[rgba(var(--goldA),0.5)]'
+                      : 'border-[rgba(var(--skyA),0.5)]'
                   }`}
                 />
               </button>

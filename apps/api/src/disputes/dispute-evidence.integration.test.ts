@@ -221,7 +221,11 @@ describeIfDb('evidence on a dispute', () => {
     });
 
     expect(added.rendered, 'nothing is displayable until the worker has run').toBe(false);
-    expect(added.byStaff, 'the customer filed it').toBe(false);
+    expect(added.filedBy, 'the customer filed it').toBe('customer');
+    /* A fresh upload is never shared: releasing a customer file is a separate, explicit act. */
+    expect(added.sharedWithPartner, 'and it is private until staff release it').toBe(
+      false,
+    );
 
     /* The original is parked under the private incoming prefix, BEFORE the row points at it. */
     expect(stored, 'exactly one object, and it is the original').toHaveLength(1);
@@ -251,7 +255,13 @@ describeIfDb('evidence on a dispute', () => {
       originalname: 'phoned-in.jpg',
     });
 
-    expect(added.byStaff).toBe(true);
+    /*
+      `'staff'`, not `true`. This was a BOOLEAN — `uploaded_by_user_id IS NOT NULL` — which had
+      only two answers because only two parties could file. Partners can file now (finding 223), so
+      the boolean would have called a host's own photograph «staff» and an operator reading the case
+      file would have believed SAFRA produced it.
+    */
+    expect(added.filedBy).toBe('staff');
 
     const rows = await db.execute<{ by: string | null }>(sql`
       SELECT uploaded_by_user_id::text AS by FROM dispute_evidence
@@ -294,7 +304,7 @@ describeIfDb('evidence on a dispute', () => {
         buffer: PHOTO,
         originalname: 'x.jpg',
       }),
-    ).resolves.toMatchObject({ byStaff: false });
+    ).resolves.toMatchObject({ filedBy: 'customer' });
   });
 
   /** Out of a staff member's cities answers exactly as absent — the same shape as every dispute write. */
@@ -319,7 +329,7 @@ describeIfDb('evidence on a dispute', () => {
         buffer: PHOTO,
         originalname: 'x.jpg',
       }),
-    ).resolves.toMatchObject({ byStaff: true });
+    ).resolves.toMatchObject({ filedBy: 'staff' });
   });
 
   /**

@@ -1993,7 +1993,16 @@ const disputeItemSchema = z.object({
       /* Whether the worker has produced anything yet — the address is the same for all of them. */
       rendered: z.boolean(),
       fileName: z.string(),
-      byStaff: z.boolean(),
+      /*
+        WHO filed it — three answers since finding 223, and it was a boolean.
+
+        `byStaff` was `uploaded_by_user_id IS NOT NULL`, which had two answers because only two
+        parties could file. A partner's upload would have read «قدّمه فريق سفرة», telling an
+        operator SAFRA produced the host's own photograph.
+      */
+      filedBy: z.enum(['customer', 'staff', 'partner']),
+      /* Whether this file has been released to the partner — only ever by an explicit staff act. */
+      sharedWithPartner: z.boolean(),
     }),
   ),
   compensationAmount: z.string().nullable(),

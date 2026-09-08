@@ -30,8 +30,53 @@ export interface DisputeEvidence {
   readonly rendered: boolean;
   readonly fileName: string;
   readonly at: string;
-  /** `true` when a staff member filed it rather than the customer. */
-  readonly byStaff: boolean;
+  /**
+   * WHO filed it — three answers now, and it used to be two (finding 223).
+   *
+   * This was `byStaff: uploaded_by_user_id IS NOT NULL`, on the sound reasoning that only a staff
+   * member or the customer could file anything: null meant the customer. Partners can file now, so
+   * that inference would have quietly labelled every partner upload «قدّمه فريق سفرة» — an operator
+   * reading the case file would believe SAFRA had produced the host's own photograph.
+   *
+   * Derived from the uploader's ROLE rather than from the absence of an id, because that is what
+   * the question actually is. It is read at display time, so a person whose role changed reads as
+   * their role today — acceptable, and no worse than the boolean it replaces, which had the same
+   * property with less information.
+   */
+  readonly filedBy: 'customer' | 'staff' | 'partner';
+  /**
+   * Whether the PARTNER may see this file.
+   *
+   * False by default and only ever set by an explicit staff act (Bashar, 2026-09-08). A partner's
+   * own upload is visible to them because they filed it, not because of this flag — see the
+   * partner's own read, which never consults it for `filedBy === 'partner'`.
+   */
+  readonly sharedWithPartner: boolean;
+}
+
+/**
+ * Who a set of claims files evidence AS.
+ *
+ * One function so the read, the write and the audit row cannot disagree about the same upload —
+ * three separate `role === 'partner'` checks is how they come to. An absent actor is the customer:
+ * the customer's own upload path carries no user id, which is exactly what `uploaded_by_user_id`
+ * being nullable expresses.
+ */
+function filedByOf(
+  claims: { role?: string } | undefined,
+): 'customer' | 'staff' | 'partner' {
+  /*
+    All three named, and NOTHING defaults to «staff».
+
+    The first version returned `'staff'` for every role that was not `partner`, which made the
+    customer's own upload path report staff — caught by the test that had asserted the boolean it
+    replaced. Defaulting an unknown role to «staff» is the wrong direction anyway: it would put
+    SAFRA's name on a file somebody else filed.
+  */
+  if (claims?.role === 'partner') return 'partner';
+  if (claims?.role === 'customer' || !claims?.role) return 'customer';
+
+  return 'staff';
 }
 
 /** The width evidence is shown at — a photograph read on a screen, not zoomed into. */
@@ -216,7 +261,12 @@ export class DisputeEvidenceService {
             fileKey,
             /* Recorded for support, never used as a key. */
             uploadedAs: file.originalname,
-            byStaff: uploadedBy !== null,
+            /*
+              WHO filed it, as a role. Was `byStaff: uploadedBy !== null`, which now has a third
+              case: a partner. An audit row saying «staff» about a host's own photograph is worse
+              than one saying nothing.
+            */
+            filedBy: filedByOf(claims),
           },
         },
         tx as unknown as Database,
@@ -249,7 +299,9 @@ export class DisputeEvidenceService {
       rendered: false,
       fileName: file.originalname,
       at: made?.at ?? '',
-      byStaff: uploadedBy !== null,
+      filedBy: filedByOf(claims),
+      /* A fresh upload is never shared: releasing a customer file is a separate, explicit act. */
+      sharedWithPartner: false,
     };
   }
 
@@ -356,14 +408,22 @@ export class DisputeEvidenceService {
       file_name: string;
       variant_widths: number[] | null;
       at: string;
-      by_staff: boolean;
+      filed_by: 'customer' | 'staff' | 'partner';
+      shared_with_partner: boolean;
     }>(sql`
-      SELECT id, storage_key, file_name, variant_widths,
-             to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS at,
-             (uploaded_by_user_id IS NOT NULL) AS by_staff
-      FROM dispute_evidence
-      WHERE dispute_id = ${disputeId}::uuid AND deleted_at IS NULL
-      ORDER BY created_at, id
+      SELECT e.id, e.storage_key, e.file_name, e.variant_widths,
+             to_char(e.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS at,
+             -- Three answers from the uploader's own role, not a boolean. See the interface.
+             CASE
+               WHEN e.uploaded_by_user_id IS NULL THEN 'customer'
+               WHEN u.role = 'partner' THEN 'partner'
+               ELSE 'staff'
+             END AS filed_by,
+             e.shared_with_partner
+        FROM dispute_evidence e
+        LEFT JOIN users u ON u.id = e.uploaded_by_user_id
+       WHERE e.dispute_id = ${disputeId}::uuid AND e.deleted_at IS NULL
+       ORDER BY e.created_at, e.id
     `);
 
     return rows.rows.map((row) => ({
@@ -371,7 +431,8 @@ export class DisputeEvidenceService {
       rendered: evidenceVariant(row.variant_widths) !== null,
       fileName: row.file_name,
       at: row.at,
-      byStaff: row.by_staff,
+      filedBy: row.filed_by,
+      sharedWithPartner: row.shared_with_partner,
     }));
   }
 
