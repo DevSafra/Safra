@@ -32,6 +32,68 @@ import { createDatabase, type Database } from '@safra/db';
 const DATABASE_URL = process.env['DATABASE_URL'];
 const describeIfDb = DATABASE_URL ? describe : describe.skip;
 
+/**
+ * Codes a compile-time catalogue cannot translate, and why not.
+ *
+ * Not a convenience list. Each group is something the console is RIGHT to print as it is stored,
+ * and `payloadValue`'s own note already says so of one of them: «a list of slugs stays as slugs,
+ * which is what a slug is for».
+ */
+const UNTRANSLATABLE = new Set<string>([
+  /*
+    City slugs. A slug is an identifier a super admin coins when adding a city, so no catalogue
+    shipped with the code can know it — and the city's Arabic NAME is a column on the row, which is
+    what every screen that names a city reads.
+  */
+  'damascus',
+  'aleppo',
+  'latakia',
+  'tartus',
+  'palmyra',
+  'kasab',
+  'aqaba',
+  'petra',
+  'tripoli',
+
+  /*
+    City-CATEGORY codes and amenity codes, for the same reason one layer down: both are rows a
+    super admin creates with their own `name_ar`, and `city_category.updated` audits the code
+    because the code is the thing that changed.
+  */
+  'coastal',
+  'mountain',
+  'desert',
+  'rural',
+  'historic',
+  'wifi',
+  'facilities',
+
+  /* A property type, also an operator-editable row carrying its own Arabic name. */
+  'restaurant',
+
+  /*
+    A payment PROVIDER's name. `simulator` is the development gateway and the real ones will be
+    Visa, Mastercard and Sham Cash — brand names, which are not translated on any surface.
+  */
+  'simulator',
+
+  /*
+    Contract file parties, and the one group here that is a REAL GAP rather than a decision.
+    `payloadValue` is keyed by value alone, so `partner` cannot mean «شريك» under `filedBy` and
+    «نسخة الشريك الموقّعة» under `party` at the same time — and naming `original`/`joint`/`safra`
+    globally would put a contract word on unrelated rows. Recorded for a decision on whether the
+    map should be keyed by (key, value); until then these four print as stored, which is
+    comprehensible rather than wrong.
+  */
+  'original',
+  'joint',
+  'safra',
+  'base',
+
+  /* Fixture noise from the testbed seed, which is not a code at all. */
+  'test',
+]);
+
 describeIfDb('what the platform has written, the console can name', () => {
   let db: Database;
 
@@ -128,30 +190,79 @@ describeIfDb('what the platform has written, the console can name', () => {
   /**
    * And the enum-shaped VALUES, which the console prints under «قبل» and «بعد».
    *
-   * Only values that LOOK like codes — lower snake_case, no spaces. A `reason` somebody typed is
-   * their own words and must fall through untranslated; a `status` of `pending_confirmation` is an
-   * identifier and must not reach a reader. The pattern is what separates the two, and it is why
-   * this cannot simply demand a translation for every string in the table.
+   * Only values that LOOK like codes. A `reason` somebody typed is their own words and must fall
+   * through untranslated; a `status` of `pending_confirmation` is an identifier and must not reach
+   * a reader. Three structural rules separate the two, and each of them was earned:
+   *
+   * 1. **The jsonb type is `string`.** It was `jsonb_each_text`, which stringifies a boolean into
+   *    `'true'` — so the guard demanded an Arabic word for `true` while the console was already
+   *    rendering it «نعم» through `payloadValue`'s boolean branch. Asking the type instead of the
+   *    text removes that whole argument rather than exempting two values.
+   * 2. **The pattern allows a SINGLE word.** It required at least one underscore
+   *    (`^[a-z][a-z0-9]*(_[a-z0-9]+)+$`), which made every one-word code invisible to it: on
+   *    2026-09-08 the audit entry for `dispute.notified` read «الشريك: queued» and «العميل:
+   *    queued» — English, on a console that is Arabic-only — and 51 such codes were reaching
+   *    readers, none of them visible to this test since the day it was written. Found by opening
+   *    the screen, not by the suite. Twenty-five were named the same day from words the catalogue
+   *    already used elsewhere; the rest are exempted below, each with a reason.
+   * 3. **At most 24 characters.** `documentHash` and `fileHash` carry SHA-256 digests, which are
+   *    64 lowercase hex characters and match any «looks like a code» pattern perfectly. No enum
+   *    value on this platform is longer than a couple of words.
    */
   it('names every coded payload value present in audit_log', async () => {
     const catalogue = adminMessages('ar').enums.payloadValue;
     const rows = await db.execute<{ v: string }>(sql`
-      SELECT DISTINCT e.value AS v
+      SELECT DISTINCT e.value #>> '{}' AS v
       FROM audit_log,
-           LATERAL jsonb_each_text(
+           LATERAL jsonb_each(
              coalesce(before, '{}'::jsonb) || coalesce(after, '{}'::jsonb)
            ) AS e(key, value)
-      WHERE e.value ~ '^[a-z][a-z0-9]*(_[a-z0-9]+)+$'
+      WHERE jsonb_typeof(e.value) = 'string'
+        AND e.value #>> '{}' ~ '^[a-z][a-z0-9]*(_[a-z0-9]+)*$'
+        AND length(e.value #>> '{}') <= 24
       ORDER BY 1
     `);
 
-    const unknown = rows.rows.map((row) => row.v).filter((code) => !(code in catalogue));
+    const unknown = rows.rows
+      .map((row) => row.v)
+      .filter((code) => !(code in catalogue) && !UNTRANSLATABLE.has(code));
 
     expect(
       unknown,
       'These coded values appear in an audit payload with no Arabic word, so سجل التدقيق prints ' +
         'the code. Add them to `enums.payloadValue` in messages/admin/ar.ts — and pick the ' +
-        'wording deliberately: the status vocabularies disagree with each other on purpose.',
+        'wording deliberately: the status vocabularies disagree with each other on purpose. If a ' +
+        'value genuinely cannot be translated at compile time, add it to UNTRANSLATABLE with the ' +
+        'reason, not here.',
+    ).toEqual([]);
+  });
+
+  /**
+   * The exemptions are held to account, because an exemption list decays in the direction of
+   * hiding things.
+   *
+   * Every entry must still be PRESENT in a payload. A value that has stopped being written is a
+   * value whose reason nobody has re-read, and leaving it here would let a future code of the same
+   * name pass unexamined — which is the failure mode this project has already met once, in a list
+   * excusing a page that «cannot gate» while the page grew a real guard.
+   */
+  it('exempts nothing that has stopped being written', async () => {
+    const rows = await db.execute<{ v: string }>(sql`
+      SELECT DISTINCT e.value #>> '{}' AS v
+      FROM audit_log,
+           LATERAL jsonb_each(
+             coalesce(before, '{}'::jsonb) || coalesce(after, '{}'::jsonb)
+           ) AS e(key, value)
+      WHERE jsonb_typeof(e.value) = 'string'
+    `);
+
+    const present = new Set(rows.rows.map((row) => row.v));
+    const stale = [...UNTRANSLATABLE].filter((code) => !present.has(code)).sort();
+
+    expect(
+      stale,
+      'These are exempted from translation and nothing writes them any more. Remove them — a ' +
+        'stale exemption silently covers the next value that happens to share the name.',
     ).toEqual([]);
   });
 
