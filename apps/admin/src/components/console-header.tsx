@@ -63,9 +63,7 @@ export async function ConsoleHeader({
       */}
       <div className="min-w-0">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h1 className="font-[family-name:var(--font-amiri)] text-[28px] leading-tight text-text">
-            {title}
-          </h1>
+          <h1 className="font-display text-[28px] leading-tight text-text">{title}</h1>
           <span className="text-[11.5px] text-faint">
             {todayLong()} · {roleName(session?.user.role)}
           </span>

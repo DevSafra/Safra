@@ -37,18 +37,14 @@ export default async function SupportPage() {
       <p className="text-[12.5px] text-muted">{t.support.intro}</p>
 
       <section className="mt-4 rounded-card border border-line bg-card p-4">
-        <h2 className="font-[family-name:var(--font-amiri)] text-[18px] text-text">
-          {t.support.openTitle}
-        </h2>
+        <h2 className="font-display text-[18px] text-text">{t.support.openTitle}</h2>
         <div className="mt-3">
           <SupportForm />
         </div>
       </section>
 
       <section className="mt-6">
-        <h2 className="font-[family-name:var(--font-amiri)] text-[18px] text-text">
-          {t.support.mineTitle}
-        </h2>
+        <h2 className="font-display text-[18px] text-text">{t.support.mineTitle}</h2>
 
         {tickets === 'failed' || tickets === 'unauthenticated' ? (
           <p className="mt-3 text-[12.5px] text-bad">{t.dashboard.loadFailed}</p>

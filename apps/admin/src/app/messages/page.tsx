@@ -147,7 +147,7 @@ function Thread({ thread, back }: { thread: ConversationItem; back: string }) {
     >
       <span
         aria-hidden
-        className="grid size-9 shrink-0 place-items-center rounded-full border border-[rgba(var(--goldA),0.3)] bg-[rgba(var(--goldA),0.12)] font-[family-name:var(--font-amiri)] font-bold text-gold"
+        className="grid size-9 shrink-0 place-items-center rounded-full border border-[rgba(var(--goldA),0.3)] bg-[rgba(var(--goldA),0.12)] font-display font-bold text-gold"
       >
         {other.slice(0, 1)}
       </span>

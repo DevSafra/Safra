@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
-import { Amiri, IBM_Plex_Sans_Arabic } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
@@ -14,36 +13,6 @@ import { ThemeScript } from '@/components/theme-script';
 import { ThemeKeeper } from '@/components/theme-keeper';
 
 import '../globals.css';
-
-/**
- * The design handoff's own pair (§4.1), which the console and the partner portal already use.
- *
- * IBM Plex Sans Arabic for UI, Amiri for display headings. This is not a fresh choice — it is the
- * documented one, and the customer site was the only app of the three not following it. Every
- * spacing value in the handoff was measured against Plex Arabic, which has tighter counters and a
- * shorter x-height than the Cairo that was here as a pre-handoff guess.
- *
- * ## Both variables go on `<html>`
- *
- * `@theme` emits `--font-sans` at `:root`, so a `--font-plex` defined on `<body>` is one level
- * BELOW where it is read: `var(--font-plex)` is then undefined, the whole declaration is
- * guaranteed-invalid, and `font-family` silently falls through to the OS stack. That is how this
- * app shipped from the day fonts were added until 2026-09-02, and it is why neither face had ever
- * actually rendered here. The console and the portal put them on `<html>` and were never affected.
- */
-const plex = IBM_Plex_Sans_Arabic({
-  subsets: ['arabic', 'latin'],
-  weight: ['300', '400', '500', '600', '700'],
-  variable: '--font-plex',
-  display: 'swap',
-});
-
-const amiri = Amiri({
-  subsets: ['arabic', 'latin'],
-  weight: ['400', '700'],
-  variable: '--font-amiri',
-  display: 'swap',
-});
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -121,7 +90,7 @@ export default async function LocaleLayout({
     <html
       lang={locale}
       dir={direction}
-      className={`${plex.variable} ${amiri.variable}`}
+
       {...(theme === 'dark' ? { 'data-theme': 'dark' } : {})}
       suppressHydrationWarning
     >

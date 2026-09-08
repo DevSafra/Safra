@@ -508,7 +508,7 @@ function PartnerQueue({
               >
                 <span
                   aria-hidden
-                  className="grid size-[34px] shrink-0 place-items-center rounded-lg border border-[rgba(var(--goldA),0.3)] bg-[rgba(var(--goldA),0.12)] font-[family-name:var(--font-amiri)] text-base text-gold"
+                  className="grid size-[34px] shrink-0 place-items-center rounded-lg border border-[rgba(var(--goldA),0.3)] bg-[rgba(var(--goldA),0.12)] font-display text-base text-gold"
                 >
                   {ORNAMENT_BRAND}
                 </span>

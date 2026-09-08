@@ -24,13 +24,57 @@
  */
 @theme {
   /*
-    The handoff's pair (§4.1), the same two the console and the partner portal load. Both fall back
-    to a generic ARABIC-capable family rather than to `system-ui` alone, which on most machines is a
-    Latin default — an Arabic string shaped by it before the webfont arrives is what `display: swap`
-    exists to make brief, not to make ugly.
+    ONE font for the whole platform: the browser's own (Bashar, 2026-09-08).
+
+    *«Please use this default font on the entire system»*, with this exact stack. So the two
+    webfaces are gone — no `next/font`, no Google download, no `--font-plex` or `--font-amiri` — and
+    both tokens point at the same list. It overrides the handoff's §4.1 pair, which is his call to
+    make; recorded here because a later reader will find §4.1 naming Amiri and IBM Plex Sans Arabic
+    and should know why the code disagrees.
+
+    ## `--font-display` survives as an ALIAS, on purpose
+
+    Sixty-two components carry `font-display`, and it now resolves to the same stack as body text.
+    Keeping the token is a two-line change where deleting it is sixty-two, and — more to the point —
+    the class still MARKS which text is a display line. The day a display face is wanted again there
+    is one value to set rather than sixty-two places to find.
+
+    ## The `var()` fallback chain is deliberate
+
+    `--default-font-family` is Tailwind v4's own hook. Naming it first means a host that defines it
+    wins, and everything after it is the fallback — which is the shape Bashar supplied and the shape
+    that degrades to a real font on any machine.
   */
-  --font-display: var(--font-amiri), 'Amiri', serif;
-  --font-sans: var(--font-plex), 'IBM Plex Sans Arabic', system-ui, sans-serif;
+  --font-display: var(
+    --default-font-family,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    'Noto Sans',
+    Arial,
+    sans-serif,
+    'Apple Color Emoji',
+    'Segoe UI Emoji',
+    'Segoe UI Symbol',
+    'Noto Color Emoji'
+  );
+  --font-sans: var(
+    --default-font-family,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    'Noto Sans',
+    Arial,
+    sans-serif,
+    'Apple Color Emoji',
+    'Segoe UI Emoji',
+    'Segoe UI Symbol',
+    'Noto Color Emoji'
+  );
 
   --color-bg: #0c0a1c;
   --color-bg2: #12102b;
