@@ -156,7 +156,7 @@ export default async function CheckoutPage({
    * The offered payment methods come from the same round of requests: neither depends
    * on the other, so awaiting them in sequence would add latency for nothing (§3).
    */
-  const [priced, offered, session, settings] = await Promise.all([
+  const [priced, methods, session, settings] = await Promise.all([
     quote({
       unitId,
       checkIn,
@@ -296,8 +296,7 @@ export default async function CheckoutPage({
             children={children}
             infants={infants}
             propertySlug={slug}
-            methods={offered.methods}
-            offlineRail={offered.offline}
+            methods={methods}
             wallet={
               applicable
                 ? {

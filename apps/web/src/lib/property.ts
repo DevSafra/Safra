@@ -276,45 +276,33 @@ export async function quote(input: {
 
 const methodsSchema = z.object({
   methods: z.array(z.enum(CUSTOMER_FACING_METHODS)),
-  /*
-    Whether the payment will be settled off the checkout session — a bank transfer today.
-
-    `.default(false)` and not `.nullable()`, and the distinction is the one this codebase already
-    learnt: a default is wrong when it INVENTS a fact, and right when the absent value has a
-    conservative reading. Here it does — an API that stopped sending the flag makes checkout say
-    «we will contact you» rather than promise transfer instructions that never arrive.
-  */
-  offline: z.boolean().default(false),
 });
 
 /**
  * Which payment methods checkout may offer for this property's country (§7.1).
  *
- * Asked of the API rather than hardcoded in the UI, because "is this rail actually
- * available?" depends on provider routing that a super admin controls (P-005).
- * Hardcoding the four approved logos would show a customer a Klarna button months
- * before Klarna is contracted.
+ * Asked of the API rather than hardcoded in the UI, because "is this rail actually available?"
+ * depends on provider routing that a super admin controls (P-005). Hardcoding the four approved
+ * logos would show a customer a Klarna button months before Klarna is contracted.
  *
- * An empty array is a real answer, not a failure: no external rail is live until an
- * acquirer or Klarna agreement exists. On a network error it also returns empty —
- * offering nothing is the safe failure, since offering a method that cannot be
- * served strands the customer mid-checkout.
+ * An empty array is a real answer, not a failure: no external rail is live until an acquirer or
+ * Klarna agreement exists, and Bashar deferred provider onboarding on 2026-09-08 until the Visa,
+ * Mastercard and Sham Cash details are supplied. On a network error it also returns empty —
+ * offering nothing is the safe failure, since offering a method that cannot be served strands the
+ * customer mid-checkout.
+ *
+ * ## It used to carry an `offline` flag, and no longer needs to
+ *
+ * The flag let checkout tell «nothing can take money» from «one rail serves everyone, so there is
+ * nothing to choose» — the ambiguity behind finding 214. That distinction went with the
+ * bank-transfer journey: from the customer's side nothing can take money, and one sentence is true
+ * again. A field no surface reads is the shape this review keeps finding, so it is gone from here.
+ * It still exists where it is still read — `StartPaymentResult.offline`, which decides whether the
+ * form follows a redirect, and the console's capture control.
  */
-export interface OfferedPayment {
-  readonly methods: CustomerFacingMethod[];
-  /**
-   * True when no method is offered and yet money can still be taken — the customer is sent to
-   * SAFRA's own transfer instructions rather than to a gateway.
-   *
-   * An empty list means two different things and checkout has to say a different true sentence for
-   * each (finding 214): «no rail at all, we will contact you», or «pay by transfer, here is how».
-   */
-  readonly offline: boolean;
-}
-
 export async function availablePaymentMethods(
   countryCode: string,
-): Promise<OfferedPayment> {
+): Promise<CustomerFacingMethod[]> {
   const url = new URL(`${API_URL}/api/v1/payments/methods`);
   url.searchParams.set('country', countryCode);
 
@@ -326,14 +314,12 @@ export async function availablePaymentMethods(
       next: { revalidate: 60 },
     });
 
-    if (!response.ok) return { methods: [], offline: false };
+    if (!response.ok) return [];
 
     const parsed = methodsSchema.safeParse(await response.json());
 
-    return parsed.success
-      ? { methods: [...parsed.data.methods], offline: parsed.data.offline }
-      : { methods: [], offline: false };
+    return parsed.success ? [...parsed.data.methods] : [];
   } catch {
-    return { methods: [], offline: false };
+    return [];
   }
 }

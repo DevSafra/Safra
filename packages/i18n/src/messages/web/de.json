@@ -324,22 +324,22 @@
     "couponApplied": "Rabatt {code}",
     "couponInvalid": "Dieser Code konnte nicht angewendet werden.",
     "signedInDetails": "Dies sind Ihre Kontodaten. Ändern Sie Name oder Telefonnummer bei Bedarf — Ihr Konto wird aktualisiert und diese Buchung samt Nachrichten verwendet die neuen Werte.",
-    "emailLocked": "Ihre Anmeldeadresse. Ändern Sie sie in den Kontoeinstellungen."
+    "emailLocked": "Ihre Anmeldeadresse. Ändern Sie sie in den Kontoeinstellungen.",
+    "submitNoPayment": "Buchung abschließen"
   },
   "bookingPending": {
-    "title": "Bezahlt. Ihre Buchung wird bestätigt",
-    "body": "SAFRA hat Ihre Zahlung erhalten. Wir kontaktieren den Partner zur Bestätigung der Verfügbarkeit.",
+    "title": "Ihre Buchung ist erfasst",
+    "body": "Bewahren Sie die untenstehende Referenz auf. Den Zahlungs- und Bestätigungsstatus sehen Sie auf Ihrer Buchungsseite.",
     "referenceLabel": "Buchungsnummer",
     "step1": "SAFRA kontaktiert den Partner zur Bestätigung innerhalb von {window}.",
     "step2": "Nach Zustimmung erhalten Sie WhatsApp und E-Mail mit Voucher und QR-Code.",
     "step3": "Bei der Ankunft nutzen Sie Ihre Buchungsnummer oder den QR-Code.",
-    "guarantee": "Antwortet der Partner nicht rechtzeitig: Die Buchung wird storniert, Sie erhalten den vollen Betrag zurück und eine Entschädigung in Ihrer Wallet."
+    "guarantee": "Antwortet der Partner nicht rechtzeitig: Die Buchung wird storniert, Sie erhalten den vollen Betrag zurück und eine Entschädigung in Ihrer Wallet.",
+    "trackLink": "Buchung verfolgen"
   },
   "paymentReturn": {
     "title": "Zahlung per Banküberweisung abschließen",
     "intro": "Ihre Buchung ist reserviert. Überweisen Sie zur Bestätigung den unten genannten Betrag und geben Sie die Referenz im Verwendungszweck an.",
-    "remittanceLabel": "Überweisungsreferenz",
-    "remittanceHint": "Bitte im Verwendungszweck angeben; ohne sie kann die Zahlung Ihrer Buchung nicht zugeordnet werden.",
     "nextSteps": "Nach Eingang der Überweisung wird Ihre Buchung innerhalb eines Werktags bestätigt; Sie erhalten eine E-Mail.",
     "referenceLabel": "Buchungsnummer",
     "viewBooking": "Buchung ansehen",
@@ -361,9 +361,7 @@
     "shamCashHint": "Mobile Wallet innerhalb Syriens",
     "gift_card": "Geschenkkarte",
     "wallet": "SAFRA-Guthaben",
-    "bank_transfer": "Banküberweisung",
-    "offlineHeading": "Zahlung per Banküberweisung",
-    "offlineBody": "Nach dem Fortfahren zeigen wir Ihnen die Kontodaten und den Verwendungszweck für Ihre Überweisung."
+    "bank_transfer": "Banküberweisung"
   },
   "auth": {
     "signIn": "Anmelden",
@@ -655,9 +653,7 @@
     "bookingTotalDue": "Zu zahlender Betrag",
     "bookingPaymentDeadline": "Zahlungsfrist endet",
     "unpaidTitle": "Ihre Zahlung ist noch nicht eingegangen",
-    "unpaidBody": "Ihre Buchung ist bis zum oben genannten Zeitpunkt reserviert. Überweisen Sie den Betrag und geben Sie den Verwendungszweck an; geht die Überweisung nicht rechtzeitig ein, wird die Buchung storniert und die Daten werden freigegeben.",
-    "unpaidRemittanceLabel": "Verwendungszweck",
-    "unpaidHowTo": "Überweisungsdaten",
+    "unpaidBody": "Ihre Buchung ist bis zum oben genannten Zeitpunkt reserviert. Das SAFRA-Team kontaktiert Sie zur Zahlungsabwicklung; geht der Betrag nicht rechtzeitig ein, wird die Buchung storniert und die Daten werden freigegeben.",
     "bookingTotalNeutral": "Buchungssumme"
   },
   "ads": {

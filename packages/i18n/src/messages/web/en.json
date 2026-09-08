@@ -324,22 +324,22 @@
     "couponApplied": "{code} discount",
     "couponInvalid": "That code could not be applied.",
     "signedInDetails": "These are your account details. Edit the name or phone if you need to — your account is updated and this booking and its messages use the new values.",
-    "emailLocked": "Your sign-in address. Change it in account settings."
+    "emailLocked": "Your sign-in address. Change it in account settings.",
+    "submitNoPayment": "Complete booking"
   },
   "bookingPending": {
-    "title": "Paid. Your booking is pending confirmation",
-    "body": "SAFRA received your payment. We are contacting the partner to confirm availability.",
+    "title": "Your booking is registered",
+    "body": "Keep the reference below. Follow the payment and confirmation status on your bookings page.",
     "referenceLabel": "Booking reference",
     "step1": "SAFRA contacts the partner to confirm availability within {window}.",
     "step2": "On approval you receive WhatsApp and email with your voucher and QR code.",
     "step3": "On arrival you use your booking reference or QR code with the partner.",
-    "guarantee": "If the partner does not respond in time: the booking is cancelled, you are refunded in full, and compensation is added to your wallet automatically."
+    "guarantee": "If the partner does not respond in time: the booking is cancelled, you are refunded in full, and compensation is added to your wallet automatically.",
+    "trackLink": "Track your booking"
   },
   "paymentReturn": {
     "title": "Complete your payment by bank transfer",
     "intro": "Your booking is held. To confirm it, transfer the amount below and quote the reference in the payment description.",
-    "remittanceLabel": "Transfer reference",
-    "remittanceHint": "Quote this on the transfer; without it the payment cannot be matched to your booking.",
     "nextSteps": "Once the transfer arrives your booking is confirmed within one business day, and we email you.",
     "referenceLabel": "Booking reference",
     "viewBooking": "View booking",
@@ -361,9 +361,7 @@
     "shamCashHint": "Mobile wallet inside Syria",
     "gift_card": "Gift card",
     "wallet": "SAFRA wallet",
-    "bank_transfer": "Bank transfer",
-    "offlineHeading": "Payment by bank transfer",
-    "offlineBody": "After you continue we show you the account details and the reference to quote with your transfer."
+    "bank_transfer": "Bank transfer"
   },
   "auth": {
     "signIn": "Sign in",
@@ -655,9 +653,7 @@
     "bookingTotalDue": "Amount due",
     "bookingPaymentDeadline": "Payment window closes",
     "unpaidTitle": "We have not received your payment yet",
-    "unpaidBody": "Your booking is held until the time above. Transfer the amount and quote the reference; if the window closes before the transfer arrives the booking is cancelled and the dates are released.",
-    "unpaidRemittanceLabel": "Transfer reference",
-    "unpaidHowTo": "Transfer details",
+    "unpaidBody": "Your booking is held until the time above. The SAFRA team will contact you to complete payment; if the window closes before the amount is received the booking is cancelled and the dates are released.",
     "bookingTotalNeutral": "Booking total"
   },
   "ads": {

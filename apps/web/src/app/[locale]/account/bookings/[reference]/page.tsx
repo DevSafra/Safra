@@ -341,12 +341,6 @@ export default async function BookingDetailPage({
         >
           <h2 className="warn-ink text-sm font-bold">{t('unpaidTitle')}</h2>
           <p className="mt-2 text-sm text-muted">{t('unpaidBody')}</p>
-
-          <p className="mt-4 text-xs text-faint">{t('unpaidRemittanceLabel')}</p>
-          {/* Selectable and monospaced: it is copied by hand into a bank form. */}
-          <p className="mt-1 select-all font-mono text-lg text-text">
-            {ltrIsolate(`SAFRA-${booking.reference}`)}
-          </p>
         </section>
       ) : null}
 

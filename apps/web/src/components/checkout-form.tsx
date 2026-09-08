@@ -41,7 +41,6 @@ export function CheckoutForm({
   infants,
   propertySlug,
   methods,
-  offlineRail,
   wallet,
   signedIn,
   account,
@@ -71,16 +70,6 @@ export function CheckoutForm({
    * without one — the booking is worth taking even if payment follows out of band.
    */
   methods: readonly CustomerFacingMethod[];
-  /**
-   * Whether an EMPTY method list still leads somewhere money can be paid.
-   *
-   * Finding 214: this screen said «no online payment method is available yet, our team will
-   * contact you» while the button below it said «continue to payment» and landed on a page giving
-   * bank details and a reference. One screen said wait, the next said act. The first was out of
-   * date — `manual_transfer` is the rail the platform runs on — and an empty list alone cannot
-   * tell «nothing can take money» from «one rail serves everyone, so there is nothing to choose».
-   */
-  offlineRail: boolean;
   /**
    * The customer's spendable balance in THIS booking's currency (§7.3), or null
    * when there is none to offer. Resolved server-side; the amount shown here is
@@ -338,27 +327,21 @@ export function CheckoutForm({
 
         {methods.length === 0 ? (
           /*
-           * Nothing to CHOOSE is not nothing to say, and which sentence is true depends on whether
-           * a rail is routed. When one is, the panel describes the transfer that is about to be
-           * asked for — the same thing the next screen says, one screen earlier. When none is, the
-           * old sentence is still the honest one: the booking is taken and payment is arranged
-           * separately.
-           */
-          <p
-            className={`mt-2 rounded-lg border p-3 text-xs ${
-              offlineRail
-                ? 'border-line bg-field text-muted'
-                : 'border-sky/30 bg-sky/10 text-sky'
-            }`}
-          >
-            {offlineRail ? (
-              <>
-                <span className="block text-sm text-text">{tm('offlineHeading')}</span>
-                <span className="mt-1 block">{tm('offlineBody')}</span>
-              </>
-            ) : (
-              tm('none')
-            )}
+            One sentence, and it is true again (Bashar, 2026-09-08).
+
+            He asked for the manual bank-transfer flow to come out of the customer journey and for
+            provider onboarding to be deferred until the Visa, Mastercard and Sham Cash details
+            exist. So nothing here can take money, «سيتواصل فريقنا معك» is the honest thing to say,
+            and the panel that described a transfer is gone with the journey it described.
+
+            The booking is still CREATED and a payment attempt is still opened behind this screen —
+            that is what leaves finance a «تأكيد استلام الحوالة» to press when the money arrives,
+            which is step 2 of the intended flow. What the customer is no longer shown is
+            instructions for a transfer they cannot complete: the page they were sent to named
+            neither the amount nor an account (finding 219).
+          */
+          <p className="mt-2 rounded-lg border border-sky/30 bg-sky/10 p-3 text-xs text-sky">
+            {tm('none')}
           </p>
         ) : (
           <div className="mt-2 grid gap-2">
@@ -398,7 +381,13 @@ export function CheckoutForm({
         disabled={submitting}
         className="mt-6 w-full rounded-lg btn-gold px-5 py-3 font-semibold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {submitting ? t('submitting') : t('submit')}
+        {/*
+          «تابع إلى الدفع» promises a next screen that takes money. With no rail there is none —
+          the press completes the booking and SAFRA gets in touch — so the label says that instead.
+        */}
+        {submitting
+          ? t('submitting')
+          : t(methods.length === 0 ? 'submitNoPayment' : 'submit')}
       </button>
 
       <p className="mt-3 text-xs text-faint">{t('terms')}</p>
@@ -458,9 +447,9 @@ function readCreated(body: unknown): CreatedBooking | null {
 /**
  * Starts payment and sends the customer wherever the provider needs them.
  *
- * `redirectUrl` is followed with a full navigation rather than the Next router: it
- * points at a payment provider (or, for bank transfer, at an instructions page),
- * and a client-side route transition cannot leave the origin.
+ * `redirectUrl` is followed with a full navigation rather than the Next router: it points at a
+ * payment provider, and a client-side route transition cannot leave the origin. An OFFLINE rail's
+ * redirect is deliberately NOT followed — see the note at the branch.
  *
  * If this step fails the customer is still sent to the booking page. The booking is
  * real and held, so stranding them on the form with an error would hide it from
@@ -499,9 +488,24 @@ async function startPayment(
     const body: unknown = await response.json().catch(() => null);
 
     if (response.ok && typeof body === 'object' && body !== null) {
-      const redirectUrl = (body as Record<string, unknown>)['redirectUrl'];
+      const result = body as Record<string, unknown>;
+      const redirectUrl = result['redirectUrl'];
 
-      if (typeof redirectUrl === 'string') {
+      /*
+        An OFFLINE rail's redirect is not followed any more.
+
+        `StartPaymentResult.offline` says the rail settles on a bank's timetable rather than in
+        this session, and for `manual_transfer` its `redirectUrl` points at SAFRA's own transfer
+        instructions — the journey Bashar asked to remove on 2026-09-08. The attempt is still
+        opened, because that is what gives finance a control to press when money arrives; the
+        customer goes to their booking, which now says plainly that payment has not been received
+        and that SAFRA will be in touch.
+
+        Reading the flag rather than the method: the day an offline rail is contracted this needs no
+        second list, and an ONLINE provider's redirect — a bank's 3-D Secure page — must still be
+        followed or nobody can pay at all.
+      */
+      if (typeof redirectUrl === 'string' && result['offline'] !== true) {
         window.location.assign(redirectUrl);
         return;
       }

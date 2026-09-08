@@ -67,6 +67,22 @@ export default async function BookingPendingPage({
       <p aria-hidden className="text-4xl text-gold">
         ⏳
       </p>
+      {/*
+        It says what the customer DID, not what SAFRA received (Bashar, 2026-09-08).
+
+        This page performs no booking lookup on purpose — references are sequential (§13.2) and a
+        lookup keyed on one would reveal a stranger's booking — so it cannot know whether money has
+        arrived. It said «تم الدفع. حجزك قيد التأكيد» and «استلمت سفرة المبلغ بنجاح» anyway: true
+        when a card settled inside the checkout session, and false the moment there is no rail, when
+        every guest lands here having paid nothing and is congratulated for it.
+
+        Its own comment already said this page «only confirms what they just did». The copy now
+        matches that, which is the one claim it can make without a lookup — and it points at
+        حجوزاتي, which IS ownership-scoped and does know.
+
+        Found by driving the journey after the rail was removed; `/ar/account/bookings/[reference]`
+        had the same defect and was fixed first. This is the more travelled of the two routes to it.
+      */}
       <h1 className="mt-4 font-display text-2xl font-bold text-gold sm:text-3xl">
         {t('title')}
       </h1>

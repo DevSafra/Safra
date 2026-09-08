@@ -47,53 +47,31 @@ export default async function PaymentReturnPage({
   const query = await searchParams;
   const t = await getTranslations('paymentReturn');
 
-  const method = first(query['method']);
-  const remittance = first(query['remittance']);
   const status = first(query['status']);
+  /*
+    The reference a provider echoes back, if it echoes one.
 
-  /**
-   * The reference is read from the remittance value the provider echoed back, not
-   * trusted as an identifier — it only ever labels the page. Nothing here queries a
-   * booking, because a query keyed on a guessable reference would leak a stranger's
-   * details (§13.2 makes references sequential).
-   */
-  const reference = remittance?.replace(/^SAFRA-/, '');
+    Read straight from the query rather than parsed out of a remittance value, which is what this
+    did while the bank-transfer branch existed. It only ever LABELS the page and builds a link:
+    `/booking/[reference]` is gated on the access token minted at creation, so a crafted reference
+    reaches a page that refuses rather than a stranger's details — which is why linking on it is
+    safe and querying a booking here would not be.
+  */
+  const reference = first(query['reference']);
 
-  if (method === 'bank_transfer' && remittance) {
-    return (
-      <div className="mx-auto max-w-2xl px-4 py-12">
-        <h1 className="font-display text-2xl font-bold text-gold sm:text-3xl">
-          {t('title')}
-        </h1>
-        <p className="mt-3 text-muted">{t('intro')}</p>
+  /*
+    The bank-transfer block is GONE (Bashar, 2026-09-08).
 
-        <div className="mt-6 rounded-card border border-gold/40 bg-card p-5">
-          <p className="text-xs text-faint">{t('remittanceLabel')}</p>
-          {/* Selectable and monospaced: the customer has to copy this accurately. */}
-          <p className="mt-1 select-all font-mono text-lg text-text">{remittance}</p>
-          <p className="mt-2 text-xs text-faint">{t('remittanceHint')}</p>
-        </div>
+    «Please remove the manual bank-transfer payment flow from the customer journey.» This page's
+    only content for it was a remittance reference — it promised «حوّل المبلغ التالي» and rendered
+    neither the amount nor an account to pay into (finding 219), because it deliberately queries no
+    booking: references are sequential (§13.2) and a lookup keyed on one would leak a stranger's
+    details. That was the right security call and the reason the page could not do its job.
 
-        <p className="mt-6 rounded-card border border-sky/30 bg-sky/10 p-4 text-sm text-sky">
-          {t('nextSteps')}
-        </p>
-
-        {reference ? (
-          <div className="mt-8">
-            <p className="text-xs text-faint">{t('referenceLabel')}</p>
-            <p className="font-display text-lg text-text">{reference}</p>
-            <Link
-              href={`/${locale}/booking/${reference}`}
-              className="mt-4 inline-block rounded-lg border border-line px-5 py-2.5 text-sm text-muted transition-colors hover:border-gold hover:text-gold"
-            >
-              {t('viewBooking')}
-            </Link>
-          </div>
-        ) : null}
-      </div>
-    );
-  }
-
+    Nothing routes here for an offline rail now: the checkout form does not follow an offline
+    redirect. What remains is what a REAL provider will need — a failure branch and a generic
+    «we are checking your payment» — and the customer's own booking page carries the state.
+  */
   if (status === 'failed') {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center">
