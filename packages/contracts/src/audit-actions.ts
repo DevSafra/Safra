@@ -83,6 +83,16 @@ export const AUDIT_ACTIONS = [
     and cannot get the answer from the first.
   */
   'refund.settled',
+  /*
+    The partner answering a dispute against them (Bashar, 2026-09-08).
+
+    Audited because it is the record that SAFRA heard both sides. An auditor — or an insurer —
+    asking «was the host given a chance to answer before this was decided» gets the answer from
+    this row and its timestamp, without reading the account itself.
+  */
+  'dispute.partner_responded',
+  /* An operator deciding a customer file is necessary for a fair resolution, which is not default. */
+  'dispute.evidence_shared',
   'booking.sla_expired',
   'booking.exported',
   'booking.export_requested',

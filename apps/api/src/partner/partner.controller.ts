@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 
 import {
   PERMISSIONS as P,
@@ -16,6 +17,8 @@ import {
   propertyUpdateSchema,
   unitCreateSchema,
   unitUpdateSchema,
+  partnerDisputeResponseSchema,
+  type PartnerDisputeResponseInput,
 } from '@safra/contracts';
 
 import { AuditExempt } from '../common/audit/audit.interceptor.js';
@@ -26,6 +29,7 @@ import { RequireVerifiedPartner } from '../rbac/verified-partner.guard.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { CalendarService } from './calendar.service.js';
 import { PartnerDashboardService } from './dashboard.service.js';
+import { PartnerDisputesService } from './partner-disputes.service.js';
 import { PropertiesService } from './properties.service.js';
 
 /**
@@ -53,6 +57,7 @@ export class PartnerController {
     private readonly properties: PropertiesService,
     private readonly calendar: CalendarService,
     private readonly dashboardService: PartnerDashboardService,
+    private readonly partnerDisputes: PartnerDisputesService,
   ) {}
 
   /**
@@ -93,6 +98,57 @@ export class PartnerController {
   @RequirePermissions(P.BOOKING_READ_OWN)
   async dashboard(@CurrentUser() user: AccessTokenClaims | undefined) {
     return this.dashboardService.overview(user);
+  }
+
+  /**
+   * النزاعات — every dispute against this partner (Bashar, 2026-09-08).
+   *
+   * `DISPUTE_RESPOND_OWN`, not the staff `DISPUTE_READ`: one permission name meaning «every dispute
+   * on the platform» for an operator and «mine» for a host is how a scope leak gets written. The
+   * partner id comes from the verified token and never from a parameter — `PartnerDisputesService`
+   * reads it, so this endpoint cannot be asked about somebody else's.
+   */
+  @Get('disputes')
+  @RequirePermissions(P.DISPUTE_RESPOND_OWN)
+  async disputes(@CurrentUser() user: AccessTokenClaims | undefined) {
+    return this.partnerDisputes.list(user);
+  }
+
+  /**
+   * One dispute, with the allegation, this partner's own responses, and the resolution when closed.
+   *
+   * A dispute belonging to another partner answers 404 rather than 403: references are sequential
+   * (§13.2), and «not yours» must read the same as «not there» or the sequence can be walked.
+   */
+  @Get('disputes/:reference')
+  @RequirePermissions(P.DISPUTE_RESPOND_OWN)
+  async dispute(
+    @Param('reference') reference: string,
+    @CurrentUser() user: AccessTokenClaims | undefined,
+  ) {
+    return this.partnerDisputes.detail(reference, user);
+  }
+
+  /**
+   * The partner's account of the night, added to the case file.
+   *
+   * Throttled: this writes to an append-only table, so a loop cannot be tidied up afterwards — the
+   * rows stay for ever. Ten a minute is far more than anybody answering a complaint needs and makes
+   * filling the file pointless.
+   */
+  @Post('disputes/:reference/responses')
+  @RequirePermissions(P.DISPUTE_RESPOND_OWN)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @AuditExempt(
+    'PartnerDisputesService records dispute.partner_responded in the transaction.',
+  )
+  async respondToDispute(
+    @Param('reference') reference: string,
+    @Body(new ZodValidationPipe(partnerDisputeResponseSchema))
+    body: PartnerDisputeResponseInput,
+    @CurrentUser() user: AccessTokenClaims | undefined,
+  ) {
+    return this.partnerDisputes.respond(reference, body.body, user);
   }
 
   /**

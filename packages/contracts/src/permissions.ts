@@ -226,6 +226,21 @@ export const PERMISSIONS = {
   MESSAGE_READ: 'message.read',
   MESSAGE_SEND: 'message.send',
   DISPUTE_READ: 'dispute.read',
+  /*
+    A partner reading and answering a dispute that freezes their money (Bashar, 2026-09-08).
+
+    Its own permission rather than reusing `DISPUTE_READ`, which is a STAFF capability over every
+    dispute on the platform: one name meaning «all of them» for an operator and «mine» for a host is
+    how a scope leak gets written. `_OWN` is the suffix this codebase already uses for that
+    distinction — `BOOKING_READ_OWN`, `PAYOUT_READ_OWN`, `REVIEW_RESPOND_OWN`.
+
+    Held by the owner AND the employee, following `VIOLATION_READ`: the person who was on the desk
+    that night is exactly who can answer «was anyone there to check them in», and an owner who was
+    not there cannot. The FROZEN AMOUNT is withheld separately on `PAYOUT_READ_OWN`, the same way
+    the dashboard withholds earnings — money is the owner's, the account of the night is the
+    business's.
+  */
+  DISPUTE_RESPOND_OWN: 'dispute.respond_own',
   DISPUTE_MANAGE: 'dispute.manage',
   /**
    * Reading the WhatsApp/email delivery log.
@@ -321,6 +336,8 @@ const PARTNER: Permission[] = [
   */
   P.PARTNER_CONTRACT_SIGN_OWN,
   P.PARTNER_COUPON_DECIDE,
+  /* Reading and answering a dispute that freezes their money — see the permission's own note. */
+  P.DISPUTE_RESPOND_OWN,
   /*
     Managing its own employees — and deliberately NOT in `PARTNER_EMPLOYEE_PERMISSIONS`.
 

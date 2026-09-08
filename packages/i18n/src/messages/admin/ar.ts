@@ -3812,6 +3812,9 @@ export const ar = {
     'booking.rejected': 'رفض الحجز من الشريك',
     /* تأكيد المالية أن الاسترداد خرج فعلاً — اللحظة التي عُكس فيها مستحق الشريك والعمولة. */
     'refund.settled': 'تأكيد إرسال الاسترداد',
+    /* سماع الطرف الآخر: ردّ الشريك على نزاع، ومشاركة ملف العميل معه بقرار صريح. */
+    'dispute.partner_responded': 'ردّ الشريك على النزاع',
+    'dispute.evidence_shared': 'مشاركة ملف من أدلة العميل مع الشريك',
     'booking.checked_in': 'تسجيل وصول الضيف',
     'booking.check_in_undone': 'التراجع عن تسجيل الوصول',
     /* The ACT, not its content: the note itself never reaches the audit log — see the action. */

@@ -61,18 +61,23 @@ describe('opening a section', () => {
 
   describe('what an employee can reach', () => {
     /**
-     * SIX of the eleven grantable capabilities open a section; the rest are in-page controls.
+     * SEVEN of the twelve grantable capabilities open a section; the rest are in-page controls.
      *
      * That proportion is the reason gating the nav is only half the job — an employee without
      * `booking.respond_as_partner` still sees the accept button unless something gates it in the
      * page, and by count that is the bigger half.
+     *
+     * Was six of eleven until `dispute.respond_own` arrived on 2026-09-08 and opened النزاعات
+     * (Bashar: «I do not want SAFRA deciding disputes while only one side is able to participate»).
+     * The count is asserted rather than the list so that ADDING a capability is a deliberate act
+     * somebody has to come here and account for — which is what has just happened.
      */
-    it('has six of the eleven capabilities open a door', () => {
+    it('has seven of the twelve capabilities open a door', () => {
       const opening = PARTNER_EMPLOYEE_PERMISSIONS.filter((permission) =>
         (Object.values(partner) as readonly string[]).includes(permission),
       );
 
-      expect(opening).toHaveLength(6);
+      expect(opening).toHaveLength(7);
     });
 
     it('never opens an owner-only section', () => {

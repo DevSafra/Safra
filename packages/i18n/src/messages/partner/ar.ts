@@ -310,6 +310,7 @@ export const ar = {
     coupons: 'الكوبونات',
     arrivals: 'الوصول اليوم',
     violations: 'المخالفات',
+    disputes: 'النزاعات',
     employees: 'الموظفون',
     employeeRoles: 'أدوار الموظفين',
     supportPage: 'الدعم',
@@ -633,6 +634,21 @@ export const ar = {
     payoutAccruing: 'مستحقات قيد التجميع: {amount} — لم يُجدوَل تحويلها بعد',
     payoutNone: 'لا تحويلات مجدولة حاليًا.',
   },
+
+  /** Dispute kinds and statuses, keyed on the `dispute_kind` and `dispute_status` enums. */
+  disputeKind: {
+    property_unavailable: 'العقار غير متاح عند الوصول',
+    not_as_described: 'الوحدة لا تطابق الوصف',
+    partner_no_response: 'لم يرد الشريك على الطلب',
+    complaint: 'شكوى أخرى',
+  } as Record<string, string>,
+
+  disputeStatus: {
+    open: 'مفتوح',
+    investigating: 'قيد الدراسة',
+    resolved: 'محسوم لصالح الضيف',
+    rejected: 'مرفوض',
+  } as Record<string, string>,
 
   /** Violation kinds, keyed on the `violation_kind` enum. */
   violationKind: {
@@ -1842,6 +1858,77 @@ export const ar = {
     allowedTitle: 'ما زال متاحًا',
     allowedRead:
       'يمكنك الدخول ومراجعة حسابك وحجوزاتك وقراءة الإشعارات والتواصل مع الدعم.',
+  },
+
+  /**
+   * النزاعات — the complaints that freeze this partner's money, and their side of them.
+   *
+   * Bashar, 2026-09-08: *«I want SAFRA to function as an adjudicator that hears both sides while
+   * still protecting customer privacy… I do not want SAFRA deciding disputes while only one side is
+   * able to participate in the process.»*
+   *
+   * The copy has one job beyond naming things: making the PRIVACY BOUNDARY legible. A partner who
+   * cannot see a customer's photograph should be told that it exists and that an operator decides
+   * whether to release it — otherwise the screen reads as though there were nothing there, and the
+   * next thing that happens is a support ticket asking what SAFRA is hiding.
+   */
+  disputes: {
+    title: 'النزاعات',
+    intro:
+      'شكاوى فتحها ضيوف على حجوزات لديك. سفرة تبتّ فيها بعد سماع الطرفين، ومستحقّ الحجز يبقى مجمّدًا حتى يُغلق النزاع.',
+    empty: 'لا نزاعات على حجوزاتك.',
+    loadFailed: 'تعذّر تحميل النزاعات. حدّث الصفحة.',
+    moneyHidden: 'المبالغ المجمّدة تظهر لمالك الحساب فقط.',
+
+    colReference: 'رقم النزاع',
+    colBooking: 'الحجز',
+    colStatus: 'الحالة',
+    colOpened: 'تاريخ الفتح',
+    colFrozen: 'المجمّد',
+    responseCount:
+      '{count, plural, zero {لا ردّ منك} one {ردّ واحد منك} two {ردّان منك} few {# ردود منك} many {# ردًّا منك} other {# ردّ منك}}',
+
+    /* ── One dispute ── */
+    detailTitle: 'النزاع {reference}',
+    allegation: 'ما ذكره الضيف',
+    noDescription: 'لم يُضف الضيف تفاصيل مكتوبة.',
+    stay: 'الإقامة',
+    frozen: 'المستحق المجمّد',
+    openedAt: 'فُتح',
+    closedAt: 'أُغلق',
+
+    decision: 'قرار سفرة',
+    decisionPending: 'لم يصدر قرار بعد. ردّك يُقرأ قبل البتّ.',
+
+    /* ── The partner's side ── */
+    yourResponses: 'ردودك',
+    noResponses: 'لم تردّ بعد.',
+    respondHeading: 'أضف ردّك',
+    respondHint:
+      'اكتب ما حدث فعلاً في تلك الليلة. يُقرأ ردّك مع الشكوى قبل البتّ، ويُحفظ في سجل النزاع ولا يمكن تعديله بعد الإرسال.',
+    respondLabel: 'ردّك',
+    respondSubmit: 'إرسال الردّ',
+    respondSending: 'جارٍ الإرسال…',
+    respondTooShort: 'اكتب عشرة أحرف على الأقل.',
+    respondFailed: 'تعذّر إرسال الردّ. حاول مرة أخرى.',
+    respondClosed: 'أُغلق النزاع، ولم يبقَ مجال للردّ. راسل الدعم إن كان لديك اعتراض.',
+    respondRedacted:
+      'أُرسل ردّك، وحُجبت منه بيانات تواصل — سفرة لا تحفظ أرقام الضيوف أو بريدهم داخل النصوص.',
+    respondSent: 'أُرسل ردّك وأُضيف إلى سجل النزاع.',
+
+    /* ── Evidence, and the boundary ── */
+    evidence: 'المستندات',
+    evidenceNone: 'لا مستندات مرفوعة منك.',
+    evidenceMine: 'مرفوع منك',
+    evidenceShared: 'شاركته سفرة معك',
+    /*
+      قيل بالعدد لا بالأسماء: اسم الملف قد يحمل ما تحمله الصورة.
+
+      وباشار: «إن قرّرت سفرة أن صورة أو ملفًا من العميل ضروري لبتٍّ عادل، فذلك قرار صريح من الفريق
+      لا سلوك افتراضي.» فالسطر يخبر الشريك أن هناك ما لم يره وكيف يطلبه، بدل أن تبدو الشاشة فارغة.
+    */
+    evidenceWithheld:
+      '{count, plural, one {مستند واحد} two {مستندان} few {# مستندات} many {# مستندًا} other {# مستند}} من أدلة الضيف لا تظهر لك حمايةً لخصوصيته. إن كان ضروريًا لبتٍّ عادل يشاركه فريق سفرة معك.',
   },
 
   violations: {

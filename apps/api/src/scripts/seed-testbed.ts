@@ -930,6 +930,21 @@ async function build(db: Seeder): Promise<void> {
 
   await db.execute(sql`DELETE FROM dispute_evidence WHERE dispute_id IN (
     SELECT id FROM disputes WHERE booking_id IN (${testbedBookings}))`);
+  /*
+    The partner's side of the case file, before the case it hangs off (2026-09-08).
+
+    `dispute_responses` is append-only by trigger, so a row-wise DELETE raises
+    `insufficient_privilege` — the same wall `ledger_entries` and `wallet_transactions` hit above,
+    and handled the same way: suspend, delete, restore immediately. Not TRUNCATE, because that
+    would take every partner's responses and not only the testbed's.
+
+    Without this the reset stops on a foreign key from `dispute_responses` to `disputes`, which is
+    what `testbed-cascade.integration.test.ts` exists to catch — and did.
+  */
+  await db.execute(sql`ALTER TABLE dispute_responses DISABLE TRIGGER USER`);
+  await db.execute(sql`DELETE FROM dispute_responses WHERE dispute_id IN (
+    SELECT id FROM disputes WHERE booking_id IN (${testbedBookings}))`);
+  await db.execute(sql`ALTER TABLE dispute_responses ENABLE TRIGGER USER`);
   await db.execute(sql`DELETE FROM disputes WHERE booking_id IN (${testbedBookings})`);
 
   /*

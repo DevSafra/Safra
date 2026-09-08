@@ -1,5 +1,13 @@
 import { relations, sql } from 'drizzle-orm';
-import { index, integer, pgEnum, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  index,
+  integer,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+} from 'drizzle-orm/pg-core';
 
 import { createdAt, foreignId, money, primaryId, timestamps } from './_shared.js';
 import { disputeStatus } from './enums.js';
@@ -163,9 +171,83 @@ export const disputeEvidence = pgTable(
     uploadedByUserId: foreignId('uploaded_by_user_id').references(() => users.id),
     /** Retired rather than destroyed — see the note above. Who did it is in the audit log. */
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
+
+    /**
+     * Whether the PARTNER may see this file — false unless somebody decided otherwise.
+     *
+     * Bashar, 2026-09-08: *«Do not expose customer-private files, photos or other evidence directly
+     * to the partner… If staff determine that a customer image or file is necessary for a fair
+     * resolution, then that should be an explicit staff decision and not the default behaviour.»*
+     *
+     * So the default is `false` and stays false until an operator chooses, and the choosing is
+     * audited as `dispute.evidence_shared`. A partner's OWN upload needs no flag — they filed it —
+     * which is why this is about VISIBILITY rather than about ownership.
+     *
+     * A CHECK in migrations/post ties this to `sharedAt`: a row claiming to be visible with no
+     * record of when it became visible is not a state this table should be able to hold.
+     */
+    sharedWithPartner: boolean('shared_with_partner').notNull().default(false),
+    sharedAt: timestamp('shared_at', { withTimezone: true }),
+    sharedByUserId: foreignId('shared_by_user_id').references(() => users.id),
+
     ...createdAt,
   },
   (t) => [index('dispute_evidence_dispute_idx').on(t.disputeId, t.createdAt)],
+);
+
+/**
+ * The partner's own account of a dispute — the other side SAFRA had never heard.
+ *
+ * Bashar, 2026-09-08: *«I want SAFRA to function as an adjudicator that hears both sides while
+ * still protecting customer privacy… I do not want SAFRA deciding disputes while only one side is
+ * able to participate in the process.»*
+ *
+ * ## Why a table rather than the dispute's conversation
+ *
+ * `conversations_exactly_one_subject_v2` is a CHECK: a row carrying `dispute_id` cannot also carry
+ * `partner_id`, so a dispute thread structurally cannot include the host — and that is the right
+ * shape, because the complainant's live messages are not something the host reads. The partner's
+ * side belongs in the CASE FILE the operator reads when deciding, which is what this is.
+ *
+ * ## Append-only, and the trigger is in migrations/post
+ *
+ * A record of a disagreement that can be edited after the fact is not a record. A partner adding
+ * something writes another response; the operator reads both, in order, which is what the index is
+ * for. `deny_mutation` raises rather than swallowing the write, so a bug that tries to rewrite one
+ * fails loudly.
+ *
+ * ## Bodies are stored REDACTED
+ *
+ * `redactContactDetails` runs before the insert, exactly as it does for every message body: a
+ * partner pasting a guest's phone number into their account of the night must not create a copy of
+ * it. The count of removed spans is DERIVED from the text at read time rather than stored, because
+ * a counter drifts from what the reader actually sees.
+ */
+export const disputeResponses = pgTable(
+  'dispute_responses',
+  {
+    id: primaryId(),
+    disputeId: foreignId('dispute_id')
+      .notNull()
+      .references(() => disputes.id),
+
+    /** Already redacted by the caller. Never the original. */
+    body: text('body').notNull(),
+
+    /**
+     * Who wrote it — required, unlike `disputeEvidence.uploadedByUserId`.
+     *
+     * A response only ever comes from a signed-in partner user, so there is no «the customer filed
+     * it» case to represent with a null. Making it required means «who said this» is always
+     * answerable, which is the whole value of the record.
+     */
+    submittedByUserId: foreignId('submitted_by_user_id')
+      .notNull()
+      .references(() => users.id),
+
+    ...createdAt,
+  },
+  (t) => [index('dispute_responses_dispute_idx').on(t.disputeId, t.createdAt)],
 );
 
 export const disputesRelations = relations(disputes, ({ one, many }) => ({

@@ -136,3 +136,21 @@ export interface DisputeSummary {
 export interface DisputeDetail extends DisputeSummary {
   readonly description: string | null;
 }
+
+/**
+ * A partner's written account of the night, as it arrives (Bashar, 2026-09-08).
+ *
+ * Bounded at both ends and for the same reasons every other body on this platform is: a response
+ * of two characters is not an account of anything, and one of ten thousand is a paste. Trimmed
+ * first, so whitespace cannot satisfy the minimum.
+ *
+ * `.strict()` because an unknown field here would most likely be somebody trying to set the author
+ * or the dispute — both of which come from the verified token and the path, never from a body.
+ */
+export const partnerDisputeResponseSchema = z
+  .object({
+    body: z.string().trim().min(10).max(4000),
+  })
+  .strict();
+
+export type PartnerDisputeResponseInput = z.infer<typeof partnerDisputeResponseSchema>;

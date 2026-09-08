@@ -77,6 +77,8 @@ export const PARTNER_EMPLOYEE_PERMISSIONS = [
   P.REVIEW_READ_OWN,
   P.REVIEW_RESPOND_OWN,
   P.VIOLATION_READ,
+  /* The night is the business's account to give; the frozen AMOUNT stays the owner's. */
+  P.DISPUTE_RESPOND_OWN,
 ] as const satisfies readonly Permission[];
 
 /** True when a permission may appear on a partner-employee role at all. */

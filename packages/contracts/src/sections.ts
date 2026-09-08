@@ -141,6 +141,14 @@ export const PARTNER_SECTION_PERMISSIONS = {
   reviews: P.REVIEW_READ_OWN,
   arrivals: P.BOOKING_CHECK_IN,
   violations: P.VIOLATION_READ,
+  /*
+    النزاعات — the disputes freezing this partner's money, and their side of them.
+
+    Beside المخالفات rather than inside مستحقاتي: a fine and a dispute are both charges against the
+    business that somebody has to answer, and a host looking for «why is my money held» reads them
+    together. The held AMOUNT still gates on `PAYOUT_READ_OWN` inside the screen.
+  */
+  disputes: P.DISPUTE_RESPOND_OWN,
   payouts: P.PAYOUT_READ_OWN,
   /*
     حسابات التحويل is a SUB-page of مستحقاتي and gates on a different capability, because the two

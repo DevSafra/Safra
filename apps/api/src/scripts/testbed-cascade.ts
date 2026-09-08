@@ -59,6 +59,8 @@ export const CASCADE_HANDLES = new Set<string>([
   'coupon_redemptions',
   'coupon_partners',
   'dispute_evidence',
+  /* The partner's account of a dispute — a pure child of `disputes`, deleted with it. */
+  'dispute_responses',
   'favourites',
   'gift_card_transactions',
   'ledger_entries',

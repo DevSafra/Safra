@@ -62,6 +62,14 @@ const SECTION_HANDLERS: Partial<
   coupons: [PartnerCouponsController, 'list', 'getMyCoupons'],
   employees: [PartnerEmployeesController, 'list', 'getMyEmployees'],
   employeeRoles: [PartnerEmployeeRolesController, 'list', 'getMyEmployeeRoles'],
+  /*
+    النزاعات — the partner's side of a dispute (Bashar, 2026-09-08).
+
+    On `DISPUTE_RESPOND_OWN`, deliberately not the staff `DISPUTE_READ`: one permission name meaning
+    «every dispute on the platform» for an operator and «mine» for a host is how a scope leak gets
+    written, and this assertion is what would let the two drift apart unnoticed.
+  */
+  disputes: [PartnerController, 'disputes', 'getMyDisputes'],
 };
 
 /**

@@ -6,6 +6,7 @@ import { AuthModule } from '../auth/auth.module.js';
 
 import { CalendarService } from './calendar.service.js';
 import { PartnerDashboardService } from './dashboard.service.js';
+import { PartnerDisputesService } from './partner-disputes.service.js';
 import { PartnerCouponsController } from './coupons.controller.js';
 import { PartnerCouponsService } from './partner-coupons.service.js';
 import { PartnerImagesController } from './images.controller.js';
@@ -65,6 +66,7 @@ import { PropertyImageService } from './property-images.service.js';
     PropertiesService,
     PropertyImageService,
     PartnerDashboardService,
+    PartnerDisputesService,
     CalendarService,
     PartnerApplicationService,
     PartnerContractReadService,
