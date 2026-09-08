@@ -1315,6 +1315,8 @@ const disputeDetailSchema = z.object({
       fileName: z.string(),
       kind: z.string(),
       uploadedAt: z.string(),
+      /* Whether there is a rendered picture yet. Not an address — the route is the same for all. */
+      rendered: z.boolean(),
       mine: z.boolean(),
     }),
   ),

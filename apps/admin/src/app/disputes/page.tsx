@@ -291,6 +291,60 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
               : ''}
           </p>
 
+          {/*
+            ── the OTHER side of it (Bashar, 2026-09-08) ─────────────────────
+
+            «I do not want SAFRA deciding disputes while only one side of the dispute has a voice in
+            the workflow.» The partner can answer since 223, and a response nobody reads is the same
+            as no response — so it sits here, between the allegation it answers and the decision
+            taken from it, on the screen where that decision is made.
+
+            When there is none and the case is still open, that is SAID rather than left as an
+            absence: closing a complaint the host has not answered should be a choice somebody makes
+            knowingly. `renderRedactions` because the bodies are stored redacted, exactly like the
+            customer's own account above.
+          */}
+          {dispute.partnerResponses.length > 0 ? (
+            <div
+              data-partner-responses={dispute.reference}
+              className="mt-2 rounded-card border border-line bg-field px-3 py-2"
+            >
+              <p className="text-[10.5px] font-semibold text-faint">
+                {t.sections.disputes.partnerResponses}
+              </p>
+              <ul className="mt-1 divide-y divide-line">
+                {dispute.partnerResponses.map((response) => (
+                  <li key={response.at} className="py-1.5 first:pt-0 last:pb-0">
+                    <p className="text-[11.5px] leading-relaxed whitespace-pre-line text-text2">
+                      {renderRedactions(response.body, 'ar')}
+                    </p>
+                    <Ltr className="mt-0.5 block text-[10px] text-faint2">
+                      {shortDateTime(response.at)}
+                    </Ltr>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : closed ? null : (
+            <p
+              data-partner-responses={dispute.reference}
+              /*
+                `text-muted`, not `text-faint2`.
+
+                Measured on the built console: `faint2` renders this at 2.31:1 in the light theme
+                and 2.15:1 in the dark one, against a 4.5:1 floor — it is the DECORATIVE step, for
+                ornament and notes nobody has to read. This sentence says the host has not answered
+                yet and that the decision waits on them, which is the one thing an operator must
+                read before closing a case they are about to decide one-sidedly. `muted` measures
+                7.01:1 and is the step the palette's own note calls «carries most secondary
+                reading».
+              */
+              className="mt-2 text-[11.5px] leading-relaxed text-muted"
+            >
+              {t.sections.disputes.partnerResponsesNone}
+            </p>
+          )}
+
           {/* The resolution, once closed. It is the whole point of requiring one. */}
           {dispute.resolution ? (
             <p className="mt-2 rounded-card border border-line bg-field px-3 py-2 text-[11.5px] leading-relaxed text-text2">

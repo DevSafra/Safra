@@ -4,6 +4,7 @@ import { getMyDispute, sidebarBadges } from '@/lib/api';
 import { requireVerifiedPartner, sectionAccess } from '@/lib/gate';
 import { Shell } from '@/components/shell';
 import { SectionRefusal } from '@/components/section-refusal';
+import { DisputeEvidence } from '@/components/dispute-evidence';
 import { DisputeResponse } from '@/components/dispute-response';
 import { Ltr } from '@/components/ltr';
 import { amount } from '@/lib/format';
@@ -181,20 +182,18 @@ export default async function DisputePage({
       <section className="rounded-card border border-line bg-card p-5">
         <h2 className="text-[13px] font-bold text-text">{t.disputes.evidence}</h2>
 
-        {dispute.evidence.length === 0 ? (
-          <p className="mt-1.5 text-[12.5px] text-faint">{t.disputes.evidenceNone}</p>
-        ) : (
-          <ul className="mt-2 grid gap-1.5">
-            {dispute.evidence.map((file) => (
-              <li key={file.id} className="text-[12.5px] text-text">
-                <Ltr>{file.fileName}</Ltr>{' '}
-                <span className="text-[11px] text-faint">
-                  · {file.mine ? t.disputes.evidenceMine : t.disputes.evidenceShared}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
+        {/*
+          The pictures themselves, and the control that adds one (finding 223, completed).
+
+          It was a list of FILE NAMES — «IMG_2841.jpg · مرفوع منك» — which is the least useful
+          rendering of a photograph there is, and there was no way to add one at all. A host asked
+          to answer «الغرفة لا تطابق الصور المنشورة» could write a paragraph and show nothing.
+        */}
+        <DisputeEvidence
+          reference={dispute.reference}
+          closed={closed}
+          evidence={dispute.evidence}
+        />
 
         {/*
           «There are files you have not seen», as a NUMBER.

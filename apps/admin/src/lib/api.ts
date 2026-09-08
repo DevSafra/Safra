@@ -2005,6 +2005,14 @@ const disputeItemSchema = z.object({
       sharedWithPartner: z.boolean(),
     }),
   ),
+  /*
+    The PARTNER's account of the night, oldest first (Bashar, 2026-09-08).
+
+    Not optional and not defaulted: `.default([])` would invent an empty list for a field the API
+    stopped sending, and «the partner never answered» is exactly the fact an operator must not be
+    told by accident. An array is always present — the query coalesces to `'[]'`.
+  */
+  partnerResponses: z.array(z.object({ body: z.string(), at: z.string() })),
   compensationAmount: z.string().nullable(),
   compensationCurrency: z.string().nullable(),
   resolution: z.string().nullable(),

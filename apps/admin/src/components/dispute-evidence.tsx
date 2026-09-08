@@ -70,6 +70,7 @@ export function DisputeEvidence({
   const [preview, setPreview] = useState<number | null>(null);
   const [replacing, setReplacing] = useState<string | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [sharing, setSharing] = useState<string | null>(null);
 
   const pending = evidence.filter((one) => !one.rendered).length;
 
@@ -156,6 +157,56 @@ export function DisputeEvidence({
       setError(t.errors.unreachable);
     } finally {
       setRemoving(null);
+    }
+  }
+
+  /**
+   * Releasing one customer file to the partner, or taking it back.
+   *
+   * ## Why it asks first, in both directions
+   *
+   * Sharing puts a guest's photograph in front of the business they complained about, which is a
+   * privacy decision rather than a click. Withholding takes away something the partner may already
+   * have built an answer around. Neither is destructive — the audit log holds both events either
+   * way — so `tone` stays default and the focus starts on the confirm.
+   *
+   * The dialog is `useConfirm()`, never the browser's: an operator must not meet a grey box
+   * captioned with this machine's hostname.
+   */
+  async function toggleShare(id: string, next: boolean): Promise<void> {
+    const go = await ask({
+      title: next ? c.evidenceShareTitle : c.evidenceUnshareTitle,
+      message: next ? c.evidenceShareMessage : c.evidenceUnshareMessage,
+      confirmLabel: next ? c.evidenceShareConfirm : c.evidenceUnshareConfirm,
+      cancelLabel: t.sections.dialog.cancel,
+    });
+
+    if (!go) return;
+
+    setSharing(id);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        `/api/disputes/evidence/${encodeURIComponent(id)}/share`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ shared: next }),
+        },
+      );
+
+      if (!response.ok) {
+        setError(apiErrorOf(await response.json().catch(() => null)));
+
+        return;
+      }
+
+      router.refresh();
+    } catch {
+      setError(t.errors.unreachable);
+    } finally {
+      setSharing(null);
     }
   }
 
@@ -268,7 +319,7 @@ export function DisputeEvidence({
                 title={one.fileName}
                 aria-label={c.evidenceOpen}
                 data-evidence={one.id}
-                className="block cursor-pointer"
+                className="relative block cursor-pointer"
               >
                 <img
                   src={fileHref(one.id)}
@@ -280,6 +331,23 @@ export function DisputeEvidence({
                       : 'border-[rgba(var(--skyA),0.5)]'
                   }`}
                 />
+                {/*
+                  «Who can see this?» is a property of the PICTURE, so it is written on the picture
+                  rather than inferred from a control's label underneath.
+
+                  An operator scanning eight thumbnails needs the answer without reading eight
+                  buttons — and the button says what pressing it would DO, which is the opposite
+                  state and therefore useless for reading the current one. White on a 0.66 scrim
+                  measures past 4.5:1 over any photograph, which a tinted text colour would not.
+                */}
+                {one.sharedWithPartner ? (
+                  <span
+                    data-evidence-shared={one.id}
+                    className="absolute inset-x-0 bottom-0 rounded-b-lg bg-[rgba(12,14,20,0.66)] px-1 py-[2px] text-center text-[9px] font-semibold text-white"
+                  >
+                    {c.evidenceSharedBadge}
+                  </span>
+                ) : null}
               </button>
 
               {closed ? null : (
@@ -305,6 +373,26 @@ export function DisputeEvidence({
                   >
                     {removing === one.id ? c.evidenceRemoving : c.evidenceRemove}
                   </button>
+                  {/*
+                    The partner's OWN photograph has no sharing decision to make — they filed it —
+                    so the control is absent rather than present and refusing. The API refuses it
+                    too, which is where the rule actually lives.
+                  */}
+                  {one.filedBy === 'partner' ? null : (
+                    <button
+                      type="button"
+                      disabled={busy || sharing !== null}
+                      data-evidence-share={one.id}
+                      onClick={() => void toggleShare(one.id, !one.sharedWithPartner)}
+                      className="cursor-pointer text-[10px] text-faint transition-colors hover:text-sky disabled:opacity-50"
+                    >
+                      {sharing === one.id
+                        ? c.evidenceSharing
+                        : one.sharedWithPartner
+                          ? c.evidenceUnshare
+                          : c.evidenceShare}
+                    </button>
+                  )}
                 </span>
               )}
             </span>
@@ -346,7 +434,28 @@ export function DisputeEvidence({
 
       {/* What «حذف» actually does, said before it is pressed rather than after. */}
       {closed || evidence.length === 0 ? null : (
-        <p className="mt-1.5 text-[10.5px] text-faint2">{c.evidenceRemoveNote}</p>
+        <>
+          <p className="mt-1.5 text-[10.5px] text-faint2">{c.evidenceRemoveNote}</p>
+          {/*
+            The DEFAULT stated where the decision is made.
+
+            «شارِك» beside a thumbnail does not say what the partner sees when nobody presses it,
+            and the whole privacy model is in that answer (Bashar, 2026-09-08). Shown only while
+            there is something shareable, so a file of the partner's own photographs does not carry
+            a note about customer privacy.
+          */}
+          {evidence.some((one) => one.filedBy !== 'partner') ? (
+            /*
+              `text-faint`, not `text-faint2`: this states the PRIVACY DEFAULT — that the guest's
+              files are not visible to the partner unless somebody releases one — and the whole
+              model is in that sentence. `faint2` is the decorative step and measures 2.3:1; this
+              is a sentence an operator has to be able to read before pressing «شارِك».
+            */
+            <p className="mt-1 text-[10.5px] leading-relaxed text-faint">
+              {c.evidenceShareNote}
+            </p>
+          ) : null}
+        </>
       )}
 
       {/*

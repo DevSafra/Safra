@@ -92,7 +92,16 @@ export default async function DisputesPage() {
               key={row.reference}
               className="rounded-card border border-line bg-card p-4 transition-colors hover:border-gold/50"
             >
-              <Link href={`/disputes/${row.reference}`} className="block">
+              {/*
+                Marked so the browser sweep finds a dispute row and nothing else — the same reason
+                the console marks its accounts and its status pills. A test that locates rows by
+                their shape passes against a page rendering something else in the same shape.
+              */}
+              <Link
+                href={`/disputes/${row.reference}`}
+                data-dispute={row.reference}
+                className="block"
+              >
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                   <span className="text-[14px] font-bold text-sky">
                     <Ltr>{row.reference}</Ltr>
