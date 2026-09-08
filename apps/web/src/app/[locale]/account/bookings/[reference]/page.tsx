@@ -187,9 +187,15 @@ export default async function BookingDetailPage({
           {t('nights', { count: booking.nights })}
         </Row>
         <Row label={t('bookingGuests')}>
+          {/*
+            NUMBERS, not `String(...)`. `Intl.PluralRules` classifies a number; handed a string it
+            has nothing numeric to look at, so every message silently resolves to `other` and reads
+            as the plural — «1 adults», «بالغ» for two. That failure leaves every test green, which
+            is why `nights` two rows above has always passed its count as a number.
+          */}
           {t('bookingGuestsValue', {
-            adults: String(booking.guestsAdults),
-            children: String(booking.guestsChildren ?? 0),
+            adults: booking.guestsAdults,
+            children: booking.guestsChildren ?? 0,
           })}
         </Row>
         {/*

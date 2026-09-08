@@ -11,8 +11,7 @@ import { Shell } from '@/components/shell';
 import { SectionRefusal } from '@/components/section-refusal';
 import { ArrivalActions } from '@/components/arrival-actions';
 import { Ltr } from '@/components/ltr';
-import { count } from '@/lib/format';
-import { fill, plural, t } from '@/lib/strings';
+import { plural, t } from '@/lib/strings';
 
 /**
  * الوصول اليوم — the desk screen (Bashar, 2026-08-23).
@@ -269,8 +268,8 @@ function Row({ arrival }: { arrival: PartnerArrival }) {
         <div className="grid justify-items-end gap-0.5 text-[13px] text-muted">
           <Ltr>{arrival.checkIn}</Ltr>
           <span>
-            {fill(t.arrivals.nights, { n: count(arrival.nights) })} ·{' '}
-            {fill(t.arrivals.guests, { n: count(arrival.guests) })}
+            {plural(t.arrivals.nights, { n: arrival.nights })} ·{' '}
+            {plural(t.arrivals.guests, { n: arrival.guests })}
           </span>
           {overdue ? <span className="text-warn">{t.arrivals.overdue}</span> : null}
         </div>

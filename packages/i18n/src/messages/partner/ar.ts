@@ -550,8 +550,10 @@ export const ar = {
     durationMinutes:
       '{count, plural, zero {أقل من دقيقة} one {دقيقة} two {دقيقتين} few {# دقائق} many {# دقيقة} other {# دقيقة}}',
     requestsEmpty: 'لا طلبات بانتظار ردك.',
-    requestsNights: '{n} ليلة',
-    requestsGuests: '{n} ضيف',
+    requestsNights:
+      '{n, plural, zero {لا ليالٍ} one {ليلة واحدة} two {ليلتان} few {# ليالٍ} many {# ليلة} other {# ليلة}}',
+    requestsGuests:
+      '{n, plural, zero {لا ضيوف} one {ضيف واحد} two {ضيفان} few {# ضيوف} many {# ضيفًا} other {# ضيف}}',
     requestsLeft: 'متبقٍ {time}',
     requestsOverdue: 'انتهت المهلة',
     requestsNoDeadline: 'بلا مهلة مسجّلة',
@@ -1782,8 +1784,10 @@ export const ar = {
     loadFailed: 'تعذّر تحميل قائمة الوصول.',
     loadMore: 'عرض المزيد',
 
-    nights: '{n} ليالٍ',
-    guests: '{n} ضيوف',
+    nights:
+      '{n, plural, zero {لا ليالٍ} one {ليلة واحدة} two {ليلتان} few {# ليالٍ} many {# ليلة} other {# ليلة}}',
+    guests:
+      '{n, plural, zero {لا ضيوف} one {ضيف واحد} two {ضيفان} few {# ضيوف} many {# ضيفًا} other {# ضيف}}',
     /* Said on the row, not in a tooltip: a date that has passed is the reader's cue to check. */
     overdue: 'موعده سابق',
 

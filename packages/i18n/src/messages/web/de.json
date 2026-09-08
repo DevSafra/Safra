@@ -450,7 +450,7 @@
     "bookingStatusLabel": "Status",
     "bookingStay": "Aufenthalt",
     "bookingGuests": "Gäste",
-    "bookingGuestsValue": "{adults} Erwachsene · {children} Kinder",
+    "bookingGuestsValue": "{adults, plural, one {1 Erwachsener} other {# Erwachsene}}{children, plural, =0 {} one { · 1 Kind} other { · # Kinder}}",
     "bookingTotal": "Gezahlter Gesamtbetrag",
     "bookingPlaced": "Gebucht am",
     "bookingDeadline": "Partner antwortet bis",

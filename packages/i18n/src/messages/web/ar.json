@@ -450,7 +450,7 @@
     "bookingStatusLabel": "الحالة",
     "bookingStay": "فترة الإقامة",
     "bookingGuests": "الضيوف",
-    "bookingGuestsValue": "{adults} بالغ · {children} طفل",
+    "bookingGuestsValue": "{adults, plural, one {بالغ واحد} two {بالغان} few {# بالغين} many {# بالغًا} other {# بالغ}}{children, plural, =0 {} one { · طفل واحد} two { · طفلان} few { · # أطفال} many { · # طفلًا} other { · # طفل}}",
     "bookingTotal": "الإجمالي المدفوع",
     "bookingPlaced": "تاريخ الحجز",
     "bookingDeadline": "مهلة رد الشريك تنتهي",

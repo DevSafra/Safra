@@ -344,8 +344,8 @@ function Requests({
                       </span>
                     ) : null}{' '}
                     · {request.checkIn} ← {request.checkOut} ·{' '}
-                    {fill(t.dashboard.requestsNights, { n: count(request.nights) })} ·{' '}
-                    {fill(t.dashboard.requestsGuests, { n: count(request.guests) })}
+                    {plural(t.dashboard.requestsNights, { n: request.nights })} ·{' '}
+                    {plural(t.dashboard.requestsGuests, { n: request.guests })}
                   </p>
                 </div>
 
