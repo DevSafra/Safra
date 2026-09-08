@@ -181,13 +181,17 @@ test('215: a booking reaches the partner queue', async ({ browser }) => {
     await page.locator('#field-phone').fill('944100500');
     await page.locator('form button[type="submit"]').first().click();
 
-    await page.waitForURL(/remittance=|\/booking\//, { timeout: 30_000 });
+    /*
+      The reference comes from the LANDING PATH now, not from a remittance query.
 
-    reference = /SAFRA-(BKG-\d{4}-\d+)/.exec(page.url())?.[1] ?? '';
-    expect(
-      reference,
-      'the booking was created and its transfer reference minted',
-    ).toMatch(/^BKG-/);
+      Bashar removed the manual bank-transfer flow from the customer journey on 2026-09-08, so
+      checkout no longer follows an offline rail's redirect to transfer instructions — it lands on
+      the booking's own page, which is the shape a real provider will return to as well.
+    */
+    await page.waitForURL(/\/booking\/BKG-/, { timeout: 30_000 });
+
+    reference = /\/booking\/(BKG-\d{4}-\d+)/.exec(page.url())?.[1] ?? '';
+    expect(reference, 'the booking was created and its page reached').toMatch(/^BKG-/);
   } finally {
     await guest.close();
   }
