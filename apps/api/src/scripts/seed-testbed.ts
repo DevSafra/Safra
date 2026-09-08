@@ -653,6 +653,135 @@ function starRatingFor(slug: string): number {
   return (hash % 5) + 1;
 }
 
+/**
+ * Three fixture photographs, UPLOADED rather than borrowed.
+ *
+ * ## Why borrowing stopped working
+ *
+ * This step used to take a `file_key` off a surviving `property_images` row and point the fixture
+ * listings at it, on the reasoning that a key from a real row must have an object behind it. **A
+ * row can outlive its object.** On 2026-09-08 the borrowed key was `properties/PRO-002059/img-1`,
+ * which the database held and the bucket did not, so every fixture listing got rows whose images
+ * 404 — the exact outcome the old comment said borrowing existed to avoid — and NINE
+ * `image-preview` tests skipped themselves with «the media bucket holds no property photographs».
+ * A skip is not a pass, and nine of them is a hole in the one suite that can see a rendered gallery.
+ *
+ * So the objects are written. Three DISTINGUISHABLE ones, because six of those tests move BETWEEN
+ * pictures — arrows, chevrons, the rail, panning — and three copies of one photograph give them
+ * nothing to move between. They are generated rather than committed: a binary fixture in the repo
+ * is a thing that rots silently, and `sharp` is already a dependency of the media pipeline.
+ *
+ * Idempotent by key: a re-run overwrites the same three objects rather than growing the bucket.
+ */
+const FIXTURE_IMAGE_KEYS = [
+  'testbed/fixture-photograph-1',
+  'testbed/fixture-photograph-2',
+  'testbed/fixture-photograph-3',
+] as const;
+
+const FIXTURE_IMAGE_SIZE = { width: 1600, height: 1067 };
+
+/**
+ * The VARIANTS, because nothing ever asks for the original.
+ *
+ * `ImageService.publicUrl` composes `{fileKey}-{width}.{format}`, so a browser asks for
+ * `…/img-1-1600.avif` and never for `img-1`. Uploading only the source produced three objects the
+ * platform had no way to request — the same blank gallery, one layer further in. The widths are the
+ * ones the property page and the previewer actually use, and both formats are written because the
+ * markup offers AVIF with a WebP fallback.
+ */
+const FIXTURE_VARIANT_WIDTHS = [400, 800, 1600];
+
+/** Uploads the three, and answers with the rows to write. Empty when storage is not configured. */
+async function seedFixturePhotographs(): Promise<
+  { fileKey: string; width: number; height: number; variantWidths: number[] }[]
+> {
+  const bucket = process.env['S3_BUCKET'];
+  const endpoint = process.env['S3_ENDPOINT'];
+
+  if (!bucket || !endpoint) {
+    console.warn(
+      '  no S3_BUCKET/S3_ENDPOINT: fixture photographs not uploaded, and image specs will skip.',
+    );
+
+    return [];
+  }
+
+  const { PutObjectCommand, S3Client } = await import('@aws-sdk/client-s3');
+  const sharp = (await import('sharp')).default;
+
+  const client = new S3Client({
+    region: process.env['S3_REGION'] ?? 'auto',
+    forcePathStyle: true,
+    endpoint,
+    credentials: {
+      accessKeyId: process.env['S3_ACCESS_KEY_ID'] ?? '',
+      secretAccessKey: process.env['S3_SECRET_ACCESS_KEY'] ?? '',
+    },
+  });
+
+  /* Three grounds a person could tell apart at a glance, which is what the rail tests need. */
+  const grounds = [
+    { r: 32, g: 28, b: 70 },
+    { r: 168, g: 122, b: 31 },
+    { r: 30, g: 110, b: 96 },
+  ];
+
+  const written: {
+    fileKey: string;
+    width: number;
+    height: number;
+    variantWidths: number[];
+  }[] = [];
+
+  let objects = 0;
+
+  for (const [index, key] of FIXTURE_IMAGE_KEYS.entries()) {
+    const ground = grounds[index] ?? grounds[0]!;
+
+    for (const width of FIXTURE_VARIANT_WIDTHS) {
+      const height = Math.round(
+        (width * FIXTURE_IMAGE_SIZE.height) / FIXTURE_IMAGE_SIZE.width,
+      );
+      const source = sharp({
+        create: { width, height, channels: 3, background: ground },
+      });
+
+      for (const format of ['avif', 'webp'] as const) {
+        const body =
+          format === 'avif'
+            ? await source.clone().avif({ quality: 50 }).toBuffer()
+            : await source.clone().webp({ quality: 70 }).toBuffer();
+
+        await client.send(
+          new PutObjectCommand({
+            Bucket: bucket,
+            Key: `${key}-${String(width)}.${format}`,
+            Body: body,
+            ContentType: `image/${format}`,
+          }),
+        );
+
+        objects += 1;
+      }
+    }
+
+    written.push({
+      fileKey: key,
+      width: FIXTURE_IMAGE_SIZE.width,
+      height: FIXTURE_IMAGE_SIZE.height,
+      variantWidths: FIXTURE_VARIANT_WIDTHS,
+    });
+  }
+
+  console.log(
+    `  uploaded ${String(objects)} fixture image objects ` +
+      `(${String(written.length)} photographs × ${String(FIXTURE_VARIANT_WIDTHS.length)} widths × 2 formats).`,
+  );
+
+  return written;
+}
+
 async function main(): Promise<void> {
   const databaseUrl = process.env['DATABASE_URL'];
 
@@ -786,19 +915,17 @@ async function build(db: Seeder): Promise<void> {
     against three copies of one photograph there is nothing to move between. A gallery of identical
     images is not a gallery.
   */
-  const borrowedImages = await db
-    .select({
-      fileKey: schema.propertyImages.fileKey,
-      width: schema.propertyImages.width,
-      height: schema.propertyImages.height,
-      variantWidths: schema.propertyImages.variantWidths,
-    })
-    .from(schema.propertyImages)
-    .limit(3);
+  /*
+    The fixture photographs, uploaded so the keys are GUARANTEED rather than assumed.
+
+    This read three `file_key`s off surviving rows and reused them. See `seedFixturePhotographs`
+    for why that stopped being safe: a row outlives its object, and the borrowed key 404'd.
+  */
+  const borrowedImages = await seedFixturePhotographs();
 
   if (borrowedImages.length === 0) {
     console.warn(
-      '  no photograph to borrow: fixture listings will have none, and image specs will skip.',
+      '  no photograph to write: fixture listings will have none, and image specs will skip.',
     );
   }
 
