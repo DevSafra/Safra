@@ -1,6 +1,7 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
 import { MISSING_CREDENTIALS, SKIP_REASON } from './staff.js';
+import { checkoutSubmit } from './checkout-submit.js';
 
 /**
  * The whole accommodation journey, on a hotel with real inventory.
@@ -124,7 +125,7 @@ async function book(
     (r) => r.url().includes('/api/bookings') && r.request().method() === 'POST',
   );
 
-  await page.getByRole('button', { name: 'تابع إلى الدفع' }).click();
+  await checkoutSubmit(page).click();
 
   const response = await created;
 

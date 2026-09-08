@@ -2,6 +2,8 @@ import { expect, test } from '@playwright/test';
 
 import { PARTNER_BASE, PARTNER_STATE } from './partner-session.js';
 import { STAFF_STATE } from './staff.js';
+import { checkoutSubmit } from './checkout-submit.js';
+import { acceptConfirm } from './confirm.js';
 
 const MAILPIT = 'http://localhost:8025';
 
@@ -91,7 +93,7 @@ test('a guest books three identical rooms', async ({ page }) => {
     (r) => r.url().includes('/api/bookings') && r.request().method() === 'POST',
   );
 
-  await page.getByRole('button', { name: 'تابع إلى الدفع' }).click();
+  await checkoutSubmit(page).click();
 
   const body = (await (await created).json()) as { reference: string };
 
@@ -149,11 +151,7 @@ test('finance captures the money and the partner accepts three rooms', async ({
     await expect(capture, 'finance can confirm the money arrived').toBeVisible();
     await capture.click();
 
-    const dialog = console_.getByRole('alertdialog');
-
-    if (await dialog.isVisible().catch(() => false)) {
-      await dialog.getByRole('button', { name: 'تأكيد' }).click();
-    }
+    await acceptConfirm(console_);
 
     await expect(
       console_.locator('[data-status-pill]').first(),
@@ -191,13 +189,29 @@ test('finance captures the money and the partner accepts three rooms', async ({
     const card = portal.locator('li', { hasText: reference }).first();
     const accept = card.getByRole('button', { name: 'قبول', exact: true });
 
-    await accept.click();
+    /*
+      Registered BEFORE the click, which is the whole point of `waitForResponse`.
 
+      It was after: `await accept.click()` and then the listener. A response that came back before
+      the listener existed was never seen, so the wait ran to the test's timeout on a decision the
+      partner had in fact made — and the failure named `waitForResponse`, which reads like a slow
+      API and was a spec listening after the event. The booking POST forty lines up had the order
+      right all along, which is what made the difference invisible.
+    */
     const accepted = portal.waitForResponse(
       (r) => r.url().includes('/decision') && r.request().method() === 'POST',
     );
 
     await accept.click();
+
+    /*
+      The partner is ASKED before the decision posts — `booking-decision.tsx` names the
+      nights and the money accepting commits them to. Without this the click only opened
+      the popup and the wait above sat on a request the dialog was still holding, which
+      read as `waitForResponse` timing out on a healthy API.
+    */
+    await acceptConfirm(portal);
+
     expect((await accepted).status(), 'the partner accepted').toBeLessThan(300);
   } finally {
     await partner.close();

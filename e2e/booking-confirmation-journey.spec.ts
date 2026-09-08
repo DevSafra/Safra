@@ -2,6 +2,9 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { PARTNER_BASE, PARTNER_STATE } from './partner-session.js';
 import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
+import { checkoutSubmit } from './checkout-submit.js';
+import { acceptConfirm } from './confirm.js';
+import { partnerAr as partnerCopy } from '../packages/i18n/src/partner.js';
 
 /**
  * From «تابع إلى الدفع» to a voucher, on a hotel with thirteen rooms.
@@ -84,7 +87,7 @@ async function bookTheSuite(page: Page): Promise<string> {
     (r) => r.url().includes('/api/bookings') && r.request().method() === 'POST',
   );
 
-  await page.getByRole('button', { name: 'تابع إلى الدفع' }).click();
+  await checkoutSubmit(page).click();
 
   const response = await created;
 
@@ -136,11 +139,7 @@ test('a chosen room survives capture, acceptance, the email, the voucher and the
     await expect(capture, 'finance can confirm the money arrived').toBeVisible();
     await capture.click();
 
-    const dialog = console_.getByRole('alertdialog');
-
-    if (await dialog.isVisible().catch(() => false)) {
-      await dialog.getByRole('button', { name: 'تأكيد' }).click();
-    }
+    await acceptConfirm(console_);
 
     await expect(
       console_.locator('[data-status-pill]').first(),
@@ -187,18 +186,50 @@ test('a chosen room survives capture, acceptance, the email, the voucher and the
     */
     const accept = card.getByRole('button', { name: 'قبول', exact: true });
 
-    await accept.click();
+    /*
+      Registered BEFORE the click, which is the whole point of `waitForResponse`.
 
+      It was after: `await accept.click()` and then the listener. A response that came back before
+      the listener existed was never seen, so the wait ran to the test's timeout on a decision the
+      partner had in fact made — and the failure named `waitForResponse`, which reads like a slow
+      API and was a spec listening after the event. The booking POST forty lines up had the order
+      right all along, which is what made the difference invisible.
+    */
     const accepted = portal.waitForResponse(
       (r) => r.url().includes('/decision') && r.request().method() === 'POST',
     );
 
     await accept.click();
+
+    /*
+      The partner is ASKED before the decision posts — `booking-decision.tsx` names the
+      nights and the money accepting commits them to. Without this the click only opened
+      the popup and the wait above sat on a request the dialog was still holding, which
+      read as `waitForResponse` timing out on a healthy API.
+    */
+    await acceptConfirm(portal);
+
     expect((await accepted).status(), 'the partner accepted it').toBeLessThan(300);
 
-    await expect(queue, 'the request leaves the queue once accepted').not.toContainText(
-      reference,
+    /*
+      The row SAYS what was decided; it does not vanish.
+
+      This asserted the reference had LEFT the queue, and that is the behaviour Bashar asked to be
+      removed. 2026-09-07: «I want the action to be extremely clear and difficult to misunderstand.
+      The user should always know whether the booking has actually been accepted or not.»
+      `router.refresh()` used to drop the request the moment it was answered, and «it disappeared»
+      reads exactly like «the deadline passed» — so `booking-decision.tsx` now states the outcome in
+      place and leaves the queue alone until the partner navigates.
+
+      So the assertion was testing for the defect. What it should hold is the promise the design
+      makes: the partner is told, on the row, that the booking is accepted.
+    */
+    await expect(card, 'the row states that it was accepted').toContainText(
+      partnerCopy.dashboard.accepted,
       { timeout: 20_000 },
+    );
+    await expect(card, 'and says what happens next').toContainText(
+      partnerCopy.dashboard.acceptedNote,
     );
   } finally {
     await partner.close();
