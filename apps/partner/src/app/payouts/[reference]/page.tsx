@@ -188,7 +188,7 @@ export default async function PayoutPage({
                       the far side of the amount and it reads as a dash between two words.
                     */}
                     {Number(booking.refunded) > 0 ? (
-                      <span className="text-[13px] text-muted">
+                      <span className="text-[14px] text-muted">
                         <Ltr>−{amount(booking.refunded, payout.currencyCode)}</Ltr>{' '}
                         {t.payouts.refundedToGuest}
                       </span>

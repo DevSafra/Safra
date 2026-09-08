@@ -304,7 +304,7 @@ export default async function BookingPage({
           (Bashar, 2026-08-06). `rate()` drops trailing zeros without ROUNDING, because these two
           numbers have to multiply out by hand for the booking to reconcile.
         */}
-        <p className="mt-3 text-xs text-faint">
+        <p className="mt-3 text-sm text-faint">
           {fill(t.sections.bookingDetail.fxSnapshot, {
             amount: money(booking.money.totalSyp),
             rate: rate(booking.money.fxRateToSyp),

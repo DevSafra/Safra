@@ -593,7 +593,7 @@ function Withheld({
             className="grid gap-1 rounded-lg border border-line2 bg-card p-3 text-[13px]"
           >
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <Ltr className="font-mono text-[13px] text-text2">{row.reference}</Ltr>
+              <Ltr className="font-mono text-[14px] text-text2">{row.reference}</Ltr>
               <span className="ms-auto font-bold tabular-nums text-text">
                 {amount(row.amount, row.currencyCode)}
               </span>
@@ -756,7 +756,7 @@ function Card({ payout }: { readonly payout: PartnerPayout }) {
         </span>
 
         {fined ? (
-          <span className="text-[13px] text-faint">
+          <span className="text-[14px] text-faint">
             {fill(t.payouts.afterFine, {
               gross: amount(payout.grossAmount, payout.currencyCode),
               fine: amount(payout.fineAmount, payout.currencyCode),
@@ -773,7 +773,7 @@ function Card({ payout }: { readonly payout: PartnerPayout }) {
           so here from the start — and only when it is not zero, because «ناقص 0» is noise.
         */}
         {recovered ? (
-          <span className="text-[13px] text-faint">
+          <span className="text-[14px] text-faint">
             {fill(t.payouts.afterRecovery, {
               gross: amount(payout.grossAmount, payout.currencyCode),
               recovery: amount(payout.recoveryAmount, payout.currencyCode),

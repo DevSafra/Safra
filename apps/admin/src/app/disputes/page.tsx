@@ -244,7 +244,7 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
                   default. A JOD stay and a USD stay differ by a factor a reader cannot infer.
                 */}
                 {dispute.frozenAmount && dispute.frozenCurrency ? (
-                  <Ltr className="text-[13px] font-bold text-indigo">
+                  <Ltr className="text-[14px] font-bold text-indigo">
                     {amount(dispute.frozenAmount, dispute.frozenCurrency)}
                   </Ltr>
                 ) : null}
