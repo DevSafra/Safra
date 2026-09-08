@@ -140,9 +140,18 @@ test.describe('بطاقات الهدايا', () => {
     */
     await page.goto('/en/account/gifts', { waitUntil: 'domcontentloaded' });
 
-    const hint = await page.locator('main').innerText();
+    /*
+      The bidi ISOLATES are stripped first, and that is why this read used to return -1.
+
+      A Latin amount on an Arabic line is wrapped by `ltrIsolate` in U+2066 … U+2069, so the
+      rendered text is «available to spend: ⁦$20.00⁩» with an invisible character between the colon
+      and the dollar. The regex asked for `: \$` and could never match it. The wallet panel's own
+      read three assertions up is `/\$([\d,]+\.\d{2})/` with no prefix, which is why it worked and
+      this did not — the same page, the same amounts, one regex anchored to punctuation.
+    */
+    const hint = (await page.locator('main').innerText()).replace(/[\u2066-\u2069]/g, '');
     const spendable = Number(
-      hint.match(/available to spend: \$([\d,]+\.\d{2})/)?.[1]?.replace(/,/g, '') ?? -1,
+      hint.match(/available to spend:\s*\$([\d,]+\.\d{2})/)?.[1]?.replace(/,/g, '') ?? -1,
     );
 
     expect(
