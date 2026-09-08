@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createRollbackDatabase, type Database } from '@safra/db';
 
-import { JobRunService } from '../common/jobs/job-run.service.js';
+import { unlockedJobRuns } from '../common/jobs/job-run.testing.js';
 import { StayCompletionService } from './stay-completion.service.js';
 
 /**
@@ -28,7 +28,7 @@ const describeIfDb = DATABASE_URL ? describe : describe.skip;
 describeIfDb('ending a stay that has departed', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   const db: Database = harness.db;
-  const stays = new StayCompletionService(db, new JobRunService(db));
+  const stays = new StayCompletionService(db, unlockedJobRuns(db));
 
   let departed = '';
   let staying = '';

@@ -7,7 +7,7 @@ import type { FxRateService } from '../fx/fx-rate.service.js';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
-import { JobRunService } from '../common/jobs/job-run.service.js';
+import { unlockedJobRuns } from '../common/jobs/job-run.testing.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { ManualTransferProvider } from './providers/manual-transfer.provider.js';
 import { PaymentProviderRegistry } from './providers/provider.registry.js';
@@ -91,7 +91,7 @@ describeIfDb('the system refund sweep', () => {
     } as unknown as NotificationService,
     { APP_URL: 'https://safra.test' } as never,
   );
-  const sweep = new SystemRefundService(db, refunds, new JobRunService(db));
+  const sweep = new SystemRefundService(db, refunds, unlockedJobRuns(db));
 
   /** Every notice the stub above was asked to send, so «told nobody» is visible. */
   const sent: number[] = [];

@@ -34,7 +34,7 @@ import type { AccessTokenClaims } from '../auth/token.service.js';
 import type { AuditService } from '../common/audit/audit.service.js';
 import type { FxRateService } from '../fx/fx-rate.service.js';
 import type { SettingsService } from '../settings/settings.service.js';
-import { JobRunService } from '../common/jobs/job-run.service.js';
+import { unlockedJobRuns } from '../common/jobs/job-run.testing.js';
 import { InternalCaptureProvider } from './providers/internal-capture.provider.js';
 
 /**
@@ -191,7 +191,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
       new MoneySettingsService(settings, fx),
       ledger,
       wallet,
-      new JobRunService(db),
+      unlockedJobRuns(db),
       /* The real one, whose transport this suite already captures — §6.4's cancellation notice. */
       notifications,
       { APP_URL: 'https://safra.test' } as never,

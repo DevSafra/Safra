@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createRollbackDatabase, type Database } from '@safra/db';
 
-import { JobRunService } from '../common/jobs/job-run.service.js';
+import { unlockedJobRuns } from '../common/jobs/job-run.testing.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { MoneySettingsService } from '../settings/money-settings.service.js';
 import { SettingsService } from '../settings/settings.service.js';
@@ -80,7 +80,7 @@ describeIfDb('the confirmation window lapsing', () => {
     new MoneySettingsService(new SettingsService(db), fx),
     new LedgerService(db),
     new WalletService(db, fx),
-    new JobRunService(db),
+    unlockedJobRuns(db),
     notifications,
     { APP_URL: 'https://safra.test' } as never,
   );

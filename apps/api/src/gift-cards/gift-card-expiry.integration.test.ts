@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { GiftCardExpiryService } from './gift-card-expiry.service.js';
-import { JobRunService } from '../common/jobs/job-run.service.js';
+import { unlockedJobRuns } from '../common/jobs/job-run.testing.js';
 import { PromotionsService } from '../admin/promotions.service.js';
 
 /**
@@ -33,7 +33,7 @@ const describeIfDb = DATABASE_URL ? describe : describe.skip;
 describeIfDb('a gift card past its expiry', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   const db: Database = harness.db;
-  const expiry = new GiftCardExpiryService(db, new JobRunService(db));
+  const expiry = new GiftCardExpiryService(db, unlockedJobRuns(db));
   const promotions = new PromotionsService(db);
 
   beforeEach(() => harness.begin());

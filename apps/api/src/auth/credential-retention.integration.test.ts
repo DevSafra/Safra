@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { CredentialRetentionService } from './credential-retention.service.js';
-import { JobRunService } from '../common/jobs/job-run.service.js';
+import { unlockedJobRuns } from '../common/jobs/job-run.testing.js';
 
 /**
  * The nightly sweep of dead credentials, against a REAL PostgreSQL (`O-sec-6`, `O-sec-11`).
@@ -28,7 +28,7 @@ describeIfDb('CredentialRetentionService', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   /* Every row this suite writes is discarded when the test that wrote it ends. */
   const db: Database = harness.db;
-  const service = new CredentialRetentionService(db, new JobRunService(db));
+  const service = new CredentialRetentionService(db, unlockedJobRuns(db));
 
   let userId = '';
 
