@@ -4168,6 +4168,8 @@ export const ar = {
      * the payload at all is that a dispute can turn on which fine was applied.
      */
     payloadKey: {
+      /* كم بيانات تواصل حُجبت من ردّ الشريك على نزاع — العدد لا المحتوى. */
+      redactedCount: 'بيانات تواصل محجوبة',
       /* How many identical rooms a partner asked for when adding a room type. */
       quantity: 'العدد',
       reason: 'السبب',
