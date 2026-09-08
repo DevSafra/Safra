@@ -103,7 +103,7 @@ export function AdminTable<T>({
   readonly empty: string;
 }) {
   if (rows.length === 0) {
-    return <p className="py-2 text-[12.5px] text-faint">{empty}</p>;
+    return <p className="py-2 text-[14px] text-faint">{empty}</p>;
   }
 
   const cols = widths(template);
@@ -116,7 +116,7 @@ export function AdminTable<T>({
     */
     <div className="overflow-x-auto">
       <table
-        className="w-full table-fixed border-collapse text-[12.5px]"
+        className="w-full table-fixed border-collapse text-[14px]"
         style={{ minWidth: `${minWidth}px` }}
       >
         <colgroup>
@@ -131,7 +131,7 @@ export function AdminTable<T>({
               <th
                 key={column.key}
                 scope="col"
-                className={`border-b border-line px-2.5 py-2 text-[11px] font-bold text-faint ${
+                className={`border-b border-line px-2.5 py-2 text-[12px] font-bold text-faint ${
                   column.align === 'center' ? 'text-center' : 'text-start'
                 }`}
               >
@@ -200,7 +200,7 @@ const TONES: Record<Tone, string> = {
   indigo: 'text-indigo border-indigo',
   /** Pending confirmation. Purple, never gold — handoff §1 and §14. */
   pend: 'text-pend border-pend',
-  gold: 'text-gold border-gold',
+  gold: 'text-gold-read border-gold',
   warn: 'text-warn border-warn',
   orange: 'text-orange border-orange',
   bad: 'text-bad border-bad',
@@ -241,7 +241,7 @@ export function StatusPill({ tone, children }: { tone: Tone; children: ReactNode
         every status looks the same; a rule that has to be remembered at each of the nineteen
         sections is one that will be forgotten at the twentieth.
       */
-      className={`inline-block w-fit whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[10.5px] font-bold ${TONES[tone]}`}
+      className={`inline-block w-fit whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[13px] font-bold ${TONES[tone]}`}
     >
       {children}
     </span>
@@ -268,7 +268,7 @@ export function StatusPill({ tone, children }: { tone: Tone; children: ReactNode
 export function Chip({ tone, children }: { tone: Tone; children: ReactNode }) {
   return (
     <span
-      className={`inline-block w-fit whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-bold ${TONES[tone]}`}
+      className={`inline-block w-fit whitespace-nowrap rounded-full border px-2 py-0.5 text-[13px] font-bold ${TONES[tone]}`}
     >
       {children}
     </span>
@@ -278,7 +278,7 @@ export function Chip({ tone, children }: { tone: Tone; children: ReactNode }) {
 /** Coloured text without the pill, for the design's النوع and الدور columns. */
 export function ToneText({ tone, children }: { tone: Tone; children: ReactNode }) {
   return (
-    <span className={`text-[11.5px] font-bold ${TONES[tone].split(' ')[0]}`}>
+    <span className={`text-[13px] font-bold ${TONES[tone].split(' ')[0]}`}>
       {children}
     </span>
   );
@@ -313,5 +313,5 @@ export function Ltr({
  * dispute freezes a payout. The handoff spells each one out and they are quoted verbatim.
  */
 export function FootNote({ children }: { children: ReactNode }) {
-  return <p className="mt-3 text-[11px] leading-relaxed text-faint">{children}</p>;
+  return <p className="mt-3 text-[14px] leading-relaxed text-faint">{children}</p>;
 }

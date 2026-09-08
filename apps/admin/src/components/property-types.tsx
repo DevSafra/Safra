@@ -73,14 +73,14 @@ export function PropertyTypes({ types }: { types: readonly PropertyType[] }) {
               Nobody loses anything. The code matters when ADDING one, and a collision there is
               answered by «هذا المعرّف مستخدم بالفعل لنوع إقامة آخر» rather than by scanning a list.
             */}
-            <span className="min-w-0 text-[13px] text-text">
+            <span className="min-w-0 text-[14px] text-text">
               {type.nameAr}
               {type.isActive ? null : (
-                <span className="ms-2 text-[11px] text-faint">{copy.retired}</span>
+                <span className="ms-2 text-[13px] text-faint">{copy.retired}</span>
               )}
             </span>
 
-            <span className="flex items-center gap-3 text-[11px] text-muted">
+            <span className="flex items-center gap-3 text-[13px] text-muted">
               {fill(copy.inUse, { n: String(type.inUse) })}
               <button
                 type="button"
@@ -144,7 +144,7 @@ export function PropertyTypes({ types }: { types: readonly PropertyType[] }) {
             <Field name="nameDe" label={copy.nameDe} disabled={busy} />
           </div>
 
-          <label className="flex items-center gap-2 text-[12px] text-muted">
+          <label className="flex items-center gap-2 text-[13px] text-muted">
             <input
               type="checkbox"
               name="hasMultipleUnits"
@@ -158,7 +158,7 @@ export function PropertyTypes({ types }: { types: readonly PropertyType[] }) {
             <button
               type="submit"
               disabled={busy}
-              className="min-h-10 cursor-pointer rounded-lg border border-line px-4 text-[12.5px] text-text disabled:cursor-not-allowed lg:min-h-0"
+              className="min-h-10 cursor-pointer rounded-lg border border-line px-4 text-[14px] text-text disabled:cursor-not-allowed lg:min-h-0"
             >
               {busy ? copy.saving : copy.save}
             </button>
@@ -166,7 +166,7 @@ export function PropertyTypes({ types }: { types: readonly PropertyType[] }) {
               type="button"
               disabled={busy}
               onClick={() => setOpen(false)}
-              className="min-h-10 cursor-pointer px-3 text-[12.5px] text-muted lg:min-h-0"
+              className="min-h-10 cursor-pointer px-3 text-[14px] text-muted lg:min-h-0"
             >
               {copy.cancel}
             </button>
@@ -176,14 +176,14 @@ export function PropertyTypes({ types }: { types: readonly PropertyType[] }) {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="min-h-10 w-fit cursor-pointer rounded-lg border border-line px-4 text-[12.5px] text-text lg:min-h-0"
+          className="min-h-10 w-fit cursor-pointer rounded-lg border border-line px-4 text-[14px] text-text lg:min-h-0"
         >
           {copy.add}
         </button>
       )}
 
       {error ? (
-        <p role="alert" className="text-[12px] text-bad">
+        <p role="alert" className="text-[13px] text-bad">
           {error}
         </p>
       ) : null}
@@ -203,7 +203,7 @@ function Field({
   disabled: boolean;
 }) {
   return (
-    <label className="grid gap-1 text-[11px] text-faint">
+    <label className="grid gap-1 text-[13px] text-faint">
       {label}
       <input
         name={name}
@@ -211,7 +211,7 @@ function Field({
         maxLength={80}
         placeholder={placeholder}
         disabled={disabled}
-        className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[13px] text-text disabled:cursor-not-allowed lg:min-h-0"
+        className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text disabled:cursor-not-allowed lg:min-h-0"
       />
     </label>
   );

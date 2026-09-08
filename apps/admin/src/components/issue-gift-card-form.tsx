@@ -143,7 +143,7 @@ export function GiftCardsToolbar({
 
   const panel = issued ? (
     <div className="grid w-full gap-2 rounded-card border border-[rgba(var(--goldA),0.4)] bg-field p-3.5">
-      <h3 className="text-[13px] font-bold text-gold">{c.issuedTitle}</h3>
+      <h3 className="text-[14px] font-bold text-gold-read">{c.issuedTitle}</h3>
       {/*
           `dir="ltr"` on a DISPLAYED Latin value, never on a field: the code is one Latin run and
           this is the display half of the rule, not the typing half.
@@ -162,13 +162,13 @@ export function GiftCardsToolbar({
         */}
       <p
         dir="ltr"
-        className="select-all rounded-lg border border-line bg-card px-3 py-3 text-center font-mono text-[13px] leading-relaxed font-bold tracking-[0.1em] break-all text-text sm:text-[15px] sm:tracking-[0.16em]"
+        className="select-all rounded-lg border border-line bg-card px-3 py-3 text-center font-mono text-[14px] leading-relaxed font-bold tracking-[0.1em] break-all text-text sm:text-[16px] sm:tracking-[0.16em]"
       >
         {issued.code}
       </p>
-      <p className="text-[11.5px] font-semibold text-bad">{c.issuedCodeOnce}</p>
+      <p className="text-[13px] font-semibold text-bad">{c.issuedCodeOnce}</p>
       {/* Always: the address is required, so a card is never issued without being sent. */}
-      <p className="text-[11.5px] text-muted">{c.issuedEmailed}</p>
+      <p className="text-[13px] text-muted">{c.issuedEmailed}</p>
       <div className="flex">
         <button
           type="button"
@@ -181,10 +181,10 @@ export function GiftCardsToolbar({
     </div>
   ) : !open ? null : (
     <div className="grid w-full gap-3 rounded-card border border-line bg-field p-3.5">
-      <h3 className="text-[13px] font-bold text-text">{c.issueTitle}</h3>
+      <h3 className="text-[14px] font-bold text-text">{c.issueTitle}</h3>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
+        <label className="grid gap-1.5 text-[13px] font-semibold text-muted">
           {c.issueAmount}
           {/* No `dir` at all — a field follows the PAGE's direction; the bidi algorithm lays out digits. */}
           <input
@@ -192,16 +192,16 @@ export function GiftCardsToolbar({
             onChange={(event) => setAmount(event.target.value)}
             placeholder={c.issueAmountPlaceholder}
             inputMode="decimal"
-            className="rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-text"
+            className="rounded-lg border border-line bg-card px-3 py-2 text-[14px] text-text"
           />
         </label>
 
-        <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
+        <label className="grid gap-1.5 text-[13px] font-semibold text-muted">
           {c.issueCurrency}
           <select
             value={currency}
             onChange={(event) => setCurrency(event.target.value as GiftCardCurrency)}
-            className="cursor-pointer rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-text"
+            className="cursor-pointer rounded-lg border border-line bg-card px-3 py-2 text-[14px] text-text"
           >
             {currencies.map((code) => (
               <option key={code} value={code}>
@@ -211,56 +211,56 @@ export function GiftCardsToolbar({
           </select>
         </label>
 
-        <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
+        <label className="grid gap-1.5 text-[13px] font-semibold text-muted">
           {c.issueExpiry}
           <input
             type="date"
             value={expiresOn}
             onChange={(event) => setExpiresOn(event.target.value)}
-            className="rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-text"
+            className="rounded-lg border border-line bg-card px-3 py-2 text-[14px] text-text"
           />
         </label>
 
-        <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
+        <label className="grid gap-1.5 text-[13px] font-semibold text-muted">
           {c.issueRecipientName}
           <input
             value={recipientName}
             onChange={(event) => setRecipientName(event.target.value)}
-            className="rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-text"
+            className="rounded-lg border border-line bg-card px-3 py-2 text-[14px] text-text"
           />
         </label>
 
-        <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted sm:col-span-2">
+        <label className="grid gap-1.5 text-[13px] font-semibold text-muted sm:col-span-2">
           {c.issueRecipientEmail}
           <input
             type="email"
             value={recipientEmail}
             onChange={(event) => setRecipientEmail(event.target.value)}
             placeholder={c.issueRecipientEmailPlaceholder}
-            className="field-ltr rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-text"
+            className="field-ltr rounded-lg border border-line bg-card px-3 py-2 text-[14px] text-text"
           />
         </label>
       </div>
 
-      <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
+      <label className="grid gap-1.5 text-[13px] font-semibold text-muted">
         {c.issueReason}
         <textarea
           value={reason}
           onChange={(event) => setReason(event.target.value)}
           rows={2}
-          className="rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-text"
+          className="rounded-lg border border-line bg-card px-3 py-2 text-[14px] text-text"
         />
         <span className="font-normal text-faint">{c.issueReasonHint}</span>
       </label>
 
-      {error ? <p className="text-[11.5px] font-semibold text-bad">{error}</p> : null}
+      {error ? <p className="text-[13px] font-semibold text-bad">{error}</p> : null}
 
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
           disabled={!ready}
           onClick={() => void submit()}
-          className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+          className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold-read transition-colors hover:bg-[rgba(var(--goldA),0.08)] disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
         >
           {busy ? t.table.working : c.issueSubmit}
         </button>
@@ -294,7 +294,7 @@ export function GiftCardsToolbar({
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4 py-1.5 text-[12.5px] font-extrabold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4 py-1.5 text-[14px] font-extrabold text-gold-read transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
           >
             {c.create}
           </button>

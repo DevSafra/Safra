@@ -150,7 +150,7 @@ export default async function AccountOverviewPage({
                         />
                       </span>
                     </span>
-                    <span className="text-sm font-semibold text-gold">
+                    <span className="text-sm font-semibold text-gold-read">
                       {reviews('writeReview')}
                     </span>
                   </Link>
@@ -195,7 +195,7 @@ function BookingRow({
             locale,
           )}
         />
-        <span className="text-sm text-gold" dir="ltr">
+        <span className="text-sm text-gold-read" dir="ltr">
           {booking.totalAmount}
         </span>
       </span>

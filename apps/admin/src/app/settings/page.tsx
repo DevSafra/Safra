@@ -129,9 +129,7 @@ export default async function SettingsPage() {
     return (
       <ConsoleShell title={t.nav.settings} counts={counts}>
         <ConsolePanel>
-          <p
-            className={`text-[12.5px] ${result === 'failed' ? 'text-bad' : 'text-muted'}`}
-          >
+          <p className={`text-[14px] ${result === 'failed' ? 'text-bad' : 'text-muted'}`}>
             {result === 'failed' ? t.dashboard.queueFailed : t.dashboard.sessionExpired}
           </p>
         </ConsolePanel>

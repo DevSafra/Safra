@@ -73,7 +73,7 @@ export default async function DashboardPage() {
           counts={await sidebarCounts()}
         >
           <ConsolePanel>
-            <p className="text-[13px] leading-relaxed text-muted">
+            <p className="text-[14px] leading-relaxed text-muted">
               {t.sections.gate.noSectionsBody}
             </p>
           </ConsolePanel>
@@ -202,7 +202,7 @@ function Overview({
         <Kpi
           label={t.admin.kpiRevenue}
           value={amount(counters.revenue_today_usd, 'USD')}
-          valueClass="text-gold"
+          valueClass="text-gold-read"
           sub={amount(counters.revenue_today_syp, 'SYP')}
         />
         <Kpi
@@ -351,10 +351,10 @@ function Attention({ counters }: { counters: DashboardOverview['counters'] }) {
 
   return (
     <section className="rounded-card border border-[rgba(var(--badA),0.45)] bg-card p-4.5">
-      <h2 className="mb-3 text-[14.5px] font-extrabold text-bad">{t.admin.attention}</h2>
+      <h2 className="mb-3 text-[16px] font-extrabold text-bad">{t.admin.attention}</h2>
 
       {rows.length === 0 ? (
-        <p className="text-[12.5px] text-muted">{t.admin.attentionEmpty}</p>
+        <p className="text-[14px] text-muted">{t.admin.attentionEmpty}</p>
       ) : (
         <ul className="grid gap-2.5">
           {rows.map((row) => (
@@ -364,14 +364,14 @@ function Attention({ counters }: { counters: DashboardOverview['counters'] }) {
             >
               <span
                 dir="ltr"
-                className="rounded bg-[rgba(var(--badA),0.12)] px-2 py-0.5 text-[10px] font-extrabold text-bad"
+                className="rounded bg-[rgba(var(--badA),0.12)] px-2 py-0.5 text-[13px] font-extrabold text-bad"
               >
                 {row.code}
               </span>
-              <span className="text-[12.5px] text-text2">{row.text}</span>
+              <span className="text-[14px] text-text2">{row.text}</span>
               <Link
                 href={row.href}
-                className="ms-auto inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1 text-[11.5px] font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+                className="ms-auto inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1 text-[13px] font-bold text-gold-read transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
               >
                 {t.admin.handle}
               </Link>
@@ -387,7 +387,7 @@ function LatestBookings({ rows }: { rows: DashboardOverview['recentBookings'] })
   return (
     <section className="min-w-0 rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <h2 className="text-[14.5px] font-extrabold text-gold">
+        <h2 className="text-[16px] font-extrabold text-gold-read">
           {t.admin.latestBookings}
         </h2>
 
@@ -405,11 +405,11 @@ function LatestBookings({ rows }: { rows: DashboardOverview['recentBookings'] })
             placeholder={t.dashboard.bookingReferencePlaceholder}
             aria-label={t.dashboard.findBookingLabel}
             /* No `dir`: a field a person types into follows the page (docs/i18n.md §9). */
-            className="min-w-[260px] rounded-lg border border-line bg-field px-3.5 py-2 text-[12.5px] text-text placeholder:text-faint"
+            className="min-w-[260px] rounded-lg border border-line bg-field px-3.5 py-2 text-[14px] text-text placeholder:text-faint"
           />
           <button
             type="submit"
-            className="cursor-pointer rounded-lg border border-line px-3.5 py-2 text-[12.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold"
+            className="cursor-pointer rounded-lg border border-line px-3.5 py-2 text-[14px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold-read"
           >
             {t.dashboard.findBooking}
           </button>
@@ -417,7 +417,7 @@ function LatestBookings({ rows }: { rows: DashboardOverview['recentBookings'] })
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-[12.5px] text-faint">{t.dashboard.nothingWaiting}</p>
+        <p className="text-[14px] text-faint">{t.dashboard.nothingWaiting}</p>
       ) : (
         /*
           A real `<table>`, though the design draws a CSS grid. This is tabular data and a
@@ -426,7 +426,7 @@ function LatestBookings({ rows }: { rows: DashboardOverview['recentBookings'] })
           sideways.
         */
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[540px] border-collapse text-[12.5px]">
+          <table className="w-full min-w-[540px] border-collapse text-[14px]">
             <thead>
               <tr>
                 <Th>{t.admin.colReference}</Th>
@@ -454,7 +454,10 @@ function LatestBookings({ rows }: { rows: DashboardOverview['recentBookings'] })
                   <td className="max-w-[140px] truncate p-2.5 text-text2">
                     {row.customer}
                   </td>
-                  <td dir="ltr" className="whitespace-nowrap p-2.5 font-bold text-gold">
+                  <td
+                    dir="ltr"
+                    className="whitespace-nowrap p-2.5 font-bold text-gold-read"
+                  >
                     {amount(row.amount, row.currency)}
                   </td>
                   <td className="p-2.5">
@@ -479,16 +482,16 @@ function PartnerQueue({
 }) {
   return (
     <section className="rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
-      <h2 className="mb-3 text-[14.5px] font-extrabold text-gold">
+      <h2 className="mb-3 text-[16px] font-extrabold text-gold-read">
         {t.admin.pendingPartners}
       </h2>
 
       {partners === 'failed' ? (
-        <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
+        <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
       ) : partners === 'unauthenticated' ? (
-        <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
+        <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
       ) : partners.items.length === 0 ? (
-        <p className="text-[12.5px] text-faint">{t.dashboard.nothingWaiting}</p>
+        <p className="text-[14px] text-faint">{t.dashboard.nothingWaiting}</p>
       ) : (
         <ul className="grid gap-2.5">
           {/*
@@ -508,15 +511,15 @@ function PartnerQueue({
               >
                 <span
                   aria-hidden
-                  className="grid size-[34px] shrink-0 place-items-center rounded-lg border border-[rgba(var(--goldA),0.3)] bg-[rgba(var(--goldA),0.12)] font-display text-base text-gold"
+                  className="grid size-[34px] shrink-0 place-items-center rounded-lg border border-[rgba(var(--goldA),0.3)] bg-[rgba(var(--goldA),0.12)] font-display text-base text-gold-read"
                 >
                   {ORNAMENT_BRAND}
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate text-[12.5px] font-bold text-text">
+                  <span className="block truncate text-[14px] font-bold text-text">
                     {partner.legalName}
                   </span>
-                  <span className="block text-[10.5px] text-faint">
+                  <span className="block text-[13px] text-faint">
                     {partner.reference} · {partner.city.slug}
                   </span>
                 </span>
@@ -527,7 +530,7 @@ function PartnerQueue({
                   building up unnoticed.
                 */}
                 <span
-                  className={`ms-auto shrink-0 text-[10.5px] font-bold ${
+                  className={`ms-auto shrink-0 text-[13px] font-bold ${
                     partner.sanctionsScreenedAt ? 'text-ok' : 'text-warn'
                   }`}
                 >
@@ -541,7 +544,7 @@ function PartnerQueue({
         </ul>
       )}
 
-      <p className="mt-2.5 text-[10.5px] leading-relaxed text-faint">
+      <p className="mt-2.5 text-[14px] leading-relaxed text-faint">
         {t.admin.pendingPartnersNote}
       </p>
     </section>
@@ -551,11 +554,11 @@ function PartnerQueue({
 function RecentActivity({ rows }: { rows: DashboardOverview['recentAudit'] }) {
   return (
     <section className="rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
-      <h2 className="mb-2.5 text-[14.5px] font-extrabold text-gold">
+      <h2 className="mb-2.5 text-[16px] font-extrabold text-gold-read">
         {t.admin.recentActivity}
       </h2>
 
-      <div className="grid gap-2 text-[11.5px] leading-relaxed text-muted">
+      <div className="grid gap-2 text-[13px] leading-relaxed text-muted">
         {rows.map((row) => (
           <p key={`${row.at}-${row.action}`} className="truncate">
             <span dir="ltr" className="text-sky">
@@ -568,7 +571,7 @@ function RecentActivity({ rows }: { rows: DashboardOverview['recentAudit'] }) {
 
       <Link
         href="/audit"
-        className="mt-3 inline-flex min-h-10 cursor-pointer items-center text-[11.5px] text-sky hover:underline lg:min-h-0"
+        className="mt-3 inline-flex min-h-10 cursor-pointer items-center text-[13px] text-sky hover:underline lg:min-h-0"
       >
         {t.admin.viewAll}
       </Link>
@@ -589,9 +592,9 @@ function Kpi({
 }) {
   return (
     <div className="rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-4">
-      <p className="text-[11.5px] text-faint">{label}</p>
+      <p className="text-[13px] text-faint">{label}</p>
       <p className={`mt-1.5 text-2xl font-extrabold ${valueClass}`}>{value}</p>
-      <p className="mt-1 text-[10.5px] text-muted">{sub}</p>
+      <p className="mt-1 text-[14px] text-muted">{sub}</p>
     </div>
   );
 }
@@ -609,7 +612,7 @@ function Th({ children }: { children: React.ReactNode }) {
   return (
     <th
       scope="col"
-      className="border-b border-line p-2.5 text-start text-[11px] font-bold text-faint"
+      className="border-b border-line p-2.5 text-start text-[12px] font-bold text-faint"
     >
       {children}
     </th>

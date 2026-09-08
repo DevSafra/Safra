@@ -73,11 +73,11 @@ export function ReplyForm({ reference }: { reference: string }) {
           rows={3}
           maxLength={4000}
           placeholder={t.sections.messages.replyPlaceholder}
-          className="rounded-lg border border-line bg-field px-3 py-2.5 text-[12.5px] leading-relaxed text-text placeholder:text-faint"
+          className="rounded-lg border border-line bg-field px-3 py-2.5 text-[14px] leading-relaxed text-text placeholder:text-faint"
         />
       </label>
 
-      <label className="flex cursor-pointer items-center gap-2.5 text-[12px] text-text2">
+      <label className="flex cursor-pointer items-center gap-2.5 text-[13px] text-text2">
         <input
           type="checkbox"
           checked={internal}
@@ -88,11 +88,11 @@ export function ReplyForm({ reference }: { reference: string }) {
       </label>
 
       {willRedact ? (
-        <p className="text-[11px] text-warn">{t.sections.messages.redactionNote}</p>
+        <p className="text-[14px] text-warn">{t.sections.messages.redactionNote}</p>
       ) : null}
 
       {error ? (
-        <p role="alert" className="text-[11.5px] text-bad">
+        <p role="alert" className="text-[13px] text-bad">
           {error}
         </p>
       ) : null}
@@ -102,7 +102,7 @@ export function ReplyForm({ reference }: { reference: string }) {
           type="button"
           disabled={body.trim().length === 0 || busy}
           onClick={() => void send()}
-          className="cursor-pointer rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-5 py-2 text-[12.5px] font-extrabold text-[#241A05] disabled:cursor-not-allowed disabled:opacity-40"
+          className="cursor-pointer rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-5 py-2 text-[14px] font-extrabold text-[#241A05] disabled:cursor-not-allowed disabled:opacity-40"
         >
           {busy ? t.sections.messages.replying : t.sections.messages.reply}
         </button>

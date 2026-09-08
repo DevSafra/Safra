@@ -241,11 +241,16 @@ export default async function HomePage({
 
             It is the handoff's own `--muted`. This product's `--muted` is DARKER (#454B5A), because
             he asked twice for the greys to be readable at caption sizes — see the note in
-            `globals.css`. At 17px the design's lighter grey measures 4.81:1 and clears the floor
-            comfortably, so honouring the file here costs nothing, and the deviation stays where it
-            was earned: the small text.
+            `globals.css`. On the light page the file's lighter grey measures 5.55:1 and clears the
+            floor, so honouring it costs nothing there, and the deviation stays where it was earned:
+            the small text.
+
+            **It is a token rather than a literal because a literal has no theme.** `text-[#5c6377]`
+            measured 3.26:1 on the dark page — this sentence, unreadable, in the theme the prototype
+            does not describe. `--color-handoff-muted` is the file's value to the byte in the light
+            theme and this product's own muted (8.11:1) in the dark one.
           */}
-          <p className="mx-auto mt-4 max-w-[62ch] text-[17px] leading-[1.8] font-medium text-[#5c6377]">
+          <p className="mx-auto mt-4 max-w-[62ch] text-[17px] leading-[1.8] font-medium text-handoff-muted">
             {t('heroSubtitle')} {t('heroPromise')}
           </p>
 
@@ -266,10 +271,7 @@ export default async function HomePage({
           */}
           <ul className="mt-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
             {trust.map(({ icon: Icon, label }) => (
-              <li
-                key={label}
-                className="flex items-center gap-2 text-[0.85rem] text-muted"
-              >
+              <li key={label} className="flex items-center gap-2 text-[14px] text-muted">
                 <span aria-hidden className="shrink-0 text-gold">
                   <Icon />
                 </span>
@@ -440,14 +442,14 @@ export default async function HomePage({
                 */}
                 <span
                   aria-hidden
-                  className="btn-gold inline-flex size-7 items-center justify-center rounded-full text-[0.85rem] font-bold"
+                  className="btn-gold inline-flex size-7 items-center justify-center rounded-full text-[14px] font-bold"
                 >
                   {index + 1}
                 </span>
-                <h3 className="mt-2.5 text-[0.9375rem] font-semibold text-text">
+                <h3 className="mt-2.5 text-[16px] font-semibold text-text">
                   {step.title}
                 </h3>
-                <p className="mt-1.5 text-[0.85rem] leading-relaxed text-muted">
+                <p className="mt-1.5 text-[14px] leading-relaxed text-muted">
                   {step.body}
                 </p>
               </li>
@@ -479,18 +481,18 @@ export default async function HomePage({
                 */}
                 <span
                   aria-hidden
-                  className="inline-flex size-11 items-center justify-center rounded-full border border-gold/40 bg-gold/10 text-gold [&_svg]:size-5"
+                  className="inline-flex size-11 items-center justify-center rounded-full border border-gold/40 bg-gold/10 text-gold-read [&_svg]:size-5"
                 >
                   <pledge.icon />
                 </span>
-                <p className="mt-3 text-[0.6875rem] tracking-wide text-faint">
+                <p className="mt-3 text-[14px] tracking-wide text-faint">
                   {pledge.ordinal}
                 </p>
                 <h3 className="mt-1 text-base font-semibold text-balance text-text sm:text-[1.0625rem]">
                   {pledge.title}
                 </h3>
                 <div className="gold-rule mx-auto mt-3 w-12" />
-                <p className="mt-3 text-[0.85rem] leading-relaxed text-muted">
+                <p className="mt-3 text-[14px] leading-relaxed text-muted">
                   {pledge.body}
                 </p>
               </li>
@@ -505,7 +507,7 @@ export default async function HomePage({
           <div className="grid gap-6 rounded-card border border-line bg-card p-6 sm:p-7 lg:grid-cols-[1fr_auto] lg:items-center lg:gap-12">
             <div>
               {/* Gold, 12px/700 — the same label treatment every other section on this page has. */}
-              <p className="text-[12px] font-bold tracking-[0.08em] text-gold">
+              <p className="text-[13px] font-bold tracking-[0.08em] text-gold-read">
                 {t('partnersTitle')}
               </p>
               {/*
@@ -517,7 +519,7 @@ export default async function HomePage({
               <h2 className="mt-1 font-display text-2xl font-bold text-balance text-text sm:text-[28px]">
                 {t('partnersSubtitle')}
               </h2>
-              <p className="mt-3 max-w-[62ch] text-[15px] leading-relaxed text-muted">
+              <p className="mt-3 max-w-[62ch] text-[16px] leading-relaxed text-muted">
                 {/*
                   The commission comes from settings, never a hardcoded string. The super admin
                   edits it from the Rules Engine page (P-005), and this text has to follow
@@ -542,7 +544,7 @@ export default async function HomePage({
             */}
             <Link
               href={`/${locale}/partners/join`}
-              className="btn-gold inline-flex min-h-12 items-center justify-center justify-self-start rounded-lg px-8 text-[15px] font-bold transition-opacity duration-200 ease-out-strong hover:opacity-90 sm:min-h-[52px]"
+              className="btn-gold inline-flex min-h-12 items-center justify-center justify-self-start rounded-lg px-8 text-[16px] font-bold transition-opacity duration-200 ease-out-strong hover:opacity-90 sm:min-h-[52px]"
             >
               {t('partnersCta')}
             </Link>
@@ -614,7 +616,7 @@ function SectionHeading({
         argued for it; Bashar has since asked twice for the design's own colours, and the gold inks
         are recorded as his decision in `e2e/contrast.spec.ts`. The design wins.
       */}
-      <p className="text-[12px] font-bold tracking-[0.08em] text-gold">{eyebrow}</p>
+      <p className="text-[13px] font-bold tracking-[0.08em] text-gold-read">{eyebrow}</p>
       <h2 className="mt-1.5 font-display text-[26px] leading-snug font-bold text-balance text-text sm:text-[32px]">
         {children}
       </h2>
@@ -684,7 +686,7 @@ function CityCard({
         ) : (
           <OrnamentField
             id={`ornament-city-${city.slug}`}
-            className="text-gold opacity-30"
+            className="text-gold-read opacity-30"
           />
         )}
       </div>
@@ -704,7 +706,7 @@ function CityCard({
 
         <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5">
           {categories ? (
-            <span className="rounded-full border border-gold/35 bg-gold/10 px-2 py-0.5 text-[10.5px] text-gold">
+            <span className="rounded-full border border-gold/35 bg-gold/10 px-2 py-0.5 text-[13px] text-gold-read">
               {categories}
             </span>
           ) : null}
@@ -714,7 +716,7 @@ function CityCard({
             place — and it read as a form field rather than as a fact about a city.
           */}
           {city.propertyCount > 0 ? (
-            <span className="text-[12.5px] text-muted">
+            <span className="text-[14px] text-muted">
               {stays('cityStays', { count: city.propertyCount })}
             </span>
           ) : null}
@@ -753,15 +755,15 @@ function StayTypeCard({
     >
       <span
         aria-hidden
-        className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-gold/35 text-base text-gold"
+        className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-gold/35 text-base text-gold-read"
       >
         {Drawn ? <Drawn /> : (type.glyph ?? <StayIcon />)}
       </span>
       <span className="min-w-0">
-        <span className="block truncate text-[0.85rem] font-semibold text-text">
+        <span className="block truncate text-[14px] font-semibold text-text">
           {label}
         </span>
-        <span className="mt-0.5 block text-[0.6875rem] text-faint">
+        <span className="mt-0.5 block text-[13px] text-faint">
           {options('typeOptions', { count: type.propertyCount })}
         </span>
       </span>

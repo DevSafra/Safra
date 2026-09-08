@@ -38,11 +38,11 @@ export default async function EmergencyPage() {
     <ConsoleShell title={t.admin.emergencyMode} counts={counts}>
       {result === 'unauthenticated' ? (
         <ConsolePanel>
-          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
         </ConsolePanel>
       ) : result === 'failed' ? (
         <ConsolePanel>
-          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
         </ConsolePanel>
       ) : (
         <div className="grid gap-4">
@@ -54,7 +54,7 @@ export default async function EmergencyPage() {
 
           <ConsolePanel title={t.sections.emergency.history}>
             {result.history.length === 0 ? (
-              <p className="text-[12.5px] text-faint">{t.sections.emergency.never}</p>
+              <p className="text-[14px] text-faint">{t.sections.emergency.never}</p>
             ) : (
               <ul className="grid gap-2.5">
                 {result.history.map((mode) => (
@@ -63,7 +63,7 @@ export default async function EmergencyPage() {
                     className="rounded-card border border-line bg-field px-3.5 py-3"
                   >
                     <div className="flex flex-wrap items-center gap-2.5">
-                      <span className="text-[12.5px] font-bold text-text">
+                      <span className="text-[14px] font-bold text-text">
                         {mode.scopeName}
                       </span>
                       <StatusPill tone={mode.deactivatedAt === null ? 'bad' : 'faint'}>
@@ -71,7 +71,7 @@ export default async function EmergencyPage() {
                           ? t.sections.emergency.stateActive
                           : t.sections.emergency.stateEnded}
                       </StatusPill>
-                      <Ltr className="ms-auto text-[10.5px] text-faint">
+                      <Ltr className="ms-auto text-[13px] text-faint">
                         {shortDateTime(mode.activatedAt)}
                         {mode.deactivatedAt
                           ? ` ← ${shortDateTime(mode.deactivatedAt)}`
@@ -79,7 +79,7 @@ export default async function EmergencyPage() {
                       </Ltr>
                     </div>
 
-                    <p className="mt-1.5 text-[11.5px] text-text2">{flagSummary(mode)}</p>
+                    <p className="mt-1.5 text-[13px] text-text2">{flagSummary(mode)}</p>
 
                     {/*
                       The reason is shown, always. It is the entire point of requiring one, and a
@@ -87,7 +87,7 @@ export default async function EmergencyPage() {
                       requirement theatre.
                     */}
                     {mode.reason ? (
-                      <p className="mt-1 text-[11px] leading-relaxed text-muted">
+                      <p className="mt-1 text-[14px] leading-relaxed text-muted">
                         {mode.reason}
                       </p>
                     ) : null}
@@ -105,7 +105,7 @@ export default async function EmergencyPage() {
 function ActiveBanner({ mode }: { mode: EmergencyMode }) {
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-card border border-bad bg-[rgba(var(--badA),0.12)] px-4 py-3">
-      <span className="text-[13px] font-extrabold text-bad">
+      <span className="text-[14px] font-extrabold text-bad">
         {fill(t.sections.emergency.activeBanner, { scope: mode.scopeName })}
       </span>
       <span className="text-xs text-text2">{flagSummary(mode)}</span>

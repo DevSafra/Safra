@@ -149,7 +149,7 @@ export function SaveButton({
         aria-pressed={saved}
         className={`inline-flex min-h-10 w-fit cursor-pointer items-center gap-2 rounded-lg border px-4 text-sm font-semibold transition-colors duration-200 ease-out-strong sm:min-h-11 ${
           saved
-            ? 'border-gold bg-gold/12 text-gold'
+            ? 'border-gold bg-gold/12 text-gold-read'
             : 'border-text2/30 bg-field text-text hover:border-gold hover:bg-gold/10'
         }`}
       >

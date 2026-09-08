@@ -282,14 +282,14 @@ export function AddCity({
       </Row>
 
       <fieldset className="grid gap-1.5">
-        <legend className="text-[11.5px] font-semibold text-muted">
+        <legend className="text-[13px] font-semibold text-muted">
           {c.categoriesLabel}
         </legend>
         <div className="flex flex-wrap gap-2">
           {options.map((option) => (
             <label
               key={option.code}
-              className="flex cursor-pointer items-center gap-1.5 text-[11.5px] text-text2"
+              className="flex cursor-pointer items-center gap-1.5 text-[13px] text-text2"
             >
               <input
                 type="checkbox"
@@ -384,14 +384,14 @@ function AddForm({
   return (
     <>
       <div className="mb-2.5 flex flex-wrap items-center gap-2.5">
-        <h2 className="text-[14px] font-extrabold text-gold">{title}</h2>
+        <h2 className="text-[16px] font-extrabold text-gold-read">{title}</h2>
         <span className="ms-auto">
           <button
             type="button"
             data-geo-add={marker}
             aria-expanded={open}
             onClick={() => setOpen(!open)}
-            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1.5 text-[11.5px] font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1.5 text-[13px] font-bold text-gold-read transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
           >
             {label}
           </button>

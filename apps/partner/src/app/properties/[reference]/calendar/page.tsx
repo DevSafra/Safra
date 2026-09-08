@@ -87,19 +87,19 @@ export default async function UnitCalendarPage({
       <div className="grid gap-4">
         <Link
           href="/properties"
-          className="inline-flex min-h-10 w-fit items-center gap-2 rounded-lg border border-line px-3 text-[12.5px] text-muted lg:min-h-0 lg:py-1.5"
+          className="inline-flex min-h-10 w-fit items-center gap-2 rounded-lg border border-line px-3 text-[14px] text-muted lg:min-h-0 lg:py-1.5"
         >
           <span aria-hidden="true">→</span>
           {t.unitCalendar.back}
         </Link>
-        <h2 className="text-[15px] font-bold text-text">{property.name.ar}</h2>
+        <h2 className="text-[16px] font-bold text-text">{property.name.ar}</h2>
         {children}
       </div>
     </Shell>
   );
 
   if (property.units.length === 0) {
-    return shell(<p className="text-[12.5px] text-faint">{t.unitCalendar.noUnits}</p>);
+    return shell(<p className="text-[14px] text-faint">{t.unitCalendar.noUnits}</p>);
   }
 
   /* The requested unit only if it is one of THIS property's; otherwise the first. */
@@ -143,9 +143,9 @@ export default async function UnitCalendarPage({
               key={candidate.id}
               href={link(candidate.id, month)}
               aria-current={candidate.id === unit.id ? 'true' : undefined}
-              className={`inline-flex min-h-10 items-center rounded-lg border px-3 text-[11.5px] lg:min-h-0 lg:py-1.5 ${
+              className={`inline-flex min-h-10 items-center rounded-lg border px-3 text-[13px] lg:min-h-0 lg:py-1.5 ${
                 candidate.id === unit.id
-                  ? 'border-gold bg-gold/15 text-gold'
+                  ? 'border-gold bg-gold/15 text-gold-read'
                   : 'border-line text-muted'
               }`}
             >
@@ -159,18 +159,18 @@ export default async function UnitCalendarPage({
         <Link
           href={link(unit.id, shift(month, -1))}
           aria-label={t.unitCalendar.previousMonth}
-          className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-[12px] text-muted lg:min-h-0 lg:py-1.5"
+          className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-[13px] text-muted lg:min-h-0 lg:py-1.5"
         >
           <span aria-hidden="true">→</span>
         </Link>
         {/* The month is a Latin numeral pair inside an Arabic page, so it carries its own `dir`. */}
-        <span className="text-[12.5px] font-bold text-text" dir="ltr">
+        <span className="text-[14px] font-bold text-text" dir="ltr">
           {month}
         </span>
         <Link
           href={link(unit.id, shift(month, 1))}
           aria-label={t.unitCalendar.nextMonth}
-          className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-[12px] text-muted lg:min-h-0 lg:py-1.5"
+          className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-[13px] text-muted lg:min-h-0 lg:py-1.5"
         >
           <span aria-hidden="true">←</span>
         </Link>

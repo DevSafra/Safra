@@ -210,7 +210,7 @@ function Month({
 
   return (
     <div className="min-w-0">
-      <p className="pb-2 text-center text-[0.85rem] font-semibold text-text">
+      <p className="pb-2 text-center text-[14px] font-semibold text-text">
         {monthName.format(first)}
       </p>
 
@@ -219,7 +219,7 @@ function Month({
           /* 2026-03-01 was a Sunday, so it seeds the seven column headings in order. */
           <span
             key={index}
-            className="grid h-7 place-items-center text-[0.625rem] text-faint"
+            className="grid h-7 place-items-center text-[13px] text-faint"
           >
             {dayName.format(Date.UTC(2026, 2, 1 + index))}
           </span>
@@ -243,7 +243,7 @@ function Month({
               disabled={disabled}
               onClick={() => onChoose(day)}
               aria-pressed={isStart || isEnd}
-              className={`grid h-8 w-full cursor-pointer place-items-center rounded-lg text-[0.75rem] tabular-nums transition-[background-color,color] duration-150 ease-out-strong disabled:cursor-not-allowed disabled:text-faint/50 ${
+              className={`grid h-8 w-full cursor-pointer place-items-center rounded-lg text-[13px] tabular-nums transition-[background-color,color] duration-150 ease-out-strong disabled:cursor-not-allowed disabled:text-faint/50 ${
                 isStart || isEnd
                   ? 'btn-gold font-bold'
                   : inRange

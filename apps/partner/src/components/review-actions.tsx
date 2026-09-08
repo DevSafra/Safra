@@ -92,7 +92,7 @@ export function ReviewActions({
       >
         <label
           htmlFor={`${mode}-${reference}`}
-          className="text-[11.5px] leading-relaxed text-muted"
+          className="text-[13px] leading-relaxed text-muted"
         >
           {isReply ? t.reviews.replyLabel : t.reviews.reportLabel}
         </label>
@@ -102,10 +102,10 @@ export function ReviewActions({
           rows={3}
           required
           minLength={isReply ? 3 : 10}
-          className="rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+          className="rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text"
         />
         {error ? (
-          <p role="alert" className="text-[11.5px] text-bad">
+          <p role="alert" className="text-[13px] text-bad">
             {error}
           </p>
         ) : null}
@@ -113,7 +113,7 @@ export function ReviewActions({
           <button
             type="submit"
             disabled={busy}
-            className="min-h-10 cursor-pointer rounded-lg border border-gold px-4 py-1.5 text-[12px] font-bold text-gold disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-lg border border-gold px-4 py-1.5 text-[13px] font-bold text-gold-read disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
           >
             {busy
               ? t.reviews.working
@@ -124,7 +124,7 @@ export function ReviewActions({
           <button
             type="button"
             onClick={() => setMode('idle')}
-            className="min-h-10 cursor-pointer rounded-lg border border-line px-4 py-1.5 text-[12px] text-muted lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-lg border border-line px-4 py-1.5 text-[13px] text-muted lg:min-h-0"
           >
             {t.reviews.cancel}
           </button>
@@ -140,7 +140,7 @@ export function ReviewActions({
         <button
           type="button"
           onClick={() => setMode('reply')}
-          className="min-h-10 cursor-pointer rounded-lg border border-gold px-4 py-1.5 text-[12px] font-bold text-gold lg:min-h-0"
+          className="min-h-10 cursor-pointer rounded-lg border border-gold px-4 py-1.5 text-[13px] font-bold text-gold-read lg:min-h-0"
         >
           {t.reviews.reply}
         </button>
@@ -150,13 +150,13 @@ export function ReviewActions({
         <button
           type="button"
           onClick={() => setMode('report')}
-          className="min-h-10 cursor-pointer rounded-lg border border-line px-4 py-1.5 text-[12px] text-muted lg:min-h-0"
+          className="min-h-10 cursor-pointer rounded-lg border border-line px-4 py-1.5 text-[13px] text-muted lg:min-h-0"
         >
           {t.reviews.report}
         </button>
       ) : null}
 
-      {reportNote ? <span className="text-[11.5px] text-faint">{reportNote}</span> : null}
+      {reportNote ? <span className="text-[13px] text-faint">{reportNote}</span> : null}
     </div>
   );
 }

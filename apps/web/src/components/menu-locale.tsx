@@ -141,9 +141,9 @@ function Controls({
  * for being offered a smaller control.
  */
 function chip(current: boolean) {
-  return `inline-flex min-h-11 items-center gap-2 rounded-lg border px-3 text-[13.5px] font-semibold transition-colors duration-200 ease-out-strong ${
+  return `inline-flex min-h-11 items-center gap-2 rounded-lg border px-3 text-[14px] font-semibold transition-colors duration-200 ease-out-strong ${
     current
-      ? 'border-gold bg-gold/12 text-gold'
+      ? 'border-gold bg-gold/12 text-gold-read'
       : 'border-line text-muted hover:border-gold/50 hover:text-text'
   }`;
 }

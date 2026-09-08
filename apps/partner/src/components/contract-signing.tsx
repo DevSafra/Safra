@@ -43,11 +43,11 @@ export function ContractSigning({
   const [error, setError] = useState<string | null>(null);
 
   if (status === 'active') {
-    return <p className="text-[11.5px] text-ok">{t.contracts.signDone}</p>;
+    return <p className="text-[13px] text-ok">{t.contracts.signDone}</p>;
   }
 
   if (status === 'draft') {
-    return <p className="text-[11.5px] text-faint">{t.contracts.signWaitingSafra}</p>;
+    return <p className="text-[13px] text-faint">{t.contracts.signWaitingSafra}</p>;
   }
 
   if (status !== 'awaiting_partner_signature') return null;
@@ -127,22 +127,22 @@ export function ContractSigning({
       onSubmit={(event) => void submit(event)}
       className="mt-3 grid gap-2.5 rounded-lg border border-[rgba(var(--goldA),0.3)] bg-[rgba(var(--goldA),0.05)] p-3.5"
     >
-      <p className="text-[12.5px] font-bold text-gold">{t.contracts.signTitle}</p>
-      <p className="text-[11.5px] leading-relaxed text-text2">{t.contracts.signSteps}</p>
+      <p className="text-[14px] font-bold text-gold-read">{t.contracts.signTitle}</p>
+      <p className="text-[13px] leading-relaxed text-text2">{t.contracts.signSteps}</p>
 
       <label className="grid gap-1">
-        <span className="text-[11px] text-muted">{t.contracts.signFile}</span>
+        <span className="text-[13px] text-muted">{t.contracts.signFile}</span>
         <input
           type="file"
           accept="application/pdf"
           required
           onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-          className="min-h-10 cursor-pointer rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-text lg:min-h-0"
+          className="min-h-10 cursor-pointer rounded-lg border border-line bg-card px-3 py-2 text-[14px] text-text lg:min-h-0"
         />
       </label>
 
       {error ? (
-        <p role="alert" className="text-[11.5px] text-bad">
+        <p role="alert" className="text-[13px] text-bad">
           {error}
         </p>
       ) : null}
@@ -150,7 +150,7 @@ export function ContractSigning({
       <button
         type="submit"
         disabled={busy || !file}
-        className="min-h-10 w-fit cursor-pointer rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-5 text-[12.5px] font-extrabold text-[#241A05] disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:py-2"
+        className="min-h-10 w-fit cursor-pointer rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-5 text-[14px] font-extrabold text-[#241A05] disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:py-2"
       >
         {busy ? t.contracts.signUploading : t.contracts.signUpload}
       </button>

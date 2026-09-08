@@ -32,7 +32,7 @@ export function UnitCalendar({
 }) {
   const unit = property.units.find((candidate) => candidate.id === unitId);
 
-  if (!unit) return <p className="text-[12.5px] text-faint">{t.unitCalendar.noUnits}</p>;
+  if (!unit) return <p className="text-[14px] text-faint">{t.unitCalendar.noUnits}</p>;
 
   const first = days[0]?.date ?? `${month}-01`;
   const last = days[days.length - 1]?.date ?? first;
@@ -46,11 +46,11 @@ export function UnitCalendar({
   return (
     <div className="grid gap-4">
       <div className="flex flex-wrap items-center gap-3">
-        <p className="text-[13px] font-bold text-text">{unit.nameAr}</p>
-        <p className="text-[11.5px] text-faint" dir="ltr">
+        <p className="text-[14px] font-bold text-text">{unit.nameAr}</p>
+        <p className="text-[13px] text-faint" dir="ltr">
           {amount(unit.basePrice, unit.currencyCode)} {t.unitCalendar.perNight}
         </p>
-        <p className="text-[11.5px] text-faint">
+        <p className="text-[13px] text-faint">
           {t.unitCalendar.minNightsShort} {count(unit.minNights)}
         </p>
       </div>

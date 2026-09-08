@@ -48,7 +48,7 @@ export function AmenityPicker({
   const c = t.editProperty;
 
   if (amenities.length === 0) {
-    return <p className="text-[11.5px] text-faint">{c.amenitiesNone}</p>;
+    return <p className="text-[13px] text-faint">{c.amenitiesNone}</p>;
   }
 
   const groups = new Map<string, OfferableAmenity[]>();
@@ -66,7 +66,7 @@ export function AmenityPicker({
 
   return (
     <fieldset className="grid gap-2.5" data-amenity-picker={idPrefix}>
-      <legend className="text-[12px] text-muted">{c.amenities}</legend>
+      <legend className="text-[13px] text-muted">{c.amenities}</legend>
 
       {/*
         What is declared RIGHT NOW, as a sentence, above the boxes that change it.
@@ -77,7 +77,7 @@ export function AmenityPicker({
       */}
       <p
         data-amenity-summary={idPrefix}
-        className={`text-[11.5px] leading-relaxed ${selected.length > 0 ? 'text-text2' : 'text-faint'}`}
+        className={`text-[13px] leading-relaxed ${selected.length > 0 ? 'text-text2' : 'text-faint'}`}
       >
         {selected.length > 0
           ? amenities
@@ -87,11 +87,11 @@ export function AmenityPicker({
           : c.amenitiesEmpty}
       </p>
 
-      <p className="text-[10.5px] leading-relaxed text-faint2">{c.amenitiesHint}</p>
+      <p className="text-[14px] leading-relaxed text-faint">{c.amenitiesHint}</p>
 
       {[...groups.entries()].map(([category, list]) => (
         <div key={category} className="grid gap-1.5">
-          <p className="text-[10.5px] font-bold text-faint">{groupLabel(category)}</p>
+          <p className="text-[14px] font-bold text-faint">{groupLabel(category)}</p>
 
           <div className="flex flex-wrap gap-x-4 gap-y-1">
             {list.map((amenity) => (
@@ -101,7 +101,7 @@ export function AmenityPicker({
               */
               <label
                 key={amenity.code}
-                className="flex cursor-pointer items-center gap-2 text-[12px] text-text2"
+                className="flex cursor-pointer items-center gap-2 text-[13px] text-text2"
               >
                 <input
                   type="checkbox"

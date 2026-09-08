@@ -72,16 +72,14 @@ export function SafraPayouts({ payouts }: { readonly payouts: readonly SafraPayo
       key: 'reference',
       header: c.colReference,
       render: (row) => (
-        <span className="font-mono text-[11.5px] font-bold text-sky">
-          {row.reference}
-        </span>
+        <span className="font-mono text-[13px] font-bold text-sky">{row.reference}</span>
       ),
     },
     {
       key: 'period',
       header: c.colPeriod,
       render: (row) => (
-        <span className="text-[11.5px] text-text2">
+        <span className="text-[13px] text-text2">
           {row.periodStart} ← {row.periodEnd}
         </span>
       ),
@@ -90,7 +88,7 @@ export function SafraPayouts({ payouts }: { readonly payouts: readonly SafraPayo
       key: 'net',
       header: c.colNet,
       render: (row) => (
-        <span className="font-bold text-gold tabular-nums">
+        <span className="font-bold text-gold-read tabular-nums">
           {amount(row.netAmount, 'SYP')}
         </span>
       ),
@@ -100,12 +98,12 @@ export function SafraPayouts({ payouts }: { readonly payouts: readonly SafraPayo
       header: c.colDestination,
       render: (row) =>
         row.accountLabel ? (
-          <span className="text-[11.5px] text-text2">
+          <span className="text-[13px] text-text2">
             {row.accountLabel} ····{row.accountLast4}
           </span>
         ) : (
           /* Stated rather than blank: no destination is why a transfer cannot be paid. */
-          <span className="text-[11.5px] text-warn">{c.noDestination}</span>
+          <span className="text-[13px] text-warn">{c.noDestination}</span>
         ),
     },
     {
@@ -121,7 +119,7 @@ export function SafraPayouts({ payouts }: { readonly payouts: readonly SafraPayo
       key: 'paid',
       header: c.colPaidAt,
       render: (row) => (
-        <span className="text-[11px] text-faint">
+        <span className="text-[13px] text-faint">
           {row.paidAt ? row.paidAt.slice(0, 10) : '—'}
           {row.paidReference ? ` · ${row.paidReference}` : ''}
         </span>
@@ -144,24 +142,24 @@ export function SafraPayouts({ payouts }: { readonly payouts: readonly SafraPayo
   return (
     <section className="grid gap-3">
       <div className="flex flex-wrap items-baseline gap-2.5">
-        <h2 className="text-[14.5px] font-extrabold text-gold">{c.payoutsTitle}</h2>
+        <h2 className="text-[16px] font-extrabold text-gold-read">{c.payoutsTitle}</h2>
         <span className="ms-auto">
           <button
             type="button"
             data-safra-payout-open
             aria-expanded={opening}
             onClick={() => setOpening(!opening)}
-            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1.5 text-[11.5px] font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1.5 text-[13px] font-bold text-gold-read transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
           >
             {c.payoutOpen}
           </button>
         </span>
       </div>
 
-      <p className="text-[11.5px] leading-relaxed text-faint">{c.payoutsNote}</p>
+      <p className="text-[13px] leading-relaxed text-faint">{c.payoutsNote}</p>
 
       {error ? (
-        <p role="alert" className="text-[12px] font-semibold text-bad">
+        <p role="alert" className="text-[13px] font-semibold text-bad">
           {error}
         </p>
       ) : null}
@@ -183,7 +181,7 @@ export function SafraPayouts({ payouts }: { readonly payouts: readonly SafraPayo
           {payouts
             .filter((one) => one.entryGroupId)
             .map((one) => (
-              <li key={one.id} className="text-[10.5px] text-faint2">
+              <li key={one.id} className="text-[14px] text-faint">
                 <span className="font-mono">{one.reference}</span> · {c.entryGroup}:{' '}
                 <span className="font-mono" data-entry-group={one.reference}>
                   {one.entryGroupId}
@@ -228,7 +226,7 @@ function Transitions({
 
   const final = payout.status === 'paid' || payout.status === 'cancelled';
 
-  if (final) return <span className="text-[11px] text-faint2">—</span>;
+  if (final) return <span className="text-[13px] text-faint">—</span>;
 
   if (paying) {
     return (
@@ -252,7 +250,7 @@ function Transitions({
               if (go) onAct('paid', { paidReference: reference.trim() });
             })();
           }}
-          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg bg-ok px-3 py-1.5 text-[11px] font-bold text-bg disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg bg-ok px-3 py-1.5 text-[13px] font-bold text-bg disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
         >
           {c.markPaid}
         </button>
@@ -304,7 +302,7 @@ function Small({
       disabled={busy}
       {...{ [marker]: id }}
       onClick={onClick}
-      className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-2.5 py-1 text-[10.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+      className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-2.5 py-1 text-[13px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
     >
       {label}
     </button>

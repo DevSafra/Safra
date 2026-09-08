@@ -83,10 +83,10 @@ export function PartnerLocation({
           .finally(() => setBusy(false));
       }}
     >
-      <p className="text-[12.5px] text-muted">{copy.intro}</p>
+      <p className="text-[14px] text-muted">{copy.intro}</p>
 
       <div className="flex flex-wrap items-end gap-2">
-        <label className="grid gap-1 text-[11px] text-faint">
+        <label className="grid gap-1 text-[13px] text-faint">
           {copy.latitude}
           <input
             name="latitude"
@@ -95,11 +95,11 @@ export function PartnerLocation({
             defaultValue={latitude ?? ''}
             placeholder="33.5138"
             disabled={busy}
-            className="min-h-10 w-32 rounded-lg border border-line bg-field px-3 py-2 text-[13px] text-text disabled:cursor-not-allowed lg:min-h-0"
+            className="min-h-10 w-32 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text disabled:cursor-not-allowed lg:min-h-0"
           />
         </label>
 
-        <label className="grid gap-1 text-[11px] text-faint">
+        <label className="grid gap-1 text-[13px] text-faint">
           {copy.longitude}
           <input
             name="longitude"
@@ -108,26 +108,26 @@ export function PartnerLocation({
             defaultValue={longitude ?? ''}
             placeholder="36.2765"
             disabled={busy}
-            className="min-h-10 w-32 rounded-lg border border-line bg-field px-3 py-2 text-[13px] text-text disabled:cursor-not-allowed lg:min-h-0"
+            className="min-h-10 w-32 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text disabled:cursor-not-allowed lg:min-h-0"
           />
         </label>
 
         <button
           type="submit"
           disabled={busy}
-          className="min-h-10 cursor-pointer rounded-lg border border-line px-4 text-[12.5px] text-text disabled:cursor-not-allowed lg:min-h-0"
+          className="min-h-10 cursor-pointer rounded-lg border border-line px-4 text-[14px] text-text disabled:cursor-not-allowed lg:min-h-0"
         >
           {busy ? copy.saving : copy.save}
         </button>
       </div>
 
       {error ? (
-        <p role="alert" className="text-[12px] text-bad">
+        <p role="alert" className="text-[13px] text-bad">
           {error}
         </p>
       ) : null}
       {saved && !error ? (
-        <p role="status" className="text-[12px] text-ok">
+        <p role="status" className="text-[13px] text-ok">
           {copy.saved}
         </p>
       ) : null}

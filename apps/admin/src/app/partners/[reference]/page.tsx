@@ -102,7 +102,7 @@ export default async function PartnerPage({
         <p className="mt-2">
           <Link
             href={`/messages?to=partner&ref=${encodeURIComponent(partner.reference)}`}
-            className="inline-flex min-h-10 items-center rounded-lg border border-line px-3.5 py-1.5 text-[11.5px] font-bold text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold lg:min-h-0"
+            className="inline-flex min-h-10 items-center rounded-lg border border-line px-3.5 py-1.5 text-[13px] font-bold text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read lg:min-h-0"
           >
             {t.sections.messages.messageAction}
           </Link>
@@ -156,7 +156,7 @@ export default async function PartnerPage({
           <p className="mt-3">
             <a
               href={`/partners/${partner.reference}/onboarding`}
-              className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-gold/40 bg-gold/10 px-4 py-2 text-[12.5px] text-gold transition-colors hover:border-gold hover:bg-gold/15 lg:min-h-0"
+              className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-gold/40 bg-gold/10 px-4 py-2 text-[14px] text-gold-read transition-colors hover:border-gold hover:bg-gold/15 lg:min-h-0"
             >
               {t.sections.partnerDetail.continueOnboarding}
             </a>
@@ -197,7 +197,7 @@ export default async function PartnerPage({
                   href={`https://www.openstreetmap.org/?mlat=${encodeURIComponent(partner.latitude)}&mlon=${encodeURIComponent(partner.longitude)}#map=17/${encodeURIComponent(partner.latitude)}/${encodeURIComponent(partner.longitude)}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex min-h-10 items-center text-gold hover:underline lg:min-h-0"
+                  className="inline-flex min-h-10 items-center text-gold-read hover:underline lg:min-h-0"
                 >
                   <Ltr>{`${partner.latitude}, ${partner.longitude}`}</Ltr>
                 </a>
@@ -233,7 +233,7 @@ export default async function PartnerPage({
                   {t.sections.partnerDetail.noPayoutDetails}
                 </span>
               ) : (
-                <span className="text-faint2">
+                <span className="text-faint">
                   {payoutAccounts.length === 0
                     ? t.sections.partnerDetail.noPayoutDetails
                     : t.sections.partnerDetail.payoutDetailsHint}
@@ -380,7 +380,7 @@ export default async function PartnerPage({
         */}
         <a
           href={`/partners/${partner.reference}/violations`}
-          className="mt-3 inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-4 py-2 text-[12.5px] text-muted hover:border-gold/50 hover:text-gold lg:min-h-0"
+          className="mt-3 inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-4 py-2 text-[14px] text-muted hover:border-gold/50 hover:text-gold-read lg:min-h-0"
         >
           {t.sections.enforcement.openViolations}
         </a>

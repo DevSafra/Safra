@@ -52,7 +52,7 @@ export default async function RegisterPage({
         {t('haveAccount')}{' '}
         <Link
           href={`/${locale}/login?next=${encodeURIComponent(next)}`}
-          className="inline-flex min-h-10 items-center lg:min-h-0 text-gold hover:underline"
+          className="inline-flex min-h-10 items-center lg:min-h-0 text-gold-read hover:underline"
         >
           {t('signIn')}
         </Link>

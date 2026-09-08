@@ -100,7 +100,7 @@ export default async function PayoutsPage({
             name="status"
             defaultValue={status ?? ''}
             aria-label={t.sections.payouts.colStatus}
-            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text"
           >
             <option value="">{t.sections.payouts.allStatuses}</option>
             {PAYOUT_STATUSES.map((value) => (
@@ -112,9 +112,9 @@ export default async function PayoutsPage({
         </TableToolbar>
 
         {result === 'unauthenticated' ? (
-          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
         ) : result === 'failed' ? (
-          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <>
             <AdminTable
@@ -210,7 +210,7 @@ function columns(position: {
       key: 'period',
       header: t.sections.payouts.colPeriod,
       render: (row) => (
-        <Ltr className="whitespace-nowrap text-[11.5px] text-faint">
+        <Ltr className="whitespace-nowrap text-[13px] text-faint">
           {row.periodStart} ← {row.periodEnd}
         </Ltr>
       ),
@@ -224,7 +224,7 @@ function columns(position: {
       key: 'net',
       header: t.sections.payouts.colNet,
       render: (row) => (
-        <Ltr className="font-extrabold whitespace-nowrap text-gold">
+        <Ltr className="font-extrabold whitespace-nowrap text-gold-read">
           {amount(row.netAmount, row.currencyCode)}
         </Ltr>
       ),

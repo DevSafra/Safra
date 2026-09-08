@@ -93,7 +93,7 @@ export default async function AccountSupportThreadPage({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="font-mono text-sm text-text">{ltrIsolate(thread.reference)}</p>
             <span
-              className={`rounded-full border px-2 py-0.5 text-[11px] ${
+              className={`rounded-full border px-2 py-0.5 text-[13px] ${
                 thread.closed
                   ? 'border-line bg-field text-faint'
                   : 'border-ok/40 bg-ok/10 text-ok'

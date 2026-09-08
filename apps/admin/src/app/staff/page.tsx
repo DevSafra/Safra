@@ -109,9 +109,9 @@ export default async function StaffPage({
 
         <ConsolePanel>
           {result === 'unauthenticated' ? (
-            <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
+            <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
           ) : result === 'failed' ? (
-            <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
+            <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
           ) : (
             <div className="grid gap-6">
               {/*
@@ -297,7 +297,7 @@ function Counters({ counters }: { counters: StaffOverview['counters'] }) {
       <Kpi
         label={t.sections.staff.kpiRoles}
         value={count(counters.rolesDefined)}
-        valueClass="text-gold"
+        valueClass="text-gold-read"
         sub={t.sections.staff.kpiRolesSub}
       />
       {/*
@@ -350,18 +350,18 @@ function Activity({
           placeholder={t.sections.staff.activitySearch}
           aria-label={t.sections.staff.activitySearchLabel}
           /* No `dir`: a field a person types into follows the page (docs/i18n.md §9). */
-          className="min-w-0 flex-1 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+          className="min-w-0 flex-1 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text"
         />
         <button
           type="submit"
-          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-4 py-2 text-[12.5px] text-muted hover:border-gold/50 hover:text-gold lg:min-h-0"
+          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-4 py-2 text-[14px] text-muted hover:border-gold/50 hover:text-gold-read lg:min-h-0"
         >
           {t.sections.staff.activitySearchGo}
         </button>
         {term ? (
           <a
             href={`/staff?${new URLSearchParams({ ...carry, activitySize: String(size) }).toString()}`}
-            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-4 py-2 text-[12.5px] text-muted hover:border-gold/50 hover:text-gold lg:min-h-0"
+            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-4 py-2 text-[14px] text-muted hover:border-gold/50 hover:text-gold-read lg:min-h-0"
           >
             {t.sections.staff.activityClear}
           </a>
@@ -369,16 +369,16 @@ function Activity({
       </form>
 
       {result === 'unauthenticated' ? (
-        <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
+        <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
       ) : result === 'failed' ? (
-        <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
+        <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
       ) : result.items.length === 0 ? (
         /*
           A search that matched nobody says so. It must NOT say «لا نشاط بعد»: the reader typed a
           colleague's name, and being told there is no activity would have them believe that person
           has done nothing rather than that the term found no one.
         */
-        <p className="text-[12.5px] text-faint">
+        <p className="text-[14px] text-faint">
           {term ? t.sections.staff.activityNoMatch : t.dashboard.nothingWaiting}
         </p>
       ) : (
@@ -387,7 +387,7 @@ function Activity({
             Capped and scrolled in its own box — Bashar's max height. `overscroll-contain` so
             reaching the end of this list does not carry on scrolling the page underneath it.
           */}
-          <ul className="grid max-h-[26rem] gap-2.25 overflow-y-auto overscroll-contain pe-1 text-[12.5px]">
+          <ul className="grid max-h-[26rem] gap-2.25 overflow-y-auto overscroll-contain pe-1 text-[14px]">
             {result.items.map((row) => (
               <li key={row.id}>
                 <a
@@ -399,10 +399,10 @@ function Activity({
                     {row.actorEmail ?? t.admin.systemActor}
                   </span>
                   <span className="text-text2">{auditAction(row.action)}</span>
-                  <span className="text-[11px] text-faint">
+                  <span className="text-[13px] text-faint">
                     {auditSubject(row.subjectType)}
                   </span>
-                  <Ltr className="ms-auto text-[11px] text-faint">
+                  <Ltr className="ms-auto text-[13px] text-faint">
                     {shortDateTime(row.createdAt)}
                   </Ltr>
                 </a>
@@ -433,7 +433,7 @@ function Pill({ tone, children }: { tone: 'gold' | 'bad'; children: React.ReactN
   const classes =
     tone === 'bad'
       ? 'border-bad/40 bg-bad/10 text-bad'
-      : 'border-gold/40 bg-gold/10 text-gold';
+      : 'border-gold/40 bg-gold/10 text-gold-read';
 
   return (
     <span className={`rounded-full border px-2.5 py-0.5 text-xs ${classes}`}>

@@ -100,7 +100,7 @@ export default async function PropertiesPage() {
             <p className="text-sm text-faint">{t.properties.empty}</p>
           ) : (
             <>
-              <p className="mb-3 text-[12.5px] text-faint">
+              <p className="mb-3 text-[14px] text-faint">
                 {fill(t.properties.count, { n: properties.length })} · {t.properties.note}
               </p>
 
@@ -164,7 +164,7 @@ function Card({ property }: { readonly property: PartnerProperty }) {
             className="h-full w-full object-cover"
           />
         ) : (
-          <span className="grid h-full place-items-center text-[11.5px] text-faint">
+          <span className="grid h-full place-items-center text-[13px] text-faint">
             {t.properties.noPhoto}
           </span>
         )}
@@ -176,7 +176,7 @@ function Card({ property }: { readonly property: PartnerProperty }) {
 
       <div className="flex flex-1 flex-col p-3.5">
         <div className="flex items-start justify-between gap-2">
-          <h2 className="min-w-0 text-[14px] font-bold text-text">
+          <h2 className="min-w-0 text-[16px] font-bold text-text">
             {property.nameAr}
             {/*
               The room number beside the name, and only when there is one (Bashar, 2026-08-19).
@@ -187,13 +187,13 @@ function Card({ property }: { readonly property: PartnerProperty }) {
               isolation on its own: the hyphen is bidi-neutral, so an unisolated value reads `12-A`.
             */}
             {property.roomNumber ? (
-              <span className="ms-2 whitespace-nowrap text-[11.5px] font-semibold text-muted">
+              <span className="ms-2 whitespace-nowrap text-[13px] font-semibold text-muted">
                 {t.properties.roomNumberBadge} <Ltr>{property.roomNumber}</Ltr>
               </span>
             ) : null}
           </h2>
           {property.rating ? (
-            <span className="shrink-0 text-[12.5px] font-extrabold text-gold">
+            <span className="shrink-0 text-[14px] font-extrabold text-gold-read">
               ★ {property.rating}
             </span>
           ) : null}
@@ -208,7 +208,7 @@ function Card({ property }: { readonly property: PartnerProperty }) {
           partner comes to believe SAFRA has changed their classification because a guest left a
           review. Absent when null, with no placeholder: the edit form is where that is answered.
         */}
-        <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11.5px] text-faint">
+        <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-faint">
           {property.starRating ? (
             <StarRating
               value={property.starRating}
@@ -223,7 +223,7 @@ function Card({ property }: { readonly property: PartnerProperty }) {
             {property.attributes.map((attribute) => (
               <li
                 key={attribute}
-                className="rounded-full border border-gold/40 px-2 py-0.5 text-[11px] font-semibold text-gold"
+                className="rounded-full border border-gold/40 px-2 py-0.5 text-[14px] font-semibold text-gold-read"
               >
                 {tripAttribute(attribute)}
               </li>
@@ -250,7 +250,7 @@ function Card({ property }: { readonly property: PartnerProperty }) {
               <li
                 key={category}
                 title={t.properties.cityCategoriesNote}
-                className="rounded-full border border-line px-2 py-0.5 text-[11px] text-muted"
+                className="rounded-full border border-line px-2 py-0.5 text-[14px] text-muted"
               >
                 {category}
               </li>
@@ -260,14 +260,14 @@ function Card({ property }: { readonly property: PartnerProperty }) {
 
         <div className="mt-auto pt-3.5">
           {property.fromPrice ? (
-            <p className="text-[17px] font-extrabold text-gold">
+            <p className="text-[17px] font-extrabold text-gold-read">
               <Ltr>
                 {amount(
                   property.fromPrice,
                   property.currencyCode ?? DEFAULT_MONEY_CURRENCY,
                 )}
               </Ltr>
-              <span className="text-[12px] font-normal text-faint">
+              <span className="text-[13px] font-normal text-faint">
                 {' '}
                 {t.properties.perNight}
               </span>
@@ -278,19 +278,19 @@ function Card({ property }: { readonly property: PartnerProperty }) {
             {/* الصور is built; تعديل and التقويم are not, and say so rather than navigating nowhere. */}
             <Link
               href={`/properties/${encodeURIComponent(property.reference)}/images`}
-              className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg border border-gold/50 px-3 text-[11.5px] font-semibold text-gold lg:min-h-0 lg:py-1.5"
+              className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg border border-gold/50 px-3 text-[13px] font-semibold text-gold-read lg:min-h-0 lg:py-1.5"
             >
               {t.properties.manageImages}
             </Link>
             <Link
               href={`/properties/${property.reference}/edit`}
-              className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg border border-line px-3 text-[11.5px] text-muted lg:min-h-0 lg:py-1.5"
+              className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg border border-line px-3 text-[13px] text-muted lg:min-h-0 lg:py-1.5"
             >
               {t.properties.edit}
             </Link>
             <Link
               href={`/properties/${property.reference}/calendar`}
-              className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg border border-line px-3 text-[11.5px] text-muted lg:min-h-0 lg:py-1.5"
+              className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg border border-line px-3 text-[13px] text-muted lg:min-h-0 lg:py-1.5"
             >
               {t.properties.calendar}
             </Link>
@@ -305,7 +305,7 @@ function Card({ property }: { readonly property: PartnerProperty }) {
 function StatusPill({ status }: { readonly status: string }) {
   return (
     <span
-      className={`rounded-full border px-2.5 py-0.5 text-[10.5px] font-bold ${TONES[statusTone(status)]}`}
+      className={`rounded-full border px-2.5 py-0.5 text-[13px] font-bold ${TONES[statusTone(status)]}`}
     >
       {propertyStatus(status)}
     </span>

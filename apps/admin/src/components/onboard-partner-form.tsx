@@ -151,12 +151,12 @@ export function OnboardPartnerForm({
         void submit(new FormData(event.currentTarget));
       }}
     >
-      <p className="rounded-lg border border-gold/30 bg-gold/5 px-4 py-3 text-[12.5px] leading-relaxed text-gold">
+      <p className="rounded-lg border border-gold/30 bg-gold/5 px-4 py-3 text-[14px] leading-relaxed text-gold-read">
         {t.sections.partnerOnboarding.passwordNote}
       </p>
 
       {error ? (
-        <p role="alert" className="text-[12.5px] text-bad">
+        <p role="alert" className="text-[14px] text-bad">
           {error}
         </p>
       ) : null}
@@ -215,7 +215,7 @@ export function OnboardPartnerForm({
         <div className="grid gap-1.5">
           <label
             htmlFor={`${formId}-partnerTypeCode`}
-            className="text-[11.5px] font-semibold text-muted"
+            className="text-[13px] font-semibold text-muted"
           >
             {t.sections.partnerOnboarding.partnerType}
           </label>
@@ -224,7 +224,7 @@ export function OnboardPartnerForm({
             name="partnerTypeCode"
             required
             defaultValue={partnerTypes[0]?.code ?? ''}
-            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2.5 text-[13px] font-normal text-text"
+            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2.5 text-[14px] font-normal text-text"
           >
             {partnerTypes.map((type) => (
               <option key={type.code} value={type.code}>
@@ -237,7 +237,7 @@ export function OnboardPartnerForm({
         <div className="grid gap-1.5">
           <label
             htmlFor={`${formId}-citySlug`}
-            className="text-[11.5px] font-semibold text-muted"
+            className="text-[13px] font-semibold text-muted"
           >
             {t.sections.partnerOnboarding.city}
           </label>
@@ -246,7 +246,7 @@ export function OnboardPartnerForm({
             name="citySlug"
             required
             defaultValue={cities[0]?.slug ?? ''}
-            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2.5 text-[13px] font-normal text-text"
+            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2.5 text-[14px] font-normal text-text"
           >
             {cities.map((city) => (
               <option key={city.slug} value={city.slug}>
@@ -276,7 +276,7 @@ export function OnboardPartnerForm({
         <div className="grid gap-1.5">
           <label
             htmlFor={`${formId}-preferredLocale`}
-            className="text-[11.5px] font-semibold text-muted"
+            className="text-[13px] font-semibold text-muted"
           >
             {t.sections.partnerOnboarding.locale}
           </label>
@@ -285,7 +285,7 @@ export function OnboardPartnerForm({
             name="preferredLocale"
             defaultValue="ar"
             aria-describedby={`${formId}-preferredLocale-hint`}
-            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2.5 text-[13px] font-normal text-text"
+            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2.5 text-[14px] font-normal text-text"
           >
             {LOCALES.map((locale) => (
               <option key={locale} value={locale}>
@@ -295,7 +295,7 @@ export function OnboardPartnerForm({
           </select>
           <span
             id={`${formId}-preferredLocale-hint`}
-            className="text-[10.5px] font-normal text-faint"
+            className="text-[13px] font-normal text-faint"
           >
             {t.sections.partnerOnboarding.localeHint}
           </span>
@@ -305,7 +305,7 @@ export function OnboardPartnerForm({
       <div className="grid gap-1.5">
         <label
           htmlFor={`${formId}-notes`}
-          className="text-[11.5px] font-semibold text-muted"
+          className="text-[13px] font-semibold text-muted"
         >
           {t.sections.partnerOnboarding.notes}
         </label>
@@ -317,14 +317,11 @@ export function OnboardPartnerForm({
           maxLength={2000}
           aria-invalid={field === 'notes' ? true : undefined}
           aria-describedby={`${formId}-notes-hint`}
-          className={`rounded-lg border bg-field px-3 py-2.5 text-[13px] font-normal text-text ${
+          className={`rounded-lg border bg-field px-3 py-2.5 text-[14px] font-normal text-text ${
             field === 'notes' ? 'border-bad' : 'border-line'
           }`}
         />
-        <span
-          id={`${formId}-notes-hint`}
-          className="text-[10.5px] font-normal text-faint"
-        >
+        <span id={`${formId}-notes-hint`} className="text-[13px] font-normal text-faint">
           {t.sections.partnerOnboarding.notesHint}
         </span>
       </div>
@@ -347,7 +344,7 @@ export function OnboardPartnerForm({
 function Fieldset({ legend, children }: { legend: string; children: React.ReactNode }) {
   return (
     <fieldset className="grid gap-3 rounded-lg border border-line bg-card p-4 sm:grid-cols-2">
-      <legend className="px-1 text-[12px] font-semibold text-text">{legend}</legend>
+      <legend className="px-1 text-[13px] font-semibold text-text">{legend}</legend>
       {children}
     </fieldset>
   );
@@ -395,7 +392,7 @@ function Field({
 
   return (
     <div className="grid gap-1.5">
-      <label htmlFor={id} className="text-[11.5px] font-semibold text-muted">
+      <label htmlFor={id} className="text-[13px] font-semibold text-muted">
         {text}
       </label>
       <input
@@ -406,12 +403,12 @@ function Field({
         maxLength={maxLength}
         aria-invalid={invalid ? true : undefined}
         aria-describedby={hint ? hintId : undefined}
-        className={`min-h-10 rounded-lg border bg-field px-3 py-2.5 text-[13px] font-normal text-text lg:min-h-0 ${
+        className={`min-h-10 rounded-lg border bg-field px-3 py-2.5 text-[14px] font-normal text-text lg:min-h-0 ${
           invalid ? 'border-bad' : 'border-line'
         }`}
       />
       {hint ? (
-        <span id={hintId} className="text-[10.5px] font-normal text-faint">
+        <span id={hintId} className="text-[13px] font-normal text-faint">
           {hint}
         </span>
       ) : null}

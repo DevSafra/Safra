@@ -46,9 +46,7 @@ export default async function LocaleNotFound() {
 
       <h1 className="text-2xl font-bold text-text sm:text-3xl">{t('title')}</h1>
 
-      <p className="max-w-prose text-[0.9375rem] leading-relaxed text-text2">
-        {t('body')}
-      </p>
+      <p className="max-w-prose text-[16px] leading-relaxed text-text2">{t('body')}</p>
 
       <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
         {/*

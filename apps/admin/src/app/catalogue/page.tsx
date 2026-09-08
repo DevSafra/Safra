@@ -102,11 +102,11 @@ function Section<T>({
   readonly children: (data: T) => React.ReactNode;
 }) {
   if (result === 'unauthenticated') {
-    return <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>;
+    return <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>;
   }
 
   if (result === 'failed') {
-    return <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>;
+    return <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>;
   }
 
   return <>{children(result)}</>;

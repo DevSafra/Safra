@@ -109,7 +109,7 @@ export function PhoneField({
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={id} className="text-sm text-muted">
-        {label} <span className="text-gold">*</span>
+        {label} <span className="text-gold-read">*</span>
       </label>
 
       {/*

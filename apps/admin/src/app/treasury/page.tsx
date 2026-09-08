@@ -49,9 +49,9 @@ export default async function TreasuryPage() {
     <ConsoleShell title={t.nav.treasury} counts={counts}>
       <ConsolePanel>
         {revenue === 'unauthenticated' ? (
-          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
         ) : revenue === 'failed' ? (
-          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <SafraRevenueSummary revenue={revenue} />
         )}
@@ -61,9 +61,9 @@ export default async function TreasuryPage() {
 
       <ConsolePanel>
         {accounts === 'unauthenticated' ? (
-          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
         ) : accounts === 'failed' ? (
-          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <SafraAccounts accounts={accounts.accounts} />
         )}
@@ -71,9 +71,9 @@ export default async function TreasuryPage() {
 
       <ConsolePanel>
         {payouts === 'unauthenticated' ? (
-          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
         ) : payouts === 'failed' ? (
-          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <SafraPayouts payouts={payouts.payouts} />
         )}

@@ -59,7 +59,7 @@ export function UnitEditor({
   if (units.length === 0) {
     return (
       <div className="grid gap-3">
-        <p className="text-[12.5px] text-faint">{t.editProperty.unitsEmpty}</p>
+        <p className="text-[14px] text-faint">{t.editProperty.unitsEmpty}</p>
         <AddUnit
           reference={reference}
           currencyCode={fallbackCurrency}
@@ -72,9 +72,7 @@ export function UnitEditor({
 
   return (
     <div className="grid gap-3">
-      <p className="text-[11.5px] leading-relaxed text-faint">
-        {t.editProperty.unitsNote}
-      </p>
+      <p className="text-[13px] leading-relaxed text-faint">{t.editProperty.unitsNote}</p>
 
       {/*
         Grouped by TYPE, not listed flat.
@@ -133,17 +131,17 @@ export function UnitEditor({
             <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-2.5 gap-y-1">
               <span
                 aria-hidden
-                className="text-[11px] text-faint transition-transform group-open:rotate-90"
+                className="text-[13px] text-faint transition-transform group-open:rotate-90"
               >
                 ‹
               </span>
-              <span className="text-[12.5px] font-bold text-text">
+              <span className="text-[14px] font-bold text-text">
                 {group.units[0]?.nameAr}
               </span>
-              <span className="text-[11.5px] font-semibold text-gold">
+              <span className="text-[13px] font-semibold text-gold-read">
                 {plural(t.editProperty.unitTypeCount, { count: group.units.length })}
               </span>
-              <span className="text-[11px] text-faint">
+              <span className="text-[13px] text-faint">
                 {t.editProperty.unitTypeHint}
               </span>
             </summary>
@@ -333,9 +331,9 @@ function UnitRow({
       {message ? (
         <p
           role="alert"
-          className={`rounded-lg border p-2.5 text-[12px] ${
+          className={`rounded-lg border p-2.5 text-[13px] ${
             message.kind === 'ok'
-              ? 'border-good/40 bg-good/10 text-good'
+              ? 'border-ok/40 bg-ok/10 text-ok'
               : 'border-bad/40 bg-bad/10 text-bad'
           }`}
         >
@@ -449,11 +447,11 @@ function UnitRow({
           onChange={(event) => set('isActive')(event.target.checked)}
           className="size-4 cursor-pointer"
         />
-        <span className="text-[12px] text-muted">{t.editProperty.unitActive}</span>
+        <span className="text-[13px] text-muted">{t.editProperty.unitActive}</span>
       </label>
 
       {form.isActive ? null : (
-        <p className="text-[11px] leading-relaxed text-warn">
+        <p className="text-[14px] leading-relaxed text-warn">
           {t.editProperty.unitInactiveNote}
         </p>
       )}
@@ -462,14 +460,14 @@ function UnitRow({
         <button
           type="submit"
           disabled={busy}
-          className="min-h-10 cursor-pointer rounded-lg border border-gold px-4 py-1.5 text-[12px] font-bold text-gold disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+          className="min-h-10 cursor-pointer rounded-lg border border-gold px-4 py-1.5 text-[13px] font-bold text-gold-read disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
         >
           {busy ? t.editProperty.unitSaving : t.editProperty.unitSave}
         </button>
 
         <Link
           href={`/properties/${reference}/calendar?unit=${unit.id}`}
-          className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-[11.5px] text-muted lg:min-h-0 lg:py-1.5"
+          className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-[13px] text-muted lg:min-h-0 lg:py-1.5"
         >
           {t.editProperty.openUnitCalendar}
         </Link>
@@ -493,14 +491,14 @@ function Field({
 }) {
   return (
     <label className="grid gap-1">
-      <span className="text-[12px] text-muted">{label}</span>
+      <span className="text-[13px] text-muted">{label}</span>
       <input
         id={id}
         dir={dir}
         value={value}
         maxLength={160}
         onChange={(event) => onChange(event.target.value)}
-        className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text lg:min-h-0"
+        className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text lg:min-h-0"
       />
     </label>
   );
@@ -532,7 +530,7 @@ function Number_({
 }) {
   return (
     <label className="grid gap-1">
-      <span className="text-[12px] text-muted">{label}</span>
+      <span className="text-[13px] text-muted">{label}</span>
       <input
         id={id}
         type="number"
@@ -540,7 +538,7 @@ function Number_({
         {...(step ? { step } : {})}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="field-ltr min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text lg:min-h-0"
+        className="field-ltr min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text lg:min-h-0"
       />
     </label>
   );

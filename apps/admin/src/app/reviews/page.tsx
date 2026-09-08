@@ -55,13 +55,13 @@ export default async function ReviewModerationPage({
     <ConsoleShell title={t.sections.reviewModeration.title} counts={counts}>
       <ConsolePanel>
         {result === 'unauthenticated' ? (
-          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
         ) : result === 'failed' ? (
-          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <>
             {result.items.length === 0 ? (
-              <p className="text-[12.5px] text-faint">
+              <p className="text-[14px] text-faint">
                 {t.sections.reviewModeration.empty}
               </p>
             ) : (
@@ -73,35 +73,35 @@ export default async function ReviewModerationPage({
                     className="scroll-mt-24 rounded-card border border-line bg-card p-4"
                   >
                     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                      <Ltr className="text-[12px] font-semibold text-sky">
+                      <Ltr className="text-[13px] font-semibold text-sky">
                         {review.reference}
                       </Ltr>
                       <span className="text-sm font-bold text-text">
                         {review.guestName}
                       </span>
-                      <span className="text-[11.5px] font-semibold text-gold">
+                      <span className="text-[13px] font-semibold text-gold-read">
                         {review.propertyName}
                       </span>
-                      <span className="text-[11.5px] text-faint">{review.unitName}</span>
-                      <span className="text-[12.5px] font-extrabold text-gold">
+                      <span className="text-[13px] text-faint">{review.unitName}</span>
+                      <span className="text-[14px] font-extrabold text-gold-read">
                         <Ltr>★ {review.rating}</Ltr>
                       </span>
-                      <span className="ms-auto text-[11.5px] text-faint">
+                      <span className="ms-auto text-[13px] text-faint">
                         <Ltr>{shortDateTime(review.createdAt)}</Ltr>
                       </span>
                     </div>
 
-                    <p className="mt-2 text-[11px] text-faint">
+                    <p className="mt-2 text-[14px] text-faint">
                       {t.sections.reviewModeration.body}
                     </p>
-                    <p className="mt-0.5 text-[12.5px] leading-[1.8] text-muted">
+                    <p className="mt-0.5 text-[14px] leading-[1.8] text-muted">
                       {review.body}
                     </p>
 
-                    <p className="mt-2.5 text-[11px] text-faint">
+                    <p className="mt-2.5 text-[14px] text-faint">
                       {t.sections.reviewModeration.reportedBy}
                     </p>
-                    <p className="mt-0.5 rounded-lg border border-warn/30 bg-warn/5 px-3 py-2 text-[12.5px] leading-relaxed text-warn">
+                    <p className="mt-0.5 rounded-lg border border-warn/30 bg-warn/5 px-3 py-2 text-[14px] leading-relaxed text-warn">
                       {review.reportReason}
                     </p>
 

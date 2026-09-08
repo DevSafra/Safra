@@ -66,10 +66,10 @@ export function StaffInvite({ roles }: { roles: readonly StaffRole[] }) {
 
   return (
     <section className="rounded-lg border border-line bg-card p-4">
-      <h2 className="text-[14.5px] font-extrabold text-gold">
+      <h2 className="text-[16px] font-extrabold text-gold-read">
         {t.sections.staff.invite}
       </h2>
-      <p className="mt-1 text-[11.5px] leading-relaxed text-faint">
+      <p className="mt-1 text-[13px] leading-relaxed text-faint">
         {t.sections.staff.inviteHint}
       </p>
 
@@ -113,7 +113,7 @@ export function StaffInvite({ roles }: { roles: readonly StaffRole[] }) {
           maxLength={120}
           placeholder={t.sections.staff.inviteNamePlaceholder}
           aria-label={t.sections.staff.inviteName}
-          className="rounded-lg border border-line bg-field px-3 py-2.5 text-[12.5px] text-text"
+          className="rounded-lg border border-line bg-field px-3 py-2.5 text-[14px] text-text"
         />
         <input
           name="email"
@@ -122,7 +122,7 @@ export function StaffInvite({ roles }: { roles: readonly StaffRole[] }) {
           placeholder={t.sections.staff.inviteEmailPlaceholder}
           aria-label={t.sections.staff.inviteEmail}
           /* No `dir`: a field a person types into follows the page (docs/i18n.md §9). */
-          className="rounded-lg border border-line bg-field px-3 py-2.5 text-[12.5px] text-text"
+          className="rounded-lg border border-line bg-field px-3 py-2.5 text-[14px] text-text"
         />
         {/*
           No default selection. The role decides what the account can reach, so a select that
@@ -133,7 +133,7 @@ export function StaffInvite({ roles }: { roles: readonly StaffRole[] }) {
           required
           defaultValue=""
           aria-label={t.sections.staff.inviteRole}
-          className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2.5 text-[12.5px] text-text"
+          className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2.5 text-[14px] text-text"
         >
           <option value="" disabled>
             {t.sections.staff.pickRole}
@@ -147,13 +147,13 @@ export function StaffInvite({ roles }: { roles: readonly StaffRole[] }) {
         <button
           type="submit"
           disabled={busy}
-          className="cursor-pointer rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-5 py-2.5 text-[12.5px] font-extrabold text-[#241A05] disabled:opacity-60"
+          className="cursor-pointer rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-5 py-2.5 text-[14px] font-extrabold text-[#241A05] disabled:opacity-60"
         >
           {busy ? t.sections.staff.inviteSending : t.sections.staff.inviteSend}
         </button>
       </form>
 
-      <p className="mt-2.5 text-[11px] text-faint">{t.sections.staff.inviteNote}</p>
+      <p className="mt-2.5 text-[14px] text-faint">{t.sections.staff.inviteNote}</p>
     </section>
   );
 }

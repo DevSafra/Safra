@@ -118,14 +118,14 @@ export function StaffScopeEditor({
       ) : null}
 
       <fieldset className="grid gap-1.5">
-        <legend className="text-[11px] text-faint">
+        <legend className="text-[13px] text-faint">
           {t.sections.staff.scopeKindLabel}
         </legend>
         {/*
           Radios rather than a select, because the two choices are the whole decision and a
           collapsed control hides the one that is not chosen.
         */}
-        <div className="flex flex-wrap gap-4 text-[12.5px]">
+        <div className="flex flex-wrap gap-4 text-[14px]">
           <label className="inline-flex cursor-pointer items-center gap-2">
             <input
               type="radio"
@@ -154,18 +154,18 @@ export function StaffScopeEditor({
       </fieldset>
 
       <fieldset className="grid gap-1.5">
-        <legend className="text-[11px] text-faint">
+        <legend className="text-[13px] text-faint">
           {t.sections.staff.scopeCitiesLabel}
         </legend>
         {cities.length === 0 ? (
-          <p className="text-[12.5px] text-warn">{t.sections.staff.scopeCitiesFailed}</p>
+          <p className="text-[14px] text-warn">{t.sections.staff.scopeCitiesFailed}</p>
         ) : (
-          <div className="flex flex-wrap gap-x-4 gap-y-2 text-[12.5px]">
+          <div className="flex flex-wrap gap-x-4 gap-y-2 text-[14px]">
             {cities.map((city) => (
               <label
                 key={city.slug}
                 className={`inline-flex items-center gap-2 ${
-                  kind === 'all_cities' ? 'text-faint2' : 'cursor-pointer'
+                  kind === 'all_cities' ? 'text-faint' : 'cursor-pointer'
                 }`}
               >
                 <input
@@ -191,7 +191,7 @@ export function StaffScopeEditor({
 
       <div className="flex flex-wrap items-end gap-2">
         <label className="grid gap-1">
-          <span className="text-[11px] text-faint">
+          <span className="text-[13px] text-faint">
             {t.sections.staff.scopeOutsideLabel}
           </span>
           <select
@@ -208,7 +208,7 @@ export function StaffScopeEditor({
         </label>
 
         <label className="grid flex-1 gap-1">
-          <span className="text-[11px] text-faint">{t.sections.staff.scopeReason}</span>
+          <span className="text-[13px] text-faint">{t.sections.staff.scopeReason}</span>
           <input
             type="text"
             value={reason}
@@ -223,7 +223,7 @@ export function StaffScopeEditor({
         <button
           type="submit"
           disabled={busy}
-          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-3 py-2 text-xs text-muted hover:border-gold/50 hover:text-gold disabled:cursor-not-allowed lg:min-h-0"
+          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-3 py-2 text-xs text-muted hover:border-gold/50 hover:text-gold-read disabled:cursor-not-allowed lg:min-h-0"
         >
           {busy ? t.sections.staff.scopeSaving : t.sections.staff.scopeSave}
         </button>

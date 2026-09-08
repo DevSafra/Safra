@@ -55,20 +55,20 @@ export function CountryRows({
 
   return (
     <>
-      <ul className="grid gap-2 text-[12.5px]">
+      <ul className="grid gap-2 text-[14px]">
         {rows.map((row) => (
           <li
             key={row.code}
             className="flex flex-wrap items-center gap-2.5 rounded-lg border border-line bg-field px-3 py-2.5"
           >
             <span className="font-bold text-text">{row.nameAr}</span>
-            <span className="text-[11px] text-faint">
+            <span className="text-[13px] text-faint">
               {row.currencyCode ?? t.admin.noData} ·{' '}
               {fill(c.activeCitiesShort, { n: String(row.activeCities) })}
             </span>
             <span className="ms-auto flex items-center gap-2">
               <span
-                className={`text-[11px] font-bold ${row.isActive ? 'text-ok' : 'text-faint'}`}
+                className={`text-[13px] font-bold ${row.isActive ? 'text-ok' : 'text-faint'}`}
               >
                 {row.isActive ? c.active : c.inactive}
               </span>
@@ -76,7 +76,7 @@ export function CountryRows({
                 type="button"
                 data-country-edit={row.code}
                 onClick={() => setEditing(editing === row.code ? null : row.code)}
-                className="cursor-pointer rounded-lg border border-line px-2.5 py-1 text-[10.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold"
+                className="cursor-pointer rounded-lg border border-line px-2.5 py-1 text-[13px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read"
               >
                 {c.edit}
               </button>
@@ -296,7 +296,7 @@ export function CurrencyRows({ rows }: { readonly rows: readonly Currency[] }) {
 
   return (
     <>
-      <ul className="grid gap-2 text-[12.5px]">
+      <ul className="grid gap-2 text-[14px]">
         {rows.map((row) => (
           <li
             key={row.code}
@@ -307,17 +307,17 @@ export function CurrencyRows({ rows }: { readonly rows: readonly Currency[] }) {
             </span>
 
             {row.isAccounting ? (
-              <span className="rounded-full bg-[rgba(var(--goldA),0.14)] px-2.5 py-0.5 text-[10px] font-extrabold text-gold">
+              <span className="rounded-full bg-[rgba(var(--goldA),0.14)] px-2.5 py-0.5 text-[13px] font-extrabold text-gold-read">
                 {c.accounting}
               </span>
             ) : null}
 
             {/* State, because a currency can be withdrawn now — see `CountryRows`. */}
             {row.isActive ? null : (
-              <span className="text-[10.5px] font-bold text-faint">{c.inactive}</span>
+              <span className="text-[13px] font-bold text-faint">{c.inactive}</span>
             )}
 
-            <span className="ms-auto flex items-center gap-2 text-[11.5px]">
+            <span className="ms-auto flex items-center gap-2 text-[13px]">
               {/*
                 A missing rate is called out in RED rather than shown as a dash. The platform
                 refuses to price a booking without one, so an unconfigured currency is a live
@@ -330,7 +330,7 @@ export function CurrencyRows({ rows }: { readonly rows: readonly Currency[] }) {
                 <Ltr className="text-muted">
                   = {money(row.rateToSyp)} ل.س
                   {row.rateSetAt ? (
-                    <span className="ms-1.5 text-[10.5px] text-faint">
+                    <span className="ms-1.5 text-[13px] text-faint">
                       {shortDate(row.rateSetAt)}
                     </span>
                   ) : null}
@@ -340,7 +340,7 @@ export function CurrencyRows({ rows }: { readonly rows: readonly Currency[] }) {
                 type="button"
                 data-currency-edit={row.code}
                 onClick={() => setEditing(editing === row.code ? null : row.code)}
-                className="cursor-pointer rounded-lg border border-line px-2.5 py-1 text-[10.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold"
+                className="cursor-pointer rounded-lg border border-line px-2.5 py-1 text-[13px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read"
               >
                 {c.edit}
               </button>
@@ -550,7 +550,7 @@ function CurrencyForm({
           who came looking is not left wondering.
         */}
         {currency.isAccounting ? (
-          <p className="text-[11.5px] text-faint">{c.fxRateAccounting}</p>
+          <p className="text-[13px] text-faint">{c.fxRateAccounting}</p>
         ) : (
           <Row>
             <Field

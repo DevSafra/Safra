@@ -80,7 +80,7 @@ export function SupportClose({ reference }: { readonly reference: string }) {
       {error ? (
         <p
           role="alert"
-          className="rounded-lg border border-bad/40 bg-bad/10 p-3 text-[12.5px] text-bad"
+          className="rounded-lg border border-bad/40 bg-bad/10 p-3 text-[14px] text-bad"
         >
           {error}
         </p>
@@ -89,12 +89,12 @@ export function SupportClose({ reference }: { readonly reference: string }) {
       <button
         type="submit"
         disabled={busy}
-        className="min-h-10 w-fit cursor-pointer rounded-lg border border-line px-5 text-[12.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 lg:py-2"
+        className="min-h-10 w-fit cursor-pointer rounded-lg border border-line px-5 text-[14px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold-read disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 lg:py-2"
       >
         {busy ? t.support.closeSubmitting : t.support.closeLabel}
       </button>
 
-      <span className="text-[11px] text-faint">{t.support.closeHint}</span>
+      <span className="text-[13px] text-faint">{t.support.closeHint}</span>
     </form>
   );
 }

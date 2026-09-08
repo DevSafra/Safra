@@ -109,7 +109,7 @@ export function PartnerCommission({
 
   return (
     <div data-partner-commission={reference} className="grid gap-3">
-      <p className="text-[12px] leading-relaxed text-faint2">{c.commissionNote}</p>
+      <p className="text-[13px] leading-relaxed text-faint">{c.commissionNote}</p>
 
       <Row>
         {/*
@@ -133,7 +133,7 @@ export function PartnerCommission({
       </Row>
 
       {/* What an empty box currently MEANS, said rather than left to be inferred. */}
-      <p className="text-[11.5px] text-muted">
+      <p className="text-[13px] text-muted">
         {percent.trim() === '' ? c.commissionPlatform : `${percent}%`}
         {' · '}
         {cap.trim() === '' ? c.commissionNoCap : `$${cap}`}
@@ -156,7 +156,7 @@ export function PartnerCommission({
       />
 
       {saved ? (
-        <p className="text-[11.5px] font-semibold text-ok">{c.commissionSaved}</p>
+        <p className="text-[13px] font-semibold text-ok">{c.commissionSaved}</p>
       ) : null}
     </div>
   );

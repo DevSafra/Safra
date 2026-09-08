@@ -87,7 +87,7 @@ export function DisputeResponse({ reference }: { readonly reference: string }) {
     return (
       <p
         role="status"
-        className="rounded-lg border border-ok/40 bg-ok/10 p-3 text-[12.5px] text-text"
+        className="rounded-lg border border-ok/40 bg-ok/10 p-3 text-[14px] text-text"
       >
         {sent.redactedCount > 0 ? c.respondRedacted : c.respondSent}
       </p>
@@ -103,7 +103,7 @@ export function DisputeResponse({ reference }: { readonly reference: string }) {
         void submit(typeof value === 'string' ? value : '');
       }}
     >
-      <label htmlFor="dispute-response" className="text-[12.5px] text-muted">
+      <label htmlFor="dispute-response" className="text-[14px] text-muted">
         {c.respondLabel}
       </label>
       {/*
@@ -117,21 +117,21 @@ export function DisputeResponse({ reference }: { readonly reference: string }) {
         required
         minLength={10}
         maxLength={4000}
-        className="rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+        className="rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text"
       />
 
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="submit"
           disabled={busy}
-          className="min-h-10 cursor-pointer rounded-lg border-none bg-[linear-gradient(135deg,#8FD9A8,#4F9E6B)] px-4 py-2 text-[12.5px] font-extrabold text-[#0A2013] transition-transform duration-150 ease-out-strong active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none lg:min-h-0"
+          className="min-h-10 cursor-pointer rounded-lg border-none bg-[linear-gradient(135deg,#8FD9A8,#4F9E6B)] px-4 py-2 text-[14px] font-extrabold text-[#0A2013] transition-transform duration-150 ease-out-strong active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none lg:min-h-0"
         >
           {busy ? c.respondSending : c.respondSubmit}
         </button>
       </div>
 
       {error ? (
-        <p role="alert" className="text-[11.5px] text-bad">
+        <p role="alert" className="text-[13px] text-bad">
           {error}
         </p>
       ) : null}

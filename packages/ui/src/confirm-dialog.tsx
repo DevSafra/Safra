@@ -92,7 +92,7 @@ export function ConfirmDialog({
       initialFocus={initial}
       onClose={() => onResolve(false)}
     >
-      <h2 id="safra-confirm-title" className="text-[15px] font-bold text-text">
+      <h2 id="safra-confirm-title" className="text-[16px] font-bold text-text">
         {request.title}
       </h2>
 
@@ -105,7 +105,7 @@ export function ConfirmDialog({
       */}
       <p
         id="safra-confirm-message"
-        className="text-[12.5px] leading-relaxed whitespace-pre-line text-muted"
+        className="text-[14px] leading-relaxed whitespace-pre-line text-muted"
       >
         {request.message}
       </p>
@@ -137,7 +137,7 @@ export function ConfirmDialog({
           ref={danger && asks ? undefined : initial}
           onClick={() => onResolve(true)}
           className={`inline-flex min-h-10 cursor-pointer items-center rounded-lg px-4.5 py-2 text-xs font-bold transition-opacity hover:opacity-90 lg:min-h-0 ${
-            danger ? 'bg-bad text-white' : 'bg-gold text-ink'
+            danger ? 'bg-bad text-bg' : 'bg-gold text-ink'
           }`}
         >
           {request.confirmLabel}

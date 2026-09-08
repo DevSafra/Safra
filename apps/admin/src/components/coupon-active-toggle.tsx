@@ -61,15 +61,15 @@ export function CouponActiveToggle({
         type="button"
         disabled={busy}
         onClick={() => void submit()}
-        className={`min-h-10 cursor-pointer rounded-lg border px-2.5 py-1 text-[11px] font-bold transition-colors disabled:opacity-50 lg:min-h-0 ${
+        className={`min-h-10 cursor-pointer rounded-lg border px-2.5 py-1 text-[13px] font-bold transition-colors disabled:opacity-50 lg:min-h-0 ${
           isActive
             ? 'border-line text-muted hover:border-bad hover:text-bad'
-            : 'border-[rgba(var(--goldA),0.4)] text-gold hover:bg-[rgba(var(--goldA),0.08)]'
+            : 'border-[rgba(var(--goldA),0.4)] text-gold-read hover:bg-[rgba(var(--goldA),0.08)]'
         }`}
       >
         {busy ? t.table.working : isActive ? c.deactivate : c.activate}
       </button>
-      {error ? <span className="text-[10.5px] text-bad">{error}</span> : null}
+      {error ? <span className="text-[13px] text-bad">{error}</span> : null}
     </div>
   );
 }

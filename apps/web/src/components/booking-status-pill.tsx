@@ -25,7 +25,7 @@ const TONES: Record<Tone, string> = {
   sky: 'border-sky/40 bg-sky/10 text-sky',
   indigo: 'border-indigo/40 bg-indigo/10 text-indigo',
   pend: 'border-pend/40 bg-pend/10 text-pend',
-  gold: 'border-gold/40 bg-gold/10 text-gold',
+  gold: 'border-gold/40 bg-gold/10 text-gold-read',
   warn: 'border-warn/40 bg-warn/10 text-warn',
   orange: 'border-orange/40 bg-orange/10 text-orange',
   bad: 'border-bad/40 bg-bad/10 text-bad',

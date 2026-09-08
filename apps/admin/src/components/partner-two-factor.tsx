@@ -75,7 +75,7 @@ export function PartnerTwoFactor({
         </span>
         <span
           data-status-pill
-          className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${
+          className={`rounded-full border px-2.5 py-0.5 text-[13px] font-bold ${
             enrolled ? 'border-ok bg-ok/15 text-ok' : 'border-warn bg-warn/15 text-warn'
           }`}
         >

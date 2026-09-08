@@ -115,7 +115,7 @@ export function GuestsField({
           decrease={labels.decrease}
         />
         {/* Said plainly, because a «0» beside «الرضّع» otherwise reads as a bed they are not getting. */}
-        <p className="pt-1 text-[0.6875rem] leading-relaxed text-faint">
+        <p className="pt-1 text-[14px] leading-relaxed text-faint">
           {labels.infantsHint}
         </p>
 

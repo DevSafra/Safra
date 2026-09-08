@@ -26,14 +26,14 @@ export async function ContractsCard({ partnerReference }: { partnerReference?: s
 
   return (
     <ConsolePanel title={t.sections.contracts.title}>
-      <p className="mb-3 text-[11.5px] text-faint">{t.sections.contracts.hint}</p>
+      <p className="mb-3 text-[13px] text-faint">{t.sections.contracts.hint}</p>
 
       {result === 'unauthenticated' ? (
-        <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
+        <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
       ) : result === 'failed' ? (
-        <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
+        <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
       ) : result.contracts.length === 0 ? (
-        <p className="text-[12.5px] text-faint">{t.sections.contracts.none}</p>
+        <p className="text-[14px] text-faint">{t.sections.contracts.none}</p>
       ) : (
         <ul className="grid gap-2.25">
           {result.contracts.map((contract) => (
@@ -55,16 +55,16 @@ function ContractRow({ contract }: { contract: ContractItem }) {
       {/* The design's 32×32 gold PDF tile. */}
       <span
         aria-hidden
-        className="grid size-8 shrink-0 place-items-center rounded-lg border border-[rgba(var(--goldA),0.3)] bg-[rgba(var(--goldA),0.12)] text-[10px] font-extrabold text-gold"
+        className="grid size-8 shrink-0 place-items-center rounded-lg border border-[rgba(var(--goldA),0.3)] bg-[rgba(var(--goldA),0.12)] text-[13px] font-extrabold text-gold-read"
       >
         PDF
       </span>
 
       <span className="min-w-0">
-        <Ltr className="block truncate text-[13px] font-bold text-text">
+        <Ltr className="block truncate text-[14px] font-bold text-text">
           {contract.fileName}
         </Ltr>
-        <span className="block text-[11px] text-faint">
+        <span className="block text-[13px] text-faint">
           <Ltr>{contract.partnerReference}</Ltr> · {kindLabel(contract.kind)} ·{' '}
           {fill(t.sections.contracts.uploadedBy, {
             date: shortDate(contract.uploadedAt),
@@ -80,7 +80,7 @@ function ContractRow({ contract }: { contract: ContractItem }) {
       <span
         aria-disabled="true"
         title={t.nav.notBuilt}
-        className="shrink-0 cursor-not-allowed rounded-lg border border-line px-3.5 py-1 text-[11.5px] font-bold text-faint2"
+        className="shrink-0 cursor-not-allowed rounded-lg border border-line px-3.5 py-1 text-[13px] font-bold text-faint"
       >
         {t.sections.contracts.view}
       </span>

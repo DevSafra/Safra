@@ -33,7 +33,7 @@ export function CheckoutTotal({
       {applied ? (
         <div className="flex justify-between">
           <dt className="text-muted">{discountLabel.replace('{code}', applied.code)}</dt>
-          <dd className="text-gold">
+          <dd className="text-gold-read">
             −
             {formatMoney(applied.discountAmount, currencyCode, locale, {
               exact: true,
@@ -52,7 +52,7 @@ export function CheckoutTotal({
         className="flex justify-between border-t border-line pt-2 text-base"
       >
         <dt className="font-semibold text-text">{label}</dt>
-        <dd className="font-semibold text-gold">
+        <dd className="font-semibold text-gold-read">
           {/*
             `exact`, because this figure sits at the foot of a breakdown that may itemise the
             accommodation and the fee above it. Those render exactly (as the invoice's lines do),

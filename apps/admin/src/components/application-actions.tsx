@@ -120,7 +120,7 @@ export function ApplicationActions({
 
       {open ? (
         <div className="grid gap-2 rounded-card border border-line bg-field p-3">
-          <p className="text-[11.5px] leading-relaxed text-muted">
+          <p className="text-[13px] leading-relaxed text-muted">
             {open === 'contact'
               ? t.sections.partnerApplications.contactHint
               : open === 'accept'
@@ -132,7 +132,7 @@ export function ApplicationActions({
 
           {open === 'resend' ? null : (
             <label className="grid gap-1">
-              <span className="text-[11.5px] text-faint">
+              <span className="text-[13px] text-faint">
                 {t.sections.partnerApplications.notes}
               </span>
               {/*
@@ -144,24 +144,24 @@ export function ApplicationActions({
                 onChange={(event) => setNotes(event.target.value)}
                 rows={3}
                 maxLength={2000}
-                className="rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-text"
+                className="rounded-lg border border-line bg-card px-3 py-2 text-[14px] text-text"
               />
             </label>
           )}
 
-          {error ? <p className="text-[11.5px] text-bad">{error}</p> : null}
+          {error ? <p className="text-[13px] text-bad">{error}</p> : null}
 
           <button
             type="button"
             disabled={!ready}
             onClick={() => void submit(open)}
-            className="min-h-10 w-fit cursor-pointer rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-5 text-[12.5px] font-extrabold text-[#241A05] disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:py-2"
+            className="min-h-10 w-fit cursor-pointer rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-5 text-[14px] font-extrabold text-[#241A05] disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:py-2"
           >
             {busy ? t.table.working : t.table.confirm}
           </button>
 
           {needsNotes && notes.trim().length < 2 ? (
-            <p className="text-[11px] text-faint">
+            <p className="text-[14px] text-faint">
               {t.sections.partnerApplications.notesRequired}
             </p>
           ) : null}
@@ -194,7 +194,7 @@ function Trigger({
       type="button"
       onClick={onClick}
       aria-expanded={active}
-      className={`min-h-10 cursor-pointer rounded-lg border px-4 text-[12.5px] transition-colors lg:min-h-0 lg:py-2 ${border} ${
+      className={`min-h-10 cursor-pointer rounded-lg border px-4 text-[14px] transition-colors lg:min-h-0 lg:py-2 ${border} ${
         active ? 'bg-field' : ''
       }`}
     >

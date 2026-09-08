@@ -100,7 +100,7 @@ export default async function AccountFavouritesPage({
                   <h2 className="font-display text-lg text-text">
                     <Link
                       href={`/${locale}/property/${item.slug}`}
-                      className="inline-flex min-h-10 items-center hover:text-gold lg:min-h-0"
+                      className="inline-flex min-h-10 items-center hover:text-gold-read lg:min-h-0"
                     >
                       {localisedName(item.property, locale)}
                     </Link>
@@ -108,7 +108,7 @@ export default async function AccountFavouritesPage({
                   {item.rating ? (
                     <span
                       dir="ltr"
-                      className="shrink-0 rounded-lg border border-line bg-field px-2 py-1 text-sm text-gold"
+                      className="shrink-0 rounded-lg border border-line bg-field px-2 py-1 text-sm text-gold-read"
                     >
                       ★ {item.rating}
                     </span>
@@ -136,7 +136,7 @@ export default async function AccountFavouritesPage({
                     {t('favouriteUnavailable')}
                   </p>
                 ) : item.fromPrice && item.currencyCode ? (
-                  <p className="text-sm text-gold">
+                  <p className="text-sm text-gold-read">
                     {t('favouriteFrom')}{' '}
                     <span dir="ltr">
                       {

@@ -85,8 +85,8 @@ export function AdsToolbar({
   const [startsOn, setStartsOn] = useState('');
   const [endsOn, setEndsOn] = useState('');
 
-  const field = 'rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-text';
-  const labelled = 'grid gap-1.5 text-[11.5px] font-semibold text-muted';
+  const field = 'rounded-lg border border-line bg-card px-3 py-2 text-[14px] text-text';
+  const labelled = 'grid gap-1.5 text-[13px] font-semibold text-muted';
 
   async function send(
     path: string,
@@ -143,7 +143,7 @@ export function AdsToolbar({
   const panel =
     open === 'advertiser' ? (
       <div className="grid w-full gap-3 rounded-card border border-line bg-field p-3.5">
-        <h3 className="text-[13px] font-bold text-text">{c.advTitle}</h3>
+        <h3 className="text-[14px] font-bold text-text">{c.advTitle}</h3>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label className={labelled}>
@@ -194,9 +194,9 @@ export function AdsToolbar({
           </label>
         </div>
 
-        {error ? <p className="text-[11.5px] font-semibold text-bad">{error}</p> : null}
+        {error ? <p className="text-[13px] font-semibold text-bad">{error}</p> : null}
         {created ? (
-          <p className="text-[11.5px] font-semibold text-gold">
+          <p className="text-[13px] font-semibold text-gold-read">
             {c.advCreated.replace('{reference}', created)}
           </p>
         ) : null}
@@ -239,7 +239,7 @@ export function AdsToolbar({
                 }
               })();
             }}
-            className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold-read disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
           >
             {busy ? t.table.working : c.advSubmit}
           </button>
@@ -258,7 +258,7 @@ export function AdsToolbar({
       </div>
     ) : open === 'campaign' ? (
       <div className="grid w-full gap-3 rounded-card border border-line bg-field p-3.5">
-        <h3 className="text-[13px] font-bold text-text">{c.newTitle}</h3>
+        <h3 className="text-[14px] font-bold text-text">{c.newTitle}</h3>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <label className={labelled}>
@@ -418,11 +418,11 @@ export function AdsToolbar({
         </div>
 
         {created ? (
-          <p className="text-[11.5px] font-semibold text-gold">
+          <p className="text-[13px] font-semibold text-gold-read">
             {c.advCreated.replace('{reference}', created)}
           </p>
         ) : null}
-        {error ? <p className="text-[11.5px] font-semibold text-bad">{error}</p> : null}
+        {error ? <p className="text-[13px] font-semibold text-bad">{error}</p> : null}
 
         <div className="flex flex-wrap gap-2">
           <button
@@ -490,7 +490,7 @@ export function AdsToolbar({
                 }
               })();
             }}
-            className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold-read disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
           >
             {busy ? t.table.working : c.submit}
           </button>
@@ -522,14 +522,14 @@ export function AdsToolbar({
             <button
               type="button"
               onClick={() => setOpen('advertiser')}
-              className="min-h-10 cursor-pointer rounded-lg border border-line px-4 py-1.5 text-[12.5px] font-bold text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold lg:min-h-0"
+              className="min-h-10 cursor-pointer rounded-lg border border-line px-4 py-1.5 text-[14px] font-bold text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold-read lg:min-h-0"
             >
               {c.newAdvertiser}
             </button>
             <button
               type="button"
               onClick={() => setOpen('campaign')}
-              className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4 py-1.5 text-[12.5px] font-extrabold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+              className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4 py-1.5 text-[14px] font-extrabold text-gold-read transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
             >
               {c.create}
             </button>

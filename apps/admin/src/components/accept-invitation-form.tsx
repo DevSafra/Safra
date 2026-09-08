@@ -75,7 +75,7 @@ export function AcceptInvitationForm({ token }: { token: string }) {
         <button
           type="button"
           onClick={() => router.push('/login')}
-          className="cursor-pointer mt-4 rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-bg"
+          className="cursor-pointer mt-4 rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-ink"
         >
           {t.sections.invitation.goToSignIn}
         </button>
@@ -122,7 +122,7 @@ export function AcceptInvitationForm({ token }: { token: string }) {
       <button
         type="submit"
         disabled={submitting}
-        className="cursor-pointer rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-60"
+        className="cursor-pointer rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60"
       >
         {submitting
           ? t.sections.panels.invitationSubmitting

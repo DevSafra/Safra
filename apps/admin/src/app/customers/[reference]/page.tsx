@@ -84,7 +84,7 @@ export default async function CustomerPage({
         <p className="mt-2">
           <Link
             href={`/messages?to=customer&ref=${encodeURIComponent(customer.reference)}`}
-            className="inline-flex min-h-10 items-center rounded-lg border border-line px-3.5 py-1.5 text-[11.5px] font-bold text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold lg:min-h-0"
+            className="inline-flex min-h-10 items-center rounded-lg border border-line px-3.5 py-1.5 text-[13px] font-bold text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read lg:min-h-0"
           >
             {t.sections.messages.messageAction}
           </Link>
@@ -128,7 +128,7 @@ export default async function CustomerPage({
                 <span className="text-faint">{c.noWallet}</span>
               ) : (
                 <span className="grid justify-items-end gap-0.5">
-                  <Ltr className="font-bold text-gold">
+                  <Ltr className="font-bold text-gold-read">
                     {amount(
                       customer.wallet.balance,
                       customer.wallet.currency ?? DEFAULT_MONEY_CURRENCY,
@@ -143,7 +143,7 @@ export default async function CustomerPage({
                     is noise that trains people not to read the line.
                   */}
                   {Number(customer.wallet.restricted) > 0 ? (
-                    <span className="text-[11px] text-faint2">
+                    <span className="text-[13px] text-faint">
                       {c.walletRestricted}{' '}
                       <Ltr>
                         {amount(
@@ -181,7 +181,9 @@ export default async function CustomerPage({
               {bookingStatus(booking.status)}
             </StatusPill>
             {/* The amount never without its currency. */}
-            <Ltr className="text-gold">{amount(booking.amount, booking.currency)}</Ltr>
+            <Ltr className="text-gold-read">
+              {amount(booking.amount, booking.currency)}
+            </Ltr>
           </Line>
         ))}
       </Bounded>
@@ -195,7 +197,7 @@ export default async function CustomerPage({
               {/* The sign says which way it went; the currency says what it was. */}
               {`${move.direction === 'credit' ? '+' : '−'}${amount(move.amount, move.currency)}`}
             </Ltr>
-            <Ltr className="text-[11.5px] text-faint">{shortDateTime(move.at)}</Ltr>
+            <Ltr className="text-[13px] text-faint">{shortDateTime(move.at)}</Ltr>
           </Line>
         ))}
       </Bounded>
@@ -207,7 +209,7 @@ export default async function CustomerPage({
               {fill(c.rating, { n: count(review.rating) })}
             </span>
             <span className="min-w-0 flex-1 truncate text-muted">{review.property}</span>
-            <Ltr className="text-[11.5px] text-faint">{shortDate(review.at)}</Ltr>
+            <Ltr className="text-[13px] text-faint">{shortDate(review.at)}</Ltr>
           </Line>
         ))}
       </Bounded>
@@ -240,7 +242,7 @@ export default async function CustomerPage({
             <StatusPill tone={statusTone(dispute.status)}>
               {label(t.enums.disputeStatus, dispute.status)}
             </StatusPill>
-            <Ltr className="text-[11.5px] text-faint">{shortDate(dispute.at)}</Ltr>
+            <Ltr className="text-[13px] text-faint">{shortDate(dispute.at)}</Ltr>
           </Line>
         ))}
       </Bounded>
@@ -266,7 +268,7 @@ export default async function CustomerPage({
             <StatusPill tone={statusTone(notice.status)}>
               {label(t.enums.notificationStatus, notice.status)}
             </StatusPill>
-            <Ltr className="text-[11.5px] text-faint">{shortDateTime(notice.at)}</Ltr>
+            <Ltr className="text-[13px] text-faint">{shortDateTime(notice.at)}</Ltr>
           </Line>
         ))}
       </Bounded>
@@ -324,7 +326,7 @@ function Bounded({
       <div className="mb-3 flex flex-wrap items-baseline gap-3">
         <h2 className="text-lg text-text">{title}</h2>
         {section.total > section.items.length ? (
-          <span className="text-[11.5px] text-faint">
+          <span className="text-[13px] text-faint">
             {/* `count()`, so the figures read in Arabic-Indic like every other number here. */}
             {fill(copy.showingRecent, {
               shown: count(section.items.length),
@@ -335,7 +337,7 @@ function Bounded({
       </div>
 
       {section.total === 0 ? (
-        <p className="text-[11.5px] text-faint">{copy.none}</p>
+        <p className="text-[13px] text-faint">{copy.none}</p>
       ) : (
         <ul className="grid gap-1.5">{children}</ul>
       )}
@@ -346,7 +348,7 @@ function Bounded({
 /** One row in a bounded section — wraps rather than scrolling sideways below `lg`. */
 function Line({ children }: { children: ReactNode }) {
   return (
-    <li className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-card px-4 py-2.5 text-[13px]">
+    <li className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-card px-4 py-2.5 text-[14px]">
       {children}
     </li>
   );
@@ -356,8 +358,8 @@ function Row({ label: rowLabel, value }: { label: string; value: ReactNode }) {
   return (
     <div className="rounded-lg border border-line bg-card px-4 py-3">
       {/* 11.5 / 13 — the same label-and-value scale every other detail screen uses. */}
-      <dt className="text-[11.5px] text-faint">{rowLabel}</dt>
-      <dd className="mt-1 break-words text-[13px] text-text">{value}</dd>
+      <dt className="text-[13px] text-faint">{rowLabel}</dt>
+      <dd className="mt-1 break-words text-[14px] text-text">{value}</dd>
     </div>
   );
 }

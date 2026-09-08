@@ -62,7 +62,7 @@ export function AuditEntryDetail({ entry }: { entry: AuditEntry }) {
   return (
     <div className="grid gap-4">
       <ConsolePanel title={t.sections.staff.activityWhat}>
-        <p className="text-[14px] font-bold text-text">
+        <p className="text-[16px] font-bold text-text">
           {auditAction(entry.action)}
           {/*
             The subject on the SAME line as the action, because together they are the sentence.
@@ -98,7 +98,7 @@ export function AuditEntryDetail({ entry }: { entry: AuditEntry }) {
                       /* Linked only where a console screen exists — six of twenty-two types. */
                       <Link
                         href={subject.href}
-                        className="cursor-pointer text-gold hover:underline"
+                        className="cursor-pointer text-gold-read hover:underline"
                       >
                         <Ltr>{subject.reference}</Ltr>
                       </Link>
@@ -145,7 +145,7 @@ export function AuditEntryDetail({ entry }: { entry: AuditEntry }) {
         </dl>
 
         {entry.reason ? (
-          <p className="mt-3 text-[12.5px] text-text2">
+          <p className="mt-3 text-[14px] text-text2">
             <span className="text-faint">{t.sections.staff.activityReason}: </span>
             {auditReason(entry.reason)}
           </p>
@@ -158,7 +158,7 @@ export function AuditEntryDetail({ entry }: { entry: AuditEntry }) {
             Many actions record nothing beyond the fact that they happened — a read, a resend. Said
             in words rather than left as an empty grid, which reads as a loading fault.
           */
-          <p className="text-[12.5px] text-faint">{t.sections.staff.activityNoChanges}</p>
+          <p className="text-[14px] text-faint">{t.sections.staff.activityNoChanges}</p>
         ) : (
           <Changes changes={changes} />
         )}
@@ -170,8 +170,8 @@ export function AuditEntryDetail({ entry }: { entry: AuditEntry }) {
 function Row({ term, children }: { term: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] text-faint">{term}</dt>
-      <dd className="mt-0.5 text-[12.5px] text-text">{children}</dd>
+      <dt className="text-[13px] text-faint">{term}</dt>
+      <dd className="mt-0.5 text-[14px] text-text">{children}</dd>
     </div>
   );
 }
@@ -209,19 +209,19 @@ function Changes({ changes }: { changes: readonly PayloadChange[] }) {
 
   return (
     <dl
-      className={`grid gap-x-4 gap-y-1.5 text-[12.5px] ${
+      className={`grid gap-x-4 gap-y-1.5 text-[14px] ${
         showBefore ? 'grid-cols-[auto_1fr_1fr]' : 'grid-cols-[auto_1fr]'
       }`}
     >
-      <span className="text-[11px] font-semibold text-faint">
+      <span className="text-[13px] font-semibold text-faint">
         {t.sections.audit.changeField}
       </span>
       {showBefore ? (
-        <span className="text-[11px] font-semibold text-faint">
+        <span className="text-[13px] font-semibold text-faint">
           {t.sections.audit.changeBefore}
         </span>
       ) : null}
-      <span className="text-[11px] font-semibold text-faint">
+      <span className="text-[13px] font-semibold text-faint">
         {t.sections.audit.changeAfter}
       </span>
 

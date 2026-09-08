@@ -188,9 +188,9 @@ export function PropertyEditor({
       {message ? (
         <p
           role="alert"
-          className={`rounded-lg border p-3 text-[12.5px] ${
+          className={`rounded-lg border p-3 text-[14px] ${
             message.kind === 'ok'
-              ? 'border-good/40 bg-good/10 text-good'
+              ? 'border-ok/40 bg-ok/10 text-ok'
               : 'border-bad/40 bg-bad/10 text-bad'
           }`}
         >
@@ -323,7 +323,7 @@ export function PropertyEditor({
       </div>
 
       <fieldset className="grid gap-2">
-        <legend className="pb-1 text-[12px] text-muted">
+        <legend className="pb-1 text-[13px] text-muted">
           {t.properties.attributesLabel}
         </legend>
         <div className="flex flex-wrap gap-1.5">
@@ -343,8 +343,8 @@ export function PropertyEditor({
                   );
                   setMessage(null);
                 }}
-                className={`min-h-10 cursor-pointer rounded-full border px-3 py-1 text-[11.5px] lg:min-h-0 ${
-                  on ? 'border-gold bg-gold/15 text-gold' : 'border-line text-muted'
+                className={`min-h-10 cursor-pointer rounded-full border px-3 py-1 text-[13px] lg:min-h-0 ${
+                  on ? 'border-gold bg-gold/15 text-gold-read' : 'border-line text-muted'
                 }`}
               >
                 {tripAttribute(attribute)}
@@ -353,7 +353,7 @@ export function PropertyEditor({
           })}
         </div>
         {attributes.length > 4 ? (
-          <p className="text-[11.5px] text-bad">{t.properties.attributesTooMany}</p>
+          <p className="text-[13px] text-bad">{t.properties.attributesTooMany}</p>
         ) : null}
       </fieldset>
 
@@ -377,7 +377,7 @@ export function PropertyEditor({
       <button
         type="submit"
         disabled={busy || attributes.length > 4}
-        className="min-h-10 w-fit cursor-pointer rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-5 py-2 text-[13px] font-extrabold text-[#241A05] disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+        className="min-h-10 w-fit cursor-pointer rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-5 py-2 text-[14px] font-extrabold text-[#241A05] disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
       >
         {busy ? t.editProperty.saving : t.editProperty.save}
       </button>
@@ -402,7 +402,7 @@ function Field({
 }) {
   return (
     <label className="grid gap-1">
-      <span className="text-[12px] text-muted">{label}</span>
+      <span className="text-[13px] text-muted">{label}</span>
       {/*
         The CLASS, not the attribute.
 
@@ -420,11 +420,11 @@ function Field({
         required={required}
         maxLength={300}
         onChange={(event) => onChange(event.target.value)}
-        className={`min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text lg:min-h-0 ${
+        className={`min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text lg:min-h-0 ${
           dir === 'ltr' ? 'field-ltr' : ''
         }`}
       />
-      {hint ? <span className="text-[10.5px] text-faint2">{hint}</span> : null}
+      {hint ? <span className="text-[13px] text-faint">{hint}</span> : null}
     </label>
   );
 }
@@ -442,14 +442,14 @@ function Area({
 }) {
   return (
     <label className="grid gap-1">
-      <span className="text-[12px] text-muted">{label}</span>
+      <span className="text-[13px] text-muted">{label}</span>
       {/* `field-ltr`, not `dir` — see the note in `Field` above. */}
       <textarea
         value={value}
         rows={4}
         maxLength={4000}
         onChange={(event) => onChange(event.target.value)}
-        className={`rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text ${
+        className={`rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text ${
           dir === 'ltr' ? 'field-ltr' : ''
         }`}
       />
@@ -470,11 +470,11 @@ function Select({
 }) {
   return (
     <label className="grid gap-1">
-      <span className="text-[12px] text-muted">{label}</span>
+      <span className="text-[13px] text-muted">{label}</span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="min-h-10 cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text lg:min-h-0"
+        className="min-h-10 cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text lg:min-h-0"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>

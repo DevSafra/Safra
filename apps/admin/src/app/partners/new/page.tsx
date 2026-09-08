@@ -71,7 +71,7 @@ export default async function NewPartnerPage() {
           {t.sections.partnerOnboarding.title}
         </h1>
         <p className="mt-1 text-sm text-muted">{t.sections.partnerOnboarding.subtitle}</p>
-        <p className="mt-3 text-[12.5px] leading-relaxed text-muted">
+        <p className="mt-3 text-[14px] leading-relaxed text-muted">
           {t.sections.partnerOnboarding.intro}
         </p>
       </header>

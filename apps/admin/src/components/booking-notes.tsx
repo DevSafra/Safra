@@ -89,9 +89,7 @@ export function BookingNotes({
     <section>
       <h2 className="mb-1 text-lg text-text">{t.sections.bookingDetail.notes}</h2>
       {/* Who does NOT see it — the only thing worth knowing before typing. */}
-      <p className="mb-3 text-[11.5px] text-faint">
-        {t.sections.bookingDetail.notesHint}
-      </p>
+      <p className="mb-3 text-[13px] text-faint">{t.sections.bookingDetail.notesHint}</p>
 
       {notes.length === 0 ? (
         <p className="text-sm text-faint">{t.sections.bookingDetail.noNotes}</p>
@@ -126,12 +124,12 @@ export function BookingNotes({
       )}
 
       {error ? (
-        <p role="alert" className="mt-3 text-[12px] text-bad">
+        <p role="alert" className="mt-3 text-[13px] text-bad">
           {error}
         </p>
       ) : null}
       {done ? (
-        <p role="status" className="mt-3 text-[12px] text-ok">
+        <p role="status" className="mt-3 text-[13px] text-ok">
           {done}
         </p>
       ) : null}
@@ -146,7 +144,7 @@ export function BookingNotes({
         }}
       >
         <label className="grid gap-1">
-          <span className="text-[11px] text-faint">
+          <span className="text-[13px] text-faint">
             {t.sections.bookingDetail.noteLabel}
           </span>
           {/* No `dir`: a field a person types into follows the page (docs/i18n.md §9). */}
@@ -157,9 +155,9 @@ export function BookingNotes({
             maxLength={2000}
             rows={3}
             disabled={busy}
-            className="rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed"
+            className="rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text disabled:cursor-not-allowed"
           />
-          <span className="text-[10.5px] text-faint">
+          <span className="text-[13px] text-faint">
             {t.sections.bookingDetail.noteHint}
           </span>
         </label>
@@ -167,7 +165,7 @@ export function BookingNotes({
         <button
           type="submit"
           disabled={busy}
-          className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-gold/50 px-4 py-2 text-[12.5px] font-bold text-gold hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
+          className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-gold/50 px-4 py-2 text-[14px] font-bold text-gold-read hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
         >
           {busy ? t.sections.bookingDetail.addingNote : t.sections.bookingDetail.addNote}
         </button>

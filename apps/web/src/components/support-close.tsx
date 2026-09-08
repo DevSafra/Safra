@@ -94,7 +94,7 @@ export function SupportClose({
       <button
         type="submit"
         disabled={busy}
-        className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-line px-5 text-sm text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 lg:py-2"
+        className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-line px-5 text-sm text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold-read disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 lg:py-2"
       >
         {busy ? labels.submitting : labels.submit}
       </button>

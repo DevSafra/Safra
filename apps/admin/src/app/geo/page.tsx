@@ -103,11 +103,11 @@ export default async function GeoPage({
     <ConsoleShell title={t.nav.geo} counts={counts}>
       {result === 'unauthenticated' ? (
         <ConsolePanel>
-          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
         </ConsolePanel>
       ) : result === 'failed' ? (
         <ConsolePanel>
-          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
         </ConsolePanel>
       ) : (
         <div className="grid gap-4">

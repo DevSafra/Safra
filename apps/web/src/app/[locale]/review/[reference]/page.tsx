@@ -88,7 +88,7 @@ export default async function ReviewPage({
             fixes the ORDER, which is all the star needs, and leaves the alignment to the document.
             The star keeps its own `aria-hidden`: it is decoration beside a number that is read out.
           */}
-          <p className="mt-1 text-lg font-bold text-gold">
+          <p className="mt-1 text-lg font-bold text-gold-read">
             <span dir="ltr">
               <span aria-hidden>★</span> {eligibility.review.rating}
             </span>
@@ -103,7 +103,7 @@ export default async function ReviewPage({
 
           {eligibility.review.partnerReply ? (
             <div className="mt-3 rounded-lg border border-gold/30 bg-gold/5 px-3 py-2">
-              <p className="text-xs font-bold text-gold">{t('partnerReply')}</p>
+              <p className="text-xs font-bold text-gold-read">{t('partnerReply')}</p>
               <p className="mt-1 text-sm leading-relaxed text-muted">
                 {eligibility.review.partnerReply}
               </p>

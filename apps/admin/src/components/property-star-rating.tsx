@@ -83,14 +83,14 @@ export function PropertyStarRating({
 
   return (
     <div data-star-editor={reference} className="grid gap-3">
-      <p className="text-[12px] leading-relaxed text-faint2">{c.starRatingHint}</p>
+      <p className="text-[13px] leading-relaxed text-faint">{c.starRatingHint}</p>
 
       {/*
         What the customer sees, drawn — or the words «بلا تصنيف» when there is nothing to draw.
         An empty space here would read as a rendering fault on 2,703 listings.
       */}
       {value === '' ? (
-        <p className="text-[12.5px] text-faint">{c.starUnset}</p>
+        <p className="text-[14px] text-faint">{c.starUnset}</p>
       ) : (
         <StarRating
           value={Number(value)}
@@ -135,7 +135,7 @@ export function PropertyStarRating({
       />
 
       {saved ? (
-        <p className="text-[11.5px] font-semibold text-ok">{c.starRatingSaved}</p>
+        <p className="text-[13px] font-semibold text-ok">{c.starRatingSaved}</p>
       ) : null}
     </div>
   );

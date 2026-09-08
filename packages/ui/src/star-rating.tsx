@@ -121,7 +121,7 @@ function Star({ lit, px }: { readonly lit: boolean; readonly px: number }) {
       height={px}
       viewBox="0 0 24 24"
       fill="currentColor"
-      className={`text-gold ${lit ? '' : 'opacity-[0.22]'}`}
+      className={`text-gold-read ${lit ? '' : 'opacity-[0.22]'}`}
     >
       {/* A five-pointed star, drawn rather than borrowed. Points at the top, as a star is read. */}
       <path d="M12 2.6l2.9 5.88 6.49.95-4.7 4.58 1.11 6.46L12 17.42l-5.8 3.05 1.11-6.46-4.7-4.58 6.49-.95L12 2.6z" />

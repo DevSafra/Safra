@@ -156,7 +156,7 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
         <Link href={`/${locale}`} className="flex items-center gap-3">
           <span
             aria-hidden
-            className="grid size-10 shrink-0 place-items-center rounded-card border border-gold/40 text-lg text-gold sm:size-11 sm:text-xl"
+            className="grid size-10 shrink-0 place-items-center rounded-card border border-gold/40 text-lg text-gold-read sm:size-11 sm:text-xl"
           >
             {ORNAMENT_BRAND}
           </span>
@@ -214,7 +214,7 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
         */}
         <Link
           href={`/${locale}/partners/join`}
-          className="hidden min-h-10 items-center rounded-lg px-3 py-2 text-[13.5px] font-semibold text-muted transition-colors hover:bg-gold/10 hover:text-text sm:min-h-11 lg:inline-flex"
+          className="hidden min-h-10 items-center rounded-lg px-3 py-2 text-[14px] font-semibold text-muted transition-colors hover:bg-gold/10 hover:text-text sm:min-h-11 lg:inline-flex"
         >
           {home('partnersCta')}
         </Link>

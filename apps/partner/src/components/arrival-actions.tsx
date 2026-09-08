@@ -73,7 +73,7 @@ export function ArrivalActions({ arrival }: { arrival: PartnerArrival }) {
       <div className="flex flex-wrap items-center gap-2">
         {checkedIn ? (
           <>
-            <span className="rounded-full border border-sky bg-sky/15 px-2.5 py-0.5 text-[11px] font-bold text-sky">
+            <span className="rounded-full border border-sky bg-sky/15 px-2.5 py-0.5 text-[13px] font-bold text-sky">
               {t.arrivals.checkedIn}
             </span>
             <button
@@ -94,7 +94,7 @@ export function ArrivalActions({ arrival }: { arrival: PartnerArrival }) {
                   if (go) void send('undo-check-in');
                 })();
               }}
-              className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-[12.5px] text-muted transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
+              className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-[14px] text-muted transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {t.arrivals.undo}
             </button>
@@ -110,7 +110,7 @@ export function ArrivalActions({ arrival }: { arrival: PartnerArrival }) {
             disabled={busy}
             aria-label={fill(t.arrivals.checkInLabel, { name: arrival.guestName })}
             onClick={() => void send('check-in')}
-            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg bg-gold px-4 text-sm font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 lg:py-2"
+            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg bg-gold px-4 text-sm font-semibold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 lg:py-2"
           >
             {busy ? t.arrivals.working : t.arrivals.checkIn}
           </button>
@@ -118,7 +118,7 @@ export function ArrivalActions({ arrival }: { arrival: PartnerArrival }) {
       </div>
 
       {error ? (
-        <p role="alert" className="text-[12.5px] text-bad">
+        <p role="alert" className="text-[14px] text-bad">
           {error}
         </p>
       ) : null}

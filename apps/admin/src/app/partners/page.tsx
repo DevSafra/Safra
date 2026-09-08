@@ -89,7 +89,7 @@ export default async function PartnersPage({
     <ConsoleShell title={t.nav.partners} subtitle={t.partners.subtitle} counts={counts}>
       <div className="grid gap-4">
         {fileUnavailable ? (
-          <p role="alert" className="text-[12.5px] text-bad">
+          <p role="alert" className="text-[14px] text-bad">
             {t.sections.partners.fileUnavailable}
           </p>
         ) : null}
@@ -109,7 +109,7 @@ export default async function PartnersPage({
           <div className="mb-3 flex justify-end">
             <Link
               href="/partners/new"
-              className="inline-flex min-h-10 items-center rounded-lg border border-ok/40 px-4 py-2 text-[12.5px] font-semibold text-ok hover:bg-ok/5 lg:min-h-0"
+              className="inline-flex min-h-10 items-center rounded-lg border border-ok/40 px-4 py-2 text-[14px] font-semibold text-ok hover:bg-ok/5 lg:min-h-0"
             >
               {t.sections.partners.onboard}
             </Link>
@@ -123,9 +123,9 @@ export default async function PartnersPage({
           />
 
           {registry === 'unauthenticated' ? (
-            <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
+            <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
           ) : registry === 'failed' ? (
-            <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
+            <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
           ) : (
             <>
               <AdminTable
@@ -180,10 +180,10 @@ export default async function PartnersPage({
                     className="flex flex-wrap items-center gap-3 rounded-card border border-line bg-field px-3.5 py-3 transition-colors hover:border-[rgba(var(--goldA),0.4)]"
                   >
                     <span className="min-w-0">
-                      <span className="block truncate text-[13px] font-bold text-text">
+                      <span className="block truncate text-[14px] font-bold text-text">
                         {partner.legalName}
                       </span>
-                      <span className="block text-[11px] text-faint">
+                      <span className="block text-[13px] text-faint">
                         <Ltr>{partner.reference}</Ltr> · {partner.city.nameAr}
                       </span>
                     </span>
@@ -281,9 +281,7 @@ const columns = (back: string): readonly AdminColumn<PartnerListItem>[] => [
       <span className="min-w-0">
         <span className="block truncate font-semibold text-text">{row.legalName}</span>
         {row.displayName !== row.legalName ? (
-          <span className="block truncate text-[10.5px] text-faint">
-            {row.displayName}
-          </span>
+          <span className="block truncate text-[13px] text-faint">{row.displayName}</span>
         ) : null}
       </span>
     ),
@@ -339,7 +337,7 @@ const columns = (back: string): readonly AdminColumn<PartnerListItem>[] => [
     render: (row) => (
       <Link
         href={`/partners/${row.reference}${back}`}
-        className="text-[11.5px] text-sky hover:underline"
+        className="text-[13px] text-sky hover:underline"
       >
         {t.table.manage}
       </Link>

@@ -105,7 +105,7 @@ export default async function PaymentReturnPage({
       {reference ? (
         <Link
           href={`/${locale}/booking/${reference}`}
-          className="mt-6 inline-block rounded-lg border border-line px-5 py-2.5 text-sm text-muted transition-colors hover:border-gold hover:text-gold"
+          className="mt-6 inline-block rounded-lg border border-line px-5 py-2.5 text-sm text-muted transition-colors hover:border-gold hover:text-gold-read"
         >
           {t('viewBooking')}
         </Link>

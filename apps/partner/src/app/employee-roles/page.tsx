@@ -85,7 +85,7 @@ export default async function EmployeeRolesPage() {
 
   return shell(
     <>
-      <p className="text-[12.5px] leading-relaxed text-muted">{t.employeeRoles.intro}</p>
+      <p className="text-[14px] leading-relaxed text-muted">{t.employeeRoles.intro}</p>
 
       {/*
         The teaching block, above the form and only when there is nothing yet. Once a role exists
@@ -94,7 +94,7 @@ export default async function EmployeeRolesPage() {
       {roles.length === 0 ? (
         <div className="grid gap-1.5 rounded-card border border-line bg-card p-4">
           <p className="text-sm font-semibold text-text">{t.employeeRoles.emptyTitle}</p>
-          <p className="text-[12.5px] leading-relaxed text-muted">
+          <p className="text-[14px] leading-relaxed text-muted">
             {t.employeeRoles.emptyBody}
           </p>
         </div>

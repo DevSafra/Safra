@@ -56,7 +56,7 @@ export function PartnerTypeManager({
       key: 'code',
       header: c.colCode,
       render: (row) => (
-        <span className="font-mono text-[11.5px] text-faint">{row.code}</span>
+        <span className="font-mono text-[13px] text-faint">{row.code}</span>
       ),
     },
     {
@@ -104,7 +104,7 @@ export function PartnerTypeManager({
             setAdding(false);
             setEditing(editing === row.code ? null : row.code);
           }}
-          className="cursor-pointer rounded-lg border border-line px-2.5 py-1 text-[10.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold"
+          className="cursor-pointer rounded-lg border border-line px-2.5 py-1 text-[13px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read"
         >
           {c.edit}
         </button>
@@ -115,7 +115,7 @@ export function PartnerTypeManager({
   return (
     <section className="grid gap-3">
       <div className="flex flex-wrap items-baseline gap-2.5">
-        <h2 className="text-[14.5px] font-extrabold text-gold">{c.typesTitle}</h2>
+        <h2 className="text-[16px] font-extrabold text-gold-read">{c.typesTitle}</h2>
         <span className="ms-auto">
           <button
             type="button"
@@ -125,14 +125,14 @@ export function PartnerTypeManager({
               setEditing(null);
               setAdding(!adding);
             }}
-            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1.5 text-[11.5px] font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1.5 text-[13px] font-bold text-gold-read transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
           >
             {c.typesAdd}
           </button>
         </span>
       </div>
 
-      <p className="text-[11.5px] leading-relaxed text-faint">{c.typesNote}</p>
+      <p className="text-[13px] leading-relaxed text-faint">{c.typesNote}</p>
 
       {adding ? <PartnerTypeForm onClose={() => setAdding(false)} /> : null}
 

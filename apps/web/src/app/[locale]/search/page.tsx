@@ -413,7 +413,7 @@ export default async function SearchPage({
                   aria-current={sort === option.value ? 'true' : undefined}
                   className={
                     sort === option.value
-                      ? 'inline-flex min-h-10 items-center rounded-lg border border-gold/50 bg-card px-3 py-1.5 text-gold sm:min-h-11'
+                      ? 'inline-flex min-h-10 items-center rounded-lg border border-gold/50 bg-card px-3 py-1.5 text-gold-read sm:min-h-11'
                       : 'inline-flex min-h-10 items-center rounded-lg border border-line px-3 py-1.5 text-muted transition-colors duration-200 ease-out-strong hover:border-gold/50 hover:bg-gold/10 hover:text-text sm:min-h-11'
                   }
                 >

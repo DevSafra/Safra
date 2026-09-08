@@ -91,14 +91,14 @@ export function AccrualControl() {
           void run();
         }}
         disabled={busy}
-        className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] bg-[rgba(var(--goldA),0.06)] px-3 text-[12.5px] font-bold text-gold transition-transform duration-150 ease-out active:scale-[0.98] disabled:cursor-default disabled:opacity-60 lg:min-h-0 lg:py-1.5"
+        className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] bg-[rgba(var(--goldA),0.06)] px-3 text-[14px] font-bold text-gold-read transition-transform duration-150 ease-out active:scale-[0.98] disabled:cursor-default disabled:opacity-60 lg:min-h-0 lg:py-1.5"
       >
         {busy ? c.accrueBusy : c.accrueNow}
       </button>
 
-      {error === null ? null : <p className="text-[11.5px] text-bad">{error}</p>}
+      {error === null ? null : <p className="text-[13px] text-bad">{error}</p>}
       {done && error === null ? (
-        <p className="text-[11.5px] text-ok">{c.accrueDone}</p>
+        <p className="text-[13px] text-ok">{c.accrueDone}</p>
       ) : null}
 
       {dialog}

@@ -114,7 +114,7 @@ export function SanctionsList({ status }: { readonly status: SanctionsStatus }) 
   return (
     <section data-sanctions className="grid gap-3">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 className="text-[14px] font-extrabold text-gold">{c.sanctionsTitle}</h2>
+        <h2 className="text-[16px] font-extrabold text-gold-read">{c.sanctionsTitle}</h2>
 
         {/*
           The consequence, in the reader's face rather than derived from a date.
@@ -125,7 +125,7 @@ export function SanctionsList({ status }: { readonly status: SanctionsStatus }) 
           to do about one fact.
         */}
         <span
-          className={`ms-auto text-[12px] font-bold ${
+          className={`ms-auto text-[13px] font-bold ${
             status.imported && !status.stale ? 'text-ok' : 'text-bad'
           }`}
         >
@@ -137,11 +137,11 @@ export function SanctionsList({ status }: { readonly status: SanctionsStatus }) 
         </span>
       </div>
 
-      <p className="text-[11.5px] leading-relaxed text-text2">{c.sanctionsNote}</p>
-      <p className="text-[11.5px] text-faint">{policyLine}</p>
+      <p className="text-[13px] leading-relaxed text-text2">{c.sanctionsNote}</p>
+      <p className="text-[13px] text-faint">{policyLine}</p>
 
       {status.imported ? (
-        <dl className="grid gap-2 text-[12.5px] sm:grid-cols-3">
+        <dl className="grid gap-2 text-[14px] sm:grid-cols-3">
           <Fact label={c.sanctionsEntries} value={count(status.entryCount)} />
           <Fact
             label={c.sanctionsFetched}
@@ -159,25 +159,25 @@ export function SanctionsList({ status }: { readonly status: SanctionsStatus }) 
       ) : null}
 
       <div className="grid gap-2 border-t border-line pt-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
-        <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
+        <label className="grid gap-1.5 text-[13px] font-semibold text-muted">
           {c.sanctionsUpload}
           <input
             ref={input}
             type="file"
             accept=".xml,text/xml,application/xml"
-            className="min-h-10 cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[12px] text-text file:me-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-[rgba(var(--goldA),0.14)] file:px-3 file:py-1.5 file:text-[11.5px] file:font-bold file:text-gold lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[13px] text-text file:me-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-[rgba(var(--goldA),0.14)] file:px-3 file:py-1.5 file:text-[13px] file:font-bold file:text-gold-read lg:min-h-0"
           />
-          <span className="text-[10.5px] font-normal text-faint2">
+          <span className="text-[13px] font-normal text-faint">
             {c.sanctionsUploadHint}
           </span>
         </label>
 
-        <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
+        <label className="grid gap-1.5 text-[13px] font-semibold text-muted">
           {c.sanctionsSource}
           <select
             value={source}
             onChange={(event) => setSource(event.target.value as 'eu_consolidated')}
-            className="min-h-10 cursor-pointer rounded-lg border border-line bg-field px-3 text-[12.5px] text-text lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-lg border border-line bg-field px-3 text-[14px] text-text lg:min-h-0"
           >
             {/*
               One option, deliberately. `SANCTIONS_SOURCES` also has `local_fixture`, which the
@@ -192,15 +192,15 @@ export function SanctionsList({ status }: { readonly status: SanctionsStatus }) 
           type="button"
           onClick={() => void importList()}
           disabled={busy}
-          className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] bg-[rgba(var(--goldA),0.06)] px-3 text-[12.5px] font-bold text-gold transition-transform duration-150 ease-out active:scale-[0.98] disabled:cursor-default disabled:opacity-60 lg:min-h-0 lg:py-1.5"
+          className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] bg-[rgba(var(--goldA),0.06)] px-3 text-[14px] font-bold text-gold-read transition-transform duration-150 ease-out active:scale-[0.98] disabled:cursor-default disabled:opacity-60 lg:min-h-0 lg:py-1.5"
         >
           {busy ? c.sanctionsImporting : c.sanctionsImport}
         </button>
       </div>
 
-      {error === null ? null : <p className="text-[11.5px] text-bad">{error}</p>}
+      {error === null ? null : <p className="text-[13px] text-bad">{error}</p>}
       {done === null ? null : (
-        <p className="text-[11.5px] text-ok">
+        <p className="text-[13px] text-ok">
           {fill(c.sanctionsImported, { n: count(done) })}
         </p>
       )}
@@ -212,7 +212,7 @@ export function SanctionsList({ status }: { readonly status: SanctionsStatus }) 
 function Fact({ label, value }: { readonly label: string; readonly value: string }) {
   return (
     <div className="grid gap-0.5 rounded-lg border border-line2 px-3 py-2">
-      <dt className="text-[10.5px] text-faint">{label}</dt>
+      <dt className="text-[13px] text-faint">{label}</dt>
       <dd className="font-bold tabular-nums text-text">{value}</dd>
     </div>
   );

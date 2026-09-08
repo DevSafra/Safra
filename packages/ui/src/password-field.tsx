@@ -125,7 +125,7 @@ export function PasswordField({
           title={revealed ? hideLabel : showLabel}
           tabIndex={-1}
           // `end-0` rather than `right-0`, for the same reason as `pe-11` above.
-          className="absolute inset-y-0 end-0 grid w-11 cursor-pointer place-items-center text-muted transition-colors hover:text-gold"
+          className="absolute inset-y-0 end-0 grid w-11 cursor-pointer place-items-center text-muted transition-colors hover:text-gold-read"
         >
           {revealed ? <EyeOff /> : <Eye />}
         </button>

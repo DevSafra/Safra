@@ -71,9 +71,9 @@ export function Kpi({
 }) {
   return (
     <div className="rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-4">
-      <p className="text-[11.5px] text-faint">{label}</p>
+      <p className="text-[13px] text-faint">{label}</p>
       <p className={`mt-1.5 text-2xl font-extrabold ${valueClass}`}>{value}</p>
-      {sub ? <p className="mt-1 text-[10.5px] text-muted">{sub}</p> : null}
+      {sub ? <p className="mt-1 text-[14px] text-muted">{sub}</p> : null}
     </div>
   );
 }
@@ -106,11 +106,11 @@ export function KpiRow({
 export function NotBuilt({ reason }: { reason: string }) {
   return (
     <section className="rounded-card border border-dashed border-[rgba(var(--goldA),0.35)] bg-card p-6">
-      <h2 className="text-[14.5px] font-extrabold text-warn">{t.unbuilt.heading}</h2>
-      <p className="mt-2.5 max-w-[70ch] text-[12.5px] leading-relaxed text-text2">
+      <h2 className="text-[16px] font-extrabold text-warn">{t.unbuilt.heading}</h2>
+      <p className="mt-2.5 max-w-[70ch] text-[14px] leading-relaxed text-text2">
         {reason}
       </p>
-      <p className="mt-3 text-[11px] text-faint">{t.unbuilt.seeRegister}</p>
+      <p className="mt-3 text-[14px] text-faint">{t.unbuilt.seeRegister}</p>
     </section>
   );
 }
@@ -138,17 +138,17 @@ export function QueueState<T>({
   children: (rows: readonly T[]) => React.ReactNode;
 }) {
   if (state === 'failed') {
-    return <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>;
+    return <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>;
   }
 
   if (state === 'unauthenticated') {
-    return <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>;
+    return <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>;
   }
 
   const rows = Array.isArray(state) ? state : state.items;
 
   if (rows.length === 0) {
-    return <p className="text-[12.5px] text-faint">{t.dashboard.nothingWaiting}</p>;
+    return <p className="text-[14px] text-faint">{t.dashboard.nothingWaiting}</p>;
   }
 
   return <ul className="grid gap-2.5">{children(rows)}</ul>;

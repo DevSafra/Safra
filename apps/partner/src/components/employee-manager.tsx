@@ -89,7 +89,7 @@ export function EmployeeInvite({ roles }: { roles: PartnerEmployeeRole[] }) {
         <p className="text-sm text-muted">{t.employees.noRoles}</p>
         <Link
           href="/employee-roles"
-          className="inline-flex min-h-10 w-fit items-center rounded-lg bg-gold px-4 text-sm font-semibold text-bg transition-opacity hover:opacity-90 lg:min-h-0 lg:py-2"
+          className="inline-flex min-h-10 w-fit items-center rounded-lg bg-gold px-4 text-sm font-semibold text-ink transition-opacity hover:opacity-90 lg:min-h-0 lg:py-2"
         >
           {t.employees.defineRoles}
         </Link>
@@ -147,7 +147,7 @@ export function EmployeeInvite({ roles }: { roles: PartnerEmployeeRole[] }) {
         out correctly inside an RTL field without being told. `dir="ltr"` would move the caret and
         the value to the far side of a label sitting on the right.
       */}
-      <label className="grid gap-1 text-[12.5px] text-muted">
+      <label className="grid gap-1 text-[14px] text-muted">
         {t.employees.fullName}
         <input
           type="text"
@@ -160,7 +160,7 @@ export function EmployeeInvite({ roles }: { roles: PartnerEmployeeRole[] }) {
         />
       </label>
 
-      <label className="grid gap-1 text-[12.5px] text-muted">
+      <label className="grid gap-1 text-[14px] text-muted">
         {t.employees.email}
         <input
           type="email"
@@ -171,7 +171,7 @@ export function EmployeeInvite({ roles }: { roles: PartnerEmployeeRole[] }) {
         />
       </label>
 
-      <label className="grid gap-1 text-[12.5px] text-muted">
+      <label className="grid gap-1 text-[14px] text-muted">
         {t.employees.role}
         <select
           value={roleId}
@@ -198,7 +198,7 @@ export function EmployeeInvite({ roles }: { roles: PartnerEmployeeRole[] }) {
       <button
         type="submit"
         disabled={busy}
-        className="w-fit cursor-pointer rounded-lg bg-gold px-5 py-2.5 text-sm font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-fit cursor-pointer rounded-lg bg-gold px-5 py-2.5 text-sm font-semibold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {busy ? t.employees.inviting : t.employees.inviteSubmit}
       </button>
@@ -287,7 +287,7 @@ export function EmployeeActions({
           onChange={(event) =>
             void send({ method: 'PATCH', body: { roleId: event.target.value } })
           }
-          className="cursor-pointer rounded-lg border border-line bg-bg px-2.5 py-1.5 text-[12.5px] text-text disabled:cursor-not-allowed disabled:opacity-60"
+          className="cursor-pointer rounded-lg border border-line bg-bg px-2.5 py-1.5 text-[14px] text-text disabled:cursor-not-allowed disabled:opacity-60"
         >
           {roles.map((role) => (
             <option key={role.id} value={role.id}>
@@ -309,7 +309,7 @@ export function EmployeeActions({
               body: { status: suspended ? 'active' : 'suspended' },
             })
           }
-          className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-[12.5px] text-text transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
+          className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-[14px] text-text transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {suspended ? t.employees.restore : t.employees.suspend}
         </button>
@@ -331,18 +331,18 @@ export function EmployeeActions({
               if (go) void send({ method: 'DELETE' });
             })();
           }}
-          className="cursor-pointer rounded-lg border border-bad/50 px-3 py-1.5 text-[12.5px] text-bad transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
+          className="cursor-pointer rounded-lg border border-bad/50 px-3 py-1.5 text-[14px] text-bad transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {t.employees.remove}
         </button>
 
         {busy ? (
-          <span className="text-[12px] text-faint">{t.employees.working}</span>
+          <span className="text-[13px] text-faint">{t.employees.working}</span>
         ) : null}
       </div>
 
       {error ? (
-        <p role="alert" className="text-[12.5px] text-bad">
+        <p role="alert" className="text-[14px] text-bad">
           {error}
         </p>
       ) : null}

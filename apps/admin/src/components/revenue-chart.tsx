@@ -66,8 +66,8 @@ export function RevenueChart({
   return (
     <div className="rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
       {/* `h2` like every other panel title, so the console has one heading outline. */}
-      <h2 className="text-[14.5px] font-extrabold text-gold">{t.admin.weekRevenue}</h2>
-      <p className="mt-1 mb-3.5 text-[11px] text-faint">{sub}</p>
+      <h2 className="text-[16px] font-extrabold text-gold-read">{t.admin.weekRevenue}</h2>
+      <p className="mt-1 mb-3.5 text-[14px] text-faint">{sub}</p>
 
       <svg
         viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
@@ -107,7 +107,7 @@ export function RevenueChart({
         labels must run the same way to stay under their own bar — the surrounding page is
         right-to-left and would otherwise reverse them.
       */}
-      <div dir="ltr" className="mt-1.5 flex justify-between text-[10px] text-faint">
+      <div dir="ltr" className="mt-1.5 flex justify-between text-[13px] text-faint">
         {series.map((point, index) => (
           <span key={point.day} className="w-[38px] text-center">
             {index === series.length - 1 ? t.admin.today : weekday(point.day)}

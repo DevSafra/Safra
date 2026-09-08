@@ -121,21 +121,21 @@ export function PayoutAccountsManager({
           <li
             key={account.id}
             data-payout-account={account.id}
-            className="grid gap-2 rounded-lg border border-line bg-panel px-3 py-2.5"
+            className="grid gap-2 rounded-lg border border-line bg-field px-3 py-2.5"
           >
             <div className="flex flex-wrap items-center gap-2">
               <span
                 data-status-pill
-                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${TONES[statusTone(account.status)]}`}
+                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[13px] font-semibold ${TONES[statusTone(account.status)]}`}
               >
                 {c.status[account.status] ?? account.status}
               </span>
               {account.isPrimary ? (
-                <span className="text-[11.5px] font-semibold text-ok">{c.primary}</span>
+                <span className="text-[13px] font-semibold text-ok">{c.primary}</span>
               ) : null}
             </div>
 
-            <div className="text-[13px] leading-relaxed">
+            <div className="text-[14px] leading-relaxed">
               <div className="font-semibold text-text">{account.accountHolder}</div>
               <div className="text-faint">
                 {c.methods[account.method] ?? account.method}
@@ -149,7 +149,7 @@ export function PayoutAccountsManager({
 
             {/* The state as a SENTENCE, because a pill says what and this says what it means. */}
             <p
-              className={`text-[11.5px] leading-relaxed ${
+              className={`text-[13px] leading-relaxed ${
                 account.status === 'rejected' ? 'text-bad' : 'text-faint'
               }`}
             >
@@ -161,7 +161,7 @@ export function PayoutAccountsManager({
             </p>
 
             {account.status === 'rejected' && account.rejectionReason ? (
-              <p className="rounded-lg border border-bad/40 bg-bad/5 px-3 py-2 text-[12px] leading-relaxed text-text">
+              <p className="rounded-lg border border-bad/40 bg-bad/5 px-3 py-2 text-[13px] leading-relaxed text-text">
                 <span className="font-semibold">{c.rejectionReason}: </span>
                 {account.rejectionReason}
               </p>
@@ -226,9 +226,9 @@ export function PayoutAccountsManager({
         />
       )}
 
-      {notice ? <p className="text-[12px] font-semibold text-ok">{notice}</p> : null}
+      {notice ? <p className="text-[13px] font-semibold text-ok">{notice}</p> : null}
       {error && open === null ? (
-        <p role="alert" className="text-[12px] font-semibold text-bad">
+        <p role="alert" className="text-[13px] font-semibold text-bad">
           {error}
         </p>
       ) : null}
@@ -286,11 +286,11 @@ function AccountForm({
       }}
     >
       {/* Said before the edit, not after it — see the note at the top of this file. */}
-      <p className="rounded-lg border border-dashed border-line px-3 py-2 text-[11.5px] leading-relaxed text-faint">
+      <p className="rounded-lg border border-dashed border-line px-3 py-2 text-[13px] leading-relaxed text-faint">
         {c.editWarning}
       </p>
 
-      <label className="grid gap-1 text-[12.5px] text-muted">
+      <label className="grid gap-1 text-[14px] text-muted">
         {c.fields.method}
         <select
           value={method}
@@ -310,7 +310,7 @@ function AccountForm({
         No `dir` on any field: a field a person types into follows the page's direction. An IBAN is
         a left-to-right RUN and the bidi algorithm lays it out correctly inside an RTL field.
       */}
-      <label className="grid gap-1 text-[12.5px] text-muted">
+      <label className="grid gap-1 text-[14px] text-muted">
         {c.fields.accountHolder}
         <input
           type="text"
@@ -323,7 +323,7 @@ function AccountForm({
         />
       </label>
 
-      <label className="grid gap-1 text-[12.5px] text-muted">
+      <label className="grid gap-1 text-[14px] text-muted">
         {c.fields.accountNumber}
         <input
           type="text"
@@ -337,7 +337,7 @@ function AccountForm({
         />
       </label>
 
-      <label className="grid gap-1 text-[12.5px] text-muted">
+      <label className="grid gap-1 text-[14px] text-muted">
         {c.fields.bankName}
         <input
           type="text"
@@ -348,7 +348,7 @@ function AccountForm({
         />
       </label>
 
-      <label className="grid gap-1 text-[12.5px] text-muted">
+      <label className="grid gap-1 text-[14px] text-muted">
         {c.fields.swiftCode}
         <input
           type="text"
@@ -359,7 +359,7 @@ function AccountForm({
         />
       </label>
 
-      <label className="grid gap-1 text-[12.5px] text-muted">
+      <label className="grid gap-1 text-[14px] text-muted">
         {c.fields.currency}
         <select
           value={currency}
@@ -385,7 +385,7 @@ function AccountForm({
         <button
           type="submit"
           disabled={busy}
-          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg bg-gold px-4 text-[13px] font-semibold text-ink transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:py-2"
+          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg bg-gold px-4 text-[14px] font-semibold text-ink transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:py-2"
         >
           {c.save}
         </button>
@@ -414,10 +414,10 @@ function Action({
       disabled={busy}
       /* `w-fit`: `inline-flex` is overruled by a grid parent, which stretches its items — and a
          full-width bordered strip reads as a table row rather than as a button. */
-      className={`inline-flex w-fit min-h-10 cursor-pointer items-center rounded-lg border px-3 text-[12.5px] font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:py-1.5 ${
+      className={`inline-flex w-fit min-h-10 cursor-pointer items-center rounded-lg border px-3 text-[14px] font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:py-1.5 ${
         danger
           ? 'border-bad/40 text-bad hover:bg-bad/10'
-          : 'border-line text-text hover:bg-panel'
+          : 'border-line text-text hover:bg-line2'
       }`}
     >
       {label}

@@ -108,7 +108,7 @@ export default async function EmployeesPage({
 
   return shell(
     <>
-      <p className="text-[12.5px] leading-relaxed text-muted">{t.employees.intro}</p>
+      <p className="text-[14px] leading-relaxed text-muted">{t.employees.intro}</p>
 
       <EmployeeInvite roles={roles} />
 
@@ -170,12 +170,12 @@ function Row({
             The address is isolated as a VALUE, never wrapped together with a label — «البريد
             a@b.com» inside one LTR run renders with the value colliding with what precedes it.
           */}
-          <Ltr className="text-[12.5px] text-muted">{employee.email}</Ltr>
+          <Ltr className="text-[14px] text-muted">{employee.email}</Ltr>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <span
-            className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${TONES[statusTone(employee.status)]}`}
+            className={`rounded-full border px-2.5 py-0.5 text-[13px] font-bold ${TONES[statusTone(employee.status)]}`}
           >
             {employee.status === 'suspended'
               ? t.employees.statusSuspended
@@ -183,7 +183,7 @@ function Row({
           </span>
 
           {progress ? (
-            <span className={`text-[11.5px] ${progress.tone}`}>{progress.label}</span>
+            <span className={`text-[13px] ${progress.tone}`}>{progress.label}</span>
           ) : null}
         </div>
       </div>

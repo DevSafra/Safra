@@ -34,7 +34,7 @@ export default async function SupportPage() {
       /* Reachable while unverified — the rejected banner sends them here — so the nav must lock. */
       locked={isLocked(profile)}
     >
-      <p className="text-[12.5px] text-muted">{t.support.intro}</p>
+      <p className="text-[14px] text-muted">{t.support.intro}</p>
 
       <section className="mt-4 rounded-card border border-line bg-card p-4">
         <h2 className="font-display text-[18px] text-text">{t.support.openTitle}</h2>
@@ -47,9 +47,9 @@ export default async function SupportPage() {
         <h2 className="font-display text-[18px] text-text">{t.support.mineTitle}</h2>
 
         {tickets === 'failed' || tickets === 'unauthenticated' ? (
-          <p className="mt-3 text-[12.5px] text-bad">{t.dashboard.loadFailed}</p>
+          <p className="mt-3 text-[14px] text-bad">{t.dashboard.loadFailed}</p>
         ) : tickets.items.length === 0 ? (
-          <p className="mt-3 rounded-card border border-line bg-card p-5 text-center text-[12.5px] text-muted">
+          <p className="mt-3 rounded-card border border-line bg-card p-5 text-center text-[14px] text-muted">
             {t.support.none}
           </p>
         ) : (
@@ -61,21 +61,19 @@ export default async function SupportPage() {
                   className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-card p-4 transition-colors hover:border-[rgba(var(--goldA),0.4)]"
                 >
                   <span className="min-w-0">
-                    <Ltr className="block text-[12.5px] text-text">
-                      {ticket.reference}
-                    </Ltr>
+                    <Ltr className="block text-[14px] text-text">{ticket.reference}</Ltr>
                     {ticket.lastMessage ? (
-                      <span className="mt-1 block truncate text-[12.5px] text-muted">
+                      <span className="mt-1 block truncate text-[14px] text-muted">
                         {ticket.lastMessage}
                       </span>
                     ) : null}
-                    <span className="mt-1 block text-[11px] text-faint">
+                    <span className="mt-1 block text-[13px] text-faint">
                       {fill(t.support.messages, { count: String(ticket.messageCount) })}
                     </span>
                   </span>
 
                   <span
-                    className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] ${
+                    className={`shrink-0 rounded-full border px-2 py-0.5 text-[13px] ${
                       ticket.closed
                         ? 'border-line bg-field text-faint'
                         : 'border-ok/40 bg-ok/10 text-ok'

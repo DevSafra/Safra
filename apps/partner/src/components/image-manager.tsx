@@ -232,19 +232,19 @@ export function ImageManager({
 
   return (
     <div className="grid gap-3.5">
-      <p className="text-[12px] leading-relaxed text-faint">{t.images.note}</p>
+      <p className="text-[13px] leading-relaxed text-faint">{t.images.note}</p>
 
       {error ? (
         <p
           role="alert"
-          className="rounded-lg border border-bad/40 bg-bad/10 p-3 text-[12.5px] text-bad"
+          className="rounded-lg border border-bad/40 bg-bad/10 p-3 text-[14px] text-bad"
         >
           {error}
         </p>
       ) : null}
 
       <div className="flex flex-wrap items-center gap-3">
-        <label className="inline-flex min-h-10 cursor-pointer items-center rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-4 py-2 text-[13px] font-extrabold text-[#241A05] lg:min-h-0">
+        <label className="inline-flex min-h-10 cursor-pointer items-center rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-4 py-2 text-[14px] font-extrabold text-[#241A05] lg:min-h-0">
           {busy ? t.images.uploading : t.images.upload}
           <input
             type="file"
@@ -263,7 +263,7 @@ export function ImageManager({
           />
         </label>
 
-        <span className="text-[11.5px] text-faint">
+        <span className="text-[13px] text-faint">
           {fill(t.images.count, { n: count(images.length), max: count(MAX) })}
         </span>
       </div>
@@ -282,7 +282,7 @@ export function ImageManager({
       {dialog}
 
       {images.length === 0 ? (
-        <p className="text-[12.5px] text-faint">{t.images.empty}</p>
+        <p className="text-[14px] text-faint">{t.images.empty}</p>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-[repeat(auto-fill,minmax(240px,1fr))]">
           {images.map((image, index) => (
@@ -329,7 +329,7 @@ export function ImageManager({
                 ) : (
                   <div className="flex h-full w-full flex-col items-center justify-center gap-1 px-3 text-center">
                     <span
-                      className={`text-[12.5px] font-bold ${
+                      className={`text-[14px] font-bold ${
                         image.status === 'failed' ? 'text-bad' : 'text-muted'
                       }`}
                     >
@@ -337,7 +337,7 @@ export function ImageManager({
                         ? t.images.failedState
                         : t.images.processing}
                     </span>
-                    <span className="text-[10.5px] text-faint">
+                    <span className="text-[13px] text-faint">
                       {image.status === 'failed'
                         ? reasonFor(image.failureCode)
                         : t.images.processingNote}
@@ -346,7 +346,7 @@ export function ImageManager({
                 )}
 
                 {image.isCover ? (
-                  <span className="absolute top-2 start-2 rounded-full border border-gold bg-gold/20 px-2.5 py-0.5 text-[10.5px] font-bold text-gold">
+                  <span className="absolute top-2 start-2 rounded-full border border-gold bg-gold/20 px-2.5 py-0.5 text-[13px] font-bold text-gold-read">
                     {t.images.cover}
                   </span>
                 ) : null}
@@ -472,7 +472,7 @@ function AltEditor({
         void onSave(trimmed).then((ok) => setSaved(ok));
       }}
     >
-      <p className="text-[11px] leading-relaxed text-faint">{t.images.altLabel}</p>
+      <p className="text-[14px] leading-relaxed text-faint">{t.images.altLabel}</p>
 
       <AltField
         id={`alt-ar-${image.id}`}
@@ -498,7 +498,7 @@ function AltEditor({
 
       <button
         type="submit"
-        className="min-h-10 w-fit cursor-pointer rounded-lg border border-line px-3 py-1 text-[11.5px] text-muted lg:min-h-0"
+        className="min-h-10 w-fit cursor-pointer rounded-lg border border-line px-3 py-1 text-[13px] text-muted lg:min-h-0"
       >
         {saved ? t.images.altSaved : t.images.altSave}
       </button>
@@ -527,14 +527,14 @@ function AltField({
 }) {
   return (
     <label className="grid gap-0.5">
-      <span className="text-[10.5px] text-faint2">{label}</span>
+      <span className="text-[13px] text-faint">{label}</span>
       <input
         id={id}
         dir={dir}
         value={value}
         maxLength={300}
         onChange={(event) => onChange(event.target.value)}
-        className="min-h-10 rounded-lg border border-line bg-field px-2.5 py-1.5 text-[12px] text-text lg:min-h-0"
+        className="min-h-10 rounded-lg border border-line bg-field px-2.5 py-1.5 text-[13px] text-text lg:min-h-0"
       />
     </label>
   );
@@ -568,7 +568,7 @@ function Small({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`min-h-10 cursor-pointer rounded-lg border px-2.5 py-1 text-[11.5px] disabled:cursor-not-allowed disabled:opacity-40 lg:min-h-0 ${
+      className={`min-h-10 cursor-pointer rounded-lg border px-2.5 py-1 text-[13px] disabled:cursor-not-allowed disabled:opacity-40 lg:min-h-0 ${
         danger ? 'border-bad/50 text-bad' : 'border-line text-muted'
       }`}
     >

@@ -149,7 +149,7 @@ export function TablePagination({
         `scroll-mt-24` so a fragment landing does not put the bar flush against the viewport edge —
         the same allowance every row anchor makes, for the same reason.
       */
-      className="mt-3.5 scroll-mt-24 flex flex-wrap items-center justify-center gap-x-6 gap-y-2.5 border-t border-line pt-3.5 text-[12px] text-muted"
+      className="mt-3.5 scroll-mt-24 flex flex-wrap items-center justify-center gap-x-6 gap-y-2.5 border-t border-line pt-3.5 text-[13px] text-muted"
     >
       {/*
         `page` and `size` both live in this form, so submitting either one keeps the other. The
@@ -260,7 +260,7 @@ export function TablePagination({
               submitted form, which is what stops the endpoint being asked for page 2 of 1.
             */
             disabled={onlyPage}
-            className="w-14 rounded-lg border border-line bg-field px-2 py-1.5 text-center text-[12.5px] text-text disabled:cursor-not-allowed disabled:opacity-40"
+            className="w-14 rounded-lg border border-line bg-field px-2 py-1.5 text-center text-[14px] text-text disabled:cursor-not-allowed disabled:opacity-40"
           />
 
           <Step
@@ -285,7 +285,7 @@ export function TablePagination({
             aria-label={t.table.pageSizeLabel}
             /* Only when every option would show the same rows — see `sizeIsMoot`. */
             disabled={sizeIsMoot}
-            className="cursor-pointer rounded-lg border border-line bg-field px-2 py-1.5 text-[12.5px] text-text disabled:cursor-not-allowed disabled:opacity-40"
+            className="cursor-pointer rounded-lg border border-line bg-field px-2 py-1.5 text-[14px] text-text disabled:cursor-not-allowed disabled:opacity-40"
           >
             {sizeOptions(size).map((option) => (
               <option key={option} value={option}>
@@ -299,7 +299,7 @@ export function TablePagination({
         <button
           type="submit"
           disabled={nothingToApply}
-          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-3 py-1.5 text-[12px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-line disabled:hover:text-muted"
+          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-3 py-1.5 text-[13px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold-read disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-line disabled:hover:text-muted"
         >
           {t.table.apply}
         </button>
@@ -371,7 +371,7 @@ function Step({
     which the sidebar stops being a drawer.
   */
   const shape =
-    'inline-flex h-10 w-10 items-center justify-center rounded-lg border text-[15px] leading-none lg:h-8 lg:w-8';
+    'inline-flex h-10 w-10 items-center justify-center rounded-lg border text-[16px] leading-none lg:h-8 lg:w-8';
 
   if (!enabled) {
     return (
@@ -401,7 +401,7 @@ function Step({
       href={href}
       scroll={false}
       aria-label={label}
-      className={`${shape} cursor-pointer border-line text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold`}
+      className={`${shape} cursor-pointer border-line text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold-read`}
     >
       <span aria-hidden="true">{glyph}</span>
     </Link>

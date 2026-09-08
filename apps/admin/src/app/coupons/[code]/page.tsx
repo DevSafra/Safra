@@ -73,7 +73,7 @@ export default async function CouponParticipationPage({
       <ConsoleShell title={t.nav.coupons} counts={counts}>
         <ConsolePanel>
           <BackLink target={back} section={t.nav.coupons} />
-          <p className="mt-3 text-[12.5px] text-muted">
+          <p className="mt-3 text-[14px] text-muted">
             {result === 'unauthenticated'
               ? t.dashboard.sessionExpired
               : t.errors.unreachable}
@@ -115,9 +115,11 @@ export default async function CouponParticipationPage({
       <ConsolePanel>
         <BackLink target={back} section={t.nav.coupons} />
 
-        <h2 className="mt-3 font-mono text-[15px] font-extrabold text-gold">{code}</h2>
-        <h3 className="mt-1 text-[13px] font-bold text-text">{c.participationTitle}</h3>
-        <p className="mt-1 text-[12px] leading-relaxed text-faint2">
+        <h2 className="mt-3 font-mono text-[16px] font-extrabold text-gold-read">
+          {code}
+        </h2>
+        <h3 className="mt-1 text-[14px] font-bold text-text">{c.participationTitle}</h3>
+        <p className="mt-1 text-[13px] leading-relaxed text-faint">
           {c.participationNote}
         </p>
 
@@ -140,15 +142,15 @@ export default async function CouponParticipationPage({
                 key={group.label}
                 href={`/coupons/${encodeURIComponent(code)}?${href.toString()}`}
                 {...(group.key ? { 'data-participation-count': group.key } : {})}
-                className={`inline-flex min-h-10 items-center gap-2 rounded-lg border px-3.5 py-2 text-[12px] font-bold transition-colors lg:min-h-0 ${
+                className={`inline-flex min-h-10 items-center gap-2 rounded-lg border px-3.5 py-2 text-[13px] font-bold transition-colors lg:min-h-0 ${
                   active
-                    ? 'border-[rgba(var(--goldA),0.5)] bg-[rgba(var(--goldA),0.1)] text-gold'
+                    ? 'border-[rgba(var(--goldA),0.5)] bg-[rgba(var(--goldA),0.1)] text-gold-read'
                     : 'border-line text-muted hover:text-text'
                 }`}
               >
                 {group.label}
                 {group.n === null ? null : (
-                  <span className="text-[11px] text-faint">{groupCount(group.n)}</span>
+                  <span className="text-[13px] text-faint">{groupCount(group.n)}</span>
                 )}
               </Link>
             );
@@ -197,7 +199,7 @@ const COLUMNS = [
     render: (row: CouponPartner) => (
       <span className="grid">
         <span className="truncate font-semibold text-text">{row.partner}</span>
-        <span className="font-mono text-[10.5px] text-faint">{row.reference}</span>
+        <span className="font-mono text-[13px] text-faint">{row.reference}</span>
       </span>
     ),
   },

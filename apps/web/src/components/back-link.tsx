@@ -36,7 +36,7 @@ export async function BackLink({
     */
     <BackNavigation
       href={href}
-      className="inline-flex min-h-10 w-fit items-center gap-2 rounded-lg border border-line px-4 text-sm text-muted transition-colors hover:border-gold hover:text-gold lg:min-h-0 lg:py-2"
+      className="inline-flex min-h-10 w-fit items-center gap-2 rounded-lg border border-line px-4 text-sm text-muted transition-colors hover:border-gold hover:text-gold-read lg:min-h-0 lg:py-2"
     >
       <span aria-hidden="true">{arrow}</span>
       {t('back')}

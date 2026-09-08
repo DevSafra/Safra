@@ -58,7 +58,7 @@ export default async function AuditEntryPage({
       <ConsoleShell title={t.sections.staff.activityEntry} counts={counts}>
         <BackLink target={back} section={t.nav.audit} />
         <ConsolePanel>
-          <p className="mt-4 text-[12.5px] text-muted">
+          <p className="mt-4 text-[14px] text-muted">
             {entry === 'unauthenticated'
               ? t.dashboard.sessionExpired
               : t.sections.staff.activityNotFound}

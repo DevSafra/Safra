@@ -607,7 +607,7 @@ function Field({
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={id} className="text-sm text-muted">
-        {label} {locked ? null : <span className="text-gold">*</span>}
+        {label} {locked ? null : <span className="text-gold-read">*</span>}
       </label>
       <input
         id={id}

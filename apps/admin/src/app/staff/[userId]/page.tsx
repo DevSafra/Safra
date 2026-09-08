@@ -76,7 +76,7 @@ export default async function StaffMemberPage({
       <ConsoleShell title={t.sections.staff.member.heading} counts={counts}>
         <BackLink target={back} section={t.nav.staff} />
         <ConsolePanel>
-          <p className="text-[12.5px] text-muted">
+          <p className="text-[14px] text-muted">
             {member === 'unauthenticated'
               ? t.dashboard.sessionExpired
               : t.sections.staff.member.notFound}
@@ -177,7 +177,7 @@ export default async function StaffMemberPage({
             stays complete, because that is the one place an operator might reasonably assume scope
             applies and it deliberately does not.
           */}
-          <p className="mt-3 text-[11px] leading-relaxed text-faint">
+          <p className="mt-3 text-[14px] leading-relaxed text-faint">
             {t.sections.staff.scopeNote}
           </p>
 
@@ -191,7 +191,7 @@ export default async function StaffMemberPage({
           */}
           {isScopable(member.role as Role) ? (
             <div className="mt-4 border-t border-line2 pt-4">
-              <h3 className="mb-2.5 text-[12.5px] font-bold text-gold">
+              <h3 className="mb-2.5 text-[14px] font-bold text-gold-read">
                 {t.sections.staff.scopeEdit}
               </h3>
               <StaffScopeEditor
@@ -206,7 +206,7 @@ export default async function StaffMemberPage({
           ) : null}
 
           {member.staffRoleId === null ? (
-            <p className="mt-3 text-[11.5px] text-warn">
+            <p className="mt-3 text-[13px] text-warn">
               {t.sections.staff.member.noNamedRoleNote}
             </p>
           ) : null}
@@ -233,12 +233,12 @@ export default async function StaffMemberPage({
         </ConsolePanel>
 
         <ConsolePanel title={t.sections.staff.member.capabilities}>
-          <p className="-mt-1 mb-3 text-[11.5px] text-faint">
+          <p className="-mt-1 mb-3 text-[13px] text-faint">
             {t.sections.staff.member.capabilitiesHint}
           </p>
 
           {member.permissions.length === 0 ? (
-            <p className="text-[12.5px] text-faint">
+            <p className="text-[14px] text-faint">
               {t.sections.staff.member.noCapabilities}
             </p>
           ) : (
@@ -250,10 +250,10 @@ export default async function StaffMemberPage({
               */}
               {groupPermissions(member.permissions).map((entry) => (
                 <div key={entry.group}>
-                  <h3 className="text-[11px] font-bold text-faint">
+                  <h3 className="text-[13px] font-bold text-faint">
                     {label(t.sections.staffRoles.group, entry.group)}
                   </h3>
-                  <p className="mt-1 text-[12.5px] leading-relaxed text-text2">
+                  <p className="mt-1 text-[14px] leading-relaxed text-text2">
                     {entry.permissions
                       .map((permission) =>
                         label(t.sections.staffRoles.capability, permission),
@@ -268,7 +268,7 @@ export default async function StaffMemberPage({
 
         {member.invitationPending ? (
           <ConsolePanel title={t.sections.staff.member.invitation}>
-            <p className="text-[12.5px] text-text2">
+            <p className="text-[14px] text-text2">
               {t.sections.staff.invitationPending}
               {member.invitationSentAt
                 ? ` · ${fill(t.sections.staff.member.invitationSentAt, {
@@ -307,9 +307,9 @@ function Row({
 }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] text-faint">{term}</dt>
+      <dt className="text-[13px] text-faint">{term}</dt>
       <dd
-        className="mt-0.5 text-[12.5px] text-text"
+        className="mt-0.5 text-[14px] text-text"
         {...(state ? { 'data-state': state } : {})}
       >
         {children}

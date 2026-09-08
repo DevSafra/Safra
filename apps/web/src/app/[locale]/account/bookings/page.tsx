@@ -99,7 +99,7 @@ export default async function AccountBookingsPage({
                         label={localStatus('bookingStatus', shown, locale)}
                       />
                       {/* Money, not a bare decimal — see the note on the schema's `currency`. */}
-                      <span className="text-sm text-gold" dir="ltr">
+                      <span className="text-sm text-gold-read" dir="ltr">
                         {formatMoney(
                           booking.totalAmount,
                           booking.currency?.code ?? DEFAULT_MONEY_CURRENCY,

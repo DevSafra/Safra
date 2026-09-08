@@ -83,8 +83,8 @@ export function PropertyAmenities({
 
   return (
     <section className="grid gap-2.5">
-      <h3 className="text-[13px] font-bold text-text">{c.propertyAmenitiesLabel}</h3>
-      <p className="text-[11.5px] text-faint">{c.propertyAmenitiesHint}</p>
+      <h3 className="text-[14px] font-bold text-text">{c.propertyAmenitiesLabel}</h3>
+      <p className="text-[13px] text-faint">{c.propertyAmenitiesHint}</p>
 
       <AmenityPicker
         amenities={amenities}
@@ -99,7 +99,7 @@ export function PropertyAmenities({
       {message ? (
         <p
           role="status"
-          className={`text-[12px] font-semibold ${
+          className={`text-[13px] font-semibold ${
             message.kind === 'ok' ? 'text-ok' : 'text-bad'
           }`}
         >
@@ -113,7 +113,7 @@ export function PropertyAmenities({
           data-property-amenities-save
           disabled={busy || !dirty}
           onClick={() => void save()}
-          className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg btn-gold px-4 py-2 text-[12.5px] font-bold disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+          className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg btn-gold px-4 py-2 text-[14px] font-bold disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
         >
           {busy ? c.propertyAmenitiesSaving : c.propertyAmenitiesSave}
         </button>

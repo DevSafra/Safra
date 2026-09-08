@@ -71,10 +71,10 @@ export default async function ThreadPage({
           */}
           {result === 'unauthenticated' || result === 'failed' ? null : (
             <div className="mt-3 flex flex-wrap items-center gap-2 border-b border-line pb-3">
-              <span className="text-[13px] font-bold text-text">
+              <span className="text-[14px] font-bold text-text">
                 {partyLine(result.subjectKind, result.customer, result.partner)}
               </span>
-              <span className="rounded-full border border-line px-2 py-px text-[10px] font-bold text-faint">
+              <span className="rounded-full border border-line px-2 py-px text-[13px] font-bold text-faint">
                 {conversationKind(result.subjectKind)}
               </span>
               {result.subjectReference
@@ -83,11 +83,11 @@ export default async function ThreadPage({
 
                     /* The booking or the dispute it is about, opened from here. */
                     return href ? (
-                      <a href={href} className="text-[11px] text-sky hover:underline">
+                      <a href={href} className="text-[13px] text-sky hover:underline">
                         <Ltr>{result.subjectReference}</Ltr>
                       </a>
                     ) : (
-                      <Ltr className="text-[11px] text-sky">
+                      <Ltr className="text-[13px] text-sky">
                         {result.subjectReference}
                       </Ltr>
                     );
@@ -100,11 +100,11 @@ export default async function ThreadPage({
           )}
 
           {result === 'unauthenticated' ? (
-            <p className="mt-3 text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
+            <p className="mt-3 text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
           ) : result === 'failed' ? (
-            <p className="mt-3 text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
+            <p className="mt-3 text-[14px] text-bad">{t.dashboard.queueFailed}</p>
           ) : result.messages.length === 0 ? (
-            <p className="mt-3 text-[12.5px] text-faint">
+            <p className="mt-3 text-[14px] text-faint">
               {t.sections.messages.noMessages}
             </p>
           ) : (
@@ -143,9 +143,7 @@ export default async function ThreadPage({
               «why can I not type» is the question a greyed-out box asks and does not answer.
             */}
             {result.closed ? (
-              <p className="text-[12.5px] text-faint">
-                {t.sections.messages.closedNotice}
-              </p>
+              <p className="text-[14px] text-faint">{t.sections.messages.closedNotice}</p>
             ) : (
               <>
                 <ReplyForm reference={reference} />
@@ -173,29 +171,27 @@ function Message({ message }: { message: ThreadMessage }) {
       }`}
     >
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[11.5px] font-bold text-gold">
+        <span className="text-[13px] font-bold text-gold-read">
           {senderLabel(message.senderKind)}
         </span>
         {message.senderEmail ? (
-          <Ltr className="text-[10.5px] text-faint">{message.senderEmail}</Ltr>
+          <Ltr className="text-[13px] text-faint">{message.senderEmail}</Ltr>
         ) : null}
         {message.internal ? (
-          <span className="rounded bg-[rgba(var(--warnA),0.15)] px-2 py-px text-[10px] font-bold text-warn">
+          <span className="rounded bg-[rgba(var(--warnA),0.15)] px-2 py-px text-[13px] font-bold text-warn">
             {t.sections.messages.internalNote}
           </span>
         ) : null}
-        <Ltr className="ms-auto text-[10.5px] text-faint">
-          {shortDateTime(message.at)}
-        </Ltr>
+        <Ltr className="ms-auto text-[13px] text-faint">{shortDateTime(message.at)}</Ltr>
       </div>
 
       {/* Arabic-only console; the body stores a token where a contact detail was removed. */}
-      <p className="mt-1.5 text-[12.5px] leading-relaxed text-text2">
+      <p className="mt-1.5 text-[14px] leading-relaxed text-text2">
         {renderRedactions(message.body, 'ar')}
       </p>
 
       {message.redactedCount > 0 ? (
-        <p className="mt-1 text-[10.5px] text-warn">
+        <p className="mt-1 text-[14px] text-warn">
           {fill(t.sections.messages.redacted, { n: count(message.redactedCount) })}
         </p>
       ) : null}

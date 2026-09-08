@@ -133,14 +133,14 @@ export async function PropertyCard({
         ) : (
           <OrnamentField
             id={`ornament-property-${item.propertyReference}`}
-            className="text-gold opacity-30"
+            className="text-gold-read opacity-30"
           />
         )}
       </div>
 
       <div className="flex flex-1 flex-col p-4">
         <div className="flex items-start justify-between gap-3">
-          <h3 className="text-[14.5px] font-bold text-text">
+          <h3 className="text-[16px] font-bold text-text">
             {/*
               The WHOLE CARD is the target, and there is still only one link (Bashar, 2026-09-02).
 
@@ -168,7 +168,7 @@ export async function PropertyCard({
             </Link>
           </h3>
           {item.rating ? (
-            <span className="shrink-0 text-[13px] font-bold text-gold">
+            <span className="shrink-0 text-[14px] font-bold text-gold-read">
               ★ {item.rating}
             </span>
           ) : null}
@@ -191,7 +191,7 @@ export async function PropertyCard({
           Absent when it is null. 2,703 listings predate the field and inventing «١ نجمة» for a
           hotel nobody has classified would be a claim, not a blank.
         */}
-        <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12.5px] text-muted">
+        <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[14px] text-muted">
           <span>{dynamicMessage(tt, item.propertyTypeCode, item.propertyTypeCode)}</span>
           {item.starRating ? (
             <StarRating
@@ -208,7 +208,7 @@ export async function PropertyCard({
             {item.badges.map((badge) => (
               <li
                 key={badge}
-                className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-xs text-gold"
+                className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-xs text-gold-read"
               >
                 {badge === 'safra_verified' ? t('badgeVerified') : t('badgeRecommends')}
               </li>
@@ -217,7 +217,7 @@ export async function PropertyCard({
         ) : null}
 
         {item.reviewsCount > 0 ? (
-          <p className="mt-2 text-[12.5px] text-muted">
+          <p className="mt-2 text-[14px] text-muted">
             {t('reviews', { count: item.reviewsCount })}
           </p>
         ) : null}
@@ -239,8 +239,8 @@ export async function PropertyCard({
         <div className="mt-auto pt-5">
           <div className="border-t-2 border-dotted border-line pt-4">
             <p className="text-base text-text">
-              <span className="text-[18px] font-bold text-gold">{nightly.text}</span>{' '}
-              <span className="text-[12.5px] text-muted">{t('perNight')}</span>
+              <span className="text-[18px] font-bold text-gold-read">{nightly.text}</span>{' '}
+              <span className="text-[14px] text-muted">{t('perNight')}</span>
             </p>
             {/*
           The total, only when it says something the line above does not. On a one-night search the
@@ -254,7 +254,7 @@ export async function PropertyCard({
             ) : null}
             {/* Said once per card, under the total — the figure a booking is actually made against. */}
             {total.converted ? (
-              <p className="mt-0.5 text-[12px] text-muted">
+              <p className="mt-0.5 text-[13px] text-muted">
                 {common('convertedFrom', { amount: total.original })}
               </p>
             ) : null}

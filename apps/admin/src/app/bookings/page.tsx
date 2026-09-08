@@ -195,7 +195,7 @@ export default async function BookingsPage({
                   {status ? <input type="hidden" name="status" value={status} /> : null}
                   <button
                     type="submit"
-                    className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line bg-field px-3.5 text-[12.5px] text-text2 hover:border-gold hover:text-gold lg:min-h-0 lg:py-2"
+                    className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line bg-field px-3.5 text-[14px] text-text2 hover:border-gold hover:text-gold-read lg:min-h-0 lg:py-2"
                   >
                     {t.table.exportCsv}
                   </button>
@@ -231,7 +231,7 @@ export default async function BookingsPage({
 
             `value="1"` because that is the only value the API accepts — see the query schema.
           */}
-          <label className="flex cursor-pointer items-center gap-2 text-[12.5px] text-muted">
+          <label className="flex cursor-pointer items-center gap-2 text-[14px] text-muted">
             <input
               type="checkbox"
               name="expiring"
@@ -246,7 +246,7 @@ export default async function BookingsPage({
             name="status"
             defaultValue={status ?? ''}
             aria-label={t.table.colStatus}
-            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text"
           >
             <option value="">{t.sections.bookings.allStatuses}</option>
             {STATUSES.map((value) => (
@@ -258,9 +258,9 @@ export default async function BookingsPage({
         </TableToolbar>
 
         {result === 'unauthenticated' ? (
-          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
         ) : result === 'failed' ? (
-          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <>
             <AdminTable
@@ -348,7 +348,7 @@ const columns = (back: string): readonly AdminColumn<BookingListItem>[] => [
     key: 'amount',
     header: t.admin.colAmount,
     render: (row) => (
-      <Ltr className="font-bold whitespace-nowrap text-gold">
+      <Ltr className="font-bold whitespace-nowrap text-gold-read">
         {money(row.amount)} {row.currency}
       </Ltr>
     ),
@@ -366,7 +366,7 @@ const columns = (back: string): readonly AdminColumn<BookingListItem>[] => [
     render: (row) => (
       <Link
         href={`/bookings/${row.reference}${back}`}
-        className="text-[11.5px] text-sky hover:underline"
+        className="text-[13px] text-sky hover:underline"
       >
         {t.table.open}
       </Link>

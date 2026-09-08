@@ -61,7 +61,7 @@ export default async function SupportThreadPage({
         /* Reachable while unverified — the rejected banner sends them here — so the nav must lock. */
         locked={isLocked(profile)}
       >
-        <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
+        <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
       </Shell>
     );
   }
@@ -75,7 +75,7 @@ export default async function SupportThreadPage({
     >
       <Link
         href="/support"
-        className="inline-flex min-h-10 w-fit items-center gap-2 rounded-lg border border-line px-4 text-[12.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold lg:min-h-0 lg:py-2"
+        className="inline-flex min-h-10 w-fit items-center gap-2 rounded-lg border border-line px-4 text-[14px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold-read lg:min-h-0 lg:py-2"
       >
         {/* The arrow is its own flex item so `dir="rtl"` places it rather than the bidi algorithm. */}
         <span aria-hidden="true">→</span>
@@ -84,9 +84,9 @@ export default async function SupportThreadPage({
 
       <section className="mt-4 rounded-card border border-line bg-card p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Ltr className="text-[12.5px] text-text">{thread.reference}</Ltr>
+          <Ltr className="text-[14px] text-text">{thread.reference}</Ltr>
           <span
-            className={`rounded-full border px-2 py-0.5 text-[11px] ${
+            className={`rounded-full border px-2 py-0.5 text-[13px] ${
               thread.closed
                 ? 'border-line bg-field text-faint'
                 : 'border-ok/40 bg-ok/10 text-ok'
@@ -109,15 +109,15 @@ export default async function SupportThreadPage({
               }`}
             >
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="text-[11px] font-semibold text-muted">
+                <span className="text-[13px] font-semibold text-muted">
                   {SENDER[message.sender]()}
                 </span>
-                <Ltr className="text-[11px] text-faint">
+                <Ltr className="text-[13px] text-faint">
                   {message.createdAt.slice(0, 16).replace('T', ' ')}
                 </Ltr>
               </div>
 
-              <p className="mt-2 text-[12.5px] leading-relaxed whitespace-pre-wrap text-text">
+              <p className="mt-2 text-[14px] leading-relaxed whitespace-pre-wrap text-text">
                 {/*
                   `'ar'` explicitly: لوحة الشريك is Arabic-only, and the stored body carries a
                   language-neutral token where a contact detail was removed — see `O-i18n-2`.
@@ -128,7 +128,7 @@ export default async function SupportThreadPage({
               {/* Said out loud: a masked number is silent in the body, and the sender would otherwise
                   wait for a call that cannot come. */}
               {message.redactedCount > 0 ? (
-                <p className="mt-2 text-[11px] text-warn">
+                <p className="mt-2 text-[14px] text-warn">
                   {fill(t.support.redacted, { count: String(message.redactedCount) })}
                 </p>
               ) : null}
@@ -138,7 +138,7 @@ export default async function SupportThreadPage({
       </section>
 
       {thread.closed ? (
-        <p className="mt-4 rounded-card border border-line bg-card p-4 text-[12.5px] text-muted">
+        <p className="mt-4 rounded-card border border-line bg-card p-4 text-[14px] text-muted">
           {t.support.closedNote}
         </p>
       ) : (

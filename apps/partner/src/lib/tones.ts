@@ -18,7 +18,7 @@ export const TONES: Record<Tone, string> = {
   sky: 'border-sky bg-sky/15 text-sky',
   indigo: 'border-indigo bg-indigo/15 text-indigo',
   pend: 'border-pend bg-pend/15 text-pend',
-  gold: 'border-gold bg-gold/15 text-gold',
+  gold: 'border-gold bg-gold/15 text-gold-read',
   warn: 'border-warn bg-warn/15 text-warn',
   orange: 'border-orange bg-orange/15 text-orange',
   bad: 'border-bad bg-bad/15 text-bad',

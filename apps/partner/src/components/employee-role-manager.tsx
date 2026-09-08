@@ -148,7 +148,7 @@ function RoleForm({
       </h2>
 
       {/* No `dir`: a field a person types into follows the page's direction (Bashar, 2026-08-19). */}
-      <label className="grid gap-1 text-[12.5px] text-muted">
+      <label className="grid gap-1 text-[14px] text-muted">
         {t.employeeRoles.nameLabel}
         <input
           type="text"
@@ -159,11 +159,11 @@ function RoleForm({
           maxLength={60}
           className="rounded-lg border border-line bg-bg px-3 py-2 text-sm text-text"
         />
-        <span className="text-[11.5px] text-faint">{t.employeeRoles.nameHint}</span>
+        <span className="text-[13px] text-faint">{t.employeeRoles.nameHint}</span>
       </label>
 
       <fieldset className="grid gap-2">
-        <legend className="text-[12.5px] text-muted">
+        <legend className="text-[14px] text-muted">
           {t.employeeRoles.capabilitiesLabel}
         </legend>
 
@@ -178,13 +178,13 @@ function RoleForm({
         */}
         {groupPermissions(capabilities).map(({ group, permissions }) => (
           <div key={group} className="grid gap-1.5">
-            <p className="text-[11.5px] font-semibold text-faint">{groupLabel(group)}</p>
+            <p className="text-[13px] font-semibold text-faint">{groupLabel(group)}</p>
 
             <div className="grid gap-1.5 sm:grid-cols-2">
               {permissions.map((permission) => (
                 <label
                   key={permission}
-                  className="flex cursor-pointer items-center gap-2 text-[12.5px] text-text"
+                  className="flex cursor-pointer items-center gap-2 text-[14px] text-text"
                 >
                   <input
                     type="checkbox"
@@ -207,7 +207,7 @@ function RoleForm({
       */}
       {chosen.length > 0 &&
       openableSections(chosen, PARTNER_SECTION_PERMISSIONS).length === 0 ? (
-        <p className="rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-[12.5px] leading-relaxed text-warn">
+        <p className="rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-[14px] leading-relaxed text-warn">
           {t.employeeRoles.opensNothing}
         </p>
       ) : null}
@@ -222,7 +222,7 @@ function RoleForm({
         <button
           type="submit"
           disabled={busy}
-          className="cursor-pointer rounded-lg bg-gold px-5 py-2.5 text-sm font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          className="cursor-pointer rounded-lg bg-gold px-5 py-2.5 text-sm font-semibold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy
             ? editing
@@ -339,14 +339,14 @@ export function EmployeeRoleManager({
                       How many people hold it, so the delete constraint is legible BEFORE the
                       button is pressed rather than reported as a refusal afterwards.
                     */}
-                    <span className="text-[11.5px] text-faint">
+                    <span className="text-[13px] text-faint">
                       {role.employeeCount === 0
                         ? t.employeeRoles.heldNobody
                         : fill(t.employeeRoles.held, { n: String(role.employeeCount) })}
                     </span>
                   </div>
 
-                  <p className="text-[12.5px] leading-relaxed text-muted">
+                  <p className="text-[14px] leading-relaxed text-muted">
                     {role.permissions.map(capabilityLabel).join(' · ')}
                   </p>
 
@@ -356,7 +356,7 @@ export function EmployeeRoleManager({
                       disabled={busyId !== null}
                       aria-label={fill(t.employeeRoles.editLabel, { name: role.name })}
                       onClick={() => setEditingId(role.id)}
-                      className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-[12.5px] text-text transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-[14px] text-text transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {t.employeeRoles.edit}
                     </button>
@@ -367,7 +367,7 @@ export function EmployeeRoleManager({
                       saying "move them first" teaches them what to do.
                     */}
                     {role.employeeCount > 0 ? (
-                      <span className="text-[11.5px] text-faint">
+                      <span className="text-[13px] text-faint">
                         {t.employeeRoles.inUse}
                       </span>
                     ) : (
@@ -378,14 +378,14 @@ export function EmployeeRoleManager({
                           name: role.name,
                         })}
                         onClick={() => void remove(role)}
-                        className="cursor-pointer rounded-lg border border-bad/50 px-3 py-1.5 text-[12.5px] text-bad transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="cursor-pointer rounded-lg border border-bad/50 px-3 py-1.5 text-[14px] text-bad transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {t.employeeRoles.remove}
                       </button>
                     )}
 
                     {busyId === role.id ? (
-                      <span className="text-[12px] text-faint">
+                      <span className="text-[13px] text-faint">
                         {t.employeeRoles.working}
                       </span>
                     ) : null}

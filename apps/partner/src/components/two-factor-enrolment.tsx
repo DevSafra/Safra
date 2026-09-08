@@ -114,7 +114,7 @@ export function TwoFactorEnrolment() {
 
         <div>
           <p className="text-sm text-text">{t.twoFactor.saveRecoveryCodes}</p>
-          <p className="mt-1 text-[12px] leading-relaxed text-faint">
+          <p className="mt-1 text-[13px] leading-relaxed text-faint">
             {t.twoFactor.recoveryCodesNote}
           </p>
 
@@ -147,7 +147,7 @@ export function TwoFactorEnrolment() {
             */
             reloadInto('/');
           }}
-          className="min-h-10 cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-bg"
+          className="min-h-10 cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-ink"
         >
           {t.twoFactor.savedContinue}
         </button>
@@ -166,14 +166,14 @@ export function TwoFactorEnrolment() {
         </p>
       ) : null}
 
-      <ol className="grid gap-2 text-[13px] text-muted">
+      <ol className="grid gap-2 text-[14px] text-muted">
         <li>{t.twoFactor.step1}</li>
         <li>{t.twoFactor.step2}</li>
         <li>{t.twoFactor.step3}</li>
       </ol>
 
       <div>
-        <p className="text-[12px] text-faint">{t.twoFactor.setupKey}</p>
+        <p className="text-[13px] text-faint">{t.twoFactor.setupKey}</p>
         <p
           dir="ltr"
           className="mt-1 break-all rounded-lg border border-line bg-field px-3 py-2.5 font-mono text-sm text-text"
@@ -183,7 +183,7 @@ export function TwoFactorEnrolment() {
       </div>
 
       <form onSubmit={(event) => void confirm(event)} className="grid gap-3">
-        <label htmlFor="code" className="text-[13px] text-muted">
+        <label htmlFor="code" className="text-[14px] text-muted">
           {t.twoFactor.sixDigitCode}
         </label>
         {/*
@@ -204,7 +204,7 @@ export function TwoFactorEnrolment() {
         <button
           type="submit"
           disabled={busy || !setup}
-          className="min-h-10 cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-60"
+          className="min-h-10 cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy ? t.twoFactor.checking : t.twoFactor.submit}
         </button>
@@ -214,7 +214,7 @@ export function TwoFactorEnrolment() {
       <form action="/api/auth/logout" method="post">
         <button
           type="submit"
-          className="min-h-10 w-full cursor-pointer rounded-lg border border-line px-4 py-2 text-[12.5px] text-faint hover:text-muted"
+          className="min-h-10 w-full cursor-pointer rounded-lg border border-line px-4 py-2 text-[14px] text-faint hover:text-muted"
         >
           {t.twoFactor.signOut}
         </button>

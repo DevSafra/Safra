@@ -435,7 +435,7 @@ export function ImageSliderFrame({
           photograph is the usual answer and it is a worse one: it darkens the picture to make the
           chrome legible, which is backwards on a surface that exists to show the picture.
         */}
-        <div className="flex shrink-0 items-center justify-between gap-3 px-3 py-3 text-[12.5px] text-white sm:px-4">
+        <div className="flex shrink-0 items-center justify-between gap-3 px-3 py-3 text-[14px] text-white sm:px-4">
           <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
             {/*
               The position, isolated as its own left-to-right run so «٣ / ١٤» lays out correctly on
@@ -448,7 +448,7 @@ export function ImageSliderFrame({
               <span className="truncate text-white/60">{current.caption}</span>
             ) : null}
             {current.badge ? (
-              <span className="shrink-0 rounded-full bg-white/12 px-2 py-0.5 text-[10.5px] font-semibold text-gold ring-1 ring-white/15">
+              <span className="shrink-0 rounded-full bg-white/12 px-2 py-0.5 text-[13px] font-semibold text-gold-read ring-1 ring-white/15">
                 {current.badge}
               </span>
             ) : null}
@@ -995,7 +995,7 @@ export function ImageSlider({
               />
             </button>
             {image.badge ? (
-              <span className="pointer-events-none absolute start-1 top-1 rounded-full bg-bg/85 px-2 py-0.5 text-[10px] text-gold ring-1 ring-gold/25">
+              <span className="pointer-events-none absolute start-1 top-1 rounded-full bg-bg/85 px-2 py-0.5 text-[13px] text-gold-read ring-1 ring-gold/25">
                 {image.badge}
               </span>
             ) : null}

@@ -75,16 +75,16 @@ export default async function DisputesPage() {
 
   return shell(
     <>
-      <p className="text-[12.5px] leading-relaxed text-muted">{t.disputes.intro}</p>
+      <p className="text-[14px] leading-relaxed text-muted">{t.disputes.intro}</p>
 
       {moneyHidden && page.disputes.length > 0 ? (
-        <p className="rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-faint">
+        <p className="rounded-lg border border-line bg-card px-3 py-2 text-[14px] text-faint">
           {t.disputes.moneyHidden}
         </p>
       ) : null}
 
       {page.disputes.length === 0 ? (
-        <p className="text-[12.5px] text-faint">{t.disputes.empty}</p>
+        <p className="text-[14px] text-faint">{t.disputes.empty}</p>
       ) : (
         <ul className="grid gap-3">
           {page.disputes.map((row) => (
@@ -103,13 +103,13 @@ export default async function DisputesPage() {
                 className="block"
               >
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <span className="text-[14px] font-bold text-sky">
+                  <span className="text-[16px] font-bold text-sky">
                     <Ltr>{row.reference}</Ltr>
                   </span>
-                  <span className="text-[12px] text-muted">
+                  <span className="text-[13px] text-muted">
                     {disputeStatus(row.status)}
                   </span>
-                  <span className="text-[12px] text-faint">{disputeKind(row.kind)}</span>
+                  <span className="text-[13px] text-faint">{disputeKind(row.kind)}</span>
                   {/*
                     BOTH or neither, and no fallback currency.
 
@@ -120,15 +120,15 @@ export default async function DisputesPage() {
                     means an amount can never render without the currency it is in.
                   */}
                   {row.frozenAmount !== null && row.currencyCode !== null ? (
-                    <span className="ms-auto text-[14px] font-extrabold text-warn">
+                    <span className="ms-auto text-[16px] font-extrabold text-warn">
                       {ltrIsolate(amount(row.frozenAmount, row.currencyCode))}
                     </span>
                   ) : null}
                 </div>
 
-                <p className="mt-1.5 text-[13px] text-text">{row.title}</p>
+                <p className="mt-1.5 text-[14px] text-text">{row.title}</p>
 
-                <p className="mt-1 text-[11.5px] text-faint">
+                <p className="mt-1 text-[13px] text-faint">
                   {t.disputes.colBooking}: <Ltr>{row.bookingReference}</Ltr> ·{' '}
                   {t.disputes.colOpened}: {ltrIsolate(row.openedAt.slice(0, 10))} ·{' '}
                   {plural(t.disputes.responseCount, { count: row.responseCount })}

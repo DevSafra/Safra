@@ -105,14 +105,14 @@ export function SubmitForReview({
       data-submit-review={reference}
       className="grid gap-3 rounded-card border border-line bg-card p-4"
     >
-      <h3 className="text-[13px] font-bold text-text">{t.editProperty.submitTitle}</h3>
+      <h3 className="text-[14px] font-bold text-text">{t.editProperty.submitTitle}</h3>
 
       {message ? (
         <p
           role="alert"
-          className={`rounded-lg border p-2.5 text-[12px] ${
+          className={`rounded-lg border p-2.5 text-[13px] ${
             message.kind === 'ok'
-              ? 'border-good/40 bg-good/10 text-good'
+              ? 'border-ok/40 bg-ok/10 text-ok'
               : 'border-bad/40 bg-bad/10 text-bad'
           }`}
         >
@@ -126,12 +126,12 @@ export function SubmitForReview({
       */}
       {submittable ? (
         <>
-          <p className="text-[12px] leading-relaxed text-muted">
+          <p className="text-[13px] leading-relaxed text-muted">
             {t.editProperty.submitHint}
           </p>
 
           {unitCount === 0 ? (
-            <p className="text-[12px] leading-relaxed text-warn">
+            <p className="text-[13px] leading-relaxed text-warn">
               {t.editProperty.submitNeedsUnit}
             </p>
           ) : null}
@@ -140,13 +140,13 @@ export function SubmitForReview({
             type="button"
             disabled={busy || unitCount === 0}
             onClick={() => void submit()}
-            className="min-h-10 w-fit cursor-pointer rounded-lg border border-gold px-4 py-1.5 text-[12px] font-bold text-gold disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+            className="min-h-10 w-fit cursor-pointer rounded-lg border border-gold px-4 py-1.5 text-[13px] font-bold text-gold-read disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
           >
             {busy ? t.editProperty.submitSending : t.editProperty.submitAction}
           </button>
         </>
       ) : (
-        <p className="text-[12px] leading-relaxed text-muted">
+        <p className="text-[13px] leading-relaxed text-muted">
           {status === 'pending_review'
             ? t.editProperty.submitPending
             : t.editProperty.submitPublished}

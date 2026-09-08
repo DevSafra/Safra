@@ -97,7 +97,7 @@ export function InvitationForm({ token }: { token: string }) {
         <button
           type="button"
           onClick={() => router.push('/login')}
-          className="w-fit cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-bg transition-opacity hover:opacity-90"
+          className="w-fit cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-ink transition-opacity hover:opacity-90"
         >
           {t.invitation.signIn}
         </button>
@@ -173,7 +173,7 @@ export function InvitationForm({ token }: { token: string }) {
       <button
         type="submit"
         disabled={busy}
-        className="mt-2 cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-2 cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {busy ? t.invitation.submitting : t.invitation.submit}
       </button>

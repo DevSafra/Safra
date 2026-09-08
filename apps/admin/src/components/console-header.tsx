@@ -64,12 +64,12 @@ export async function ConsoleHeader({
       <div className="min-w-0">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h1 className="font-display text-[28px] leading-tight text-text">{title}</h1>
-          <span className="text-[11.5px] text-faint">
+          <span className="text-[13px] text-faint">
             {todayLong()} · {roleName(session?.user.role)}
           </span>
         </div>
 
-        {subtitle ? <p className="mt-0.5 text-[11.5px] text-faint">{subtitle}</p> : null}
+        {subtitle ? <p className="mt-0.5 text-[13px] text-faint">{subtitle}</p> : null}
       </div>
 
       {/*

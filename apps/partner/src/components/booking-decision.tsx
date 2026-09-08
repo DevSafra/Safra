@@ -142,7 +142,7 @@ export function BookingDecision({
       <p
         data-decided
         role="status"
-        className={`flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-lg border p-3 text-[12.5px] ${
+        className={`flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-lg border p-3 text-[14px] ${
           accepted ? 'border-ok/40 bg-ok/10' : 'border-line bg-field'
         }`}
         style={{ animation: 'safra-decided 200ms cubic-bezier(0.23,1,0.32,1) both' }}
@@ -167,7 +167,7 @@ export function BookingDecision({
       >
         <label
           htmlFor={`reason-${reference}`}
-          className="text-[11.5px] leading-relaxed text-muted"
+          className="text-[13px] leading-relaxed text-muted"
         >
           {d.rejectReason}
         </label>
@@ -176,26 +176,26 @@ export function BookingDecision({
           name="reason"
           rows={2}
           required
-          className="rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+          className="rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text"
         />
         <div className="flex flex-wrap gap-2">
           <button
             type="submit"
             disabled={busy}
-            className="min-h-10 cursor-pointer rounded-lg border border-bad/50 px-4 py-2 text-[12.5px] font-bold text-bad transition-transform duration-150 ease-out-strong active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-lg border border-bad/50 px-4 py-2 text-[14px] font-bold text-bad transition-transform duration-150 ease-out-strong active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none lg:min-h-0"
           >
             {busy ? d.working : d.rejectConfirm}
           </button>
           <button
             type="button"
             onClick={() => setMode('idle')}
-            className="min-h-10 cursor-pointer rounded-lg border border-line px-4 py-2 text-[12.5px] text-muted transition-transform duration-150 ease-out-strong active:scale-[0.97] motion-reduce:transition-none lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-lg border border-line px-4 py-2 text-[14px] text-muted transition-transform duration-150 ease-out-strong active:scale-[0.97] motion-reduce:transition-none lg:min-h-0"
           >
             {d.cancel}
           </button>
         </div>
         {error ? (
-          <p role="alert" className="text-[11.5px] text-bad">
+          <p role="alert" className="text-[13px] text-bad">
             {error}
           </p>
         ) : null}
@@ -206,7 +206,7 @@ export function BookingDecision({
   return (
     <div className="flex flex-wrap items-center gap-2">
       {error ? (
-        <p role="alert" className="w-full text-[11.5px] text-bad">
+        <p role="alert" className="w-full text-[13px] text-bad">
           {error}
         </p>
       ) : null}
@@ -216,7 +216,7 @@ export function BookingDecision({
         type="button"
         disabled={busy}
         onClick={() => void accept()}
-        className="min-h-10 cursor-pointer rounded-lg border-none bg-[linear-gradient(135deg,#8FD9A8,#4F9E6B)] px-4 py-2 text-[12.5px] font-extrabold text-[#0A2013] transition-transform duration-150 ease-out-strong active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none lg:min-h-0"
+        className="min-h-10 cursor-pointer rounded-lg border-none bg-[linear-gradient(135deg,#8FD9A8,#4F9E6B)] px-4 py-2 text-[14px] font-extrabold text-[#0A2013] transition-transform duration-150 ease-out-strong active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none lg:min-h-0"
       >
         {busy ? d.working : d.accept}
       </button>
@@ -224,7 +224,7 @@ export function BookingDecision({
         type="button"
         disabled={busy}
         onClick={() => setMode('reject')}
-        className="min-h-10 cursor-pointer rounded-lg border border-bad/50 bg-transparent px-4 py-2 text-[12.5px] font-bold text-bad transition-transform duration-150 ease-out-strong active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none lg:min-h-0"
+        className="min-h-10 cursor-pointer rounded-lg border border-bad/50 bg-transparent px-4 py-2 text-[14px] font-bold text-bad transition-transform duration-150 ease-out-strong active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none lg:min-h-0"
       >
         {d.reject}
       </button>

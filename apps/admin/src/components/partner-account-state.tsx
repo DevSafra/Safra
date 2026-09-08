@@ -85,7 +85,7 @@ export function PartnerAccountState({
 
   if (activated) {
     return (
-      <p className="mt-2 text-[12px] text-ok">
+      <p className="mt-2 text-[13px] text-ok">
         {t.sections.partnerOnboarding.accountActivated}
       </p>
     );
@@ -93,7 +93,7 @@ export function PartnerAccountState({
 
   return (
     <div className="mt-2 rounded-lg border border-gold/30 bg-gold/5 px-3 py-2.5">
-      <p className="text-[12px] leading-relaxed text-gold">
+      <p className="text-[13px] leading-relaxed text-gold-read">
         {fill(
           invitationPending
             ? t.sections.partnerOnboarding.accountPending
@@ -103,13 +103,13 @@ export function PartnerAccountState({
       </p>
 
       {error ? (
-        <p role="alert" className="mt-2 text-[12px] text-bad">
+        <p role="alert" className="mt-2 text-[13px] text-bad">
           {error}
         </p>
       ) : null}
 
       {done ? (
-        <p role="status" className="mt-2 text-[12px] text-ok">
+        <p role="status" className="mt-2 text-[13px] text-ok">
           {done}
         </p>
       ) : null}
@@ -118,7 +118,7 @@ export function PartnerAccountState({
         type="button"
         disabled={busy}
         onClick={() => void resend()}
-        className="mt-2 inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-gold/40 px-3 py-1.5 text-[12px] font-semibold text-gold hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
+        className="mt-2 inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-gold/40 px-3 py-1.5 text-[13px] font-semibold text-gold-read hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
       >
         {busy
           ? t.sections.partnerOnboarding.resending

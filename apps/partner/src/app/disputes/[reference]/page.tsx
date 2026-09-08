@@ -85,24 +85,24 @@ export default async function DisputePage({
     <>
       <section className="rounded-card border border-line bg-card p-5">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className="text-[14px] font-bold text-sky">
+          <span className="text-[16px] font-bold text-sky">
             <Ltr>{dispute.reference}</Ltr>
           </span>
-          <span className="text-[12px] text-muted">{disputeStatus(dispute.status)}</span>
-          <span className="text-[12px] text-faint">{disputeKind(dispute.kind)}</span>
+          <span className="text-[13px] text-muted">{disputeStatus(dispute.status)}</span>
+          <span className="text-[13px] text-faint">{disputeKind(dispute.kind)}</span>
           {dispute.frozenAmount !== null && dispute.currencyCode !== null ? (
-            <span className="ms-auto text-[15px] font-extrabold text-warn">
+            <span className="ms-auto text-[16px] font-extrabold text-warn">
               {ltrIsolate(amount(dispute.frozenAmount, dispute.currencyCode))}
             </span>
           ) : null}
         </div>
 
-        <p className="mt-1 text-[11.5px] text-faint">
+        <p className="mt-1 text-[13px] text-faint">
           {t.disputes.stay}: <Ltr>{dispute.booking.reference}</Ltr>
           {dispute.booking.unitName ? ` · ${dispute.booking.unitName}` : ''} ·{' '}
           {ltrIsolate(dispute.booking.checkIn)} ← {ltrIsolate(dispute.booking.checkOut)}
         </p>
-        <p className="mt-0.5 text-[11.5px] text-faint">
+        <p className="mt-0.5 text-[13px] text-faint">
           {t.disputes.openedAt}: {ltrIsolate(dispute.openedAt.slice(0, 10))}
           {dispute.closedAt
             ? ` · ${t.disputes.closedAt}: ${ltrIsolate(dispute.closedAt.slice(0, 10))}`
@@ -111,11 +111,11 @@ export default async function DisputePage({
       </section>
 
       <section className="rounded-card border border-line bg-card p-5">
-        <h2 className="text-[13px] font-bold text-text">{t.disputes.allegation}</h2>
-        <p className="mt-1.5 text-[13px] font-semibold text-text">
+        <h2 className="text-[14px] font-bold text-text">{t.disputes.allegation}</h2>
+        <p className="mt-1.5 text-[14px] font-semibold text-text">
           {renderRedactions(dispute.title, 'ar')}
         </p>
-        <p className="mt-2 text-[12.5px] leading-relaxed whitespace-pre-line text-muted">
+        <p className="mt-2 text-[14px] leading-relaxed whitespace-pre-line text-muted">
           {dispute.description
             ? renderRedactions(dispute.description, 'ar')
             : t.disputes.noDescription}
@@ -131,8 +131,8 @@ export default async function DisputePage({
         writing their account deserves to know it will be read.
       */}
       <section className="rounded-card border border-line bg-card p-5">
-        <h2 className="text-[13px] font-bold text-text">{t.disputes.decision}</h2>
-        <p className="mt-1.5 text-[12.5px] leading-relaxed whitespace-pre-line text-muted">
+        <h2 className="text-[14px] font-bold text-text">{t.disputes.decision}</h2>
+        <p className="mt-1.5 text-[14px] leading-relaxed whitespace-pre-line text-muted">
           {dispute.resolution
             ? renderRedactions(dispute.resolution, 'ar')
             : t.disputes.decisionPending}
@@ -140,10 +140,10 @@ export default async function DisputePage({
       </section>
 
       <section className="rounded-card border border-line bg-card p-5">
-        <h2 className="text-[13px] font-bold text-text">{t.disputes.yourResponses}</h2>
+        <h2 className="text-[14px] font-bold text-text">{t.disputes.yourResponses}</h2>
 
         {dispute.responses.length === 0 ? (
-          <p className="mt-1.5 text-[12.5px] text-faint">{t.disputes.noResponses}</p>
+          <p className="mt-1.5 text-[14px] text-faint">{t.disputes.noResponses}</p>
         ) : (
           <ul className="mt-2 grid gap-2">
             {dispute.responses.map((response) => (
@@ -151,10 +151,10 @@ export default async function DisputePage({
                 key={response.submittedAt}
                 className="rounded-lg border border-line bg-field p-3"
               >
-                <p className="text-[12.5px] leading-relaxed whitespace-pre-line text-text">
+                <p className="text-[14px] leading-relaxed whitespace-pre-line text-text">
                   {renderRedactions(response.body, 'ar')}
                 </p>
-                <p className="mt-1 text-[11px] text-faint">
+                <p className="mt-1 text-[14px] text-faint">
                   {ltrIsolate(response.submittedAt.slice(0, 16).replace('T', ' '))}
                 </p>
               </li>
@@ -164,13 +164,13 @@ export default async function DisputePage({
 
         <div className="mt-4 border-t border-line pt-4">
           {closed ? (
-            <p className="text-[12.5px] text-faint">{t.disputes.respondClosed}</p>
+            <p className="text-[14px] text-faint">{t.disputes.respondClosed}</p>
           ) : (
             <>
-              <h3 className="text-[12.5px] font-bold text-text">
+              <h3 className="text-[14px] font-bold text-text">
                 {t.disputes.respondHeading}
               </h3>
-              <p className="mt-1 mb-3 text-[11.5px] leading-relaxed text-faint">
+              <p className="mt-1 mb-3 text-[13px] leading-relaxed text-faint">
                 {t.disputes.respondHint}
               </p>
               <DisputeResponse reference={dispute.reference} />
@@ -180,7 +180,7 @@ export default async function DisputePage({
       </section>
 
       <section className="rounded-card border border-line bg-card p-5">
-        <h2 className="text-[13px] font-bold text-text">{t.disputes.evidence}</h2>
+        <h2 className="text-[14px] font-bold text-text">{t.disputes.evidence}</h2>
 
         {/*
           The pictures themselves, and the control that adds one (finding 223, completed).
@@ -203,7 +203,7 @@ export default async function DisputePage({
           «explicit staff decision» Bashar asked for something nobody ever requests.
         */}
         {dispute.withheldEvidenceCount > 0 ? (
-          <p className="mt-3 rounded-lg border border-line bg-field px-3 py-2 text-[11.5px] leading-relaxed text-faint">
+          <p className="mt-3 rounded-lg border border-line bg-field px-3 py-2 text-[13px] leading-relaxed text-faint">
             {plural(t.disputes.evidenceWithheld, {
               count: dispute.withheldEvidenceCount,
             })}

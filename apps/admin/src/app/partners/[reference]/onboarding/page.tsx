@@ -176,7 +176,7 @@ export default async function PartnerOnboardingPage({
         the partner — and `router.replace` means a reload does not repeat the claim falsely.
       */}
       {query['created'] === '1' ? (
-        <p className="rounded-lg border border-ok/30 bg-ok/5 px-4 py-3 text-[12.5px] leading-relaxed text-ok">
+        <p className="rounded-lg border border-ok/30 bg-ok/5 px-4 py-3 text-[14px] leading-relaxed text-ok">
           {fill(
             query['adopted'] === '1'
               ? t.sections.partnerOnboarding.createdExistingAccount
@@ -235,7 +235,7 @@ export default async function PartnerOnboardingPage({
         state={contractActive ? 'done' : 'outstanding'}
         note={t.sections.partnerOnboarding[contractState]}
       >
-        <p className="mb-3 text-[12.5px] leading-relaxed text-muted">
+        <p className="mb-3 text-[14px] leading-relaxed text-muted">
           {t.sections.partnerOnboarding.contractIntro}
         </p>
 
@@ -304,7 +304,7 @@ export default async function PartnerOnboardingPage({
             : t.sections.partnerOnboarding.approvalPending
         }
       >
-        <p className="mb-3 text-[12.5px] leading-relaxed text-muted">
+        <p className="mb-3 text-[14px] leading-relaxed text-muted">
           {t.sections.partnerOnboarding.approvalIntro}
         </p>
 
@@ -401,7 +401,7 @@ function Step({
       ? { border: 'border-ok/30', text: 'text-ok' }
       : state === 'optional'
         ? { border: 'border-line', text: 'text-muted' }
-        : { border: 'border-gold/30', text: 'text-gold' };
+        : { border: 'border-gold/30', text: 'text-gold-read' };
 
   const stateWord =
     state === 'done'
@@ -422,10 +422,10 @@ function Step({
           <span className="me-2 text-faint">{count(number)}</span>
           {title}
         </h2>
-        <span className={`text-[11.5px] font-semibold ${tone.text}`}>{stateWord}</span>
+        <span className={`text-[13px] font-semibold ${tone.text}`}>{stateWord}</span>
       </div>
 
-      <p className={`mt-1 text-[12px] ${tone.text}`}>{note}</p>
+      <p className={`mt-1 text-[13px] ${tone.text}`}>{note}</p>
 
       {children ? <div className="mt-4">{children}</div> : null}
     </section>

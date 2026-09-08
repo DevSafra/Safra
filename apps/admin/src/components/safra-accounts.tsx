@@ -109,7 +109,7 @@ export function SafraAccounts({
       header: c.colLast4,
       /* Masked, and it always was: the API never selects the ciphertext, let alone returns it. */
       render: (row) => (
-        <span className="font-mono text-[11.5px] text-faint">····{row.last4}</span>
+        <span className="font-mono text-[13px] text-faint">····{row.last4}</span>
       ),
     },
     {
@@ -119,7 +119,7 @@ export function SafraAccounts({
         row.isDefault ? (
           <StatusPill tone="gold">{c.yes}</StatusPill>
         ) : (
-          <span className="text-[11px] text-faint2">{c.no}</span>
+          <span className="text-[13px] text-faint">{c.no}</span>
         ),
     },
     {
@@ -164,7 +164,7 @@ export function SafraAccounts({
             setAdding(false);
             setEditing(editing === row.id ? null : row.id);
           }}
-          className="cursor-pointer rounded-lg border border-line px-2.5 py-1 text-[10.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold"
+          className="cursor-pointer rounded-lg border border-line px-2.5 py-1 text-[13px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read"
         >
           {t.sections.geo.edit}
         </button>
@@ -175,7 +175,7 @@ export function SafraAccounts({
   return (
     <section className="grid gap-3">
       <div className="flex flex-wrap items-baseline gap-2.5">
-        <h2 className="text-[14.5px] font-extrabold text-gold">{c.accountsTitle}</h2>
+        <h2 className="text-[16px] font-extrabold text-gold-read">{c.accountsTitle}</h2>
         <span className="ms-auto">
           <button
             type="button"
@@ -185,17 +185,17 @@ export function SafraAccounts({
               setEditing(null);
               setAdding(!adding);
             }}
-            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1.5 text-[11.5px] font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1.5 text-[13px] font-bold text-gold-read transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
           >
             {c.accountAdd}
           </button>
         </span>
       </div>
 
-      <p className="text-[11.5px] leading-relaxed text-faint">{c.accountsNote}</p>
+      <p className="text-[13px] leading-relaxed text-faint">{c.accountsNote}</p>
 
       {error ? (
-        <p role="alert" className="text-[12px] font-semibold text-bad">
+        <p role="alert" className="text-[13px] font-semibold text-bad">
           {error}
         </p>
       ) : null}
@@ -216,11 +216,11 @@ export function SafraAccounts({
           className="grid gap-3 rounded-card border border-line bg-field p-4"
           data-safra-account-panel={open.id}
         >
-          <p className="text-[11.5px] font-bold text-gold">{c.accountEditTitle}</p>
+          <p className="text-[13px] font-bold text-gold-read">{c.accountEditTitle}</p>
 
           {/* Why it was refused, where the person deciding what to do next is looking. */}
           {open.rejectionReason ? (
-            <p className="rounded-lg border border-bad/40 bg-bad/5 px-3 py-2 text-[12px] leading-relaxed text-text">
+            <p className="rounded-lg border border-bad/40 bg-bad/5 px-3 py-2 text-[13px] leading-relaxed text-text">
               {open.rejectionReason}
             </p>
           ) : null}

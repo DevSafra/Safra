@@ -58,7 +58,7 @@ export default async function PropertyImagesPage({
       <div className="grid gap-4">
         <Link
           href="/properties"
-          className="inline-flex min-h-10 w-fit items-center gap-2 rounded-lg border border-line px-3 text-[12.5px] text-muted lg:min-h-0 lg:py-1.5"
+          className="inline-flex min-h-10 w-fit items-center gap-2 rounded-lg border border-line px-3 text-[14px] text-muted lg:min-h-0 lg:py-1.5"
         >
           {/* The arrow is its own flex item so `dir="rtl"` places it, not the bidi algorithm. */}
           <span aria-hidden="true">→</span>

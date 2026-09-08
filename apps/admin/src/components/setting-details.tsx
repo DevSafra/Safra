@@ -86,43 +86,41 @@ export function SettingDetails({
     <div className="mt-3 rounded-lg border border-line bg-field p-3.5">
       <dl className="grid gap-2 sm:grid-cols-2">
         <div className="min-w-0">
-          <dt className="text-[10.5px] text-faint2">
-            {t.sections.settings.technicalKey}
-          </dt>
+          <dt className="text-[13px] text-faint">{t.sections.settings.technicalKey}</dt>
           {/* The key is a Latin identifier on an Arabic line, so it is isolated. */}
           <dd className="mt-0.5">
-            <Ltr className="font-mono text-[11.5px] break-all text-text2">
+            <Ltr className="font-mono text-[13px] break-all text-text2">
               {setting.key}
             </Ltr>
           </dd>
         </div>
 
         <div className="min-w-0">
-          <dt className="text-[10.5px] text-faint2">{t.sections.settings.valueType}</dt>
-          <dd className="mt-0.5 text-[11.5px] text-text2">
+          <dt className="text-[13px] text-faint">{t.sections.settings.valueType}</dt>
+          <dd className="mt-0.5 text-[13px] text-text2">
             {valueTypeName(setting.valueSchema)}
           </dd>
         </div>
       </dl>
 
-      <h4 className="mt-3.5 text-[11.5px] font-bold text-gold">
+      <h4 className="mt-3.5 text-[13px] font-bold text-gold-read">
         {t.sections.settings.historyTitle}
       </h4>
 
       {state.status === 'loading' ? (
-        <p className="mt-1.5 text-[11px] text-faint">
+        <p className="mt-1.5 text-[14px] text-faint">
           {t.sections.settings.historyLoading}
         </p>
       ) : null}
 
       {state.status === 'failed' ? (
-        <p role="alert" className="mt-1.5 text-[11px] text-bad">
+        <p role="alert" className="mt-1.5 text-[14px] text-bad">
           {t.sections.settings.historyFailed}
         </p>
       ) : null}
 
       {state.status === 'ready' && state.entries.length === 0 ? (
-        <p className="mt-1.5 text-[11px] leading-relaxed text-faint">
+        <p className="mt-1.5 text-[14px] leading-relaxed text-faint">
           {t.sections.settings.historyEmpty}
         </p>
       ) : null}
@@ -147,18 +145,18 @@ export function SettingDetails({
                 and their currency. A change log that reads «من 10 إلى 12» about a fine is the same
                 defect as a bare amount on the row above it.
               */}
-              <p className="text-[12px] leading-snug font-semibold text-text">
+              <p className="text-[13px] leading-normal font-semibold text-text">
                 {historyChange(entry, setting, alwaysUsd)}
               </p>
 
-              <p className="mt-0.5 text-[10.5px] text-faint">
+              <p className="mt-0.5 text-[14px] text-faint">
                 {fill(t.sections.settings.historyBy, {
                   who: entry.changedByEmail ?? t.sections.settings.historySystem,
                   when: shortDate(entry.createdAt),
                 })}
               </p>
 
-              <p className="mt-0.5 text-[10.5px] leading-relaxed text-faint2">
+              <p className="mt-0.5 text-[14px] leading-relaxed text-faint">
                 {entry.reason
                   ? fill(t.sections.settings.historyReason, { reason: entry.reason })
                   : t.sections.settings.historyNoReason}

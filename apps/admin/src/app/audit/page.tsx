@@ -106,7 +106,7 @@ export default async function AuditPage({
       <ConsolePanel>
         <div className="mb-3 flex flex-wrap items-center gap-2.5">
           {/* The immutability badge, in the design's exact treatment. */}
-          <span className="rounded-full border border-[rgba(var(--badA),0.4)] bg-[rgba(var(--badA),0.12)] px-3 py-0.5 text-[10.5px] font-extrabold text-bad">
+          <span className="rounded-full border border-[rgba(var(--badA),0.4)] bg-[rgba(var(--badA),0.12)] px-3 py-0.5 text-[13px] font-extrabold text-bad">
             {t.sections.audit.immutable}
           </span>
           <span className="text-xs text-faint">{t.sections.audit.hint}</span>
@@ -122,7 +122,7 @@ export default async function AuditPage({
             name="action"
             defaultValue={action ?? ''}
             aria-label={t.sections.audit.colAction}
-            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text"
           >
             <option value="">{t.sections.bookings.allStatuses}</option>
             {actions.map((value) => (
@@ -134,9 +134,9 @@ export default async function AuditPage({
         </TableToolbar>
 
         {entries === 'unauthenticated' ? (
-          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
         ) : entries === 'failed' ? (
-          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <>
             <AdminTable
@@ -183,7 +183,7 @@ const columnsFor = (back: string): readonly AdminColumn<AuditEntry>[] => [
     render: (row) => (
       <div className="grid gap-0.5">
         <Ltr className="text-sky">{clock(row.createdAt)}</Ltr>
-        <Ltr className="text-[10px] text-faint">{shortDate(row.createdAt)}</Ltr>
+        <Ltr className="text-[13px] text-faint">{shortDate(row.createdAt)}</Ltr>
       </div>
     ),
   },
@@ -236,7 +236,7 @@ const columnsFor = (back: string): readonly AdminColumn<AuditEntry>[] => [
           which is what every row written for a custom role will look like.
         */}
         {(row.actorRoleName ?? row.actorRole) ? (
-          <span className="text-[10px] text-faint">
+          <span className="text-[13px] text-faint">
             {row.actorRoleName ?? roleName(row.actorRole ?? undefined)}
           </span>
         ) : null}
@@ -278,7 +278,7 @@ const columnsFor = (back: string): readonly AdminColumn<AuditEntry>[] => [
         </a>
 
         {row.reason ? (
-          <span className="text-[10.5px] leading-relaxed text-faint">
+          <span className="text-[13px] leading-relaxed text-faint">
             {auditReason(row.reason)}
           </span>
         ) : null}
@@ -304,16 +304,16 @@ const columnsFor = (back: string): readonly AdminColumn<AuditEntry>[] => [
         entry is about; the action opens it.
       */
       <div className="grid gap-0.5">
-        <span className="text-[11px] text-faint">
+        <span className="text-[13px] text-faint">
           {auditSubject(row.subject?.type ?? row.subjectType)}
         </span>
         {row.subject?.label ? (
-          <span className="text-[11.5px] text-text2">{row.subject.label}</span>
+          <span className="text-[13px] text-text2">{row.subject.label}</span>
         ) : null}
         {row.subject?.reference ? (
-          <Ltr className="text-[10.5px] text-sky">{row.subject.reference}</Ltr>
+          <Ltr className="text-[13px] text-sky">{row.subject.reference}</Ltr>
         ) : row.subjectId ? (
-          <Ltr className="text-[10.5px] text-sky">{row.subjectId.slice(0, 8)}</Ltr>
+          <Ltr className="text-[13px] text-sky">{row.subjectId.slice(0, 8)}</Ltr>
         ) : null}
       </div>
     ),

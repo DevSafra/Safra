@@ -58,9 +58,9 @@ export default async function ReportsPage() {
   return (
     <ConsoleShell title={t.nav.reports} counts={counts}>
       {result === 'unauthenticated' ? (
-        <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
+        <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
       ) : result === 'failed' ? (
-        <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
+        <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-4">
           {result.cards.map((card) => (
@@ -86,7 +86,7 @@ function Card({
 
   return (
     <section className="rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
-      <h2 className="text-[14px] font-extrabold text-gold">{meta.title}</h2>
+      <h2 className="text-[16px] font-extrabold text-gold-read">{meta.title}</h2>
 
       <p className="mt-3 text-2xl font-extrabold text-text">{format(card)}</p>
       <Trend card={card} />
@@ -113,7 +113,7 @@ function Card({
         ))}
       </div>
 
-      <p className="mt-2 text-[10.5px] leading-relaxed text-faint">
+      <p className="mt-2 text-[14px] leading-relaxed text-faint">
         {typeof meta.sub === 'function' ? meta.sub(settings) : meta.sub}
       </p>
     </section>
@@ -128,9 +128,7 @@ function Card({
  */
 function Trend({ card }: { card: ReportCard }) {
   if (card.previous === null) {
-    return (
-      <p className="mt-1 text-[11.5px] text-faint">{t.sections.reports.noPrevious}</p>
-    );
+    return <p className="mt-1 text-[13px] text-faint">{t.sections.reports.noPrevious}</p>;
   }
 
   const now = Number(card.value);
@@ -139,7 +137,7 @@ function Trend({ card }: { card: ReportCard }) {
 
   if (!Number.isFinite(delta) || Math.abs(delta) < 0.05) {
     return (
-      <p className="mt-1 text-[11.5px] text-faint">— {t.sections.reports.vsPrevious}</p>
+      <p className="mt-1 text-[13px] text-faint">— {t.sections.reports.vsPrevious}</p>
     );
   }
 
@@ -147,7 +145,7 @@ function Trend({ card }: { card: ReportCard }) {
   const good = rising === HIGHER_IS_BETTER[card.key];
 
   return (
-    <p className={`mt-1 text-[11.5px] ${good ? 'text-ok' : 'text-bad'}`}>
+    <p className={`mt-1 text-[13px] ${good ? 'text-ok' : 'text-bad'}`}>
       {rising ? '↑' : '↓'} {formatDelta(card, Math.abs(delta))}{' '}
       {t.sections.reports.vsPrevious}
     </p>

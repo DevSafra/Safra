@@ -104,13 +104,13 @@ export function SettleRefund({
         type="button"
         disabled={busy}
         onClick={() => void settle()}
-        className="min-h-10 cursor-pointer rounded-lg border border-gold/50 px-3 py-1.5 text-[12px] font-bold text-gold transition-transform duration-150 ease-out-strong active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none lg:min-h-0"
+        className="min-h-10 cursor-pointer rounded-lg border border-gold/50 px-3 py-1.5 text-[13px] font-bold text-gold-read transition-transform duration-150 ease-out-strong active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none lg:min-h-0"
       >
         {busy ? c.settleWorking : c.settleAction}
       </button>
 
       {error ? (
-        <p role="alert" className="mt-1.5 text-[11.5px] text-bad">
+        <p role="alert" className="mt-1.5 text-[13px] text-bad">
           {error}
         </p>
       ) : null}

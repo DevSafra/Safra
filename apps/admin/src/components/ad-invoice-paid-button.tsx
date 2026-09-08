@@ -64,7 +64,7 @@ export function AdInvoicePaidButton({ reference }: { readonly reference: string 
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex w-fit cursor-pointer items-center justify-center whitespace-nowrap rounded-lg border border-line px-2.5 py-1 text-[10.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold"
+        className="inline-flex w-fit cursor-pointer items-center justify-center whitespace-nowrap rounded-lg border border-line px-2.5 py-1 text-[13px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold-read"
       >
         {c.markPaid}
       </button>
@@ -78,17 +78,17 @@ export function AdInvoicePaidButton({ reference }: { readonly reference: string 
         onChange={(event) => setNote(event.target.value)}
         placeholder={c.notePlaceholder}
         aria-label={c.note}
-        className="rounded-lg border border-line bg-card px-2 py-1 text-[11px] text-text placeholder:text-faint"
+        className="rounded-lg border border-line bg-card px-2 py-1 text-[13px] text-text placeholder:text-faint"
       />
 
-      {error ? <span className="text-[10px] font-semibold text-bad">{error}</span> : null}
+      {error ? <span className="text-[13px] font-semibold text-bad">{error}</span> : null}
 
       <div className="flex flex-wrap gap-1.5">
         <button
           type="button"
           disabled={note.trim().length < 3 || busy}
           onClick={() => void submit()}
-          className="cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-2.5 py-0.5 text-[10.5px] font-bold text-gold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          className="cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-2.5 py-0.5 text-[13px] font-bold text-gold-read transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         >
           {busy ? t.sections.ads.pausing : c.confirm}
         </button>
@@ -98,7 +98,7 @@ export function AdInvoicePaidButton({ reference }: { readonly reference: string 
             setOpen(false);
             setError(null);
           }}
-          className="cursor-pointer rounded-lg border border-line px-2.5 py-0.5 text-[10.5px] text-muted"
+          className="cursor-pointer rounded-lg border border-line px-2.5 py-0.5 text-[13px] text-muted"
         >
           {t.sections.ads.cancel}
         </button>

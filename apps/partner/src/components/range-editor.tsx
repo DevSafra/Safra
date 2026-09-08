@@ -133,14 +133,14 @@ export function RangeEditor({
       className="grid gap-3 rounded-card border border-line bg-card p-4"
       onSubmit={(event) => void apply(event)}
     >
-      <p className="text-[13px] font-bold text-text">{t.unitCalendar.editorTitle}</p>
+      <p className="text-[14px] font-bold text-text">{t.unitCalendar.editorTitle}</p>
 
       {message ? (
         <p
           role="alert"
-          className={`rounded-lg border p-3 text-[12.5px] ${
+          className={`rounded-lg border p-3 text-[14px] ${
             message.kind === 'ok'
-              ? 'border-good/40 bg-good/10 text-good'
+              ? 'border-ok/40 bg-ok/10 text-ok'
               : 'border-bad/40 bg-bad/10 text-bad'
           }`}
         >
@@ -150,7 +150,7 @@ export function RangeEditor({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="grid gap-1">
-          <span className="text-[12px] text-muted">{t.unitCalendar.from}</span>
+          <span className="text-[13px] text-muted">{t.unitCalendar.from}</span>
           <input
             type="date"
             required
@@ -160,11 +160,11 @@ export function RangeEditor({
             onChange={(event) =>
               setRange((current) => ({ ...current, from: event.target.value }))
             }
-            className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text lg:min-h-0"
+            className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text lg:min-h-0"
           />
         </label>
         <label className="grid gap-1">
-          <span className="text-[12px] text-muted">{t.unitCalendar.to}</span>
+          <span className="text-[13px] text-muted">{t.unitCalendar.to}</span>
           <input
             type="date"
             required
@@ -174,18 +174,18 @@ export function RangeEditor({
             onChange={(event) =>
               setRange((current) => ({ ...current, to: event.target.value }))
             }
-            className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text lg:min-h-0"
+            className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text lg:min-h-0"
           />
         </label>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="grid gap-1">
-          <span className="text-[12px] text-muted">{t.unitCalendar.status}</span>
+          <span className="text-[13px] text-muted">{t.unitCalendar.status}</span>
           <select
             value={status}
             onChange={(event) => setStatus(event.target.value)}
-            className="min-h-10 cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text lg:min-h-0"
           >
             <option value="">{t.unitCalendar.statusUnchanged}</option>
             {/* Exactly what the contract accepts — `booked` is deliberately not here. */}
@@ -196,7 +196,7 @@ export function RangeEditor({
         </label>
 
         <label className="grid gap-1">
-          <span className="text-[12px] text-muted">{t.unitCalendar.price}</span>
+          <span className="text-[13px] text-muted">{t.unitCalendar.price}</span>
           {/*
             `field-ltr`, not the `dir` attribute. Both make the digits read left to right; only the
             class leaves the ALIGNMENT to the document, so the caret and the value stay on the same
@@ -210,14 +210,14 @@ export function RangeEditor({
             value={price === 'clear' ? '' : price}
             placeholder={t.unitCalendar.priceUnchanged}
             onChange={(event) => setPrice(event.target.value)}
-            className="field-ltr min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text lg:min-h-0"
+            className="field-ltr min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text lg:min-h-0"
           />
           <button
             type="button"
             onClick={() => setPrice(price === 'clear' ? '' : 'clear')}
             aria-pressed={price === 'clear'}
-            className={`min-h-10 w-fit cursor-pointer rounded-lg border px-2.5 py-1 text-[11px] lg:min-h-0 ${
-              price === 'clear' ? 'border-gold text-gold' : 'border-line text-faint2'
+            className={`min-h-10 w-fit cursor-pointer rounded-lg border px-2.5 py-1 text-[13px] lg:min-h-0 ${
+              price === 'clear' ? 'border-gold text-gold-read' : 'border-line text-faint'
             }`}
           >
             {t.unitCalendar.priceClear}
@@ -225,37 +225,37 @@ export function RangeEditor({
         </label>
 
         <label className="grid gap-1">
-          <span className="text-[12px] text-muted">{t.unitCalendar.minNights}</span>
+          <span className="text-[13px] text-muted">{t.unitCalendar.minNights}</span>
           <input
             type="number"
             min={1}
             max={365}
             value={minNights}
             onChange={(event) => setMinNights(event.target.value)}
-            className="field-ltr min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text lg:min-h-0"
+            className="field-ltr min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text lg:min-h-0"
           />
         </label>
       </div>
 
       <label className="grid gap-1">
-        <span className="text-[12px] text-muted">{t.unitCalendar.note}</span>
+        <span className="text-[13px] text-muted">{t.unitCalendar.note}</span>
         <input
           value={note}
           maxLength={500}
           onChange={(event) => setNote(event.target.value)}
-          className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text lg:min-h-0"
+          className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text lg:min-h-0"
         />
-        <span className="text-[10.5px] text-faint2">{t.unitCalendar.noteHint}</span>
+        <span className="text-[13px] text-faint">{t.unitCalendar.noteHint}</span>
       </label>
 
-      <p className="text-[11.5px] leading-relaxed text-faint">
+      <p className="text-[13px] leading-relaxed text-faint">
         {t.unitCalendar.bookedWarning}
       </p>
 
       <button
         type="submit"
         disabled={busy}
-        className="min-h-10 w-fit cursor-pointer rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-5 py-2 text-[13px] font-extrabold text-[#241A05] disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+        className="min-h-10 w-fit cursor-pointer rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-5 py-2 text-[14px] font-extrabold text-[#241A05] disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
       >
         {busy ? t.unitCalendar.applying : t.unitCalendar.apply}
       </button>

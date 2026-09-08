@@ -79,7 +79,7 @@ export default async function ViolationsPage({
 
   return shell(
     <>
-      <p className="text-[12.5px] leading-relaxed text-muted">{t.violations.intro}</p>
+      <p className="text-[14px] leading-relaxed text-muted">{t.violations.intro}</p>
 
       {/*
         Said ONCE, above the list, rather than per row. A reader who may not see amounts learns it
@@ -87,7 +87,7 @@ export default async function ViolationsPage({
         eleven separate refusals.
       */}
       {page.moneyHidden ? (
-        <p className="rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-faint">
+        <p className="rounded-lg border border-line bg-card px-3 py-2 text-[14px] text-faint">
           {t.violations.moneyHidden}
         </p>
       ) : null}
@@ -178,16 +178,16 @@ function Row({ violation }: { violation: PartnerViolation }) {
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-semibold text-text">{kind}</p>
           {/* The raw value if the ladder grows a stage nobody labelled — never prettified. */}
-          <span className="rounded-lg border border-line px-1.5 py-0.5 text-[11px] text-muted">
+          <span className="rounded-lg border border-line px-1.5 py-0.5 text-[13px] text-muted">
             {t.violations.stage[violation.stage] ?? violation.stage}
           </span>
         </div>
-        <Ltr className="text-[12px] text-faint">{violation.createdAt}</Ltr>
+        <Ltr className="text-[13px] text-faint">{violation.createdAt}</Ltr>
         {/* The affordance, so a card that opens looks like one. */}
-        <span className="text-[11.5px] text-gold">{t.violations.open} ←</span>
+        <span className="text-[13px] text-gold-read">{t.violations.open} ←</span>
       </div>
 
-      <p className="text-[12.5px] text-muted">
+      <p className="text-[14px] text-muted">
         {fill(t.violations.occurrence, { n: count(violation.occurrenceNumber) })}
         {violation.bookingReference ? (
           <>
@@ -214,11 +214,11 @@ function Row({ violation }: { violation: PartnerViolation }) {
         line and not «—», which would claim a description exists and is blank.
       */}
       {described ? (
-        <p className="text-[12.5px] leading-relaxed text-text">{described}</p>
+        <p className="text-[14px] leading-relaxed text-text">{described}</p>
       ) : null}
 
       {fine ? (
-        <p className="text-[12.5px] text-text">
+        <p className="text-[14px] text-text">
           {fill(t.violations.fine, { amount: fine })}
           {violation.customerCompensationAmount && violation.fineCurrency
             ? ` · ${fill(t.violations.compensation, {
@@ -236,7 +236,7 @@ function Row({ violation }: { violation: PartnerViolation }) {
         reason for a fine whose size they may not see.
       */}
       {violation.fineReason ? (
-        <p className="text-[12.5px] leading-relaxed text-text2">
+        <p className="text-[14px] leading-relaxed text-text2">
           {fill(t.violations.fineReason, { reason: violation.fineReason })}
         </p>
       ) : null}
@@ -254,7 +254,7 @@ function Row({ violation }: { violation: PartnerViolation }) {
         existed. A stage inferred from a fine would put words in SAFRA's mouth.
       */}
       {violation.warnedAt ? (
-        <p className="text-[12.5px] text-muted">
+        <p className="text-[14px] text-muted">
           {fill(t.violations.warnedOn, { date: violation.warnedAt })}
           {violation.warningNote
             ? ` · ${fill(t.violations.warningNote, { note: violation.warningNote })}`
@@ -278,25 +278,25 @@ function Row({ violation }: { violation: PartnerViolation }) {
       {violation.waived || violation.waiver ? (
         <div className="grid gap-1">
           {waiverMoney ? (
-            <p className="text-[12.5px] text-ok">
+            <p className="text-[14px] text-ok">
               {fill(t.violations.waivedAmount, { amount: waiverMoney })}
               {' · '}
               {fill(t.violations.net, { amount: net })}
             </p>
           ) : null}
-          <p className="text-[12.5px] text-ok">
+          <p className="text-[14px] text-ok">
             {waivedReason
               ? fill(t.violations.waivedFor, { reason: waivedReason })
               : t.violations.waived}
           </p>
           {violation.waiver ? (
-            <p className="text-[12px] text-faint">
+            <p className="text-[13px] text-faint">
               {fill(t.violations.waivedOn, { date: violation.waiver.at })}
             </p>
           ) : null}
         </div>
       ) : (
-        <p className="text-[12px] text-faint">
+        <p className="text-[13px] text-faint">
           {violation.collectedAt ? t.violations.collected : t.violations.outstanding}
         </p>
       )}

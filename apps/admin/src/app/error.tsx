@@ -48,7 +48,7 @@ export default function ErrorBoundary({
           <button
             type="button"
             onClick={reset}
-            className="border-line bg-card text-gold hover:border-gold inline-flex min-h-10 cursor-pointer items-center rounded-lg border px-4 text-sm lg:min-h-0"
+            className="border-line bg-card text-gold-read hover:border-gold inline-flex min-h-10 cursor-pointer items-center rounded-lg border px-4 text-sm lg:min-h-0"
           >
             {t.errorPage.retry}
           </button>
@@ -68,7 +68,7 @@ export default function ErrorBoundary({
           somebody can find the stack — without the response carrying a query, a parameter or a path.
         */}
         {error.digest ? (
-          <p className="text-faint mt-6 font-mono text-[11px]">{error.digest}</p>
+          <p className="text-faint mt-6 font-mono text-[14px]">{error.digest}</p>
         ) : null}
       </div>
     </main>

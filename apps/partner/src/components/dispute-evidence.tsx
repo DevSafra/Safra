@@ -154,7 +154,7 @@ export function DisputeEvidence({
   return (
     <>
       {evidence.length === 0 ? (
-        <p className="mt-1.5 text-[12.5px] text-faint">{c.evidenceNone}</p>
+        <p className="mt-1.5 text-[14px] text-faint">{c.evidenceNone}</p>
       ) : (
         <ImageSlider images={slides} labels={t.slider} tileClassName="h-20 w-28" />
       )}
@@ -173,7 +173,7 @@ export function DisputeEvidence({
               <li
                 key={one.id}
                 data-evidence-pending={one.id}
-                className="grid h-20 w-28 place-items-center rounded-lg border border-dashed border-line px-2 text-center text-[10.5px] leading-tight text-faint"
+                className="grid h-20 w-28 place-items-center rounded-lg border border-dashed border-line px-2 text-center text-[14px] leading-tight text-faint"
               >
                 {slow ? c.evidenceSlow : c.evidenceProcessing}
               </li>
@@ -182,18 +182,16 @@ export function DisputeEvidence({
       ) : null}
 
       {closed ? (
-        <p className="mt-3 text-[11.5px] text-faint">{c.evidenceClosedNote}</p>
+        <p className="mt-3 text-[13px] text-faint">{c.evidenceClosedNote}</p>
       ) : (
         <div className="mt-3 border-t border-line pt-3">
-          <p className="mb-2 text-[11.5px] leading-relaxed text-faint">
-            {c.evidenceHint}
-          </p>
+          <p className="mb-2 text-[13px] leading-relaxed text-faint">{c.evidenceHint}</p>
 
           <button
             type="button"
             disabled={busy}
             onClick={() => file.current?.click()}
-            className="min-h-10 cursor-pointer rounded-lg border border-line bg-field px-4 py-2 text-[12.5px] font-bold text-text transition-colors duration-150 ease-out-strong hover:border-gold hover:text-gold disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-lg border border-line bg-field px-4 py-2 text-[14px] font-bold text-text transition-colors duration-150 ease-out-strong hover:border-gold hover:text-gold-read disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none lg:min-h-0"
           >
             {busy ? c.evidenceUploading : c.evidenceAdd}
           </button>
@@ -217,7 +215,7 @@ export function DisputeEvidence({
       )}
 
       {error ? (
-        <p role="alert" className="mt-2 text-[11.5px] text-bad">
+        <p role="alert" className="mt-2 text-[13px] text-bad">
           {error}
         </p>
       ) : null}

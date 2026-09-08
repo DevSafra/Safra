@@ -123,7 +123,7 @@ export function ScreeningPanel({
           advisory ? 'border-gold/40 bg-gold/5' : 'border-bad/40 bg-bad/10'
         }`}
       >
-        <p className={`text-sm ${advisory ? 'text-gold' : 'text-bad'}`}>
+        <p className={`text-sm ${advisory ? 'text-gold-read' : 'text-bad'}`}>
           {listStatus.imported
             ? fill(t.sections.screening.listStale, { days: listStatus.ageDays ?? 0 })
             : listStatus.fixtureLoaded
@@ -197,7 +197,7 @@ export function ScreeningPanel({
           ) : null}
         </div>
       ) : (
-        <p className="text-sm text-gold">{t.sections.screening.notScreened}</p>
+        <p className="text-sm text-gold-read">{t.sections.screening.notScreened}</p>
       )}
 
       {error ? (
@@ -211,7 +211,7 @@ export function ScreeningPanel({
           type="button"
           onClick={() => void run()}
           disabled={busy}
-          className="cursor-pointer rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-bg disabled:opacity-60 disabled:cursor-not-allowed"
+          className="cursor-pointer rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-ink disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {busy
             ? t.sections.panels.screeningSearching
@@ -230,7 +230,7 @@ export function ScreeningPanel({
               type="button"
               onClick={() => setOverride(previous.matched ? false : true)}
               disabled={busy}
-              className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-xs text-muted hover:border-gold/50 hover:text-gold disabled:opacity-60 disabled:cursor-not-allowed"
+              className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-xs text-muted hover:border-gold/50 hover:text-gold-read disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {previous.matched
                 ? t.sections.panels.screeningMarkNoMatch
@@ -242,7 +242,7 @@ export function ScreeningPanel({
 
       {override !== null ? (
         <div className="mt-3 rounded border border-gold/30 bg-gold/5 p-3">
-          <p className="text-xs text-gold">
+          <p className="text-xs text-gold-read">
             {override
               ? t.sections.panels.screeningMatchWarning
               : t.sections.panels.screeningClearWarning}
@@ -252,7 +252,7 @@ export function ScreeningPanel({
               type="button"
               onClick={() => void run(override)}
               disabled={busy}
-              className="cursor-pointer rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-bg disabled:opacity-60 disabled:cursor-not-allowed"
+              className="cursor-pointer rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-ink disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {t.sections.screening.confirmOverride}
             </button>
@@ -275,7 +275,7 @@ function ConfidencePill({ confidence }: { confidence: Candidate['confidence'] })
     confidence === 'strong'
       ? 'border-bad/40 bg-bad/10 text-bad'
       : confidence === 'possible'
-        ? 'border-gold/40 bg-gold/10 text-gold'
+        ? 'border-gold/40 bg-gold/10 text-gold-read'
         : 'border-line bg-field text-faint';
 
   return (

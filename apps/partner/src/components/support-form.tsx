@@ -88,14 +88,14 @@ export function SupportForm({ reference }: { readonly reference?: string }) {
       {error ? (
         <p
           role="alert"
-          className="rounded-lg border border-bad/40 bg-bad/10 p-3 text-[12.5px] text-bad"
+          className="rounded-lg border border-bad/40 bg-bad/10 p-3 text-[14px] text-bad"
         >
           {error}
         </p>
       ) : null}
 
       <label className="grid gap-1">
-        <span className="text-[12.5px] text-muted">
+        <span className="text-[14px] text-muted">
           {reference ? t.support.replyLabel : t.support.bodyLabel}
         </span>
         <textarea
@@ -108,13 +108,13 @@ export function SupportForm({ reference }: { readonly reference?: string }) {
           required
           className="rounded-lg border border-line bg-field px-3 py-2 text-text"
         />
-        <span className="text-[11px] text-faint">{t.support.bodyHint}</span>
+        <span className="text-[13px] text-faint">{t.support.bodyHint}</span>
       </label>
 
       <button
         type="submit"
         disabled={busy}
-        className="min-h-10 w-fit cursor-pointer rounded-lg bg-gold px-5 text-[12.5px] font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 lg:py-2"
+        className="min-h-10 w-fit cursor-pointer rounded-lg bg-gold px-5 text-[14px] font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 lg:py-2"
       >
         {busy
           ? t.support.submitting

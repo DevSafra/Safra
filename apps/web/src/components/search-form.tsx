@@ -337,9 +337,7 @@ export async function SearchForm({
 
       {attributes.length > 0 ? (
         <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
-          <span className="text-[12.5px] font-semibold text-muted">
-            {attributesLabel}
-          </span>
+          <span className="text-[14px] font-semibold text-muted">{attributesLabel}</span>
           {attributes.map(({ code, label }) => (
             /*
               A checkbox styled as a chip, INSIDE the form (Bashar, 2026-09-03: «should be
@@ -369,7 +367,7 @@ export async function SearchForm({
             */
             <label
               key={code}
-              className="inline-flex min-h-10 cursor-pointer items-center rounded-full border border-line bg-card px-3 py-1.5 text-[12.5px] font-semibold text-muted transition-[color,border-color,background-color] duration-150 ease-out-strong has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-gold has-[:checked]:border-gold has-[:checked]:bg-gold/15 has-[:checked]:text-gold lg:min-h-8 hover:border-gold/60 hover:bg-gold/5 hover:text-gold"
+              className="inline-flex min-h-10 cursor-pointer items-center rounded-full border border-line bg-card px-3 py-1.5 text-[14px] font-semibold text-muted transition-[color,border-color,background-color] duration-150 ease-out-strong has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-gold has-[:checked]:border-gold has-[:checked]:bg-gold/15 has-[:checked]:text-gold-read lg:min-h-8 hover:border-gold/60 hover:bg-gold/5 hover:text-gold-read"
             >
               <input
                 type="checkbox"

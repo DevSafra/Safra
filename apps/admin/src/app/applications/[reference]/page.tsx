@@ -86,7 +86,7 @@ export default async function PartnerApplicationPage({
           <StatusPill tone={statusTone(application.status)}>
             {label(t.enums.partnerApplicationStatus, application.status)}
           </StatusPill>
-          <span className="text-[12px] text-faint">
+          <span className="text-[13px] text-faint">
             {c.submittedAt} <Ltr>{shortDateTime(application.createdAt)}</Ltr>
           </span>
         </div>
@@ -133,8 +133,8 @@ export default async function PartnerApplicationPage({
 
         {application.message ? (
           <div className="mt-2 rounded-lg border border-line bg-card px-4 py-3">
-            <p className="text-[11.5px] text-faint">{c.message}</p>
-            <p className="mt-1 whitespace-pre-wrap text-[13px] leading-relaxed text-text">
+            <p className="text-[13px] text-faint">{c.message}</p>
+            <p className="mt-1 whitespace-pre-wrap text-[14px] leading-relaxed text-text">
               {application.message}
             </p>
           </div>
@@ -207,7 +207,7 @@ export default async function PartnerApplicationPage({
           reference={application.reference}
           status={application.status}
         />
-        <p className="mt-3 rounded-lg border border-dashed border-line px-3 py-2 text-[11.5px] leading-relaxed text-faint">
+        <p className="mt-3 rounded-lg border border-dashed border-line px-3 py-2 text-[13px] leading-relaxed text-faint">
           {c.afterAccept}
         </p>
       </Section>
@@ -258,8 +258,8 @@ function Row({
 }) {
   return (
     <div className="rounded-lg border border-line bg-card px-4 py-3">
-      <p className="text-[11.5px] text-faint">{name}</p>
-      <p className="mt-1 text-[13px] text-text">{value}</p>
+      <p className="text-[13px] text-faint">{name}</p>
+      <p className="mt-1 text-[14px] text-text">{value}</p>
     </div>
   );
 }
@@ -279,18 +279,18 @@ function Event({
   return (
     <li className="rounded-lg border border-line bg-card px-4 py-3">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="text-[12.5px] font-semibold text-text">{title}</span>
-        <span className="text-[11.5px] text-faint">
+        <span className="text-[14px] font-semibold text-text">{title}</span>
+        <span className="text-[13px] text-faint">
           <Ltr>{shortDateTime(when)}</Ltr>
         </span>
         {by ? (
-          <span className="text-[11.5px] text-faint">
+          <span className="text-[13px] text-faint">
             {t.sections.partnerApplications.contactedBy} <Ltr>{by}</Ltr>
           </span>
         ) : null}
       </div>
       {notes ? (
-        <p className="mt-1 whitespace-pre-wrap text-[12.5px] leading-relaxed text-text2">
+        <p className="mt-1 whitespace-pre-wrap text-[14px] leading-relaxed text-text2">
           {notes}
         </p>
       ) : null}

@@ -148,7 +148,7 @@ export default async function PayoutsPage() {
             stopped paying me» — and the sentence they need is that the balance is still theirs.
           */}
           {suspended ? (
-            <p className="rounded-card border border-bad/40 bg-bad/5 px-3.5 py-2.5 text-[12.5px] leading-relaxed text-text">
+            <p className="rounded-card border border-bad/40 bg-bad/5 px-3.5 py-2.5 text-[14px] leading-relaxed text-text">
               {t.suspension.payoutsFrozen}
             </p>
           ) : null}
@@ -206,7 +206,7 @@ export default async function PayoutsPage() {
           />
 
           {payouts.length === 0 ? (
-            <p className="rounded-card border border-line bg-card p-5 text-center text-[12.5px] text-faint">
+            <p className="rounded-card border border-line bg-card p-5 text-center text-[14px] text-faint">
               {t.payouts.empty}
             </p>
           ) : (
@@ -222,10 +222,8 @@ export default async function PayoutsPage() {
             </>
           )}
 
-          <p className="text-[11.5px] leading-relaxed text-faint2">{t.payouts.note}</p>
-          <p className="text-[11.5px] leading-relaxed text-faint2">
-            {t.payouts.readOnly}
-          </p>
+          <p className="text-[13px] leading-relaxed text-faint">{t.payouts.note}</p>
+          <p className="text-[13px] leading-relaxed text-faint">{t.payouts.readOnly}</p>
         </div>
       )}
     </Shell>
@@ -290,18 +288,18 @@ function Summary({
         that appears and disappears teaches a reader nothing about where things are.
       */}
       <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <span className="text-[12px] font-bold tracking-wide text-faint">
+        <span className="text-[13px] font-bold tracking-wide text-faint">
           {t.payouts.summaryHeading}
         </span>
         <Link
           href="/settings"
-          className="inline-flex min-h-10 items-center text-[12px] font-semibold text-gold underline underline-offset-2 lg:min-h-0"
+          className="inline-flex min-h-10 items-center text-[13px] font-semibold text-gold-read underline underline-offset-2 lg:min-h-0"
         >
           {t.payouts.accountsLink}
         </Link>
       </span>
 
-      <p className="text-[15px] leading-relaxed font-semibold text-text">
+      <p className="text-[16px] leading-relaxed font-semibold text-text">
         {pending && currency && open.length > 0 ? (
           plural(t.payouts.summaryPending, {
             amount: amount(pending, currency),
@@ -312,7 +310,7 @@ function Summary({
         )}
       </p>
 
-      <p className="text-[12.5px] leading-relaxed text-muted">
+      <p className="text-[14px] leading-relaxed text-muted">
         {next ? <>{fill(t.payouts.summaryNext, { date: next })} </> : null}
         {paid && paidCurrency && settled.length > 0
           ? fill(t.payouts.summaryPaid, { amount: amount(paid, paidCurrency) })
@@ -325,13 +323,13 @@ function Summary({
         destination means nothing moves however long the list gets.
       */}
       {verified ? (
-        <p className="text-[12px] text-faint">
+        <p className="text-[13px] text-faint">
           {fill(t.payouts.summaryTo, {
             account: `${verified.bankName ?? ''} ····${verified.last4}`.trim(),
           })}
         </p>
       ) : (
-        <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 text-[12px] leading-relaxed text-warn">
+        <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 text-[13px] leading-relaxed text-warn">
           {t.payouts.summaryNoAccount}
           <Link
             href="/settings"
@@ -384,21 +382,21 @@ function Fines({ rows }: { readonly rows: readonly PartnerFine[] }) {
       className="grid gap-3 rounded-card border border-line2 bg-field p-5"
     >
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 className="text-[13px] font-bold text-text">{t.payouts.fineTitle}</h2>
-        <span className="ms-auto text-[12.5px] font-bold tabular-nums text-text">
+        <h2 className="text-[14px] font-bold text-text">{t.payouts.fineTitle}</h2>
+        <span className="ms-auto text-[14px] font-bold tabular-nums text-text">
           {t.payouts.fineOutstanding}:{' '}
           {[...totals].map(([code, sum]) => amount(sum.toFixed(2), code)).join(' · ')}
         </span>
       </div>
 
-      <p className="text-[11.5px] leading-relaxed text-text2">{t.payouts.fineNote}</p>
+      <p className="text-[13px] leading-relaxed text-text2">{t.payouts.fineNote}</p>
 
       <ul className="grid gap-1.5">
         {rows.map((row) => (
           <li
             key={`${row.kind}-${row.bookingReference ?? ''}-${row.createdAt}`}
             data-fine={row.bookingReference ?? row.kind}
-            className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg border border-line px-3 py-2 text-[12px]"
+            className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg border border-line px-3 py-2 text-[13px]"
           >
             <span className="font-semibold text-text">{violationKind(row.kind)}</span>
 
@@ -469,21 +467,21 @@ function Recoveries({ rows }: { readonly rows: readonly PartnerRecovery[] }) {
       className="grid gap-3 rounded-card border border-line2 bg-field p-5"
     >
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 className="text-[13px] font-bold text-text">{t.payouts.recoveryTitle}</h2>
-        <span className="ms-auto text-[12.5px] font-bold tabular-nums text-text">
+        <h2 className="text-[14px] font-bold text-text">{t.payouts.recoveryTitle}</h2>
+        <span className="ms-auto text-[14px] font-bold tabular-nums text-text">
           {t.payouts.recoveryOutstanding}:{' '}
           {[...totals].map(([code, sum]) => amount(sum.toFixed(2), code)).join(' · ')}
         </span>
       </div>
 
-      <p className="text-[11.5px] leading-relaxed text-text2">{t.payouts.recoveryNote}</p>
+      <p className="text-[13px] leading-relaxed text-text2">{t.payouts.recoveryNote}</p>
 
       <ul className="grid gap-1.5">
         {rows.map((row) => (
           <li
             key={row.bookingReference}
             data-recovery={row.bookingReference}
-            className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg border border-line px-3 py-2 text-[12px]"
+            className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg border border-line px-3 py-2 text-[13px]"
           >
             <span className="text-muted">
               {t.payouts.recoveryFromBooking}{' '}
@@ -557,14 +555,14 @@ function Withheld({
       className="grid gap-3 rounded-card border border-[rgba(var(--warnA),0.35)] bg-[rgba(var(--warnA),0.05)] p-5"
     >
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 className="text-[13px] font-bold text-warn">{t.payouts.withheldHeading}</h2>
-        <span className="ms-auto text-[12.5px] font-bold tabular-nums text-warn">
+        <h2 className="text-[14px] font-bold text-warn">{t.payouts.withheldHeading}</h2>
+        <span className="ms-auto text-[14px] font-bold tabular-nums text-warn">
           {t.payouts.withheldTotal}:{' '}
           {[...totals].map(([code, sum]) => amount(sum.toFixed(2), code)).join(' · ')}
         </span>
       </div>
 
-      <p className="text-[11.5px] leading-relaxed text-text2">{t.payouts.withheldNote}</p>
+      <p className="text-[13px] leading-relaxed text-text2">{t.payouts.withheldNote}</p>
 
       {/*
         The sum actually stopped, said ONCE.
@@ -576,7 +574,7 @@ function Withheld({
         review keeps finding.
       */}
       {blocked.length > 0 ? (
-        <p className="text-[12px] font-semibold text-warn">
+        <p className="text-[13px] font-semibold text-warn">
           {blocked.length === 1
             ? fill(t.payouts.withheldBlocking, {
                 reference: blocked[0]!.reference,
@@ -592,15 +590,15 @@ function Withheld({
         {rows.map((row) => (
           <li
             key={row.reference}
-            className="grid gap-1 rounded-lg border border-line2 bg-card p-3 text-[12px]"
+            className="grid gap-1 rounded-lg border border-line2 bg-card p-3 text-[13px]"
           >
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <Ltr className="font-mono text-[11.5px] text-text2">{row.reference}</Ltr>
+              <Ltr className="font-mono text-[13px] text-text2">{row.reference}</Ltr>
               <span className="ms-auto font-bold tabular-nums text-text">
                 {amount(row.amount, row.currencyCode)}
               </span>
             </div>
-            <p className="text-[11px] text-faint">
+            <p className="text-[14px] text-faint">
               {t.payouts.withheldStay}: <Ltr>{row.checkIn}</Ltr> ←{' '}
               <Ltr>{row.checkOut}</Ltr> · {t.payouts.withheldOpened}:{' '}
               <Ltr>{row.openedAt.slice(0, 10)}</Ltr>
@@ -614,7 +612,7 @@ function Withheld({
               has its own screen since 223 — and it carries the complaint's kind and its state, so
               the row says what the money is waiting on rather than only that it is waiting.
             */}
-            <p className="text-[11px] text-muted">
+            <p className="text-[14px] text-muted">
               {t.payouts.withheldWhy}: {disputeKind(row.disputeKind)} ·{' '}
               {disputeStatus(row.disputeStatus)} ·{' '}
               <Link
@@ -634,7 +632,7 @@ function Withheld({
               reassurance they came to the page for.
             */}
             {row.responseCount === 0 ? (
-              <p className="text-[11px] font-semibold leading-relaxed text-warn">
+              <p className="text-[14px] font-semibold leading-relaxed text-warn">
                 {t.payouts.withheldReleaseNeedsYou}{' '}
                 <Link
                   href={`/disputes/${row.disputeReference}`}
@@ -644,7 +642,7 @@ function Withheld({
                 </Link>
               </p>
             ) : (
-              <p className="text-[11px] leading-relaxed text-faint">
+              <p className="text-[14px] leading-relaxed text-faint">
                 {plural(t.payouts.withheldResponded, { count: row.responseCount })}{' '}
                 {t.payouts.withheldRelease}
               </p>
@@ -668,7 +666,7 @@ function Group({
 
   return (
     <section className="grid gap-2">
-      <h2 className="text-[12px] font-bold tracking-wide text-faint">
+      <h2 className="text-[13px] font-bold tracking-wide text-faint">
         {heading} · {count(rows.length)}
       </h2>
 
@@ -716,15 +714,15 @@ function Card({ payout }: { readonly payout: PartnerPayout }) {
     >
       <span className="grid gap-1.5">
         <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-          <Ltr className="text-[13px] font-bold text-sky">{payout.reference}</Ltr>
+          <Ltr className="text-[14px] font-bold text-sky">{payout.reference}</Ltr>
           <span
-            className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${TONES[statusTone(payout.status)]}`}
+            className={`rounded-full border px-2.5 py-0.5 text-[13px] font-bold ${TONES[statusTone(payout.status)]}`}
           >
             {payoutStatus(payout.status)}
           </span>
         </span>
 
-        <span className="text-[11.5px] leading-relaxed text-faint">
+        <span className="text-[13px] leading-relaxed text-faint">
           <Ltr>
             {payout.periodStart} ← {payout.periodEnd}
           </Ltr>
@@ -746,19 +744,19 @@ function Card({ payout }: { readonly payout: PartnerPayout }) {
 
         {/* A held transfer explains itself here rather than only on its own screen. */}
         {payout.holdReason ? (
-          <span className="text-[11.5px] leading-relaxed text-warn">
+          <span className="text-[13px] leading-relaxed text-warn">
             {t.payouts.holdReason}: {payout.holdReason}
           </span>
         ) : null}
       </span>
 
       <span className="grid gap-0.5 sm:justify-items-end sm:text-end">
-        <span className="text-[18px] font-extrabold text-gold">
+        <span className="text-[18px] font-extrabold text-gold-read">
           <Ltr>{amount(payout.netAmount, payout.currencyCode)}</Ltr>
         </span>
 
         {fined ? (
-          <span className="text-[11px] text-faint2">
+          <span className="text-[13px] text-faint">
             {fill(t.payouts.afterFine, {
               gross: amount(payout.grossAmount, payout.currencyCode),
               fine: amount(payout.fineAmount, payout.currencyCode),
@@ -775,7 +773,7 @@ function Card({ payout }: { readonly payout: PartnerPayout }) {
           so here from the start — and only when it is not zero, because «ناقص 0» is noise.
         */}
         {recovered ? (
-          <span className="text-[11px] text-faint2">
+          <span className="text-[13px] text-faint">
             {fill(t.payouts.afterRecovery, {
               gross: amount(payout.grossAmount, payout.currencyCode),
               recovery: amount(payout.recoveryAmount, payout.currencyCode),

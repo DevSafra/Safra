@@ -69,7 +69,7 @@ export default async function CouponsPage() {
 
   return shell(
     <>
-      <p className="text-[12.5px] leading-relaxed text-muted">{t.coupons.intro}</p>
+      <p className="text-[14px] leading-relaxed text-muted">{t.coupons.intro}</p>
 
       <Section
         title={t.coupons.pendingTitle}
@@ -105,10 +105,10 @@ function Section({
 }) {
   return (
     <section>
-      <h2 className="mb-2 text-[14.5px] font-extrabold text-gold">{title}</h2>
+      <h2 className="mb-2 text-[16px] font-extrabold text-gold-read">{title}</h2>
 
       {rows.length === 0 ? (
-        <p className="text-[12.5px] text-faint2">{empty}</p>
+        <p className="text-[14px] text-faint">{empty}</p>
       ) : (
         <ul className="grid gap-2">
           {rows.map((coupon) => (
@@ -118,20 +118,20 @@ function Section({
               className="grid gap-2 rounded-card border border-line bg-card px-4 py-3.5"
             >
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span className="font-mono text-[13px] font-bold text-text">
+                <span className="font-mono text-[14px] font-bold text-text">
                   {coupon.code}
                 </span>
-                <span className="text-[12.5px] font-semibold text-gold">
+                <span className="text-[14px] font-semibold text-gold-read">
                   {discountOf(coupon)}
                 </span>
                 {coupon.expired ? (
-                  <span className="rounded-full border border-line px-2 py-0.5 text-[10.5px] text-faint">
+                  <span className="rounded-full border border-line px-2 py-0.5 text-[13px] text-faint">
                     {t.coupons.expired}
                   </span>
                 ) : null}
               </div>
 
-              <p className="text-[11.5px] text-faint">
+              <p className="text-[13px] text-faint">
                 {t.coupons.colWindow}: {day(coupon.startsAt)} – {day(coupon.endsAt)}
                 {coupon.minBookingAmount ? (
                   <>

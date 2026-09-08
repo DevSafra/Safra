@@ -81,8 +81,8 @@ export default async function JoinAsPartnerPage({
     <main className="mx-auto grid max-w-3xl gap-10 px-4 py-10">
       <header>
         <h1 className="text-3xl font-extrabold text-gold">{t('title')}</h1>
-        <p className="mt-2 text-[15px] leading-relaxed text-text">{t('subtitle')}</p>
-        <p className="mt-3 text-[14px] leading-relaxed text-muted">{t('intro')}</p>
+        <p className="mt-2 text-[16px] leading-relaxed text-text">{t('subtitle')}</p>
+        <p className="mt-3 text-[16px] leading-relaxed text-muted">{t('intro')}</p>
       </header>
 
       <section>
@@ -91,7 +91,7 @@ export default async function JoinAsPartnerPage({
           {reasons.map((key) => (
             <li
               key={key}
-              className="rounded-card border border-line bg-card px-4 py-3 text-[13.5px] leading-relaxed text-text2"
+              className="rounded-card border border-line bg-card px-4 py-3 text-[14px] leading-relaxed text-text2"
             >
               {t(`why.${key}`)}
             </li>
@@ -108,11 +108,11 @@ export default async function JoinAsPartnerPage({
           document's language, which is what keeps «١» from appearing in a German list — and the
           numerals themselves never become copy that a translator has to carry.
         */}
-        <ol className="grid list-inside list-decimal gap-2 marker:font-bold marker:text-gold">
+        <ol className="grid list-inside list-decimal gap-2 marker:font-bold marker:text-gold-read">
           {steps.map((key) => (
             <li
               key={key}
-              className="rounded-card border border-line bg-card px-4 py-3 text-[13.5px] leading-relaxed text-text2"
+              className="rounded-card border border-line bg-card px-4 py-3 text-[14px] leading-relaxed text-text2"
             >
               {t(`steps.${key}`)}
             </li>
@@ -127,9 +127,9 @@ export default async function JoinAsPartnerPage({
           tell and it is also worse markup: a screen reader announces a list of five items either
           way, and only one of them draws correctly at every text size.
         */}
-        <ul className="grid list-inside list-disc gap-2 marker:text-gold">
+        <ul className="grid list-inside list-disc gap-2 marker:text-gold-read">
           {documents.map((key) => (
-            <li key={key} className="text-[13.5px] leading-relaxed text-text2">
+            <li key={key} className="text-[14px] leading-relaxed text-text2">
               {t(`documents.${key}`)}
             </li>
           ))}
@@ -139,16 +139,16 @@ export default async function JoinAsPartnerPage({
           uploaded from this page, and an applicant who attaches a passport to a public form has
           been let down by the page rather than by themselves.
         */}
-        <p className="mt-3 rounded-card border border-dashed border-line px-4 py-3 text-[12.5px] leading-relaxed text-faint">
+        <p className="mt-3 rounded-card border border-dashed border-line px-4 py-3 text-[14px] leading-relaxed text-faint">
           {t('documentsNote')}
         </p>
       </section>
 
       <section>
         <h2 className="mb-1 text-xl font-bold text-text">{t('formTitle')}</h2>
-        <p className="mb-1 text-[12.5px] text-faint">{t('formNote')}</p>
+        <p className="mb-1 text-[14px] text-faint">{t('formNote')}</p>
         {/* Why there is no email box, said where somebody would look for one. */}
-        <p className="mb-4 text-[12.5px] text-faint">{t('signedInNote')}</p>
+        <p className="mb-4 text-[14px] text-faint">{t('signedInNote')}</p>
 
         <PartnerApplicationForm
           countries={dialOptions(locale)}

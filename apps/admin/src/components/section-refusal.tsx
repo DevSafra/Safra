@@ -58,7 +58,7 @@ export async function refuseSection(
           fault in the product, and this is not a fault — it is the console describing the reader's
           role accurately.
         */}
-        <p className="text-[13px] leading-relaxed text-muted">
+        <p className="text-[14px] leading-relaxed text-muted">
           {access === 'closed' ? t.sections.gate.closed : t.sections.gate.role}
         </p>
       </ConsolePanel>

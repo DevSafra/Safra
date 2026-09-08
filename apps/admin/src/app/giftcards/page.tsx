@@ -124,9 +124,9 @@ export default async function GiftCardsPage({
         />
 
         {result === 'unauthenticated' ? (
-          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
         ) : result === 'failed' ? (
-          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <>
             <AdminTable
@@ -175,7 +175,7 @@ const COLUMNS: readonly AdminColumn<GiftCardItem>[] = [
     render: (row) => (
       <div className="grid min-w-0 gap-0.5">
         <Ltr className="font-semibold text-sky">{row.reference}</Ltr>
-        <Ltr className="text-[10.5px] text-faint">••••{row.codeLast4}</Ltr>
+        <Ltr className="text-[13px] text-faint">••••{row.codeLast4}</Ltr>
       </div>
     ),
   },
@@ -193,7 +193,7 @@ const COLUMNS: readonly AdminColumn<GiftCardItem>[] = [
     header: t.sections.giftcards.colRemaining,
     /* Gold, because the remaining balance is the liability — the number that still matters. */
     render: (row) => (
-      <Ltr className="font-bold whitespace-nowrap text-gold">
+      <Ltr className="font-bold whitespace-nowrap text-gold-read">
         {money(row.remainingAmount)} {row.currency}
       </Ltr>
     ),

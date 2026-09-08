@@ -214,7 +214,7 @@ export async function AccountShell({
                 aria-current={current ? 'page' : undefined}
                 className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm transition-colors lg:min-h-0 lg:py-2 ${
                   current
-                    ? 'bg-gold/12 font-bold text-gold'
+                    ? 'bg-gold/12 font-bold text-gold-read'
                     : 'text-muted hover:bg-line/40 hover:text-text'
                 }`}
               >
@@ -227,7 +227,7 @@ export async function AccountShell({
                 {badge ? (
                   <span
                     dir="ltr"
-                    className="ms-auto rounded-full bg-sky/15 px-2 py-0.5 text-[11px] font-bold text-sky"
+                    className="ms-auto rounded-full bg-sky/15 px-2 py-0.5 text-[12px] font-bold text-sky"
                   >
                     {badge}
                   </span>
@@ -249,7 +249,7 @@ export async function AccountShell({
           */}
           <Link
             href={`/${locale}/partners/join`}
-            className="mt-2 inline-flex min-h-10 items-center border-t border-line px-3 pt-3 text-sm text-muted transition-colors hover:bg-line/40 hover:text-gold lg:min-h-0 lg:py-2"
+            className="mt-2 inline-flex min-h-10 items-center border-t border-line px-3 pt-3 text-sm text-muted transition-colors hover:bg-line/40 hover:text-gold-read lg:min-h-0 lg:py-2"
           >
             {tf('becomePartner')}
           </Link>

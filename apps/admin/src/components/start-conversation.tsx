@@ -133,7 +133,7 @@ export function StartConversation({
       type="button"
       onClick={() => setOpen(!open)}
       aria-expanded={open}
-      className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+      className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold-read transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
     >
       {c.compose}
     </button>
@@ -141,13 +141,13 @@ export function StartConversation({
 
   const form = (
     <div className="grid gap-3 rounded-card border border-line bg-field p-3.5">
-      <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
+      <label className="grid gap-1.5 text-[13px] font-semibold text-muted">
         {c.composeTo}
         <select
           name="to"
           value={to}
           onChange={(event) => setTo(event.target.value as Recipient)}
-          className="cursor-pointer rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-text"
+          className="cursor-pointer rounded-lg border border-line bg-card px-3 py-2 text-[14px] text-text"
         >
           <option value="customer">{c.composeToCustomer}</option>
           <option value="partner">{c.composeToPartner}</option>
@@ -162,7 +162,7 @@ export function StartConversation({
         correctly without being told. `dir="ltr"` would move the field's START edge and put the
         label on one side and the caret on the other.
       */}
-      <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
+      <label className="grid gap-1.5 text-[13px] font-semibold text-muted">
         {c.composeReference}
         <input
           name="reference"
@@ -170,14 +170,14 @@ export function StartConversation({
           onChange={(event) => setReference(event.target.value)}
           /* The prefix is the whole hint: it changes with the recipient above it. */
           placeholder={referencePlaceholder(to)}
-          className="rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-text placeholder:text-faint"
+          className="rounded-lg border border-line bg-card px-3 py-2 text-[14px] text-text placeholder:text-faint"
         />
-        <span className="text-[10.5px] font-normal text-faint2">
+        <span className="text-[13px] font-normal text-faint">
           {c.composeReferenceHint}
         </span>
       </label>
 
-      <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
+      <label className="grid gap-1.5 text-[13px] font-semibold text-muted">
         {c.composeBody}
         <textarea
           name="body"
@@ -185,13 +185,13 @@ export function StartConversation({
           onChange={(event) => setBody(event.target.value)}
           rows={4}
           placeholder={c.composeBodyPlaceholder}
-          className="rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] leading-relaxed text-text placeholder:text-faint"
+          className="rounded-lg border border-line bg-card px-3 py-2 text-[14px] leading-relaxed text-text placeholder:text-faint"
         />
       </label>
 
-      <p className="text-[10.5px] leading-relaxed text-faint2">{c.composeNote}</p>
+      <p className="text-[14px] leading-relaxed text-faint">{c.composeNote}</p>
 
-      {error ? <p className="text-[11px] font-semibold text-bad">{error}</p> : null}
+      {error ? <p className="text-[14px] font-semibold text-bad">{error}</p> : null}
 
       <div className="flex flex-wrap items-center gap-2">
         <button

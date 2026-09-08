@@ -103,7 +103,7 @@ export default async function AccountSupportPage({
 
                     <span className="flex flex-col items-end gap-1">
                       <span
-                        className={`rounded-full border px-2 py-0.5 text-[11px] ${
+                        className={`rounded-full border px-2 py-0.5 text-[13px] ${
                           ticket.closed
                             ? 'border-line bg-field text-faint'
                             : 'border-ok/40 bg-ok/10 text-ok'

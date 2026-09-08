@@ -98,9 +98,9 @@ export function CouponDecision({ code }: { readonly code: string }) {
   return (
     <div className="grid gap-2">
       {/* Said on the card as well as in the dialog — see the note above. */}
-      <p className="text-[11.5px] leading-relaxed text-bad">{c.warning}</p>
+      <p className="text-[13px] leading-relaxed text-bad">{c.warning}</p>
 
-      {error ? <p className="text-[11.5px] font-semibold text-bad">{error}</p> : null}
+      {error ? <p className="text-[13px] font-semibold text-bad">{error}</p> : null}
 
       <div className="flex flex-wrap items-center gap-2">
         <button

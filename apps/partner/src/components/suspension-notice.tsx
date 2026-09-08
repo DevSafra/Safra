@@ -42,10 +42,10 @@ export function SuspensionNotice({
     >
       <div className="grid gap-1">
         <h2 className="text-sm font-semibold text-bad">{t.suspension.title}</h2>
-        <p className="text-[12.5px] text-text">
+        <p className="text-[14px] text-text">
           {fill(t.suspension.reason, { reason: suspension.reason })}
         </p>
-        <p className="text-[12px] text-faint">
+        <p className="text-[13px] text-faint">
           {fill(t.suspension.since, { date: suspension.since })}
         </p>
       </div>
@@ -53,14 +53,14 @@ export function SuspensionNotice({
       {/*
         Second, and before anything about what stopped. This is the sentence the notice is for.
       */}
-      <p className="text-[12.5px] font-medium text-text">{t.suspension.guestsSafe}</p>
+      <p className="text-[14px] font-medium text-text">{t.suspension.guestsSafe}</p>
 
       <div className="grid gap-2 sm:grid-cols-2">
         <div className="grid gap-1">
-          <h3 className="text-[12px] font-semibold text-muted">
+          <h3 className="text-[13px] font-semibold text-muted">
             {t.suspension.blockedTitle}
           </h3>
-          <ul className="grid gap-1 text-[12.5px] text-muted">
+          <ul className="grid gap-1 text-[14px] text-muted">
             <li>{t.suspension.blockedListings}</li>
             <li>{t.suspension.blockedProperties}</li>
             <li>{t.suspension.blockedPayouts}</li>
@@ -68,10 +68,10 @@ export function SuspensionNotice({
         </div>
 
         <div className="grid gap-1">
-          <h3 className="text-[12px] font-semibold text-muted">
+          <h3 className="text-[13px] font-semibold text-muted">
             {t.suspension.allowedTitle}
           </h3>
-          <ul className="grid gap-1 text-[12.5px] text-muted">
+          <ul className="grid gap-1 text-[14px] text-muted">
             <li>{t.suspension.allowedRead}</li>
           </ul>
         </div>

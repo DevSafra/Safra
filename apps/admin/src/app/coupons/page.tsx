@@ -95,9 +95,9 @@ export default async function CouponsPage({
         />
 
         {result === 'unauthenticated' ? (
-          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
         ) : result === 'failed' ? (
-          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <>
             <AdminTable
@@ -173,7 +173,7 @@ const columns = (back: string): readonly AdminColumn<CouponItem>[] => [
     key: 'discount',
     header: t.sections.coupons.colDiscount,
     render: (row) => (
-      <Ltr className="font-bold whitespace-nowrap text-gold">
+      <Ltr className="font-bold whitespace-nowrap text-gold-read">
         {row.valueKind === 'percent'
           ? `${Number(row.value).toLocaleString('en-US')}${t.percentSign}`
           : amount(row.value, row.currency ?? DEFAULT_MONEY_CURRENCY)}
@@ -215,7 +215,7 @@ const columns = (back: string): readonly AdminColumn<CouponItem>[] => [
     render: (row) => (
       <div className="grid gap-0.5">
         <Ltr className="text-muted">{shortDate(row.startsAt)}</Ltr>
-        <Ltr className="text-[10.5px] text-faint">{shortDate(row.endsAt)}</Ltr>
+        <Ltr className="text-[13px] text-faint">{shortDate(row.endsAt)}</Ltr>
       </div>
     ),
   },

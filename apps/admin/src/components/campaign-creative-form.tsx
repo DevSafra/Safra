@@ -390,8 +390,8 @@ export function CampaignCreativeForm({
   }
 
   const field =
-    'w-full min-w-0 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text';
-  const labelled = 'grid gap-1.5 text-[11.5px] font-semibold text-muted';
+    'w-full min-w-0 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text';
+  const labelled = 'grid gap-1.5 text-[13px] font-semibold text-muted';
 
   return (
     <>
@@ -399,7 +399,7 @@ export function CampaignCreativeForm({
         ref={trigger}
         type="button"
         onClick={() => reopen()}
-        className="inline-flex w-full cursor-pointer items-center justify-center whitespace-nowrap rounded-lg border border-line px-2.5 py-1 text-[10.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold"
+        className="inline-flex w-full cursor-pointer items-center justify-center whitespace-nowrap rounded-lg border border-line px-2.5 py-1 text-[13px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold-read"
       >
         {c.editCreative}
       </button>
@@ -419,12 +419,12 @@ export function CampaignCreativeForm({
             className="w-full max-w-xl rounded-card border border-line bg-card p-5 shadow-2xl"
           >
             <div className="mb-4 flex items-start justify-between gap-4">
-              <h2 className="text-[15px] font-bold text-text">{c.editTitle}</h2>
+              <h2 className="text-[16px] font-bold text-text">{c.editTitle}</h2>
               <button
                 type="button"
                 onClick={() => dismiss()}
                 aria-label={c.closeDialog}
-                className="grid size-8 cursor-pointer place-items-center rounded-lg border border-line text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold"
+                className="grid size-8 cursor-pointer place-items-center rounded-lg border border-line text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold-read"
               >
                 <span aria-hidden="true">×</span>
               </button>
@@ -510,7 +510,7 @@ export function CampaignCreativeForm({
                 <div className="flex flex-wrap items-center gap-3">
                   {staged.kind === 'remove' ? (
                     /* What حفظ is about to do, said before it is done. */
-                    <span className="grid h-20 w-32 content-center gap-1 rounded-lg border border-dashed border-line px-2 text-center text-[10.5px] text-muted">
+                    <span className="grid h-20 w-32 content-center gap-1 rounded-lg border border-dashed border-line px-2 text-center text-[13px] text-muted">
                       <span>{c.imageNone}</span>
                       <span className="font-normal text-faint">
                         {c.imageRemoveStaged}
@@ -526,7 +526,7 @@ export function CampaignCreativeForm({
                       served. It is not: what gets served is the SERVER's re-encode, and this tile
                       shows only that.
                     */
-                    <span className="grid h-20 w-32 content-center gap-1 rounded-lg border border-dashed border-[rgba(var(--goldA),0.55)] px-2 text-center text-[10.5px] text-gold">
+                    <span className="grid h-20 w-32 content-center gap-1 rounded-lg border border-dashed border-[rgba(var(--goldA),0.55)] px-2 text-center text-[13px] text-gold-read">
                       <span className="w-full truncate" title={staged.file.name}>
                         {staged.file.name}
                       </span>
@@ -556,7 +556,7 @@ export function CampaignCreativeForm({
                       />
                     </button>
                   ) : (
-                    <span className="grid h-20 w-32 place-items-center rounded-lg border border-dashed border-line px-2 text-center text-[10.5px] text-faint">
+                    <span className="grid h-20 w-32 place-items-center rounded-lg border border-dashed border-line px-2 text-center text-[13px] text-faint">
                       {imageStatus === 'processing'
                         ? slow
                           ? c.imageSlow
@@ -572,7 +572,7 @@ export function CampaignCreativeForm({
                       type="button"
                       disabled={busy}
                       onClick={() => file.current?.click()}
-                      className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-line px-4 py-2 text-[12px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold disabled:opacity-50 lg:min-h-0"
+                      className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-line px-4 py-2 text-[13px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold-read disabled:opacity-50 lg:min-h-0"
                     >
                       {imageUrl || staged.kind === 'replace'
                         ? c.imageReplace
@@ -589,7 +589,7 @@ export function CampaignCreativeForm({
                         type="button"
                         disabled={busy}
                         onClick={() => setStaged({ kind: 'remove' })}
-                        className="w-fit cursor-pointer text-[10.5px] font-normal text-muted underline transition-colors hover:text-bad disabled:opacity-50"
+                        className="w-fit cursor-pointer text-[13px] font-normal text-muted underline transition-colors hover:text-bad disabled:opacity-50"
                       >
                         {c.imageRemove}
                       </button>
@@ -597,7 +597,7 @@ export function CampaignCreativeForm({
 
                     {/* Putting a staged change back, without closing everything else down. */}
                     {staged.kind === 'none' ? (
-                      <span className="text-[10.5px] font-normal text-faint">
+                      <span className="text-[13px] font-normal text-faint">
                         {c.imageHint}
                       </span>
                     ) : (
@@ -605,7 +605,7 @@ export function CampaignCreativeForm({
                         type="button"
                         disabled={busy}
                         onClick={() => setStaged({ kind: 'none' })}
-                        className="w-fit cursor-pointer text-[10.5px] font-normal text-muted underline transition-colors hover:text-gold disabled:opacity-50"
+                        className="w-fit cursor-pointer text-[13px] font-normal text-muted underline transition-colors hover:text-gold-read disabled:opacity-50"
                       >
                         {staged.kind === 'remove'
                           ? c.imageRemoveUndo
@@ -642,7 +642,7 @@ export function CampaignCreativeForm({
               </div>
 
               {error ? (
-                <p className="text-[11.5px] font-semibold text-bad">{error}</p>
+                <p className="text-[13px] font-semibold text-bad">{error}</p>
               ) : null}
 
               <div className="mt-1 flex flex-wrap justify-end gap-2">
@@ -669,7 +669,7 @@ export function CampaignCreativeForm({
                   type="button"
                   disabled={!ready || !changed}
                   onClick={() => void submit()}
-                  className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold transition-colors disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+                  className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold-read transition-colors disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
                 >
                   {busy ? c.pausing : c.saveCreative}
                 </button>

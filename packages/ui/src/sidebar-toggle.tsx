@@ -152,7 +152,7 @@ export function SidebarToggle({
       title={label}
       aria-expanded={visible}
       aria-controls={sidebarId}
-      className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-lg border border-line bg-field text-muted transition-colors hover:border-gold hover:text-gold"
+      className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-lg border border-line bg-field text-muted transition-colors hover:border-gold hover:text-gold-read"
     >
       {/*
         Drawn as three bars rather than set as text, so it is a glyph at an exact size instead of

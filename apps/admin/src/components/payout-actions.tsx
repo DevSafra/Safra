@@ -85,13 +85,13 @@ export function PayoutActions({
 
   /* A paid payout is history. There is nothing left to decide, and the screen says so. */
   if (status === 'paid' || status === 'cancelled') {
-    return <p className="text-[12.5px] text-faint">{t.sections.payouts.noActions}</p>;
+    return <p className="text-[14px] text-faint">{t.sections.payouts.noActions}</p>;
   }
 
   return (
     <div className="grid gap-3">
       {error ? (
-        <p role="alert" className="text-[12.5px] text-bad">
+        <p role="alert" className="text-[14px] text-bad">
           {error}
         </p>
       ) : null}
@@ -193,7 +193,7 @@ export function PayoutActions({
             }
           }}
         >
-          <p className="text-[12.5px] leading-relaxed text-muted">{HINTS[open]}</p>
+          <p className="text-[14px] leading-relaxed text-muted">{HINTS[open]}</p>
 
           {open === 'release' ? (
             <>
@@ -223,14 +223,14 @@ export function PayoutActions({
             <button
               type="submit"
               disabled={busy}
-              className="min-h-10 cursor-pointer rounded-lg bg-gold px-4 py-2 text-[12.5px] font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
+              className="min-h-10 cursor-pointer rounded-lg bg-gold px-4 py-2 text-[14px] font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
             >
               {busy ? t.sections.payouts.working : t.sections.payouts.confirm}
             </button>
             <button
               type="button"
               onClick={() => setOpen(null)}
-              className="min-h-10 cursor-pointer rounded-lg border border-line px-4 py-2 text-[12.5px] text-muted lg:min-h-0"
+              className="min-h-10 cursor-pointer rounded-lg border border-line px-4 py-2 text-[14px] text-muted lg:min-h-0"
             >
               {t.sections.payouts.cancel}
             </button>
@@ -269,9 +269,9 @@ function Button({
       type="button"
       onClick={onClick}
       title={hint}
-      className={`min-h-10 cursor-pointer rounded-lg px-4 py-2 text-[12.5px] font-semibold lg:min-h-0 ${
+      className={`min-h-10 cursor-pointer rounded-lg px-4 py-2 text-[14px] font-semibold lg:min-h-0 ${
         primary
-          ? 'bg-gold text-bg'
+          ? 'bg-gold text-ink'
           : danger
             ? 'border border-bad/50 text-bad'
             : 'border border-line text-muted'
@@ -295,12 +295,12 @@ function Field({
 }) {
   return (
     <label className="grid gap-1">
-      <span className="text-[11.5px] text-faint">{label}</span>
+      <span className="text-[13px] text-faint">{label}</span>
       <input
         name={name}
         type={type}
         required={required}
-        className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text lg:min-h-0"
+        className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text lg:min-h-0"
       />
     </label>
   );

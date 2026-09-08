@@ -83,7 +83,7 @@ export function BookingVerification() {
 
   return (
     <section className="grid gap-4">
-      <p className="text-[12.5px] text-muted">{copy.intro}</p>
+      <p className="text-[14px] text-muted">{copy.intro}</p>
 
       {error ? (
         <p
@@ -111,7 +111,7 @@ export function BookingVerification() {
         }}
       >
         <label className="grid gap-1">
-          <span className="text-[11px] text-faint">{copy.referenceLabel}</span>
+          <span className="text-[13px] text-faint">{copy.referenceLabel}</span>
           {/* No `dir`: a field a person types into follows the page (docs/i18n.md §9). */}
           <input
             name="reference"
@@ -119,15 +119,15 @@ export function BookingVerification() {
             value={reference}
             onChange={(event) => setReference(event.target.value)}
             disabled={busy}
-            className="min-h-10 w-64 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed lg:min-h-0"
+            className="min-h-10 w-64 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text disabled:cursor-not-allowed lg:min-h-0"
           />
-          <span className="text-[10.5px] text-faint">{copy.referenceHint}</span>
+          <span className="text-[13px] text-faint">{copy.referenceHint}</span>
         </label>
 
         <button
           type="submit"
           disabled={busy || reference.trim() === ''}
-          className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-gold/50 px-4 py-2 text-[12.5px] font-bold text-gold hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
+          className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-gold/50 px-4 py-2 text-[14px] font-bold text-gold-read hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
         >
           {busy ? copy.sending : copy.send}
         </button>
@@ -157,7 +157,7 @@ export function BookingVerification() {
             });
           }}
         >
-          <p className="text-[12.5px] text-text">
+          <p className="text-[14px] text-text">
             {fill(copy.sentTo, {
               destination: sentTo,
               minutes: String(BOOKING_VERIFICATION_MINUTES),
@@ -165,7 +165,7 @@ export function BookingVerification() {
           </p>
 
           <label className="grid gap-1">
-            <span className="text-[11px] text-faint">{copy.codeLabel}</span>
+            <span className="text-[13px] text-faint">{copy.codeLabel}</span>
             {/*
               `inputMode="numeric"` and a six-digit pattern, so a phone shows the number pad and a
               mistyped letter is refused before a round trip — one of only three attempts.
@@ -177,14 +177,14 @@ export function BookingVerification() {
               pattern="\d{6}"
               maxLength={6}
               disabled={busy}
-              className="min-h-10 w-32 rounded-lg border border-line bg-field px-3 py-2 text-center text-[14px] tracking-[0.3em] text-text disabled:cursor-not-allowed lg:min-h-0"
+              className="min-h-10 w-32 rounded-lg border border-line bg-field px-3 py-2 text-center text-[16px] tracking-[0.3em] text-text disabled:cursor-not-allowed lg:min-h-0"
             />
           </label>
 
           <button
             type="submit"
             disabled={busy}
-            className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-gold/50 px-4 py-2 text-[12.5px] font-bold text-gold hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
+            className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-gold/50 px-4 py-2 text-[14px] font-bold text-gold-read hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
           >
             {busy ? copy.confirming : copy.confirm}
           </button>
@@ -204,14 +204,14 @@ export function BookingVerification() {
           </p>
           <Link
             href={`/bookings/${encodeURIComponent(verified)}`}
-            className="inline-flex min-h-10 w-fit items-center text-[12.5px] text-sky hover:underline lg:min-h-0"
+            className="inline-flex min-h-10 w-fit items-center text-[14px] text-sky hover:underline lg:min-h-0"
           >
             <Ltr>{verified}</Ltr>
             <span className="ms-2">{copy.openBooking}</span>
           </Link>
         </div>
       ) : (
-        <p className="text-[11px] text-faint">{copy.sealed}</p>
+        <p className="text-[14px] text-faint">{copy.sealed}</p>
       )}
     </section>
   );

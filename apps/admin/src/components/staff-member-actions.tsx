@@ -144,7 +144,7 @@ export function StaffMemberActions({
         <button
           type="submit"
           disabled={busy}
-          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-3 py-2 text-xs text-muted hover:border-gold/50 hover:text-gold disabled:cursor-not-allowed lg:min-h-0"
+          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-3 py-2 text-xs text-muted hover:border-gold/50 hover:text-gold-read disabled:cursor-not-allowed lg:min-h-0"
         >
           {busy
             ? t.sections.staff.member.renameSaving
@@ -153,7 +153,7 @@ export function StaffMemberActions({
       </form>
 
       {isSelf ? (
-        <p className="text-[12.5px] text-faint">{t.sections.staff.member.actionsSelf}</p>
+        <p className="text-[14px] text-faint">{t.sections.staff.member.actionsSelf}</p>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
           {/*
@@ -211,7 +211,7 @@ export function StaffMemberActions({
                   : fill(t.sections.staff.suspendedNotice, { email: member.email }),
               )
             }
-            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-3 py-2 text-xs text-muted hover:border-gold/50 hover:text-gold disabled:cursor-not-allowed lg:min-h-0"
+            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-3 py-2 text-xs text-muted hover:border-gold/50 hover:text-gold-read disabled:cursor-not-allowed lg:min-h-0"
           >
             {member.status === 'suspended'
               ? t.sections.staff.reinstate
@@ -229,7 +229,7 @@ export function StaffMemberActions({
                   fill(t.sections.staff.inviteResent, { email: member.email }),
                 )
               }
-              className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-3 py-2 text-xs text-muted hover:border-gold/50 hover:text-gold disabled:cursor-not-allowed lg:min-h-0"
+              className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-3 py-2 text-xs text-muted hover:border-gold/50 hover:text-gold-read disabled:cursor-not-allowed lg:min-h-0"
             >
               {t.sections.staff.inviteResend}
             </button>

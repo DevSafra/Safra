@@ -126,14 +126,14 @@ export function ChangePassword() {
       className="grid gap-3"
       data-change-password
     >
-      <p className="text-[11.5px] leading-relaxed text-faint">{c.passwordNote}</p>
+      <p className="text-[13px] leading-relaxed text-faint">{c.passwordNote}</p>
 
       {message ? (
         <p
           role="alert"
-          className={`rounded-lg border p-2.5 text-[12px] leading-relaxed ${
+          className={`rounded-lg border p-2.5 text-[13px] leading-relaxed ${
             message.kind === 'ok'
-              ? 'border-good/40 bg-good/10 text-good'
+              ? 'border-ok/40 bg-ok/10 text-ok'
               : 'border-bad/40 bg-bad/10 text-bad'
           }`}
         >
@@ -193,7 +193,7 @@ export function ChangePassword() {
       <button
         type="submit"
         disabled={busy || !ready}
-        className="min-h-10 w-fit cursor-pointer rounded-lg border border-gold px-4 py-1.5 text-[12px] font-bold text-gold disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+        className="min-h-10 w-fit cursor-pointer rounded-lg border border-gold px-4 py-1.5 text-[13px] font-bold text-gold-read disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
       >
         {busy ? c.passwordSaving : c.passwordSubmit}
       </button>

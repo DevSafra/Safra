@@ -178,7 +178,7 @@ function LanguageMenu({
                     {current ? (
                       <CheckIcon />
                     ) : (
-                      <span className="text-[0.6875rem] tracking-wide text-faint uppercase">
+                      <span className="text-[13px] tracking-wide text-faint uppercase">
                         {code}
                       </span>
                     )}
@@ -229,7 +229,7 @@ function CurrencyMenu({
         aria-label={`${labels.currency}: ${currency}`}
         className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm text-text/85 transition-colors duration-200 ease-out-strong hover:bg-gold/10 hover:text-text sm:min-h-11"
       >
-        <span aria-hidden className="text-[0.9375rem] leading-none">
+        <span aria-hidden className="text-[16px] leading-none">
           {symbolOf(currency)}
         </span>
         <span className="hidden text-xs font-semibold tracking-wide sm:inline">
@@ -288,7 +288,7 @@ function CurrencyMenu({
                   */}
                   <span
                     aria-hidden
-                    className="grid size-7 shrink-0 place-items-center text-[0.85rem]"
+                    className="grid size-7 shrink-0 place-items-center text-[14px]"
                   >
                     {symbol}
                   </span>
@@ -304,7 +304,7 @@ function CurrencyMenu({
             member typed, and the booking is charged in the listing's own currency. The card prints
             the original underneath for the same reason.
           */}
-          <p className="mt-3 text-[0.6875rem] leading-relaxed text-faint">
+          <p className="mt-3 text-[14px] leading-relaxed text-faint">
             {labels.currencyHelp}
           </p>
 
@@ -343,7 +343,7 @@ function CheckIcon() {
       strokeWidth={2}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="shrink-0 text-gold"
+      className="shrink-0 text-gold-read"
     >
       <path d="m5 12.8 4.2 4.2L19 7.4" />
     </svg>

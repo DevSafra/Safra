@@ -86,11 +86,11 @@ export default async function PaymentsPage({
       <MarkSectionSeen section="payments" readTo={oldestShown} readFrom={newestShown} />
       {result === 'unauthenticated' ? (
         <ConsolePanel>
-          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
         </ConsolePanel>
       ) : result === 'failed' ? (
         <ConsolePanel>
-          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
         </ConsolePanel>
       ) : (
         <div className="grid gap-4">
@@ -98,7 +98,7 @@ export default async function PaymentsPage({
             <Kpi
               label={t.sections.payments.kpiCaptured}
               value={amount(result.counters.captured_today, result.counters.currency)}
-              valueClass="text-gold"
+              valueClass="text-gold-read"
             />
             <Kpi
               label={t.sections.payments.kpiRefunded}
@@ -131,7 +131,7 @@ export default async function PaymentsPage({
             <Kpi
               label={t.sections.payments.kpiAdRevenue}
               value={amount(result.counters.ad_revenue_month, result.counters.currency)}
-              valueClass="text-gold"
+              valueClass="text-gold-read"
             />
           </KpiRow>
 
@@ -172,7 +172,7 @@ export default async function PaymentsPage({
             <FootNote>
               <Link
                 href="/payouts"
-                className="inline-flex min-h-10 items-center font-semibold text-gold underline-offset-2 hover:underline lg:min-h-0"
+                className="inline-flex min-h-10 items-center font-semibold text-gold-read underline-offset-2 hover:underline lg:min-h-0"
               >
                 {t.sections.payments.payoutsLink}
               </Link>
@@ -221,7 +221,7 @@ const COLUMNS: readonly AdminColumn<FinanceItem>[] = [
     key: 'amount',
     header: t.admin.colAmount,
     render: (row) => (
-      <Ltr className="font-bold whitespace-nowrap text-gold">
+      <Ltr className="font-bold whitespace-nowrap text-gold-read">
         {money(row.amount)} {row.currency}
       </Ltr>
     ),
@@ -234,7 +234,7 @@ const COLUMNS: readonly AdminColumn<FinanceItem>[] = [
         <StatusPill tone={statusTone(row.status)}>
           {label(t.enums.paymentStatus, row.status)}
         </StatusPill>
-        <Ltr className="text-[10.5px] text-faint">{shortDateTime(row.at)}</Ltr>
+        <Ltr className="text-[13px] text-faint">{shortDateTime(row.at)}</Ltr>
       </div>
     ),
   },

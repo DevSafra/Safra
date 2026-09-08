@@ -94,33 +94,33 @@ export function PartnerSuspension({
           data-partner-suspended="true"
           className="rounded-lg border border-bad/40 bg-bad/10 p-3.5"
         >
-          <p className="text-[13px] font-extrabold text-bad">
+          <p className="text-[14px] font-extrabold text-bad">
             {t.sections.enforcement.suspendedTitle}
           </p>
 
           {/* What suspension actually does — all four clauses, on the screen where it is lifted. */}
-          <p className="mt-1.5 text-[11.5px] leading-relaxed text-text2">
+          <p className="mt-1.5 text-[13px] leading-relaxed text-text2">
             {t.sections.enforcement.suspendedEffect}
           </p>
 
           <dl className="mt-3 grid gap-2 sm:grid-cols-2">
             <div className="min-w-0 sm:col-span-2">
-              <dt className="text-[11px] text-faint">
+              <dt className="text-[13px] text-faint">
                 {t.sections.enforcement.suspendedReason}
               </dt>
               {/* Null only for a suspension predating the column — say so rather than blank. */}
-              <dd className="mt-0.5 text-[12.5px] text-text">
+              <dd className="mt-0.5 text-[14px] text-text">
                 {suspension.reason ?? t.admin.noData}
               </dd>
             </div>
 
             <div className="min-w-0">
-              <dt className="text-[11px] text-faint">
+              <dt className="text-[13px] text-faint">
                 {fill(t.sections.enforcement.suspendedSince, {
                   when: shortDateTime(suspension.since),
                 })}
               </dt>
-              <dd className="mt-0.5 text-[12.5px] text-text2">
+              <dd className="mt-0.5 text-[14px] text-text2">
                 {suspension.by
                   ? fill(t.sections.enforcement.suspendedBy, { who: suspension.by })
                   : t.admin.systemActor}
@@ -137,14 +137,14 @@ export function PartnerSuspension({
           */}
           {suspension.notes ? (
             <div className="mt-3 rounded border border-line bg-field p-2.5">
-              <p className="text-[11px] text-faint">
+              <p className="text-[14px] text-faint">
                 {t.sections.enforcement.suspendedNotes}
-                <span className="text-faint2">
+                <span className="text-faint">
                   {' · '}
                   {t.sections.enforcement.suspendedNotesHint}
                 </span>
               </p>
-              <p className="mt-0.5 text-[12px] text-text2">{suspension.notes}</p>
+              <p className="mt-0.5 text-[13px] text-text2">{suspension.notes}</p>
             </div>
           ) : null}
         </div>
@@ -183,7 +183,7 @@ export function PartnerSuspension({
         }}
       >
         <label className="grid gap-1">
-          <span className="text-[11px] text-faint">
+          <span className="text-[13px] text-faint">
             {suspension
               ? t.sections.enforcement.unsuspendReasonLabel
               : t.sections.enforcement.suspendReasonLabel}
@@ -199,9 +199,9 @@ export function PartnerSuspension({
             minLength={ENFORCEMENT_REASON_MIN}
             maxLength={2000}
             rows={2}
-            className="rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+            className="rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text"
           />
-          <span className="text-[10.5px] text-faint">
+          <span className="text-[13px] text-faint">
             {t.sections.enforcement.reasonHint}
           </span>
         </label>
@@ -209,14 +209,14 @@ export function PartnerSuspension({
         {/* Only when imposing: lifting a suspension has no private half worth keeping. */}
         {suspension ? null : (
           <label className="grid gap-1">
-            <span className="text-[11px] text-faint">
+            <span className="text-[13px] text-faint">
               {t.sections.enforcement.notesLabel}
             </span>
             <textarea
               name="notes"
               maxLength={2000}
               rows={2}
-              className="rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+              className="rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text"
             />
           </label>
         )}
@@ -224,7 +224,7 @@ export function PartnerSuspension({
         <button
           type="submit"
           disabled={busy}
-          className={`inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border px-4 py-2 text-[12.5px] font-bold disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 ${
+          className={`inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border px-4 py-2 text-[14px] font-bold disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 ${
             suspension
               ? 'border-ok/50 text-ok hover:bg-ok/10'
               : 'border-bad/50 text-bad hover:bg-bad/10'

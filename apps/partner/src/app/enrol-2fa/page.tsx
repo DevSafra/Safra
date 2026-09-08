@@ -23,9 +23,9 @@ export default async function EnrolPage() {
     <main className="mx-auto grid min-h-screen max-w-md place-content-center px-4 py-10">
       <div className="w-full">
         <h1 className="font-display text-2xl font-bold text-gold">{t.twoFactor.title}</h1>
-        <p className="mt-2 text-[13px] leading-relaxed text-muted">{t.twoFactor.why}</p>
+        <p className="mt-2 text-[14px] leading-relaxed text-muted">{t.twoFactor.why}</p>
         {/* `dir="ltr"`: an email is a Latin run on an Arabic line. */}
-        <p dir="ltr" className="mt-2 text-start text-[12px] text-faint">
+        <p dir="ltr" className="mt-2 text-start text-[13px] text-faint">
           {session?.user.email}
         </p>
 

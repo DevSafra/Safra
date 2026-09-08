@@ -73,11 +73,11 @@ export default async function DisputesPage({
     <ConsoleShell title={t.nav.disputes} counts={counts}>
       {result === 'unauthenticated' ? (
         <ConsolePanel>
-          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
         </ConsolePanel>
       ) : result === 'failed' ? (
         <ConsolePanel>
-          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
         </ConsolePanel>
       ) : (
         <div className="grid gap-4">
@@ -94,7 +94,7 @@ export default async function DisputesPage({
                 name="status"
                 defaultValue={status ?? ''}
                 aria-label={t.table.colStatus}
-                className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+                className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text"
               >
                 <option value="">{t.sections.bookings.allStatuses}</option>
                 {DISPUTE_STATUSES.map((value) => (
@@ -106,7 +106,7 @@ export default async function DisputesPage({
             </TableToolbar>
 
             {result.items.length === 0 ? (
-              <p className="text-[12.5px] text-faint">{t.table.empty}</p>
+              <p className="text-[14px] text-faint">{t.table.empty}</p>
             ) : (
               <div className="grid gap-3">
                 {result.items.map((dispute) => (
@@ -132,7 +132,7 @@ export default async function DisputesPage({
             <FootNote>
               <Link
                 href="/reviews"
-                className="inline-flex min-h-10 items-center font-semibold text-gold underline-offset-2 hover:underline lg:min-h-0"
+                className="inline-flex min-h-10 items-center font-semibold text-gold-read underline-offset-2 hover:underline lg:min-h-0"
               >
                 {t.sections.reviewModeration.title}
               </Link>
@@ -202,7 +202,7 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
           <div className="flex flex-wrap items-center gap-2.5">
             <Ltr className="font-bold text-sky">{dispute.reference}</Ltr>
             {/* The EC code, in the design's small square tag. */}
-            <span className="rounded bg-[rgba(var(--badA),0.14)] px-2 py-0.5 text-[10px] font-extrabold text-bad">
+            <span className="rounded bg-[rgba(var(--badA),0.14)] px-2 py-0.5 text-[13px] font-extrabold text-bad">
               {label(t.enums.disputeKind, dispute.kind)}
             </span>
             {dispute.freezesPayout ? (
@@ -222,10 +222,10 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
                 held payout reads as cold rather than as an alarm. Same shape as the sanctions pill
                 on الشركاء, which takes teal/orange for exactly this reason.
               */
-              <StatusPill tone="indigo">
-                {t.sections.disputes.frozen}
+              <>
+                <StatusPill tone="indigo">{t.sections.disputes.frozen}</StatusPill>
                 {/*
-                  ── with the FIGURE, since finding 209 ────────────────────────
+                  ── the FIGURE, since finding 209 — BESIDE the pill, not inside it ────────────
 
                   Bashar, 2026-09-08, about the partner's side of this: «If a partner has frozen
                   funds, I want the partner to be able to understand … how much money is frozen.»
@@ -233,21 +233,27 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
                   a COUNT and no figure anywhere, so an operator taking that partner's call could
                   not confirm the number they were reading.
 
+                  **It was inside the pill for a day, and that was wrong twice over.** A pill's text
+                  IS its status, so «المستحقات مجمّدة · $181.35» made one status read as a different
+                  status per amount: `navigation.spec.ts` reported three indigo pills as three
+                  statuses sharing a colour, and it only passed at first because the fixture had a
+                  single frozen dispute. It also stretched a chip whose width is supposed to be its
+                  word. An amount is a VALUE; it goes next to the label, not in it.
+
                   `amount()` and not `money()`: the booking's own currency, never the platform's
                   default. A JOD stay and a USD stay differ by a factor a reader cannot infer.
                 */}
                 {dispute.frozenAmount && dispute.frozenCurrency ? (
-                  <>
-                    {' · '}
-                    <Ltr>{amount(dispute.frozenAmount, dispute.frozenCurrency)}</Ltr>
-                  </>
+                  <Ltr className="text-[13px] font-bold text-indigo">
+                    {amount(dispute.frozenAmount, dispute.frozenCurrency)}
+                  </Ltr>
                 ) : null}
-              </StatusPill>
+              </>
             ) : null}
           </div>
 
           {/* The title is redacted on the way in, so it is rendered on the way out. */}
-          <p className="mt-1.5 text-[13px] font-semibold text-text">
+          <p className="mt-1.5 text-[14px] font-semibold text-text">
             {renderRedactions(dispute.title, 'ar')}
           </p>
 
@@ -270,14 +276,14 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
             <p
               /* Marked so the browser sweep can find the account and nothing else. */
               data-dispute-account={dispute.reference}
-              className="mt-1.5 text-[12px] leading-relaxed whitespace-pre-line text-text2"
+              className="mt-1.5 text-[13px] leading-relaxed whitespace-pre-line text-text2"
             >
               {renderRedactions(dispute.description, 'ar')}
             </p>
           ) : null}
 
           {/* Back from the booking returns to النزاعات, the list the reader is actually in. */}
-          <p className="mt-1 text-[11.5px] text-faint">
+          <p className="mt-1 text-[13px] text-faint">
             {dispute.bookingReference ? (
               <Link
                 href={`/bookings/${dispute.bookingReference}?from=disputes`}
@@ -329,16 +335,16 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
               data-partner-responses={dispute.reference}
               className="mt-2 rounded-card border border-line bg-field px-3 py-2"
             >
-              <p className="text-[10.5px] font-semibold text-faint">
+              <p className="text-[14px] font-semibold text-faint">
                 {t.sections.disputes.partnerResponses}
               </p>
               <ul className="mt-1 divide-y divide-line">
                 {dispute.partnerResponses.map((response) => (
                   <li key={response.at} className="py-1.5 first:pt-0 last:pb-0">
-                    <p className="text-[11.5px] leading-relaxed whitespace-pre-line text-text2">
+                    <p className="text-[13px] leading-relaxed whitespace-pre-line text-text2">
                       {renderRedactions(response.body, 'ar')}
                     </p>
-                    <Ltr className="mt-0.5 block text-[10px] text-faint2">
+                    <Ltr className="mt-0.5 block text-[13px] text-faint">
                       {shortDateTime(response.at)}
                     </Ltr>
                   </li>
@@ -349,17 +355,16 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
             <p
               data-partner-responses={dispute.reference}
               /*
-                `text-muted`, not `text-faint2`.
+                `text-muted`, not `text-faint`.
 
-                Measured on the built console: `faint2` renders this at 2.31:1 in the light theme
-                and 2.15:1 in the dark one, against a 4.5:1 floor — it is the DECORATIVE step, for
-                ornament and notes nobody has to read. This sentence says the host has not answered
-                yet and that the decision waits on them, which is the one thing an operator must
-                read before closing a case they are about to decide one-sidedly. `muted` measures
-                7.01:1 and is the step the palette's own note calls «carries most secondary
-                reading».
+                This sentence says the host has not answered yet and that the decision waits on
+                them — the one thing an operator must read before closing a case they are about to
+                decide one-sidedly. It was painted in the decorative tone, measured on the built
+                console at 2.31:1 light and 2.15:1 dark against a 4.5:1 floor; that tone has since
+                been deleted from the palette. `muted` measures 7.01:1 and is the step the
+                palette's own note calls «carries most secondary reading» — which is what this is.
               */
-              className="mt-2 text-[11.5px] leading-relaxed text-muted"
+              className="mt-2 text-[13px] leading-relaxed text-muted"
             >
               {t.sections.disputes.partnerResponsesNone}
             </p>
@@ -367,10 +372,10 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
 
           {/* The resolution, once closed. It is the whole point of requiring one. */}
           {dispute.resolution ? (
-            <p className="mt-2 rounded-card border border-line bg-field px-3 py-2 text-[11.5px] leading-relaxed text-text2">
+            <p className="mt-2 rounded-card border border-line bg-field px-3 py-2 text-[13px] leading-relaxed text-text2">
               {dispute.resolution}
               {dispute.compensationAmount && dispute.compensationCurrency ? (
-                <span className="ms-1.5 font-bold text-gold">
+                <span className="ms-1.5 font-bold text-gold-read">
                   <Ltr>
                     {amount(dispute.compensationAmount, dispute.compensationCurrency)}
                   </Ltr>
@@ -384,7 +389,7 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
           <StatusPill tone={statusTone(dispute.status)}>
             {label(t.enums.disputeStatus, dispute.status)}
           </StatusPill>
-          <Ltr className="text-[11px] text-faint">
+          <Ltr className="text-[13px] text-faint">
             {closed ? shortDateTime(dispute.closedAt) : `${count(dispute.ageHours)}h`}
           </Ltr>
         </div>

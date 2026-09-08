@@ -79,7 +79,7 @@ export default async function PayoutPage({
       <div className="grid gap-4">
         <Link
           href="/payouts"
-          className="inline-flex min-h-10 w-fit items-center gap-2 rounded-lg border border-line px-3 text-[12.5px] text-muted lg:min-h-0 lg:py-1.5"
+          className="inline-flex min-h-10 w-fit items-center gap-2 rounded-lg border border-line px-3 text-[14px] text-muted lg:min-h-0 lg:py-1.5"
         >
           {/* The arrow is its own flex item so `dir="rtl"` places it rather than the bidi algorithm. */}
           <span aria-hidden="true">→</span>
@@ -87,9 +87,9 @@ export default async function PayoutPage({
         </Link>
 
         <header className="flex flex-wrap items-center gap-3">
-          <Ltr className="text-[15px] font-bold text-sky">{payout.reference}</Ltr>
+          <Ltr className="text-[16px] font-bold text-sky">{payout.reference}</Ltr>
           <span
-            className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${TONES[statusTone(payout.status)]}`}
+            className={`rounded-full border px-2.5 py-0.5 text-[13px] font-bold ${TONES[statusTone(payout.status)]}`}
           >
             {payoutStatus(payout.status)}
           </span>
@@ -132,20 +132,20 @@ export default async function PayoutPage({
         </section>
 
         <section>
-          <h2 className="mb-2 text-[14px] font-extrabold text-gold">
+          <h2 className="mb-2 text-[16px] font-extrabold text-gold-read">
             {/* No count on a failed load: «(٠)» is the same false claim as «no bookings». */}
             {t.payouts.coveredBookings}
             {coveredFailed ? '' : ` (${count(covered.length)})`}
           </h2>
 
           {coveredFailed ? (
-            <p className="text-[12.5px] text-warn">
+            <p className="text-[14px] text-warn">
               {bookings === 'unauthenticated'
                 ? t.dashboard.sessionExpired
                 : t.dashboard.loadFailed}
             </p>
           ) : covered.length === 0 ? (
-            <p className="text-[12.5px] text-faint">{t.payouts.noBookings}</p>
+            <p className="text-[14px] text-faint">{t.payouts.noBookings}</p>
           ) : (
             <ul className="grid gap-2">
               {/*
@@ -160,15 +160,15 @@ export default async function PayoutPage({
                   key={booking.bookingReference}
                   className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-card border border-line bg-card px-3.5 py-3"
                 >
-                  <Ltr className="text-[12.5px] font-semibold text-sky">
+                  <Ltr className="text-[14px] font-semibold text-sky">
                     {booking.bookingReference}
                   </Ltr>
-                  <span className="text-[12px] text-muted">{booking.property ?? ''}</span>
-                  <Ltr className="text-[11.5px] text-faint">
+                  <span className="text-[13px] text-muted">{booking.property ?? ''}</span>
+                  <Ltr className="text-[13px] text-faint">
                     {booking.checkIn} ← {booking.checkOut}
                   </Ltr>
                   <span className="ms-auto grid justify-items-end gap-0.5">
-                    <Ltr className="text-[13px] font-bold text-gold">
+                    <Ltr className="text-[14px] font-bold text-gold-read">
                       {amount(booking.amount, payout.currencyCode)}
                     </Ltr>
                     {/*
@@ -188,7 +188,7 @@ export default async function PayoutPage({
                       the far side of the amount and it reads as a dash between two words.
                     */}
                     {Number(booking.refunded) > 0 ? (
-                      <span className="text-[11px] text-muted">
+                      <span className="text-[13px] text-muted">
                         <Ltr>−{amount(booking.refunded, payout.currencyCode)}</Ltr>{' '}
                         {t.payouts.refundedToGuest}
                       </span>
@@ -206,12 +206,12 @@ export default async function PayoutPage({
           proportion — is not something a partner can infer from a smaller number.
         */}
         {covered.some((one) => Number(one.refunded) > 0) ? (
-          <p className="rounded-lg border border-line bg-field px-3 py-2 text-[11.5px] leading-relaxed text-muted">
+          <p className="rounded-lg border border-line bg-field px-3 py-2 text-[13px] leading-relaxed text-muted">
             {t.payouts.refundedNote}
           </p>
         ) : null}
 
-        <p className="rounded-lg border border-dashed border-line px-3 py-2 text-[11.5px] leading-relaxed text-faint">
+        <p className="rounded-lg border border-dashed border-line px-3 py-2 text-[13px] leading-relaxed text-faint">
           {t.payouts.readOnly}
         </p>
       </div>
@@ -232,9 +232,9 @@ function Row({
 }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-card border border-line bg-card px-3.5 py-2.5">
-      <span className="text-[11.5px] text-faint">{label}</span>
+      <span className="text-[13px] text-faint">{label}</span>
       <span
-        className={`text-[13px] ${strong ? 'font-extrabold text-gold' : 'text-text'}`}
+        className={`text-[14px] ${strong ? 'font-extrabold text-gold-read' : 'text-text'}`}
       >
         {ltr ? <Ltr>{value}</Ltr> : value}
       </span>

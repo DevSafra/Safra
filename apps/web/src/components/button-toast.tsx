@@ -104,7 +104,7 @@ export function ButtonToast({ message }: { readonly message: ToastMessage | null
         transform at all, and mirrors itself between Arabic and German for free.
       */
       className={`pointer-events-none absolute bottom-full start-0 z-10 mb-2 max-w-[min(20rem,78vw)] rounded-lg px-3 py-1.5 text-xs font-semibold shadow-[0_6px_16px_-6px_rgba(15,18,32,0.45)] transition-[opacity,transform,translate] duration-200 ease-out-strong motion-reduce:transition-none ${
-        held.tone === 'bad' ? 'bg-bad text-white' : 'bg-text text-bg'
+        held.tone === 'bad' ? 'bg-bad text-bg' : 'bg-text text-bg'
       } ${shown ? 'translate-y-0 opacity-100' : 'translate-y-1.5 opacity-0'}`}
     >
       {held.text}

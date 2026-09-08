@@ -24,6 +24,41 @@
  */
 @theme {
   /*
+   * ── The type scale, and why its floor is 13px ────────────────────────────────────────────────
+   *
+   * Bashar, 2026-09-08: _«Many small text elements across the platform feel difficult to read
+   * because they are simply too small, even when the colour contrast is technically acceptable. …
+   * Even if a text element passes contrast requirements, I do not want important operational
+   * information hidden behind very small typography.»_
+   *
+   * He was right, and it was not a handful of labels. Measured by reading every rendered text node
+   * on 14 console screens, 8 portal screens and 7 customer pages: **60% of the console's 3,097
+   * words were at or below 12px**, the modal size was 12.5px, and only 3% reached 14px. The portal
+   * was 51% at or below 12px.
+   *
+   * ## Two problems, not one
+   *
+   * The first is SIZE, and Arabic is why it bites harder than the numbers suggest: the script
+   * carries meaning in strokes and dots that are a fraction of the letterform, so 11px Arabic is
+   * not 11px Latin with different shapes — it is a smaller effective size at the same nominal one.
+   *
+   * The second is that there were **thirteen distinct sizes below 15px** — 9, 9.5, 10, 10.5, 11,
+   * 11.5, 12, 12.5, 13, 13.5, 14, 14.5, 15 — seven of them inside three pixels. That is not a
+   * scale, it is noise: a reader cannot learn a hierarchy from a half-pixel step, so none of those
+   * differences was doing any work. Collapsing them into four steps is what MAKES the lift
+   * affordable, because most of the growth comes out of sizes that were distinctions in name only.
+   *
+   *   12px  micro · 13px metadata · 14px body and operational values · 16px panel headings
+   *
+   * The console's `globals.css` carries the full reasoning; this is the same scale, because a
+   * partner and an operator read the same booking and must not be given two different type sizes
+   * for it.
+   */
+  --text-xs: 13px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 18px;
+  /*
     ONE font for the whole platform: the browser's own (Bashar, 2026-09-08).
 
     *«Please use this default font on the entire system»*, with this exact stack. So the two
@@ -77,6 +112,26 @@
   );
 
   --color-bg: #0c0a1c;
+  /*
+   * The ink that goes ON a gold surface, and it does NOT change with the theme.
+   *
+   * `--color-gold` inverts between themes — #e8bc66 against night, #a87a1f against white — so a
+   * label that also inverts follows it the wrong way round. `bg-gold text-bg` measures **10.98:1**
+   * in the dark theme and **3.56:1** in the light one, and thirty-six buttons said exactly that:
+   * the primary action of all three applications, «تسجيل الوصول» on the partner's arrivals,
+   * «إنشاء الدور», «إرسال الدعوة», every «تأكيد».
+   *
+   * A FIXED dark ink reads on both, because both golds are mid-tone: **10.98:1** on the night gold
+   * and **5.08:1** on the day gold. So this is declared once, in the theme block, and is
+   * deliberately absent from the light block below — that absence is the mechanism, not an
+   * oversight, and the light block says so where the rest of the pairs are listed.
+   *
+   * It fixes the button WITHOUT touching the brand. Bashar, 2026-09-03: «why you changed the
+   * button colour and price colour? please undo that». The gold is unchanged here; only the label
+   * on top of it moved, which is the half of the contrast problem the palette can solve on its own.
+   * Gold TEXT on a page — panel headings, prices — is the other half and is finding 229.
+   */
+  --color-ink: #0c0a1c;
   --color-bg2: #12102b;
   --color-footer: #0a0817;
   --hero-title-grad: linear-gradient(120deg, #f6e3b0, #e8bc66 45%, #c4923e);
@@ -86,9 +141,46 @@
   --color-line: #2a2450;
   --color-text: #f4eedf;
   --color-muted: #a9a3c4;
+  /*
+   * The HANDOFF's own grey, kept for the one line that was asked for verbatim.
+   *
+   * Bashar, 2026-09-03: «should be exactly same as the html file» — about the hero subtitle, whose
+   * #5C6377 and 1.8 line-height are sampled from the prototype rather than inferred. That is §9.2's
+   * `--muted`; this product's is DARKER (#454B5A) because he asked twice for the greys to be
+   * readable at caption sizes, and the deviation is deliberately confined to small text.
+   *
+   * It was a LITERAL, `text-[#5c6377]`, and a literal has no theme. On the light page it measures
+   * 5.55:1 and honouring the file costs nothing, which is what its note said. **On the dark page it
+   * measures 3.26:1** — the first sentence a visitor reads, under the floor, and nothing caught it
+   * because the dark half of the contrast sweep had never actually run (it set `data-theme` from an
+   * init script, which `ThemeKeeper` then deleted).
+   *
+   * So it is a token with two values instead of one hard-coded colour. The prototype is a LIGHT
+   * document and says nothing about a dark page, so the light value is the file's to the byte and
+   * the dark value is this product's own muted, at 8.11:1. Nothing he asked for changed.
+   */
+  --color-handoff-muted: #a9a3c4;
   --color-faint: #908da8;
   --color-gold: #e8bc66;
-  --color-faint2: #4e4a6e;
+  /*
+   * Gold that can be READ, as opposed to gold the brand is made of. Bashar's decision on 229.
+   *
+   * 2026-09-08: _«Please keep the existing SAFRA gold branding colour unchanged. I do not want the
+   * primary brand colour changed globally. However, I agree with introducing a secondary
+   * accessibility-safe gold variant for small text elements where the current gold does not meet
+   * readability requirements.»_ Brand gold for decoration, large headings, branding and highlights;
+   * this one for small text, prices, labels, chips and metadata.
+   *
+   * **In the DARK theme it is the brand gold, unchanged.** #e8bc66 measures 10.98:1 on the page and
+   * clears the body floor on every dark surface, so there is nothing to fix here and nothing to
+   * look different. The token exists in both themes so that a caller can write one class and be
+   * right in both, rather than reaching for the light-theme value and dulling the night palette.
+   *
+   * The split is WCAG's own: 4.5:1 under 18.66px bold, 3:1 at or above it. The brand gold clears
+   * the large-text floor everywhere it lands (3.09:1 at its worst) — so a display heading in brand
+   * gold is correct, and the same colour on a 12.5px price is not.
+   */
+  --color-gold-read: #e8bc66;
   --color-text2: #c9c3e0;
   --color-sky: #78aee0;
   --color-ok: #6fc792;
@@ -100,7 +192,9 @@
     raw RGB TRIPLET so the handoff's tint ladder composes as `rgba(var(--goldA), .22)`. The staff apps
     already carry both; the customer app did not, because nothing here needed a translucent gold fill
     before the account dashboard. Every one has a counterpart in both light blocks below — including
-    the triplet, which is the half that is easy to forget.
+    the triplet, which is the half that is easy to forget. The ONE deliberate exception is
+    `--color-ink`: it is the ink that goes on gold and it must not follow the theme, so it is
+    declared once above and nowhere else. Its own note says why.
   */
   --color-band: #1b1440;
   --color-hero: #241b52;
@@ -192,9 +286,26 @@
    * decisions are not in tension: gold is the brand, grey is for reading.
    */
   --color-muted: #454b5a;
+  /* The prototype's own value, to the byte. See the note above. */
+  --color-handoff-muted: #5c6377;
   --color-faint: #5e6372;
   --color-gold: #a87a1f;
-  --color-faint2: #a5aabc;
+  /*
+   * The readable gold, derived from the brand rather than picked beside it.
+   *
+   * #805d18 is #a87a1f with the SAME hue (39.9deg) and the SAME saturation (0.688), darkened until
+   * the palest surface a gold word lands on clears the body floor. That is why it still reads as
+   * SAFRA's gold and not as brown: nothing about the colour moved except its lightness.
+   *
+   *   on #ffffff  6.01:1     on #eceef5  5.14:1
+   *   on #f5f6fa  5.66:1     on #eaedf4  5.08:1
+   *   on #f1f3f8  5.41:1     on #e2e6f5  4.82:1   <- the hero band, the worst ground
+   *
+   * The brand gold, for comparison, measures 3.84:1 on white and 3.09:1 on that band — under the
+   * 4.5 body floor everywhere, and over the 3.0 large-text floor everywhere. Both statements are
+   * why there are two tokens rather than one compromise.
+   */
+  --color-gold-read: #805d18;
   --color-text2: #3a415a;
   /*
    * Gold that can be READ at body size, as opposed to gold the brand is made of.

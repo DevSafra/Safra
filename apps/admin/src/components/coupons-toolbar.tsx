@@ -124,12 +124,12 @@ export function CouponsToolbar({
     }
   }
 
-  const field = 'rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-text';
-  const labelled = 'grid gap-1.5 text-[11.5px] font-semibold text-muted';
+  const field = 'rounded-lg border border-line bg-card px-3 py-2 text-[14px] text-text';
+  const labelled = 'grid gap-1.5 text-[13px] font-semibold text-muted';
 
   const panel = !open ? null : (
     <div className="grid w-full gap-3 rounded-card border border-line bg-field p-3.5">
-      <h3 className="text-[13px] font-bold text-text">{c.newTitle}</h3>
+      <h3 className="text-[14px] font-bold text-text">{c.newTitle}</h3>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <label className={labelled}>
@@ -272,14 +272,14 @@ export function CouponsToolbar({
         </label>
       </div>
 
-      {error ? <p className="text-[11.5px] font-semibold text-bad">{error}</p> : null}
+      {error ? <p className="text-[13px] font-semibold text-bad">{error}</p> : null}
 
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
           disabled={!ready}
           onClick={() => void submit()}
-          className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+          className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold-read transition-colors hover:bg-[rgba(var(--goldA),0.08)] disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
         >
           {busy ? t.table.working : c.submit}
         </button>
@@ -308,7 +308,7 @@ export function CouponsToolbar({
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4 py-1.5 text-[12.5px] font-extrabold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4 py-1.5 text-[14px] font-extrabold text-gold-read transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
           >
             {c.create}
           </button>

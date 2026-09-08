@@ -182,13 +182,13 @@ export function PartnerApplicationForm({
         className="rounded-card border border-[rgba(var(--goldA),0.25)] bg-card p-6"
       >
         <h2 className="text-xl font-bold text-gold">{t('successTitle')}</h2>
-        <p className="mt-2 text-[14px] leading-relaxed text-text">
+        <p className="mt-2 text-[16px] leading-relaxed text-text">
           {t('successBody', { reference })}
         </p>
-        <p className="mt-2 text-[13px] leading-relaxed text-muted">{t('successKeep')}</p>
+        <p className="mt-2 text-[14px] leading-relaxed text-muted">{t('successKeep')}</p>
         <Link
           href={`/${locale}`}
-          className="mt-4 inline-flex min-h-10 items-center rounded-lg border border-line px-4 text-[13px] text-muted lg:min-h-0 lg:py-2"
+          className="mt-4 inline-flex min-h-10 items-center rounded-lg border border-line px-4 text-[14px] text-muted lg:min-h-0 lg:py-2"
         >
           {t('backHome')}
         </Link>
@@ -199,7 +199,7 @@ export function PartnerApplicationForm({
   return (
     <form onSubmit={(event) => void submit(event)} noValidate className="grid gap-5">
       <fieldset className="grid gap-4">
-        <legend className="mb-2 text-[15px] font-bold text-gold">
+        <legend className="mb-2 text-[16px] font-bold text-gold-read">
           {t('sectionContact')}
         </legend>
 
@@ -215,11 +215,11 @@ export function PartnerApplicationForm({
           person's mailbox, which is the whole class of problem requiring a session removed.
         */}
         <div className="grid gap-1.5">
-          <span className="text-[13px] font-semibold text-text">{t('email')}</span>
-          <p className="min-h-11 rounded-card border border-line bg-card px-3.5 py-3 text-[14px] text-muted">
+          <span className="text-[14px] font-semibold text-text">{t('email')}</span>
+          <p className="min-h-11 rounded-card border border-line bg-card px-3.5 py-3 text-[16px] text-muted">
             {email}
           </p>
-          <span className="text-[12px] text-faint">{t('emailHint')}</span>
+          <span className="text-[13px] text-faint">{t('emailHint')}</span>
         </div>
 
         <PhoneField
@@ -249,7 +249,7 @@ export function PartnerApplicationForm({
       </fieldset>
 
       <fieldset className="grid gap-4">
-        <legend className="mb-2 text-[15px] font-bold text-gold">
+        <legend className="mb-2 text-[16px] font-bold text-gold-read">
           {t('sectionBusiness')}
         </legend>
 
@@ -292,28 +292,28 @@ export function PartnerApplicationForm({
         <Field name="website" label={t('website')} error={errors['website']} />
 
         <label className="grid gap-1.5">
-          <span className="text-[13px] font-semibold text-text">{t('message')}</span>
+          <span className="text-[14px] font-semibold text-text">{t('message')}</span>
           <textarea
             name="message"
             rows={4}
             maxLength={2000}
-            className="rounded-card border border-line bg-field px-3.5 py-2.5 text-[14px] text-text"
+            className="rounded-card border border-line bg-field px-3.5 py-2.5 text-[16px] text-text"
           />
         </label>
       </fieldset>
 
       {failure ? (
-        <p role="alert" className="text-[13px] text-bad">
+        <p role="alert" className="text-[14px] text-bad">
           {failure}
         </p>
       ) : null}
 
-      <p className="text-[12px] leading-relaxed text-faint">{t('privacy')}</p>
+      <p className="text-[13px] leading-relaxed text-faint">{t('privacy')}</p>
 
       <button
         type="submit"
         disabled={busy}
-        className="min-h-11 w-fit cursor-pointer rounded-card bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-6 text-[14px] font-extrabold text-[#241A05] disabled:cursor-not-allowed disabled:opacity-50"
+        className="min-h-11 w-fit cursor-pointer rounded-card bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-6 text-[16px] font-extrabold text-[#241A05] disabled:cursor-not-allowed disabled:opacity-50"
       >
         {busy ? t('submitting') : t('submit')}
       </button>
@@ -347,9 +347,9 @@ function Field({
 
   return (
     <label className="grid gap-1.5">
-      <span className="text-[13px] font-semibold text-text">{label}</span>
+      <span className="text-[14px] font-semibold text-text">{label}</span>
       {hint ? (
-        <span id={describedBy} className="text-[12px] text-faint">
+        <span id={describedBy} className="text-[13px] text-faint">
           {hint}
         </span>
       ) : null}
@@ -359,10 +359,10 @@ function Field({
         {...(autoComplete ? { autoComplete } : {})}
         {...(describedBy ? { 'aria-describedby': describedBy } : {})}
         aria-invalid={error ? true : undefined}
-        className="min-h-11 rounded-card border border-line bg-field px-3.5 text-[14px] text-text"
+        className="min-h-11 rounded-card border border-line bg-field px-3.5 text-[16px] text-text"
       />
       {error ? (
-        <span role="alert" className="text-[12px] text-bad">
+        <span role="alert" className="text-[13px] text-bad">
           {error}
         </span>
       ) : null}
@@ -387,12 +387,12 @@ function Select({
 }) {
   return (
     <label className="grid gap-1.5">
-      <span className="text-[13px] font-semibold text-text">{label}</span>
+      <span className="text-[14px] font-semibold text-text">{label}</span>
       <select
         name={name}
         defaultValue={defaultValue ?? ''}
         aria-invalid={error ? true : undefined}
-        className="min-h-11 cursor-pointer rounded-card border border-line bg-field px-3.5 text-[14px] text-text"
+        className="min-h-11 cursor-pointer rounded-card border border-line bg-field px-3.5 text-[16px] text-text"
       >
         {placeholder ? <option value="">{placeholder}</option> : null}
         {options.map((option) => (
@@ -402,7 +402,7 @@ function Select({
         ))}
       </select>
       {error ? (
-        <span role="alert" className="text-[12px] text-bad">
+        <span role="alert" className="text-[13px] text-bad">
           {error}
         </span>
       ) : null}

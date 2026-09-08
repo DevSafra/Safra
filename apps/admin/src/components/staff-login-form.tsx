@@ -255,7 +255,7 @@ export function StaffLoginForm({ next }: { next: string }) {
           <button
             type="submit"
             disabled={submitting}
-            className="mt-2 cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2 cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting ? t.login.submittingCode : t.login.submitCode}
           </button>
@@ -264,7 +264,7 @@ export function StaffLoginForm({ next }: { next: string }) {
           <button
             type="button"
             onClick={startOver}
-            className="cursor-pointer text-sm text-muted underline-offset-4 hover:text-gold hover:underline"
+            className="cursor-pointer text-sm text-muted underline-offset-4 hover:text-gold-read hover:underline"
           >
             {t.login.useDifferentAccount}
           </button>
@@ -300,7 +300,7 @@ export function StaffLoginForm({ next }: { next: string }) {
           <button
             type="submit"
             disabled={submitting}
-            className="mt-2 cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2 cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting ? t.login.submittingCredentials : t.login.submitCredentials}
           </button>

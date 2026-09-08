@@ -206,7 +206,7 @@ export function PartnerContractPanel({
       data-contract-status={current?.status ?? 'none'}
       className="rounded-lg border border-line bg-card p-4"
     >
-      <p className="text-[12.5px] leading-relaxed text-muted">
+      <p className="text-[14px] leading-relaxed text-muted">
         {current ? state : t.sections.partnerContract.intro}
       </p>
 
@@ -234,7 +234,7 @@ export function PartnerContractPanel({
           onClick={() =>
             void post('/api/contracts/generate', { partnerReference, kind: 'base' })
           }
-          className="cursor-pointer rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-60"
+          className="cursor-pointer rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy
             ? t.sections.partnerContract.generating
@@ -246,7 +246,7 @@ export function PartnerContractPanel({
         {current ? (
           <a
             href={`/api/contracts/${current.id}/file/original`}
-            className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-xs text-muted hover:border-gold/50 hover:text-gold lg:min-h-0 lg:py-1.5"
+            className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-xs text-muted hover:border-gold/50 hover:text-gold-read lg:min-h-0 lg:py-1.5"
           >
             {t.sections.partnerContract.download}
           </a>
@@ -256,7 +256,7 @@ export function PartnerContractPanel({
         {current && current.status !== 'draft' ? (
           <a
             href={`/api/contracts/${current.id}/file/safra`}
-            className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-xs text-muted hover:border-gold/50 hover:text-gold lg:min-h-0 lg:py-1.5"
+            className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-xs text-muted hover:border-gold/50 hover:text-gold-read lg:min-h-0 lg:py-1.5"
           >
             {t.sections.partnerContract.downloadSafra}
           </a>
@@ -265,7 +265,7 @@ export function PartnerContractPanel({
         {current?.status === 'active' ? (
           <a
             href={`/api/contracts/${current.id}/file/partner`}
-            className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-xs text-muted hover:border-gold/50 hover:text-gold lg:min-h-0 lg:py-1.5"
+            className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-xs text-muted hover:border-gold/50 hover:text-gold-read lg:min-h-0 lg:py-1.5"
           >
             {t.sections.partnerContract.downloadPartner}
           </a>
@@ -283,7 +283,7 @@ export function PartnerContractPanel({
             type="button"
             disabled={busy}
             onClick={() => void post(`/api/contracts/${current.id}/reopen`, {})}
-            className="cursor-pointer rounded-lg border border-gold/50 px-3 py-1.5 text-xs text-gold hover:bg-gold hover:text-bg disabled:cursor-not-allowed disabled:opacity-60"
+            className="cursor-pointer rounded-lg border border-gold/50 px-3 py-1.5 text-xs text-gold-read hover:bg-gold hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy
               ? t.sections.partnerContract.reopening
@@ -294,7 +294,7 @@ export function PartnerContractPanel({
 
       {/* What the button will do, said before it is pressed rather than after. */}
       {current?.status === 'active' ? (
-        <p className="mt-2 text-[11px] leading-relaxed text-faint2">
+        <p className="mt-2 text-[14px] leading-relaxed text-faint">
           {t.sections.partnerContract.reopenHint}
         </p>
       ) : null}
@@ -316,7 +316,7 @@ export function PartnerContractPanel({
           className="mt-3 grid gap-2 rounded-lg border border-line2 bg-field p-3"
         >
           <label className="grid gap-1">
-            <span className="text-[11px] text-faint2">
+            <span className="text-[13px] text-faint">
               {t.sections.partnerContract.file}
             </span>
             <input
@@ -345,7 +345,7 @@ export function PartnerContractPanel({
             <button
               type="submit"
               disabled={busy || !file}
-              className="w-fit cursor-pointer rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-fit cursor-pointer rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60"
             >
               {busy
                 ? t.sections.partnerContract.uploading
@@ -372,7 +372,7 @@ export function PartnerContractPanel({
           </div>
 
           {joint ? (
-            <p className="text-[11px] leading-relaxed text-faint2">
+            <p className="text-[14px] leading-relaxed text-faint">
               {t.sections.partnerContract.uploadJointHint}
             </p>
           ) : null}
@@ -386,13 +386,13 @@ export function PartnerContractPanel({
             button the operator pressed.
           */}
           {current.status === 'active' ? (
-            <p className="text-[11px] leading-relaxed text-gold">
+            <p className="text-[14px] leading-relaxed text-gold-read">
               {t.sections.partnerContract.replaceWarning}
             </p>
           ) : null}
 
           {joint && current.status !== 'draft' ? (
-            <p className="text-[11px] leading-relaxed text-gold">
+            <p className="text-[14px] leading-relaxed text-gold-read">
               {t.sections.partnerContract.uploadJointReplaceWarning}
             </p>
           ) : null}
@@ -435,7 +435,7 @@ function ContractHistory({ contract }: { readonly contract: ContractItem }) {
 
   return (
     <div className="mt-3 grid gap-1.5 rounded-lg border border-line2 bg-field px-3 py-2.5">
-      <p className="text-[11px] font-bold text-muted">
+      <p className="text-[14px] font-bold text-muted">
         {t.sections.partnerContract.historyTitle}
       </p>
 
@@ -444,14 +444,14 @@ function ContractHistory({ contract }: { readonly contract: ContractItem }) {
           <li
             /* Index: these carry no id, and the list is server-ordered and static. */
             key={index}
-            className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]"
+            className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[14px]"
           >
-            <span className={event.superseded ? 'text-faint2' : 'text-text2'}>
+            <span className={event.superseded ? 'text-faint' : 'text-text2'}>
               {event.party === 'partner'
                 ? t.sections.partnerContract.historyPartner
                 : t.sections.partnerContract.historySafra}
             </span>
-            <span className="text-faint2">{event.at}</span>
+            <span className="text-faint">{event.at}</span>
             {/*
               `Chip`, not `StatusPill`: these are states of a ROW in this list, not statuses of a
               record, and `StatusPill` would enrol them in the console's status colour sweep.

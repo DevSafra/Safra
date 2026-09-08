@@ -145,7 +145,7 @@ export default async function BookingDetailPage({
           {(booking.rooms ?? 1) > 1 ? (
             <>
               {' · '}
-              <span className="font-semibold text-gold">
+              <span className="font-semibold text-gold-read">
                 {t('roomsCount', { count: booking.rooms ?? 1 })}
               </span>
             </>
@@ -285,7 +285,7 @@ export default async function BookingDetailPage({
                       before any customer-facing screen read one.
                     */}
                     {refund.percent !== null ? (
-                      <span className="text-xs text-faint2">
+                      <span className="text-xs text-faint">
                         {t('refundPolicy', { percent: refund.percent })}
                       </span>
                     ) : null}
@@ -358,7 +358,7 @@ export default async function BookingDetailPage({
               >
                 <span
                   aria-hidden
-                  className="grid size-7 shrink-0 place-items-center rounded-full border border-gold/40 text-sm text-gold"
+                  className="grid size-7 shrink-0 place-items-center rounded-full border border-gold/40 text-sm text-gold-read"
                 >
                   {index + 1}
                 </span>
@@ -405,7 +405,7 @@ export default async function BookingDetailPage({
             href={`/${locale}/api/bookings/${encodeURIComponent(booking.reference)}/voucher`}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex min-h-10 items-center text-sm font-bold text-gold hover:underline lg:min-h-0"
+            className="inline-flex min-h-10 items-center text-sm font-bold text-gold-read hover:underline lg:min-h-0"
           >
             {t('voucherOpen')}
           </a>

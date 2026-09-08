@@ -32,12 +32,71 @@
  * it rather than inventing intermediate values.
  *
  * The light theme (§9.2) is below, and every token here has a counterpart there — including the
- * `*A` triples, which is the half that is easy to forget. Bashar asked for the toggle on
+ * `*A` triples, which is the half that is easy to forget. The ONE deliberate exception is
+ * `--color-ink`: it is the ink that goes on gold and it must not follow the theme, so it is
+ * declared here and nowhere else. Its own note says why. Bashar asked for the toggle on
  * 2026-08-04; before that the console was dark-only and the gap report recorded it as a
  * deliberate omission.
  */
 @theme {
+  /*
+   * ── The type scale, and why its floor is 13px ────────────────────────────────────────────────
+   *
+   * Bashar, 2026-09-08: _«Many small text elements across the platform feel difficult to read
+   * because they are simply too small, even when the colour contrast is technically acceptable. …
+   * Even if a text element passes contrast requirements, I do not want important operational
+   * information hidden behind very small typography.»_
+   *
+   * He was right, and it was not a handful of labels. Measured by reading every rendered text node
+   * on 14 console screens, 8 portal screens and 7 customer pages: **60% of the console's 3,097
+   * words were at or below 12px**, the modal size was 12.5px, and only 3% reached 14px. The portal
+   * was 51% at or below 12px.
+   *
+   * ## Two problems, not one
+   *
+   * The first is SIZE, and Arabic is why it bites harder than the numbers suggest: the script
+   * carries meaning in strokes and dots that are a fraction of the letterform, so 11px Arabic is
+   * not 11px Latin with different shapes — it is a smaller effective size at the same nominal one.
+   *
+   * The second is that there were **thirteen distinct sizes below 15px** — 9, 9.5, 10, 10.5, 11,
+   * 11.5, 12, 12.5, 13, 13.5, 14, 14.5, 15 — seven of them inside three pixels. That is not a
+   * scale, it is noise: a reader cannot learn a hierarchy from a half-pixel step, so none of those
+   * differences was doing any work. Collapsing them into four steps is what MAKES the lift
+   * affordable, because most of the growth comes out of sizes that were distinctions in name only.
+   *
+   *   12px  micro — a pill, a column header, a timestamp. The floor; nothing goes below it.
+   *   13px  metadata and secondary lines (`text-xs`, redefined from Tailwind's 12)
+   *   14px  BODY, and every operational value: prices, statuses, booking and dispute detail
+   *   16px  panel headings (`text-base`)
+   *
+   * `--text-xs` is the only default overridden: at Tailwind's 12px it was the same size as the
+   * micro step, so 225 uses of it could not be told apart from a pill's caption.
+   */
+  --text-xs: 13px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 18px;
   --color-bg: #0c0a1c;
+  /*
+   * The ink that goes ON a gold surface, and it does NOT change with the theme.
+   *
+   * `--color-gold` inverts between themes — #e8bc66 against night, #a87a1f against white — so a
+   * label that also inverts follows it the wrong way round. `bg-gold text-bg` measures **10.98:1**
+   * in the dark theme and **3.56:1** in the light one, and thirty-six buttons said exactly that:
+   * the primary action of all three applications, «تسجيل الوصول» on the partner's arrivals,
+   * «إنشاء الدور», «إرسال الدعوة», every «تأكيد».
+   *
+   * A FIXED dark ink reads on both, because both golds are mid-tone: **10.98:1** on the night gold
+   * and **5.08:1** on the day gold. So this is declared once, in the theme block, and is
+   * deliberately absent from the light block below — that absence is the mechanism, not an
+   * oversight, and the light block says so where the rest of the pairs are listed.
+   *
+   * It fixes the button WITHOUT touching the brand. Bashar, 2026-09-03: «why you changed the
+   * button colour and price colour? please undo that». The gold is unchanged here; only the label
+   * on top of it moved, which is the half of the contrast problem the palette can solve on its own.
+   * Gold TEXT on a page — panel headings, prices — is the other half and is finding 229.
+   */
+  --color-ink: #0c0a1c;
   /** One step up from `bg`, for a raised surface that is not a card. */
   --color-bg2: #12102b;
   --color-card: #17142f;
@@ -50,9 +109,33 @@
   --color-text2: #c9c3e0;
   --color-muted: #a9a3c4;
   --color-faint: #908da8;
-  /** Dimmest legible tier — a denied cell in the permission matrix, an unbuilt nav item. */
-  --color-faint2: #4e4a6e;
+  /*
+   * `faint` is the QUIETEST tone, and there is nothing below it. The note in the light block below
+   * says what used to be here and why it is gone — briefly: a dimmer tier existed, it was never a
+   * reading tone, and it had spread to 85 places carrying real sentences.
+   *
+   * If a note needs to be quieter than `faint`, the answer is not a new token — it is fewer words.
+   */
   --color-gold: #e8bc66;
+  /*
+   * Gold that can be READ, as opposed to gold the brand is made of. Bashar's decision on 229.
+   *
+   * 2026-09-08: _«Please keep the existing SAFRA gold branding colour unchanged. I do not want the
+   * primary brand colour changed globally. However, I agree with introducing a secondary
+   * accessibility-safe gold variant for small text elements where the current gold does not meet
+   * readability requirements.»_ Brand gold for decoration, large headings, branding and highlights;
+   * this one for small text, prices, labels, chips and metadata.
+   *
+   * **In the DARK theme it is the brand gold, unchanged.** #e8bc66 measures 10.98:1 on the page and
+   * clears the body floor on every dark surface, so there is nothing to fix here and nothing to
+   * look different. The token exists in both themes so that a caller can write one class and be
+   * right in both, rather than reaching for the light-theme value and dulling the night palette.
+   *
+   * The split is WCAG's own: 4.5:1 under 18.66px bold, 3:1 at or above it. The brand gold clears
+   * the large-text floor everywhere it lands (3.09:1 at its worst) — so a display heading in brand
+   * gold is correct, and the same colour on a 12.5px price is not.
+   */
+  --color-gold-read: #e8bc66;
 
   /*
    * The surface radius, so `packages/ui` can name it.
@@ -202,29 +285,64 @@
    *   --muted  #454b5a    7.01:1   AAA, carries most secondary reading
    *   --faint  #5e6372    4.82:1   AA, the quietest step
    *
+   * **There is no fourth step.** `--color-faint2` (#a5aabc light, #4e4a6e dark) used to sit under
+   * `faint` and it was never a reading tone — it measured **2.31:1 light and 2.15:1 dark**, half
+   * the floor. It had spread to 83 places carrying real sentences, because a colour named like the
+   * others reads like one of the others. All **85** moved up to `faint` on 2026-09-08 — 61 in the
+   * console, 22 in the portal, 2 on the customer site — and the token was DELETED, so the trap
+   * cannot be walked into again. A genuinely decorative mark uses `faint`, which is still three
+   * steps quieter than `text`.
+   *
    * **This is the only place the palette departs from §9.2, and it departs in one direction.** The
    * golds are the design's exactly — he reverted an earlier attempt to darken those, and the two
    * decisions are not in tension: gold is the brand, grey is for reading.
    */
   --color-muted: #454b5a;
   --color-faint: #5e6372;
-  --color-faint2: #a5aabc;
   --color-gold: #a87a1f;
   /*
-   * Gold that can be READ at body size, as opposed to gold the brand is made of.
+   * The readable gold, derived from the brand rather than picked beside it.
    *
-   * Bashar, 2026-09-03: «why you changed the button colour and price colour? please undo that — I
-   * meant the grey texts.» He was right. Darkening `--color-gold` to fix eight small labels took
-   * the brand down with it: the primary button and the price went from gold to a muddy brown, which
-   * is not a contrast fix, it is a rebrand nobody asked for.
+   * #805d18 is #a87a1f with the SAME hue (39.9deg) and the SAME saturation (0.688), darkened until
+   * the palest surface a gold word lands on clears the body floor. That is why it still reads as
+   * SAFRA's gold and not as brown: nothing about the colour moved except its lightness.
    *
-   * So there are two now, and the split is exactly the WCAG one. `--color-gold` is the brand —
-   * surfaces, borders, ornament, and display text, where the floor is 3:1 and it measures 3.09 at
-   * its worst. `--color-gold` is for gold text below 18.66px bold, where the floor is 4.5 and
-   * the brand gold cannot reach it at any size a body sets.
+   *   on #ffffff  6.01:1     on #eceef5  5.14:1
+   *   on #f5f6fa  5.66:1     on #eaedf4  5.08:1
+   *   on #f1f3f8  5.41:1     on #e2e6f5  4.82:1   <- the hero band, the worst ground
    *
-   * Reaching for `gold` on a heading is as wrong as reaching for `gold` on a caption: one is
-   * needlessly dull, the other is unreadable. If the text is large, it is the brand's colour.
+   * The brand gold, for comparison, measures 3.84:1 on white and 3.09:1 on that band — under the
+   * 4.5 body floor everywhere, and over the 3.0 large-text floor everywhere. Both statements are
+   * why there are two tokens rather than one compromise.
+   */
+  --color-gold-read: #805d18;
+  /*
+   * ── ONE gold, and small gold text is below the floor. Recorded as finding 229. ───────────────
+   *
+   * This comment used to say «there are two now» and describe a split between a brand gold and a
+   * gold that can be read at body size. **There is one token.** The paragraph named
+   * `--color-gold` on both sides of its own distinction, which is how it read as a rule and was
+   * never a rule — the second token was described and never created, so every gold caption, panel
+   * heading and price on the console is painted in the brand gold.
+   *
+   * Measured on 2026-09-08 by reading every rendered text node on 23 console screens in both
+   * themes: **about 290 nodes in the light theme are gold text below 18.66px, between 3.25:1 and
+   * 3.84:1 against a 4.5:1 floor.** Panel headings («أحدث الحجوزات» at 14.5px), money («$201.99» at
+   * 12.5px), a partner tier («ذهبي»). The dark theme's gold is fine; this is a light-theme problem.
+   *
+   * ## Why it has not simply been fixed
+   *
+   * Bashar, 2026-09-03: «why you changed the button colour and PRICE colour? please undo that — I
+   * meant the grey texts.» The price is one of the things measuring 3.84:1, and he has explicitly
+   * asked for it not to be darkened once already. Repainting it — or creating the second token and
+   * pointing the prices at it — is a visible change to the product's colour, and that is his call
+   * rather than a correctness fix somebody makes while passing.
+   *
+   * The GREYS were his instruction and are done: 85 occurrences of `faint2` moved to `faint` the
+   * same day, taking the console's dark theme from 217 sub-floor nodes to none at all.
+   *
+   * `--color-warn` (#9e6e15) is in the same family and misses by a hair — 4.47:1 on white, 3.78:1
+   * on a field — and it is a STATUS colour, so moving it moves a status. Same decision, same owner.
    */
   --color-sky: #2e66a8;
   --color-ok: #1f7d53;

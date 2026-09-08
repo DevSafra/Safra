@@ -284,7 +284,7 @@ export function PartnerLoginForm({ next }: { readonly next: string }) {
                 onClick={() => {
                   void resendCode();
                 }}
-                className="w-fit cursor-pointer text-sm text-muted underline-offset-4 hover:text-gold hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-fit cursor-pointer text-sm text-muted underline-offset-4 hover:text-gold-read hover:underline disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {busy ? t.login.codeResending : t.login.codeResend}
               </button>
@@ -295,7 +295,7 @@ export function PartnerLoginForm({ next }: { readonly next: string }) {
           <button
             type="submit"
             disabled={busy}
-            className="mt-2 cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2 cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy ? t.login.codeChecking : t.login.codeSubmit}
           </button>
@@ -307,7 +307,7 @@ export function PartnerLoginForm({ next }: { readonly next: string }) {
               setAwaitingCode(false);
               setError(null);
             }}
-            className="cursor-pointer text-sm text-muted underline-offset-4 hover:text-gold hover:underline"
+            className="cursor-pointer text-sm text-muted underline-offset-4 hover:text-gold-read hover:underline"
           >
             {t.login.codeBack}
           </button>
@@ -343,7 +343,7 @@ export function PartnerLoginForm({ next }: { readonly next: string }) {
           <button
             type="submit"
             disabled={busy}
-            className="mt-2 cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2 cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy ? t.login.signingIn : t.login.submit}
           </button>

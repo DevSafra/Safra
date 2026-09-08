@@ -146,7 +146,7 @@ export async function Shell({
             registry deliberately does not search by email — so the name is the only handle, and
             scraping it by class would break the first time this row is restyled.
           */}
-          <p data-partner-name className="ms-auto text-[12.5px] text-muted">
+          <p data-partner-name className="ms-auto text-[14px] text-muted">
             {partnerName}
           </p>
         </header>
@@ -183,7 +183,7 @@ export async function Shell({
         aria-label={t.nav.heading}
         className="portal-sidebar flex flex-col rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-3.5"
       >
-        <p className="mb-2 px-2 text-[11px] tracking-wide text-faint">{partnerName}</p>
+        <p className="mb-2 px-2 text-[14px] tracking-wide text-faint">{partnerName}</p>
 
         {/*
           The NAV scrolls, not the whole sidebar.
@@ -415,7 +415,7 @@ export async function Shell({
           <form action="/api/auth/logout" method="post" className="flex-1">
             <button
               type="submit"
-              className="min-h-10 w-full cursor-pointer rounded-lg border border-line px-2.5 py-2 text-[12.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold"
+              className="min-h-10 w-full cursor-pointer rounded-lg border border-line px-2.5 py-2 text-[14px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold-read"
             >
               {t.nav.signOut}
             </button>
@@ -443,9 +443,9 @@ function Item({
     <Link
       href={href}
       {...(current ? { 'aria-current': 'page' as const } : {})}
-      className={`flex min-h-10 items-center gap-2 rounded-lg px-2.5 py-2 text-[13px] transition-colors lg:min-h-0 ${
+      className={`flex min-h-10 items-center gap-2 rounded-lg px-2.5 py-2 text-[14px] transition-colors lg:min-h-0 ${
         current
-          ? 'bg-[rgba(var(--goldA),0.12)] font-extrabold text-gold'
+          ? 'bg-[rgba(var(--goldA),0.12)] font-extrabold text-gold-read'
           : 'text-muted hover:bg-line2'
       }`}
     >
@@ -457,7 +457,7 @@ function Item({
       {badge ? (
         <span
           dir="ltr"
-          className="ms-auto rounded-full bg-[rgba(var(--skyA),0.15)] px-2 py-0.5 text-[10.5px] font-bold text-sky"
+          className="ms-auto rounded-full bg-[rgba(var(--skyA),0.15)] px-2 py-0.5 text-[12px] font-bold text-sky"
         >
           {badge}
         </span>

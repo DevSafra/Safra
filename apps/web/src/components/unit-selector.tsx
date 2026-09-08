@@ -126,7 +126,7 @@ export function UnitSelector({
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                     <h3 className="font-display text-lg text-text">{room.name}</h3>
                     {many && room.cheapest ? (
-                      <span className="rounded-full border border-[rgba(var(--goldA),0.4)] px-2 py-0.5 text-[11px] font-semibold text-gold">
+                      <span className="rounded-full border border-[rgba(var(--goldA),0.4)] px-2 py-0.5 text-[13px] font-semibold text-gold-read">
                         {copy.cheapest}
                       </span>
                     ) : null}
@@ -135,7 +135,7 @@ export function UnitSelector({
                   <p className="mt-1.5 text-sm text-muted">{room.occupancyText}</p>
 
                   {room.leftText ? (
-                    <p className="mt-1 text-xs font-semibold text-gold">
+                    <p className="mt-1 text-xs font-semibold text-gold-read">
                       {room.leftText}
                     </p>
                   ) : null}
@@ -161,16 +161,14 @@ export function UnitSelector({
                       {room.amenityNames.map((name) => (
                         <li
                           key={name}
-                          className="rounded-lg border border-line2 px-2.5 py-1 text-[12.5px] text-text2"
+                          className="rounded-lg border border-line2 px-2.5 py-1 text-[14px] text-text2"
                         >
                           {name}
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="mt-2.5 text-[12.5px] text-faint">
-                      {copy.amenitiesNone}
-                    </p>
+                    <p className="mt-2.5 text-[14px] text-faint">{copy.amenitiesNone}</p>
                   )}
                 </div>
 
@@ -191,15 +189,13 @@ export function UnitSelector({
                     looked right. The nightly rate stays underneath, because it is how a guest
                     compares rooms — it just is not the number the sentence above promised.
                   */}
-                  <span className="text-[11px] text-faint sm:text-end">
+                  <span className="text-[13px] text-faint sm:text-end">
                     {copy.stayTotalLabel}
                   </span>
                   <p className="text-xl font-extrabold tabular-nums text-gold sm:text-end">
                     {room.totalText}
                   </p>
-                  <p className="text-[11.5px] text-muted sm:text-end">
-                    {room.stayCaption}
-                  </p>
+                  <p className="text-[13px] text-muted sm:text-end">{room.stayCaption}</p>
 
                   {room.tooShort ? (
                     /*
@@ -211,7 +207,7 @@ export function UnitSelector({
                       finding. So the row states the minimum and what to do about it, and the room
                       stays visible because knowing it exists is worth something.
                     */
-                    <p className="mt-2 text-center text-[12px] font-semibold leading-relaxed text-warn sm:text-end">
+                    <p className="mt-2 text-center text-[13px] font-semibold leading-relaxed text-warn sm:text-end">
                       {room.tooShortText}
                     </p>
                   ) : room.soldOut ? (
@@ -249,8 +245,8 @@ export function UnitSelector({
                       onClick={() => add(toBasketRoom(room))}
                       className={`mt-2 block w-full cursor-pointer rounded-lg border px-4 py-2.5 text-center text-sm font-semibold transition-colors duration-200 ease-out-strong active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${
                         inBasket > 0
-                          ? 'border-gold bg-[rgba(var(--goldA),0.15)] text-gold'
-                          : 'border-[rgba(var(--goldA),0.45)] text-gold hover:bg-[rgba(var(--goldA),0.08)]'
+                          ? 'border-gold bg-[rgba(var(--goldA),0.15)] text-gold-read'
+                          : 'border-[rgba(var(--goldA),0.45)] text-gold-read hover:bg-[rgba(var(--goldA),0.08)]'
                       }`}
                     >
                       {inBasket > 0

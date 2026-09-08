@@ -323,14 +323,14 @@ function CityForm({
         </Row>
 
         <fieldset className="grid gap-1.5">
-          <legend className="text-[11.5px] font-semibold text-muted">
+          <legend className="text-[13px] font-semibold text-muted">
             {c.categoriesLabel}
           </legend>
           <div className="flex flex-wrap gap-2">
             {options.map((option) => (
               <label
                 key={option.code}
-                className="flex cursor-pointer items-center gap-1.5 text-[11.5px] text-text2"
+                className="flex cursor-pointer items-center gap-1.5 text-[13px] text-text2"
               >
                 <input
                   type="checkbox"
@@ -356,7 +356,7 @@ function CityForm({
 
         {/* ── The photographs §5.4 asks for ─────────────────────────────────── */}
         <div className="grid gap-1.5 border-t border-line pt-3">
-          <span className="text-[11.5px] font-semibold text-muted">{c.images}</span>
+          <span className="text-[13px] font-semibold text-muted">{c.images}</span>
 
           {/*
             Every photograph, each managing itself — see `CityPhotographs`. It was ONE thumbnail
@@ -371,7 +371,7 @@ function CityForm({
               disabled={busy}
               data-city-image-add={city.slug}
               onClick={() => file.current?.click()}
-              className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-dashed border-line px-3 py-1.5 text-[11px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold disabled:opacity-50 lg:min-h-0"
+              className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-dashed border-line px-3 py-1.5 text-[13px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read disabled:opacity-50 lg:min-h-0"
             >
               {busy ? c.imagesUploading : c.imagesAdd}
             </button>
@@ -393,7 +393,7 @@ function CityForm({
             />
           </div>
 
-          <p className="text-[10.5px] text-faint2">{c.imagesNote}</p>
+          <p className="text-[14px] text-faint">{c.imagesNote}</p>
         </div>
 
         <Actions
@@ -572,7 +572,7 @@ export function GeoCities({
                     data-city-up={row.slug}
                     aria-label={`${c.cityMoveUp} — ${row.nameAr}`}
                     onClick={() => void move(row.slug, -1)}
-                    className="cursor-pointer rounded-lg border border-line px-1.5 py-0.5 text-[11px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold disabled:cursor-not-allowed disabled:opacity-35"
+                    className="cursor-pointer rounded-lg border border-line px-1.5 py-0.5 text-[13px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read disabled:cursor-not-allowed disabled:opacity-35"
                   >
                     ↑
                   </button>
@@ -582,7 +582,7 @@ export function GeoCities({
                     data-city-down={row.slug}
                     aria-label={`${c.cityMoveDown} — ${row.nameAr}`}
                     onClick={() => void move(row.slug, 1)}
-                    className="cursor-pointer rounded-lg border border-line px-1.5 py-0.5 text-[11px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold disabled:cursor-not-allowed disabled:opacity-35"
+                    className="cursor-pointer rounded-lg border border-line px-1.5 py-0.5 text-[13px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read disabled:cursor-not-allowed disabled:opacity-35"
                   >
                     ↓
                   </button>
@@ -598,7 +598,7 @@ export function GeoCities({
                 {/* Whether this city HAS photography — the thing §5.4 turns on. */}
                 <span
                   data-city-images={row.slug}
-                  className={`text-[10.5px] ${row.images === 0 ? 'text-bad' : 'text-faint'}`}
+                  className={`text-[13px] ${row.images === 0 ? 'text-bad' : 'text-faint'}`}
                 >
                   {row.images === 0
                     ? c.imagesNone
@@ -608,7 +608,7 @@ export function GeoCities({
                   type="button"
                   data-city-edit={row.slug}
                   onClick={() => setEditing(editing === row.slug ? null : row.slug)}
-                  className="cursor-pointer rounded-lg border border-line px-2.5 py-1 text-[10.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold"
+                  className="cursor-pointer rounded-lg border border-line px-2.5 py-1 text-[13px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read"
                 >
                   {c.edit}
                 </button>

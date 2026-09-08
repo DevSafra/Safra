@@ -71,12 +71,12 @@ export function CloseThreadButton({ reference }: { reference: string }) {
         type="button"
         disabled={busy}
         onClick={() => void end()}
-        className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-3.5 py-1.5 text-[11.5px] font-bold text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+        className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-3.5 py-1.5 text-[13px] font-bold text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
       >
         {busy ? c.closingThread : c.closeThread}
       </button>
-      <span className="text-[10.5px] text-faint">{c.closeThreadHint}</span>
-      {error ? <span className="text-[11px] font-semibold text-bad">{error}</span> : null}
+      <span className="text-[13px] text-faint">{c.closeThreadHint}</span>
+      {error ? <span className="text-[13px] font-semibold text-bad">{error}</span> : null}
     </div>
   );
 }

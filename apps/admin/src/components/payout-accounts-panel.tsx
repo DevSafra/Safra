@@ -125,16 +125,16 @@ export function PayoutAccountsPanel({
 
   return (
     <div data-payout-accounts={reference} className="grid gap-4">
-      <p className="text-[12px] leading-relaxed text-faint2">{c.intro}</p>
+      <p className="text-[13px] leading-relaxed text-faint">{c.intro}</p>
       {/*
         Separation of duties as guidance, shown where the verifying happens. The platform records
         both actors and does not refuse — so this asks, where a second person is available, rather
         than describing a control that does not exist.
       */}
-      <p className="text-[11.5px] leading-relaxed text-muted">{c.ownSubmissionNote}</p>
+      <p className="text-[13px] leading-relaxed text-muted">{c.ownSubmissionNote}</p>
 
       {accounts.length === 0 && open !== 'new' ? (
-        <p className="text-[12.5px] text-faint">{c.empty}</p>
+        <p className="text-[14px] text-faint">{c.empty}</p>
       ) : null}
 
       <ul className="grid gap-3">
@@ -142,23 +142,23 @@ export function PayoutAccountsPanel({
           <li
             key={account.id}
             data-payout-account={account.id}
-            className="grid gap-2 rounded-lg border border-line bg-panel2 p-3"
+            className="grid gap-2 rounded-lg border border-line bg-field p-3"
           >
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill tone={statusTone(account.status)}>
                 {t.enums.payoutAccountStatus[account.status] ?? account.status}
               </StatusPill>
               {account.isPrimary ? (
-                <span className="text-[11.5px] font-semibold text-ok">{c.primary}</span>
+                <span className="text-[13px] font-semibold text-ok">{c.primary}</span>
               ) : null}
-              <span className="text-[11.5px] text-muted">
+              <span className="text-[13px] text-muted">
                 {account.submittedByPartner ? c.submittedByPartner : c.submittedByStaff}
               </span>
             </div>
 
-            <div className="text-[13px] leading-relaxed">
+            <div className="text-[14px] leading-relaxed">
               <div className="font-semibold">{account.accountHolder}</div>
-              <div className="text-faint2">
+              <div className="text-faint">
                 {c.methods[account.method] ?? account.method}
                 {account.bankName ? ` · ${account.bankName}` : ''}
                 {' · '}
@@ -172,12 +172,12 @@ export function PayoutAccountsPanel({
                 {account.currency}
               </div>
               {account.status === 'verified' && account.verifiedAt !== null ? (
-                <div className="text-[11.5px] text-muted">
+                <div className="text-[13px] text-muted">
                   {fill(c.verifiedOn, { date: shortDateTime(account.verifiedAt) })}
                 </div>
               ) : null}
               {account.status === 'rejected' ? (
-                <div className="text-[11.5px] text-bad">
+                <div className="text-[13px] text-bad">
                   {account.rejectedAt === null
                     ? c.rejectionReason
                     : fill(c.rejectedOn, { date: shortDateTime(account.rejectedAt) })}
@@ -271,9 +271,9 @@ export function PayoutAccountsPanel({
         />
       )}
 
-      {notice ? <p className="text-[11.5px] font-semibold text-ok">{notice}</p> : null}
+      {notice ? <p className="text-[13px] font-semibold text-ok">{notice}</p> : null}
       {error && open === null ? (
-        <p className="text-[11.5px] font-semibold text-bad">{error}</p>
+        <p className="text-[13px] font-semibold text-bad">{error}</p>
       ) : null}
 
       {dialog}
@@ -424,7 +424,7 @@ function Rejection({
 
   return (
     <div data-reject-account={account.id} className="grid w-full gap-2">
-      <p className="text-[11.5px] text-faint2">{c.message}</p>
+      <p className="text-[13px] text-faint">{c.message}</p>
       <Field label={c.reason} name="reason" value={reason} onChange={setReason} />
       <div className="flex gap-2">
         <Action
@@ -465,10 +465,10 @@ function Action({
       type="button"
       onClick={onClick}
       disabled={busy}
-      className={`inline-flex min-h-10 cursor-pointer items-center rounded-md border px-3 text-[12.5px] font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:py-1.5 ${
+      className={`inline-flex min-h-10 cursor-pointer items-center rounded-md border px-3 text-[14px] font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:py-1.5 ${
         danger
           ? 'border-bad/40 text-bad hover:bg-bad/10'
-          : 'border-line text-text hover:bg-panel2'
+          : 'border-line text-text hover:bg-line2'
       }`}
     >
       {label}

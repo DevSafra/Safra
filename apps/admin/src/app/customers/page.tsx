@@ -96,9 +96,9 @@ export default async function CustomersPage({
         />
 
         {result === 'unauthenticated' ? (
-          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
         ) : result === 'failed' ? (
-          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <>
             <AdminTable
@@ -182,7 +182,7 @@ const columns = (back: string): readonly AdminColumn<CustomerListItem>[] => [
       row.walletBalance === null ? (
         <span className="text-faint">{t.admin.noData}</span>
       ) : (
-        <Ltr className="font-bold whitespace-nowrap text-gold">
+        <Ltr className="font-bold whitespace-nowrap text-gold-read">
           {amount(row.walletBalance, row.walletCurrency ?? DEFAULT_MONEY_CURRENCY)}
         </Ltr>
       ),

@@ -111,7 +111,7 @@ export default async function PayoutPage({
           <Row
             label={t.sections.payouts.net}
             value={
-              <Ltr className="font-extrabold text-gold">
+              <Ltr className="font-extrabold text-gold-read">
                 {amount(payout.netAmount, payout.currencyCode)}
               </Ltr>
             }
@@ -186,7 +186,7 @@ export default async function PayoutPage({
           <div className="overflow-x-auto">
             <table className="w-full min-w-[680px] text-sm">
               <thead>
-                <tr className="text-start text-[11.5px] text-faint">
+                <tr className="text-start text-[13px] text-faint">
                   <Th>{t.sections.payouts.colBooking}</Th>
                   <Th>{t.sections.payouts.colProperty}</Th>
                   <Th>{t.sections.payouts.colStay}</Th>
@@ -202,7 +202,7 @@ export default async function PayoutPage({
                     </Td>
                     <Td>{booking.property ?? t.admin.noData}</Td>
                     <Td>
-                      <Ltr className="text-[11.5px] text-faint">
+                      <Ltr className="text-[13px] text-faint">
                         {booking.checkIn} ← {booking.checkOut}
                       </Ltr>
                     </Td>
@@ -225,7 +225,7 @@ export default async function PayoutPage({
                           {amount(booking.refunded, payout.currencyCode)}
                         </Ltr>
                       ) : (
-                        <span className="text-faint2">—</span>
+                        <span className="text-faint">—</span>
                       )}
                     </Td>
                   </tr>
@@ -242,7 +242,7 @@ export default async function PayoutPage({
               rather than alarming.
             */}
             {payout.bookings.some((one) => Number(one.refunded) > 0) ? (
-              <p className="mt-2 text-[11.5px] leading-relaxed text-faint2">
+              <p className="mt-2 text-[13px] leading-relaxed text-faint">
                 {t.sections.payouts.refundedNote}
               </p>
             ) : null}
@@ -264,10 +264,10 @@ export default async function PayoutPage({
                 <span className="font-semibold text-text">
                   {auditAction(entry.action)}
                 </span>
-                <Ltr className="text-[11.5px] text-faint">
+                <Ltr className="text-[13px] text-faint">
                   {entry.actorEmail ?? t.admin.noData}
                 </Ltr>
-                <Ltr className="ms-auto text-[11.5px] text-faint">
+                <Ltr className="ms-auto text-[13px] text-faint">
                   {shortDateTime(entry.createdAt)}
                 </Ltr>
               </li>
@@ -297,7 +297,7 @@ export default async function PayoutPage({
                 className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-card px-4 py-2.5"
               >
                 <span
-                  className={`text-[11.5px] font-bold ${
+                  className={`text-[13px] font-bold ${
                     entry.direction === 'debit' ? 'text-sky' : 'text-ok'
                   }`}
                 >
@@ -335,7 +335,7 @@ function Shell({ back, children }: { back: BackTarget; children: ReactNode }) {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section>
-      <h2 className="mb-2 text-sm font-semibold text-gold">{title}</h2>
+      <h2 className="mb-2 text-sm font-semibold text-gold-read">{title}</h2>
       {children}
     </section>
   );
@@ -344,7 +344,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 function Row({ label: name, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex justify-between gap-3 rounded-lg border border-line bg-card px-4 py-2.5">
-      <dt className="text-[12.5px] text-faint">{name}</dt>
+      <dt className="text-[14px] text-faint">{name}</dt>
       <dd className="text-text">{value}</dd>
     </div>
   );

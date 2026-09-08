@@ -149,7 +149,7 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)]"
+          className="cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold-read transition-colors hover:bg-[rgba(var(--goldA),0.08)]"
         >
           {t.sections.disputes.open}
         </button>
@@ -159,35 +159,35 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
 
   return (
     <div className="mt-3 grid gap-3 rounded-card border border-line bg-field p-3.5">
-      <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
+      <label className="grid gap-1.5 text-[13px] font-semibold text-muted">
         {t.sections.disputes.outcome}
         <select
           value={outcome}
           onChange={(event) =>
             setOutcome(event.target.value === 'rejected' ? 'rejected' : 'resolved')
           }
-          className="cursor-pointer rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-text"
+          className="cursor-pointer rounded-lg border border-line bg-card px-3 py-2 text-[14px] text-text"
         >
           <option value="resolved">{t.sections.disputes.outcomeResolved}</option>
           <option value="rejected">{t.sections.disputes.outcomeRejected}</option>
         </select>
       </label>
 
-      <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
+      <label className="grid gap-1.5 text-[13px] font-semibold text-muted">
         {t.sections.disputes.resolution}
         <textarea
           value={resolution}
           onChange={(event) => setResolution(event.target.value)}
           rows={3}
           maxLength={2000}
-          className="rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] leading-relaxed text-text"
+          className="rounded-lg border border-line bg-card px-3 py-2 text-[14px] leading-relaxed text-text"
         />
-        <span className="text-[10.5px] font-normal text-faint2">
+        <span className="text-[13px] font-normal text-faint">
           {t.sections.disputes.resolutionHint}
         </span>
       </label>
 
-      <label className="flex cursor-pointer items-center gap-2.5 text-[12.5px] text-text2">
+      <label className="flex cursor-pointer items-center gap-2.5 text-[14px] text-text2">
         <input
           type="checkbox"
           checked={compensate}
@@ -198,7 +198,7 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
       </label>
 
       {compensate ? (
-        <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
+        <label className="grid gap-1.5 text-[13px] font-semibold text-muted">
           <span className="sr-only">{t.sections.disputes.compensation}</span>
           <input
             value={compensationAmount}
@@ -207,38 +207,38 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
             placeholder="10.00"
             /* No `dir`: a field a person types into follows the page (docs/i18n.md §9). */
             aria-invalid={!amountValid}
-            className={`w-40 rounded-lg border bg-card px-3 py-2 text-[13px] text-text ${
+            className={`w-40 rounded-lg border bg-card px-3 py-2 text-[14px] text-text ${
               amountValid ? 'border-line' : 'border-bad'
             }`}
           />
-          <span className="text-[10.5px] font-normal text-faint2">
+          <span className="text-[13px] font-normal text-faint">
             {t.sections.disputes.compensationHint}
           </span>
         </label>
       ) : null}
 
       {error ? (
-        <p role="alert" className="text-[11.5px] text-bad">
+        <p role="alert" className="text-[13px] text-bad">
           {error}
         </p>
       ) : null}
 
       {/* Only while it is actually blocking — a permanent hint is noise nobody reads. */}
-      {blocker ? <p className="text-[11.5px] text-faint2">{blocker}</p> : null}
+      {blocker ? <p className="text-[13px] text-faint">{blocker}</p> : null}
 
       <div className="flex flex-wrap gap-2.5">
         <button
           type="button"
           disabled={!ready}
           onClick={() => void submit()}
-          className="cursor-pointer rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-5 py-2 text-[12.5px] font-extrabold text-[#241A05] disabled:cursor-not-allowed disabled:opacity-40"
+          className="cursor-pointer rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-5 py-2 text-[14px] font-extrabold text-[#241A05] disabled:cursor-not-allowed disabled:opacity-40"
         >
           {busy ? t.sections.disputes.closing : t.sections.disputes.confirmClose}
         </button>
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="cursor-pointer rounded-lg border border-line px-5 py-2 text-[12.5px] text-muted"
+          className="cursor-pointer rounded-lg border border-line px-5 py-2 text-[14px] text-muted"
         >
           {t.sections.settings.cancel}
         </button>

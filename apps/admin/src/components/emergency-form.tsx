@@ -89,15 +89,15 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
 
   return (
     <section className="max-w-[640px] rounded-card border border-[rgba(var(--badA),0.5)] bg-card p-5.5">
-      <h2 className="text-[15px] font-extrabold text-bad">
+      <h2 className="text-[16px] font-extrabold text-bad">
         {t.sections.emergency.title}
       </h2>
-      <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted">
+      <p className="mt-1.5 text-[14px] leading-relaxed text-muted">
         {t.sections.emergency.hint}
       </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
+        <label className="grid gap-1.5 text-[13px] font-semibold text-muted">
           {t.sections.emergency.scope}
           <select
             value={scope}
@@ -108,14 +108,14 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
               setScopeRef('');
               setConfirming(false);
             }}
-            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2.5 text-[13px] text-text"
+            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2.5 text-[14px] text-text"
           >
             <option value="city">{t.sections.emergency.scopeCity}</option>
             <option value="country">{t.sections.emergency.scopeCountry}</option>
           </select>
         </label>
 
-        <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
+        <label className="grid gap-1.5 text-[13px] font-semibold text-muted">
           {t.sections.emergency.target}
           <select
             value={scopeRef}
@@ -123,7 +123,7 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
               setScopeRef(event.target.value);
               setConfirming(false);
             }}
-            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2.5 text-[13px] text-text"
+            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2.5 text-[14px] text-text"
           >
             <option value="">—</option>
             {targets.map((target) => (
@@ -135,7 +135,7 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
         </label>
       </div>
 
-      <fieldset className="mt-4 grid gap-2.5 text-[13px] text-text2">
+      <fieldset className="mt-4 grid gap-2.5 text-[14px] text-text2">
         <legend className="sr-only">{t.sections.emergency.title}</legend>
 
         {(
@@ -163,12 +163,12 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
 
       {/* The broadcast has no send path yet; saying so beats a checkbox that quietly does nothing. */}
       {flags.broadcast ? (
-        <p className="mt-2.5 text-[11px] leading-relaxed text-warn">
+        <p className="mt-2.5 text-[14px] leading-relaxed text-warn">
           {t.sections.emergency.broadcastPending}
         </p>
       ) : null}
 
-      <label className="mt-4 grid gap-1.5 text-[11.5px] font-semibold text-muted">
+      <label className="mt-4 grid gap-1.5 text-[13px] font-semibold text-muted">
         {t.sections.emergency.reason}
         <textarea
           id={`${formId}-reason`}
@@ -179,15 +179,15 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
           }}
           rows={2}
           maxLength={500}
-          className="rounded-lg border border-line bg-field px-3 py-2.5 text-[13px] text-text"
+          className="rounded-lg border border-line bg-field px-3 py-2.5 text-[14px] text-text"
         />
-        <span className="text-[10.5px] font-normal text-faint2">
+        <span className="text-[13px] font-normal text-faint">
           {t.sections.emergency.reasonHint}
         </span>
       </label>
 
       {error ? (
-        <p role="alert" className="mt-3 text-[12.5px] text-bad">
+        <p role="alert" className="mt-3 text-[14px] text-bad">
           {error}
         </p>
       ) : null}
@@ -199,8 +199,8 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
             sure?". A generic prompt trains people to click through it; this one is only
             answerable by reading it.
           */}
-          <p className="text-[12.5px] font-bold text-bad">{selected.name}</p>
-          <ul className="mt-1.5 grid gap-0.5 text-[11.5px] text-text2">
+          <p className="text-[14px] font-bold text-bad">{selected.name}</p>
+          <ul className="mt-1.5 grid gap-0.5 text-[13px] text-text2">
             {flags.stopBookings ? <li>• {t.sections.emergency.stopBookings}</li> : null}
             {flags.waiveFines ? <li>• {t.sections.emergency.waiveFines}</li> : null}
             {flags.broadcast ? <li>• {t.sections.emergency.broadcast}</li> : null}
@@ -220,7 +220,7 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
               setConfirming(true);
             }
           }}
-          className="cursor-pointer rounded-lg bg-bad px-6 py-3 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-40"
+          className="cursor-pointer rounded-lg bg-bad px-6 py-3 text-sm font-extrabold text-bg disabled:cursor-not-allowed disabled:opacity-40"
         >
           {confirming ? t.sections.emergency.activate : t.admin.handle}
         </button>
@@ -229,7 +229,7 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
           <button
             type="button"
             onClick={() => setConfirming(false)}
-            className="cursor-pointer rounded-lg border border-line px-6 py-3 text-[13px] text-muted"
+            className="cursor-pointer rounded-lg border border-line px-6 py-3 text-[14px] text-muted"
           >
             {t.login.useDifferentAccount}
           </button>
@@ -267,7 +267,7 @@ export function DeactivateButton({ id, scopeName }: { id: string; scopeName: str
       type="button"
       disabled={busy}
       onClick={() => void deactivate()}
-      className="ms-auto cursor-pointer rounded-lg bg-bad px-4.5 py-1.75 text-xs font-extrabold whitespace-nowrap text-white disabled:opacity-50"
+      className="ms-auto cursor-pointer rounded-lg bg-bad px-4.5 py-1.75 text-xs font-extrabold whitespace-nowrap text-bg disabled:opacity-50"
     >
       {t.sections.emergency.deactivate}
     </button>

@@ -364,7 +364,7 @@ function Press({
       type="button"
       disabled={busy}
       onClick={onClick}
-      className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-3 py-1.5 text-[11.5px] text-muted hover:border-gold/50 hover:text-gold disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
+      className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-3 py-1.5 text-[13px] text-muted hover:border-gold/50 hover:text-gold-read disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
     >
       {busy ? working : idle}
     </button>
@@ -390,14 +390,14 @@ function Toggle({
 }) {
   const tone = danger
     ? 'border-bad/50 text-bad hover:border-bad'
-    : 'border-line text-muted hover:border-gold/50 hover:text-gold';
+    : 'border-line text-muted hover:border-gold/50 hover:text-gold-read';
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex min-h-10 cursor-pointer items-center rounded-lg border px-3 py-1.5 text-[11.5px] lg:min-h-0 ${
-        active ? (danger ? 'border-bad text-bad' : 'border-gold/60 text-gold') : tone
+      className={`inline-flex min-h-10 cursor-pointer items-center rounded-lg border px-3 py-1.5 text-[13px] lg:min-h-0 ${
+        active ? (danger ? 'border-bad text-bad' : 'border-gold/60 text-gold-read') : tone
       }`}
     >
       {label}
@@ -406,7 +406,7 @@ function Toggle({
 }
 
 function Hint({ children }: { children: React.ReactNode }) {
-  return <p className="text-[11px] text-faint">{children}</p>;
+  return <p className="text-[14px] text-faint">{children}</p>;
 }
 
 /**
@@ -445,12 +445,12 @@ function Reasoned({
         onSubmit(text(new FormData(event.currentTarget), 'reason').trim());
       }}
     >
-      <p className={`text-[11.5px] ${tone === 'bad' ? 'text-bad' : 'text-gold'}`}>
+      <p className={`text-[13px] ${tone === 'bad' ? 'text-bad' : 'text-gold-read'}`}>
         {hint}
       </p>
 
       <label className="grid gap-1">
-        <span className="text-[11px] text-faint">{label}</span>
+        <span className="text-[13px] text-faint">{label}</span>
         {/*
           `minLength` matches the schema's own floor so the browser refuses first — the server
           still refuses, so a drift costs a round trip rather than a bad row. No `dir`: a field a
@@ -463,18 +463,18 @@ function Reasoned({
           maxLength={1000}
           rows={2}
           disabled={busy}
-          className="rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed"
+          className="rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text disabled:cursor-not-allowed"
         />
-        <span className="text-[10.5px] text-faint">{fieldHint}</span>
+        <span className="text-[13px] text-faint">{fieldHint}</span>
       </label>
 
       <button
         type="submit"
         disabled={busy}
-        className={`inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border px-4 py-2 text-[12.5px] font-bold disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 ${
+        className={`inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border px-4 py-2 text-[14px] font-bold disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 ${
           tone === 'bad'
             ? 'border-bad/50 text-bad hover:bg-bad/10'
-            : 'border-gold/50 text-gold hover:bg-gold/10'
+            : 'border-gold/50 text-gold-read hover:bg-gold/10'
         }`}
       >
         {submitLabel}
@@ -515,16 +515,16 @@ function DisputeForm({
       }}
     >
       {/* Both consequences before the first field: frozen money, and a changed booking status. */}
-      <p className="text-[11.5px] text-gold">{copy.disputeHint}</p>
+      <p className="text-[13px] text-gold-read">{copy.disputeHint}</p>
 
       <label className="grid gap-1">
-        <span className="text-[11px] text-faint">{copy.disputeKindLabel}</span>
+        <span className="text-[13px] text-faint">{copy.disputeKindLabel}</span>
         <select
           name="kind"
           required
           defaultValue=""
           disabled={busy}
-          className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+          className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text"
         >
           <option value="" disabled>
             {copy.pickDisputeKind}
@@ -538,7 +538,7 @@ function DisputeForm({
       </label>
 
       <label className="grid gap-1">
-        <span className="text-[11px] text-faint">{copy.disputeTitleLabel}</span>
+        <span className="text-[13px] text-faint">{copy.disputeTitleLabel}</span>
         {/* No `dir`: a field a person types into follows the page (docs/i18n.md §9). */}
         <input
           name="title"
@@ -553,13 +553,13 @@ function DisputeForm({
             `lg` — a text INPUT is not in that list, so it comes out at 38px on a phone and misses
             the rule by two pixels. Measured, not guessed.
           */
-          className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed lg:min-h-0"
+          className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text disabled:cursor-not-allowed lg:min-h-0"
         />
-        <span className="text-[10.5px] text-faint">{copy.disputeTitleHint}</span>
+        <span className="text-[13px] text-faint">{copy.disputeTitleHint}</span>
       </label>
 
       <label className="grid gap-1">
-        <span className="text-[11px] text-faint">{copy.disputeDescriptionLabel}</span>
+        <span className="text-[13px] text-faint">{copy.disputeDescriptionLabel}</span>
         <textarea
           name="description"
           required
@@ -567,9 +567,9 @@ function DisputeForm({
           maxLength={4000}
           rows={3}
           disabled={busy}
-          className="rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed"
+          className="rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text disabled:cursor-not-allowed"
         />
-        <span className="text-[10.5px] text-faint">{copy.disputeDescriptionHint}</span>
+        <span className="text-[13px] text-faint">{copy.disputeDescriptionHint}</span>
       </label>
 
       <Submit busy={busy} label={busy ? copy.openingDispute : copy.openDispute} />
@@ -649,11 +649,11 @@ function RefundForm({
         onSubmit(text(new FormData(event.currentTarget), 'reason').trim());
       }}
     >
-      <p className="text-[11.5px] text-gold">{copy.refundHint}</p>
+      <p className="text-[13px] text-gold-read">{copy.refundHint}</p>
 
       {/* The figure, as soon as it is known. `failed` is silent: the form still works. */}
       {quote && !nothing ? (
-        <p className="text-[12.5px] text-text">
+        <p className="text-[14px] text-text">
           <Ltr>
             {fill(copy.refundQuoteLine, {
               amount: money(quote.refundable),
@@ -663,7 +663,7 @@ function RefundForm({
             })}
           </Ltr>
           {Number(quote.walletAmount) > 0 ? (
-            <span className="block text-[11px] text-faint">
+            <span className="block text-[13px] text-faint">
               {fill(copy.refundToWallet, {
                 amount: money(quote.walletAmount),
                 currency: quote.currencyCode,
@@ -673,11 +673,11 @@ function RefundForm({
         </p>
       ) : null}
 
-      {nothing ? <p className="text-[12px] text-faint">{copy.refundNothing}</p> : null}
-      {failed ? <p className="text-[12px] text-faint">{t.errors.unknown}</p> : null}
+      {nothing ? <p className="text-[13px] text-faint">{copy.refundNothing}</p> : null}
+      {failed ? <p className="text-[13px] text-faint">{t.errors.unknown}</p> : null}
 
       <label className="grid gap-1">
-        <span className="text-[11px] text-faint">{copy.refundReasonLabel}</span>
+        <span className="text-[13px] text-faint">{copy.refundReasonLabel}</span>
         <textarea
           name="reason"
           required
@@ -685,9 +685,9 @@ function RefundForm({
           maxLength={500}
           rows={2}
           disabled={busy || nothing}
-          className="rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed"
+          className="rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text disabled:cursor-not-allowed"
         />
-        <span className="text-[10.5px] text-faint">{copy.refundReasonHint}</span>
+        <span className="text-[13px] text-faint">{copy.refundReasonHint}</span>
       </label>
 
       <Submit busy={busy || nothing} label={busy ? copy.refunding : copy.refund} />
@@ -727,11 +727,11 @@ function CompensationForm({
         });
       }}
     >
-      <p className="text-[11.5px] text-gold">{copy.compensateHint}</p>
+      <p className="text-[13px] text-gold-read">{copy.compensateHint}</p>
 
       <div className="flex flex-wrap gap-2">
         <label className="grid gap-1">
-          <span className="text-[11px] text-faint">{copy.compensateAmountLabel}</span>
+          <span className="text-[13px] text-faint">{copy.compensateAmountLabel}</span>
           {/*
             `inputMode="decimal"` rather than `type="number"`: a number input's spinner and its
             locale-dependent parsing are both wrong for money, and the value is sent as a STRING
@@ -743,17 +743,17 @@ function CompensationForm({
             inputMode="decimal"
             pattern="\d{1,10}(\.\d{1,2})?"
             disabled={busy}
-            className="w-32 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed min-h-10 lg:min-h-0"
+            className="w-32 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text disabled:cursor-not-allowed min-h-10 lg:min-h-0"
           />
         </label>
 
         <label className="grid gap-1">
-          <span className="text-[11px] text-faint">{copy.compensateCurrencyLabel}</span>
+          <span className="text-[13px] text-faint">{copy.compensateCurrencyLabel}</span>
           <select
             name="currency"
             required
             disabled={busy}
-            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text"
           >
             {currencies.map((code) => (
               <option key={code} value={code}>
@@ -765,7 +765,7 @@ function CompensationForm({
       </div>
 
       <label className="grid gap-1">
-        <span className="text-[11px] text-faint">{copy.compensateNoteLabel}</span>
+        <span className="text-[13px] text-faint">{copy.compensateNoteLabel}</span>
         <textarea
           name="note"
           required
@@ -773,9 +773,9 @@ function CompensationForm({
           maxLength={500}
           rows={2}
           disabled={busy}
-          className="rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed"
+          className="rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text disabled:cursor-not-allowed"
         />
-        <span className="text-[10.5px] text-faint">{copy.compensateNoteHint}</span>
+        <span className="text-[13px] text-faint">{copy.compensateNoteHint}</span>
       </label>
 
       <Submit busy={busy} label={busy ? copy.compensating : copy.compensate} />
@@ -789,7 +789,7 @@ function Submit({ busy, label: text }: { busy: boolean; label: string }) {
     <button
       type="submit"
       disabled={busy}
-      className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-gold/50 px-4 py-2 text-[12.5px] font-bold text-gold hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
+      className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-gold/50 px-4 py-2 text-[14px] font-bold text-gold-read hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
     >
       {text}
     </button>

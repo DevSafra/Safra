@@ -194,7 +194,7 @@ export default async function CityPage({
             */}
             <Link
               href={`/${locale}`}
-              className="inline-flex min-h-10 items-center hover:text-gold lg:min-h-0"
+              className="inline-flex min-h-10 items-center hover:text-gold-read lg:min-h-0"
             >
               {t('backHome')}
             </Link>

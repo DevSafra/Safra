@@ -409,7 +409,7 @@ export default async function PropertyPage({
           {/* Both breadcrumb links are controls — see the note on the city page. */}
           <Link
             href={`/${locale}`}
-            className="inline-flex min-h-10 items-center hover:text-gold lg:min-h-0"
+            className="inline-flex min-h-10 items-center hover:text-gold-read lg:min-h-0"
           >
             {tc('backHome')}
           </Link>
@@ -418,7 +418,7 @@ export default async function PropertyPage({
           </span>
           <Link
             href={`/${locale}/city/${property.city.slug}`}
-            className="inline-flex min-h-10 items-center hover:text-gold lg:min-h-0"
+            className="inline-flex min-h-10 items-center hover:text-gold-read lg:min-h-0"
           >
             {cityName}
           </Link>
@@ -508,7 +508,7 @@ export default async function PropertyPage({
                 </span>
                 <a
                   href="#location"
-                  className="inline-flex min-h-10 items-center font-semibold text-gold underline decoration-gold/40 underline-offset-2 lg:min-h-0 hover:decoration-gold"
+                  className="inline-flex min-h-10 items-center font-semibold text-gold-read underline decoration-gold/40 underline-offset-2 lg:min-h-0 hover:decoration-gold"
                 >
                   {t('location')}
                 </a>
@@ -569,7 +569,7 @@ export default async function PropertyPage({
               {property.badges.map((badge) => (
                 <li
                   key={badge}
-                  className="rounded-full border border-gold/40 bg-gold/10 px-3 py-1 text-xs text-gold"
+                  className="rounded-full border border-gold/40 bg-gold/10 px-3 py-1 text-xs text-gold-read"
                 >
                   {badge === 'safra_verified' ? t('badgeVerified') : t('badgeRecommends')}
                 </li>
@@ -651,7 +651,7 @@ export default async function PropertyPage({
                     title={`${day.date} · ${tcal(day.status)}`}
                     className={`flex w-14 flex-col items-center rounded-lg border px-1 py-1.5 text-center ${dayClasses(day.status)}`}
                   >
-                    <span className="text-[10px] opacity-70">{day.date.slice(8)}</span>
+                    <span className="text-[13px] opacity-70">{day.date.slice(8)}</span>
                     <span aria-hidden className="text-xs">
                       {dayGlyph(day.status)}
                     </span>
@@ -739,7 +739,7 @@ export default async function PropertyPage({
                           `dir="ltr"`: a ★ followed by a digit is a Latin run, and the star is
                           bidi-neutral — without this it lands on the wrong side of the number.
                         */}
-                          <span dir="ltr" className="text-sm font-bold text-gold">
+                          <span dir="ltr" className="text-sm font-bold text-gold-read">
                             <span aria-hidden>★</span> {review.rating}
                           </span>
                           <span className="text-xs text-faint">
@@ -756,7 +756,7 @@ export default async function PropertyPage({
 
                         {review.partnerReply ? (
                           <div className="mt-3 rounded-lg border border-gold/30 bg-gold/5 px-4 py-3">
-                            <p className="text-xs font-semibold text-gold">
+                            <p className="text-xs font-semibold text-gold-read">
                               {t('reviewsPartnerReply')}
                             </p>
                             <p className="mt-1 text-sm leading-relaxed text-muted">
@@ -925,7 +925,7 @@ export default async function PropertyPage({
                 */}
                   <Link
                     href={`/${locale}/account/support`}
-                    className="mt-2 block rounded-lg border border-line px-5 py-3 text-center text-sm text-muted transition-colors hover:border-gold hover:text-gold"
+                    className="mt-2 block rounded-lg border border-line px-5 py-3 text-center text-sm text-muted transition-colors hover:border-gold hover:text-gold-read"
                   >
                     {t('askSafra')}
                   </Link>
@@ -958,7 +958,7 @@ function PinIcon() {
       strokeWidth={1.75}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="shrink-0 text-gold"
+      className="shrink-0 text-gold-read"
     >
       <path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Z" />
       <circle cx="12" cy="10" r="2.5" />
