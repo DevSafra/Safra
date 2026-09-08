@@ -21,6 +21,7 @@ import { refuseSection } from '@/components/section-refusal';
 import { COMPENSATION_CURRENCIES } from '@safra/contracts';
 import { readerPermissions } from '@/lib/gate';
 import { BookingActions } from '@/components/booking-actions';
+import { SettleRefund } from '@/components/settle-refund';
 import { BookingNotes } from '@/components/booking-notes';
 
 /**
@@ -354,8 +355,20 @@ export default async function BookingPage({
                   key={refund.createdAt}
                   className="rounded-lg border border-line bg-card px-4 py-3"
                 >
+                  {/*
+                    `Number(...) === 0`, not `=== '0.00'`.
+
+                    `refunds.wallet_amount` is `numeric` and arrives from pg as a STRING at the
+                    column's own scale — `'0.000'`, three decimals. The comparison was against a
+                    two-decimal literal, so it never matched and EVERY refund was described as
+                    «... 0.00 USD إلى المحفظة»: a statement about where a customer's money went
+                    that was wrong on every refund with no wallet component. Found by reading the
+                    row while adding the settlement control beside it.
+
+                    Compared as a NUMBER so no scale can break it again.
+                  */}
                   <span className="text-text">
-                    {refund.walletAmount === '0.00'
+                    {Number(refund.walletAmount) === 0
                       ? fill(t.sections.bookingDetail.refunded, {
                           amount: money(refund.amount),
                           currency: booking.money.currencyCode,
@@ -372,9 +385,35 @@ export default async function BookingPage({
                     sentence is not something this console can do, and paraphrasing one on a
                     money record would be worse than leaving it.
                   */}
+                  {/*
+                    The reason THROUGH `cancellationReason`, which is the same duality this console
+                    already resolves elsewhere: what the PLATFORM writes is a code and what a person
+                    writes is a sentence. Printed raw, an operator read «system.partner_no_response»
+                    on the money record — and the Arabic for it was already in the catalogue with
+                    nothing reaching it. An operator's own words still pass through unchanged.
+                  */}
                   <span className="block text-xs text-faint">
-                    {label(t.enums.paymentStatus, refund.status)} · {refund.reason}
+                    {label(t.enums.paymentStatus, refund.status)} ·{' '}
+                    {cancellationReason(refund.reason)}
                   </span>
+
+                  {/*
+                    The confirmation an OFFLINE refund needs, on the row it belongs to.
+
+                    `settleable` is the API's answer, not this page's: still `processing`, on a rail
+                    that cannot report for itself. A gateway refund is confirmed by its webhook and
+                    must never be settled by hand, and a wallet-only refund completed on issue.
+
+                    ANDed with the reader's own refund permission — the same courtesy every other
+                    control here observes, with the endpoint as the real control.
+                  */}
+                  {refund.settleable && permissions.includes('refund.create') ? (
+                    <SettleRefund
+                      refundId={refund.id}
+                      amount={money(refund.amount)}
+                      currency={booking.money.currencyCode}
+                    />
+                  ) : null}
                 </li>
               ))}
             </ul>

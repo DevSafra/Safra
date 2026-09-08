@@ -917,11 +917,21 @@ const bookingDetailSchema = z.object({
       ),
       refunds: z.array(
         z.object({
+          /* The refund's own id: a booking may carry several and only some settleable. */
+          id: z.string(),
           amount: z.string(),
           walletAmount: z.string(),
           status: z.string(),
           reason: z.string(),
           createdAt: z.string(),
+          /*
+            Whether finance has to confirm this one left the account (finding 222).
+
+            Not `.optional()`: an API that stopped sending it must fail the parse rather than let
+            the control quietly vanish from a screen where its absence means money is never
+            reversed. The API decides — see `booking-detail.service.ts` for why.
+          */
+          settleable: z.boolean(),
         }),
       ),
     })
