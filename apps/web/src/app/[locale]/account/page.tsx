@@ -13,10 +13,10 @@ import {
   type CustomerBooking,
 } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
-import { dynamicMessage } from '@/lib/dynamic-message';
 import { formatMoney, localisedName } from '@/lib/localise';
 import { returnParam } from '@/lib/return-to';
 import type { Locale } from '@/i18n/routing';
+import { localStatus } from '@/lib/status-word';
 
 /**
  * نظرة عامة — the account overview (handoff §6).
@@ -189,10 +189,10 @@ function BookingRow({
       <span className="flex items-center gap-3">
         <StatusPill
           status={customerBookingStatus(booking.status)}
-          label={dynamicMessage(
-            t,
-            `status.${customerBookingStatus(booking.status)}`,
-            booking.status,
+          label={localStatus(
+            'bookingStatus',
+            customerBookingStatus(booking.status),
+            locale,
           )}
         />
         <span className="text-sm text-gold" dir="ltr">

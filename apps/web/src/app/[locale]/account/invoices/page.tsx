@@ -7,9 +7,9 @@ import { DateRange } from '@/components/date-range';
 import { StatusPill, customerBookingStatus } from '@/components/booking-status-pill';
 import { getAccountSummary, getMyInvoices } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
-import { dynamicMessage } from '@/lib/dynamic-message';
 import { ltrIsolate } from '@/lib/bidi';
 import { formatMoney, localisedName } from '@/lib/localise';
+import { localStatus } from '@/lib/status-word';
 
 /**
  * الفواتير — handoff §6.
@@ -113,10 +113,10 @@ export default async function AccountInvoicesPage({
                     </span>
                     <StatusPill
                       status={customerBookingStatus(invoice.bookingStatus)}
-                      label={dynamicMessage(
-                        t,
-                        `status.${customerBookingStatus(invoice.bookingStatus)}`,
-                        invoice.bookingStatus,
+                      label={localStatus(
+                        'bookingStatus',
+                        customerBookingStatus(invoice.bookingStatus),
+                        locale,
                       )}
                     />
                     {/*

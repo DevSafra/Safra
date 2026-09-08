@@ -35,6 +35,8 @@
  * placeholder names out of. Without it every template degrades to `string` and the
  * type checking silently stops.
  */
+import { statusWords, unambiguousStatusWords } from '../../statuses.js';
+
 export const ar = {
   /** Document metadata — the browser tab and any bookmark. */
   meta: {
@@ -1416,7 +1418,7 @@ export const ar = {
        * the customer would find it marked مستخدمة. The value is the same either way — better, if
        * anything, since a wallet balance does not expire — but the screen has to say which.
        */
-      note: 'تُستخدم للحجوزات والمطاعم والأنشطة الشريكة. عند الاستخدام تُحوَّل قيمة البطاقة كاملةً إلى محفظة العميل وتُصبح البطاقة مستخدمة؛ ما تبقّى بعد العملية يظل في المحفظة. بطاقة منتهية أثناء الدفع؟ تُعاد الحسبة قبل التأكيد (EC-012).',
+      note: 'تُستخدم للحجوزات والمطاعم والأنشطة الشريكة. عند الاستخدام تُحوَّل قيمة البطاقة كاملةً إلى محفظة العميل وتُصبح البطاقة مستبدلة؛ ما تبقّى بعد العملية يظل في المحفظة. بطاقة منتهية أثناء الدفع؟ تُعاد الحسبة قبل التأكيد (EC-012).',
       /* ── The issue form (Bashar, 2026-08-26) ─────────────────────────────────────────────── */
       issueTitle: 'إصدار بطاقة هدية',
       issueAmount: 'القيمة',
@@ -4015,24 +4017,19 @@ export const ar = {
      * fault. «قيد التجميع» and «بانتظار الإفراج» are the pair most at risk of being collapsed
      * into one «قيد المعالجة»; they are different things and an operator acts differently on each.
      */
-    payoutStatus: {
-      accruing: 'قيد التجميع',
-      pending_release: 'بانتظار الإفراج',
-      on_hold: 'معلَّق',
-      scheduled: 'مجدول',
-      paid: 'مدفوع',
-      cancelled: 'ملغى',
-    } as Record<string, string>,
+    /*
+      From the canonical status catalogue (Bashar, 2026-09-08): one word per state, in every app.
+      The list that used to be here diverged from the customer app's and the portal's —
+      see `packages/i18n/src/statuses.ts` for what each choice was and why.
+    */
+    payoutStatus: statusWords('payoutStatus', 'ar'),
 
-    propertyStatus: {
-      draft: 'مسودة',
-      pending_review: 'قيد المراجعة',
-      rejected: 'مرفوض',
-      approved: 'معتمد',
-      published: 'منشور',
-      suspended: 'موقوف مؤقتاً',
-      archived: 'مؤرشف',
-    } as Record<string, string>,
+    /*
+      From the canonical status catalogue (Bashar, 2026-09-08): one word per state, in every app.
+      The list that used to be here diverged from the customer app's and the portal's —
+      see `packages/i18n/src/statuses.ts` for what each choice was and why.
+    */
+    propertyStatus: statusWords('propertyStatus', 'ar'),
 
     /**
      * The five documents a partner uploads for verification (§8.1).
@@ -4109,11 +4106,12 @@ export const ar = {
       5: '5 نجوم',
     } as Record<string, string>,
 
-    payoutAccountStatus: {
-      pending: 'قيد المراجعة',
-      verified: 'موثَّق',
-      rejected: 'مرفوض',
-    } as Record<string, string>,
+    /*
+      From the canonical status catalogue (Bashar, 2026-09-08): one word per state, in every app.
+      The list that used to be here diverged from the customer app's and the portal's —
+      see `packages/i18n/src/statuses.ts` for what each choice was and why.
+    */
+    payoutAccountStatus: statusWords('payoutAccountStatus', 'ar'),
 
     partnerTier: {
       new: 'جديد',
@@ -4146,40 +4144,12 @@ export const ar = {
       cash_office: 'مكتب صرافة',
     } as Record<string, string>,
 
-    paymentStatus: {
-      initiated: 'بدأت',
-      requires_action: 'تحتاج إجراء',
-      authorized: 'مُصرَّح بها',
-      captured: 'ناجحة',
-      failed: 'فشلت',
-      expired: 'منتهية',
-      refunded: 'مستردة',
-      partially_refunded: 'مستردة جزئياً',
-      /*
-        `pending` and `processing` both read «قيد المعالجة» until 2026-08-06, which put two
-        DIFFERENT statuses on one screen under one word. Once every status has its own colour that
-        is worse than a shared colour: one word in two colours reads as a rendering bug. They are
-        also genuinely different — nothing has started yet, versus the provider is working on it.
-      */
-      pending: 'بالانتظار',
-      processing: 'قيد المعالجة',
-      completed: 'مكتمل',
-      collected: 'محصلة',
-      /*
-        «معفاة», not «ملغاة» (2026-08-27).
-
-        The same problem `pending`/`processing` had above, one screen further out: «ملغاة» was
-        ALSO بطاقات الهدايا's `cancelled`, so one word appeared in two colours — stone on الدفع and
-        red on بطاقات الهدايا. `status-tone.test.ts` cannot see it, because the two are in
-        different vocabularies; only the browser sweep across all twenty sections can, and it only
-        sees it on a day when both screens happen to show both statuses. Found 2026-08-27.
-
-        It is also the more accurate word. A waived fee was FORGIVEN — SAFRA chose not to collect
-        it — where a cancelled gift card was withdrawn. «معفاة» says the first and cannot be read
-        as the second.
-      */
-      waived: 'معفاة',
-    } as Record<string, string>,
+    /*
+      From the canonical status catalogue (Bashar, 2026-09-08): one word per state, in every app.
+      The list that used to be here diverged from the customer app's and the portal's —
+      see `packages/i18n/src/statuses.ts` for what each choice was and why.
+    */
+    paymentStatus: statusWords('paymentStatus', 'ar'),
 
     /**
      * Who processed a payment.
@@ -4588,6 +4558,8 @@ export const ar = {
      * unchanged, exactly like a typed cancellation reason.
      */
     payloadValue: {
+      ...unambiguousStatusWords('ar'),
+
       /* ── إشعارات: نتيجة الإرسال (سجل التدقيق يقرؤها تحت «الشريك» و«العميل») ─────
          كانت تُطبع «queued» و«created» بالإنجليزية على لوحة عربية بالكامل، لأن حارس
          سجل التدقيق كان يشترط شرطةً سفلية في القيمة فلم يرَ أي كلمة مفردة. */
@@ -4595,19 +4567,9 @@ export const ar = {
       created: 'أُنشئ الإشعار',
 
       /* مراحل سلّم الإنفاذ، كما تسمّيها شاشة المخالفات نفسها. */
-      recorded: 'سُجّلت',
-      warned: 'صدر إنذار',
-      fined: 'غرامة',
-      suspension: 'رُفع إلى الإيقاف',
 
       /* حالات تُقرأ في «قبل» و«بعد» — الكلمات نفسها التي تستخدمها الشاشات. */
-      cancelled: 'ملغى',
-      paid: 'مدفوع',
-      disputed: 'متنازع عليه',
-      investigating: 'قيد المراجعة',
-      scheduled: 'مجدول',
       paused: 'متوقف',
-      verified: 'موثّق',
 
       /* أطراف ومستفيدون: تُقرأ تحت «إلى» و«مَن قدّمه» و«الدور». */
       booking: 'حجز',
@@ -4635,7 +4597,6 @@ export const ar = {
         القيمة إلا في `dispute.resolved` و`dispute.notified` — تحقّقنا من ذلك في السجل قبل
         اختيار كلمةٍ خاصة بالنزاعات.
       */
-      resolved: 'مغلق — لصالح العميل',
 
       /*
         حالتا إشعار النزاع للشريك (اكتشاف 223). «فتح» له مقابلٌ في مفردات أخرى، أما
@@ -4649,7 +4610,6 @@ export const ar = {
         المراجعة» deliberately, matching `enums.propertyStatus` — the audit trail and the registry
         must call one state by one name, or a reader comparing the two screens sees two events.
       */
-      pending_review: 'قيد المراجعة',
 
       /* The payout rails, as `PAYOUT_METHODS` spells them. */
       bank_transfer: 'حوالة مصرفية',
@@ -4667,7 +4627,6 @@ export const ar = {
         been driven through the browser rather than posted straight to the API.
       */
       manual_transfer: 'حوالة بنكية',
-      requires_action: 'بانتظار إجراء من العميل',
 
       /*
         A violation KIND, reaching a payload because `violation.recorded` records which offence.
@@ -4675,7 +4634,6 @@ export const ar = {
         this catalogue is looked up by VALUE across every payload in the log, and pointing it at
         another map would mean a reader of either could not tell what the other one covers.
       */
-      stale_calendar: 'تقويم غير محدَّث',
       /*
         ALL FIVE kinds, not only the one the log happened to contain.
 
@@ -4685,10 +4643,6 @@ export const ar = {
         2026-08-24, hours after the same shape of gap took الدفع down: a catalogue completed to the
         data rather than to the enum, which reads as coverage until the sixth row arrives.
       */
-      no_response: 'عدم الرد',
-      rejected_after_payment: 'رفض بعد الدفع',
-      inaccurate_listing: 'وصف غير مطابق',
-      no_show: 'عدم استقبال',
 
       /*
         The sanctions list a screening was run against. `local_fixture` is here for the same reason
@@ -4706,15 +4660,23 @@ export const ar = {
       awaiting_partner_signature: 'بانتظار توقيع الشريك',
 
       /*
-        ── Statuses and codes as they appear in an audit payload (Bashar, 2026-08-20) ───────────
-        These are written out here rather than resolved through the status vocabularies above, and
-        the reason is that those DISAGREE with each other on purpose: `active` is «نشطة» for a gift
-        card and «نشط» for a coupon, `rejected` is «مرفوض» in three maps and «مغلق — مرفوض» in
-        disputes. A merged lookup would pick whichever map came first and print the wrong
-        agreement. The audit log is one column with one voice, so it gets one deliberate list.
+        ── Statuses and codes as they appear in an audit payload ────────────────────────────────
+
+        The canonical word wherever there IS one word (Bashar, 2026-09-08), and a deliberate choice
+        only where a value means two things.
+
+        This whole block used to be written out, on the sound reasoning that the vocabularies above
+        disagree with each other on purpose and a merged lookup would print the wrong agreement.
+        What that cost was measured on 2026-09-08: twenty values, so an operator read «قيد المراجعة»
+        on an audit row about a dispute every screen calls «قيد الدراسة», and «عدم الرد» about a
+        violation the partner is told is «عدم الرد على طلب حجز». Fifteen of the twenty were not
+        ambiguous at all — `checked_in`, `investigating`, `no_show`, `recorded` and the rest belong
+        to exactly one vocabulary — so they now come from `unambiguousStatusWords` above and there
+        is nothing left to keep in step.
+
+        The five that stay written out are below with the reason each is a real collision. They come
+        AFTER the spread, so an explicit entry wins.
       */
-      pending_payment: 'بانتظار الدفع',
-      pending_confirmation: 'قيد التأكيد',
       /*
         The three the lifecycle work of 2026-08-25 made reachable.
 
@@ -4725,28 +4687,17 @@ export const ar = {
 
         `confirmed` and `completed` are here for the same reason and were one run behind.
       */
-      confirmed: 'مؤكد',
-      checked_in: 'تم الوصول',
       completed: 'مكتمل',
       /*
         The dispute KINDS, reaching a payload because `dispute.opened_by_staff` records which
         complaint was raised. All four, not only the one a run happened to produce — the same
         lesson the violation kinds above record, learnt the same way on the same day.
       */
-      property_unavailable: 'العقار غير متاح',
-      not_as_described: 'غير مطابق للوصف',
-      partner_no_response: 'الشريك لم يرد',
-      complaint: 'شكوى',
       contacted: 'تم الاتصال',
       accepted: 'مقبول',
-      rejected: 'مرفوض',
-      approved: 'معتمد',
-      active: 'نشط',
-      suspended: 'موقوف',
       draft: 'مسودة',
       closed: 'مغلق',
       available: 'متاح',
-      used: 'مستخدم',
       credit: 'دائن',
       debit: 'مدين',
       manual: 'يدوي',
@@ -4780,6 +4731,29 @@ export const ar = {
       finance_officer: 'مسؤول مالي',
       support_agent: 'موظف دعم',
       csv: 'CSV',
+
+      /*
+        ── The four that stay written out, because each is TWO states sharing an enum label ─────
+
+        Everything else in this map now comes from the canonical catalogue. These cannot, because
+        `payloadValue` is looked up by VALUE across every payload in the log and each of these
+        values means different things in different vocabularies. A merged lookup would pick one and
+        print the wrong agreement with confidence, which is worse than a general word.
+
+        `rejected`   — a refused listing, document, application or payout account, AND a dispute
+                       decided for the partner. «محسوم لصالح الشريك» on a refused DOCUMENT is
+                       nonsense, so the column keeps the general word.
+        `active`     — «سارية» for a gift card, «نشط» for a coupon, «مفعَّل» for a user.
+        `suspended`  — «موقوف مؤقتاً» for a listing, «موقوف» for a coupon, «معطّل» for a user.
+        `cancelled`  — «ملغى» for a booking or a payout, «ملغاة» for a gift card. Gendered rather
+                       than different, and one column cannot be both.
+
+        Finding 226 is the shape that would resolve them properly: key the map by (key, value).
+      */
+      rejected: 'مرفوض',
+      active: 'نشط',
+      suspended: 'موقوف',
+      cancelled: 'ملغى',
     } as Record<string, string>,
 
     /**
@@ -4907,13 +4881,12 @@ export const ar = {
         'رفض الشريك حجزاً بعد أن أتمّ الضيف الدفع، فاستُرد المبلغ للضيف.',
     } as Record<string, string>,
 
-    violationKind: {
-      no_response: 'عدم الرد',
-      rejected_after_payment: 'رفض بعد الدفع',
-      stale_calendar: 'تقويم غير محدَّث',
-      inaccurate_listing: 'وصف غير مطابق',
-      no_show: 'عدم استقبال',
-    } as Record<string, string>,
+    /*
+      From the canonical status catalogue (Bashar, 2026-09-08): one word per state, in every app.
+      The list that used to be here diverged from the customer app's and the portal's —
+      see `packages/i18n/src/statuses.ts` for what each choice was and why.
+    */
+    violationKind: statusWords('violationKind', 'ar'),
 
     /*
       How far a violation has been TAKEN — `VIOLATION_STAGES`, forward only.
@@ -4927,12 +4900,12 @@ export const ar = {
       of recommending suspension, which is not the same as the partner currently being suspended —
       that is `suspension` on the partner record, and it can be lifted while this stage stands.
     */
-    violationStage: {
-      recorded: 'سُجّلت',
-      warned: 'صدر إنذار',
-      fined: 'غرامة',
-      suspension: 'رُفع إلى الإيقاف',
-    } as Record<string, string>,
+    /*
+      From the canonical status catalogue (Bashar, 2026-09-08): one word per state, in every app.
+      The list that used to be here diverged from the customer app's and the portal's —
+      see `packages/i18n/src/statuses.ts` for what each choice was and why.
+    */
+    violationStage: statusWords('violationStage', 'ar'),
 
     /* `user_status` — three values, so the customer record never prints a raw identifier. */
     userStatus: {
@@ -4950,12 +4923,12 @@ export const ar = {
       profile_claim: 'ضم حساب ضيف',
     } as Record<string, string>,
 
-    giftCardStatus: {
-      active: 'نشطة',
-      used: 'مستخدمة',
-      expired: 'منتهية',
-      cancelled: 'ملغاة',
-    } as Record<string, string>,
+    /*
+      From the canonical status catalogue (Bashar, 2026-09-08): one word per state, in every app.
+      The list that used to be here diverged from the customer app's and the portal's —
+      see `packages/i18n/src/statuses.ts` for what each choice was and why.
+    */
+    giftCardStatus: statusWords('giftCardStatus', 'ar'),
 
     couponStatus: {
       active: 'نشط',
@@ -4984,19 +4957,28 @@ export const ar = {
       campaign: 'حملة تسويقية',
     } as Record<string, string>,
 
+    /*
+      The canonical LABEL, composed with the SRS code an operator uses for traceability.
+
+      The label used to be written out with the code baked into it, and the three apps therefore
+      named one category three ways (Bashar, 2026-09-08). Composition keeps both: the word is the
+      canonical one every reader sees, and «(EC-007)» is the console's own addition, in the one
+      place where somebody cross-references the specification. `complaint` has no EC code because
+      §10 gives it none.
+    */
     disputeKind: {
-      property_unavailable: 'العقار غير متاح (EC-006)',
-      not_as_described: 'غير مطابق للوصف (EC-007)',
-      partner_no_response: 'الشريك لم يرد (EC-008)',
-      complaint: 'شكوى',
+      property_unavailable: `${statusWords('disputeKind', 'ar')['property_unavailable']} (EC-006)`,
+      not_as_described: `${statusWords('disputeKind', 'ar')['not_as_described']} (EC-007)`,
+      partner_no_response: `${statusWords('disputeKind', 'ar')['partner_no_response']} (EC-008)`,
+      complaint: statusWords('disputeKind', 'ar')['complaint'] ?? 'complaint',
     } as Record<string, string>,
 
-    disputeStatus: {
-      open: 'مفتوح',
-      investigating: 'قيد المراجعة',
-      resolved: 'مغلق — لصالح العميل',
-      rejected: 'مغلق — مرفوض',
-    } as Record<string, string>,
+    /*
+      From the canonical status catalogue (Bashar, 2026-09-08): one word per state, in every app.
+      The list that used to be here diverged from the customer app's and the portal's —
+      see `packages/i18n/src/statuses.ts` for what each choice was and why.
+    */
+    disputeStatus: statusWords('disputeStatus', 'ar'),
 
     notificationStatus: {
       queued: 'قيد الانتظار',
@@ -5101,15 +5083,12 @@ export const ar = {
   } as Record<string, string>,
 
   /** Booking statuses, so the table does not show raw enum values. */
-  bookingStatus: {
-    pending_payment: 'بانتظار الدفع',
-    pending_confirmation: 'قيد التأكيد',
-    confirmed: 'مؤكد',
-    checked_in: 'تم الوصول',
-    completed: 'مكتمل',
-    cancelled: 'ملغى',
-    disputed: 'متنازع عليه',
-  } as Record<string, string>,
+  /*
+    From the canonical status catalogue (Bashar, 2026-09-08): one word per state, in every app.
+    The list that used to be here diverged from the customer app's and the portal's —
+    see `packages/i18n/src/statuses.ts` for what each choice was and why.
+  */
+  bookingStatus: statusWords('bookingStatus', 'ar'),
 
   /** Role names, so `super_admin` does not appear raw next to Arabic text. */
   roles: {

@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import { STAFF_STATE } from './staff.js';
 
 import en from '../packages/i18n/src/messages/web/en.json' assert { type: 'json' };
+import { statusWord } from '../packages/i18n/src/statuses.js';
 
 /**
  * بطاقات الهدايا, from the customer's side (handoff §6).
@@ -518,12 +519,21 @@ test.describe('بطاقات الهدايا', () => {
           problem the API did not have. A test must not be stricter than the rule it is testing.
         */
         const live =
-          text.includes(en.disputeStatuses.open) ||
-          text.includes(en.disputeStatuses.investigating);
+          text.includes(statusWord('disputeStatus', 'open', 'en')) ||
+          text.includes(statusWord('disputeStatus', 'investigating', 'en'));
 
         if (!live) continue;
 
-        for (const [kind, label] of Object.entries(en.disputeKinds)) {
+        /*
+          The KIND as it appears on the row — the canonical label, not the form's question.
+
+          `disputeKinds` used to be both: the first-person option a guest picks and the word on the
+          list. They are now separate (Bashar, 2026-09-08) — `disputeReasons` asks, the canonical
+          catalogue names — and this loop reads the row, so it reads the label.
+        */
+        for (const kind of Object.keys(en.disputeReasons)) {
+          const label = statusWord('disputeKind', kind, 'en');
+
           if (booking && text.includes(label)) spent.add(`${booking}|${kind}`);
         }
       }
@@ -566,7 +576,7 @@ test.describe('بطاقات الهدايا', () => {
           options.map((option) => (option as HTMLOptionElement).value),
         )
     ).flatMap((booking) =>
-      Object.keys(en.disputeKinds).map((kind) => ({ booking, kind })),
+      Object.keys(en.disputeReasons).map((kind) => ({ booking, kind })),
     );
 
     const pair = candidates.find(({ booking, kind }) => !spent.has(`${booking}|${kind}`));

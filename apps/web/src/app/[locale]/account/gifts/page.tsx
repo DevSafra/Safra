@@ -6,9 +6,9 @@ import { AccountShell } from '@/components/account-shell';
 import { BuyForm, RedeemForm } from '@/components/gift-card-forms';
 import { getAccountSummary, getMyGiftCards, getMyWallet } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
-import { dynamicMessage } from '@/lib/dynamic-message';
 import { formatMoney } from '@/lib/localise';
 import { ltrIsolate } from '@/lib/bidi';
+import { localStatus } from '@/lib/status-word';
 
 /**
  * بطاقات الهدايا — handoff §6.
@@ -141,7 +141,7 @@ export default async function AccountGiftsPage({
                       })}
                     </span>
                     <span className="text-xs text-muted">
-                      {dynamicMessage(t, `giftStatus.${card.status}`, card.status)}
+                      {localStatus('giftCardStatus', card.status, locale)}
                     </span>
                   </span>
                 </li>

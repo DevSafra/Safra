@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm';
 
 import { createRollbackDatabase, type Database } from '@safra/db';
 import { INVOICE_LINE_KEYS } from '@safra/contracts';
-import { LOCALES, WEB_CATALOGUES } from '@safra/i18n';
+import { LOCALES, WEB_CATALOGUES, statusWords, type StatusVocabulary } from '@safra/i18n';
 
 /**
  * Every status and every line a receipt can render has a word in every language.
@@ -71,23 +71,50 @@ describeIfDb('receipt copy covers every enum it renders', () => {
     await expect(enumValues('booking_status')).resolves.not.toHaveLength(0);
   });
 
-  it.each([...LOCALES])('%s labels every booking status', async (locale) => {
-    const statuses = await enumValues('booking_status');
-    const labels = nested(locale, ['account', 'status']);
+  /**
+   * Every value of every state enum has a canonical word, in every language.
+   *
+   * ## Why this widened, and why it reads the canonical catalogue
+   *
+   * It checked two vocabularies against the customer app's OWN copy of them. Those copies are gone
+   * (Bashar, 2026-09-08): one word per state now lives in `packages/i18n/src/statuses.ts` and all
+   * three apps read it, because 22 of the 58 states they shared were named differently by two of
+   * them. Pointing this at the canonical catalogue keeps what the test was for — the database is
+   * the authority on which states exist — and extends it to every vocabulary backed by an enum,
+   * which is the same class of gap one table wider.
+   *
+   * `statuses.test.ts` proves the catalogue is internally complete and that every app resolves it.
+   * Only THIS test can say whether it covers what the database can actually hold, because only
+   * this app can read `pg_enum`. A value added to an enum and not to the catalogue reads as its
+   * own identifier on a receipt — a raw `pending_confirmation` in a financial document.
+   */
+  const ENUM_VOCABULARIES: readonly (readonly [string, StatusVocabulary])[] = [
+    ['booking_status', 'bookingStatus'],
+    ['payment_status', 'paymentStatus'],
+    ['dispute_status', 'disputeStatus'],
+    ['dispute_kind', 'disputeKind'],
+    ['gift_card_status', 'giftCardStatus'],
+    ['payout_status', 'payoutStatus'],
+    ['payout_account_status', 'payoutAccountStatus'],
+    ['property_status', 'propertyStatus'],
+    ['violation_kind', 'violationKind'],
+    ['violation_stage', 'violationStage'],
+  ];
 
-    expect(statuses.filter((status) => typeof labels[status] !== 'string')).toStrictEqual(
-      [],
-    );
-  });
+  for (const [enumName, vocabulary] of ENUM_VOCABULARIES) {
+    it.each([...LOCALES])(`%s names every ${enumName}`, async (locale) => {
+      const values = await enumValues(enumName);
+      const words = statusWords(vocabulary, locale);
 
-  it.each([...LOCALES])('%s labels every payment status', async (locale) => {
-    const statuses = await enumValues('payment_status');
-    const labels = nested(locale, ['account', 'paymentStatus']);
-
-    expect(statuses.filter((status) => typeof labels[status] !== 'string')).toStrictEqual(
-      [],
-    );
-  });
+      expect(values, `${enumName} has no values — check the type name`).not.toHaveLength(
+        0,
+      );
+      expect(
+        values.filter((value) => typeof words[value] !== 'string'),
+        `Add these to ${vocabulary} in packages/i18n/src/statuses.ts, in all three languages.`,
+      ).toStrictEqual([]);
+    });
+  }
 
   /**
    * A payment method needs a word too.

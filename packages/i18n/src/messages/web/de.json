@@ -465,16 +465,6 @@
       "admin_adjustment": "Anpassung durch SAFRA",
       "gift_card_transfer": "Geschenkkarte"
     },
-    "status": {
-      "draft": "Entwurf",
-      "pending_payment": "Zahlung ausstehend",
-      "pending_confirmation": "Bestätigung ausstehend",
-      "confirmed": "Bestätigt",
-      "cancelled": "Storniert",
-      "checked_in": "Eingecheckt",
-      "completed": "Abgeschlossen",
-      "disputed": "Strittig"
-    },
     "navHeading": "Mein Konto",
     "navOverview": "Übersicht",
     "navBookings": "Meine Buchungen",
@@ -548,16 +538,6 @@
       "giftCard": "Geschenkkarte",
       "wallet": "Guthaben"
     },
-    "paymentStatus": {
-      "initiated": "Gestartet",
-      "requires_action": "Bestätigung erforderlich",
-      "authorized": "Reserviert",
-      "captured": "Eingezogen",
-      "failed": "Fehlgeschlagen",
-      "expired": "Abgelaufen",
-      "refunded": "Erstattet",
-      "partially_refunded": "Teilweise erstattet"
-    },
     "passwordConfirm": "Neues Passwort bestätigen",
     "passwordMismatch": "Die beiden Passwörter stimmen nicht überein.",
     "invoiceDownload": "PDF herunterladen",
@@ -588,12 +568,6 @@
     "giftNoneBought": "Sie haben noch keine Karten gekauft.",
     "giftCardEnding": "Endet auf {last4}",
     "giftRecipientFor": "Für {name}",
-    "giftStatus": {
-      "active": "Aktiv",
-      "used": "Eingelöst",
-      "expired": "Abgelaufen",
-      "cancelled": "Storniert"
-    },
     "walletGiftCaption": "Aus Geschenkkarten eingelöst · wird zuerst verwendet",
     "navShowSidebar": "Menü anzeigen",
     "navHideSidebar": "Menü ausblenden",
@@ -683,17 +657,11 @@
     "unreachable": "Der Server ist nicht erreichbar.",
     "none": "Keine Aufenthalte warten auf Ihre Bewertung."
   },
-  "disputeKinds": {
+  "disputeReasons": {
     "property_unavailable": "Die Unterkunft war bei meiner Ankunft geschlossen oder nicht verfügbar",
     "not_as_described": "Sie entsprach nicht den Fotos oder der Beschreibung",
     "partner_no_response": "Der Gastgeber hat auf meine Buchung nie geantwortet",
     "complaint": "Etwas anderes"
-  },
-  "disputeStatuses": {
-    "open": "Offen",
-    "investigating": "In Prüfung",
-    "resolved": "Geklärt",
-    "rejected": "Abgelehnt"
   },
   "footer": {
     "about": "SAFRA vermittelt Unterkünfte in der Levante, von einer Nacht bis zum Langzeitaufenthalt, mit klaren Preisen und Stornobedingungen, die vor der Zahlung feststehen.",

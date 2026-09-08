@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import ar from '../packages/i18n/src/messages/web/ar.json' assert { type: 'json' };
-import en from '../packages/i18n/src/messages/web/en.json' assert { type: 'json' };
+import { statusWord } from '../packages/i18n/src/statuses.js';
 
 /**
  * حجوزاتي: three states, and a row that opens the booking it names.
@@ -19,10 +19,17 @@ import en from '../packages/i18n/src/messages/web/en.json' assert { type: 'json'
 const PASSWORD = process.env['TESTBED_PASSWORD'] ?? 'a-testbed-password-1';
 const EMAIL = 'customer@safra.test';
 
+/*
+  The words come from the CANONICAL catalogue now (Bashar, 2026-09-08).
+
+  They used to be read out of the customer app's own copy of the booking statuses, which is exactly
+  the copy that had drifted from the console's — «تم الوصول» against «تم تسجيل الوصول». A spec
+  reading one app's copy proves that app agrees with itself.
+*/
 const ALLOWED = [
-  ar.account.status.cancelled,
-  ar.account.status.pending_confirmation,
-  ar.account.status.confirmed,
+  statusWord('bookingStatus', 'cancelled', 'ar'),
+  statusWord('bookingStatus', 'pending_confirmation', 'ar'),
+  statusWord('bookingStatus', 'confirmed', 'ar'),
 ];
 
 test.use({ baseURL: 'http://localhost:3000' });
@@ -53,7 +60,9 @@ test.describe('حجوزاتي', () => {
     ).toStrictEqual([]);
     /* «مكتمل» named explicitly: it is the word this change removed, and the fixture still holds
        `completed` bookings, so a regression would put it back here. */
-    expect(painted.map((p) => p.word)).not.toContain(ar.account.status.completed);
+    expect(painted.map((p) => p.word)).not.toContain(
+      statusWord('bookingStatus', 'completed', 'ar'),
+    );
 
     const byWord = new Map<string, Set<string>>();
     for (const { word, colour } of painted) {
@@ -121,14 +130,11 @@ test.describe('حجوزاتي', () => {
       list in one language would then match nothing and the biconditional below would quietly assert
       «no booking offers a voucher», which is exactly the vacuous pass this file's header warns of.
     */
-    const OFFERS = [
-      ar.account.status.confirmed,
-      ar.account.status.checked_in,
-      ar.account.status.completed,
-      en.account.status.confirmed,
-      en.account.status.checked_in,
-      en.account.status.completed,
-    ];
+    const OFFERS = (['ar', 'en'] as const).flatMap((locale) => [
+      statusWord('bookingStatus', 'confirmed', locale),
+      statusWord('bookingStatus', 'checked_in', locale),
+      statusWord('bookingStatus', 'completed', locale),
+    ]);
 
     /* Read once, from a list this block navigated to itself — not from wherever history left us. */
     await page.goto('/ar/account/bookings');

@@ -465,16 +465,6 @@
       "admin_adjustment": "تعديل من سفرة",
       "gift_card_transfer": "بطاقة هدية"
     },
-    "status": {
-      "draft": "مسودة",
-      "pending_payment": "بانتظار الدفع",
-      "pending_confirmation": "قيد التأكيد",
-      "confirmed": "مؤكد",
-      "cancelled": "ملغى",
-      "checked_in": "تم تسجيل الوصول",
-      "completed": "مكتمل",
-      "disputed": "قيد النزاع"
-    },
     "navHeading": "حسابي",
     "navOverview": "نظرة عامة",
     "navBookings": "حجوزاتي",
@@ -548,16 +538,6 @@
       "giftCard": "بطاقة هدية",
       "wallet": "من المحفظة"
     },
-    "paymentStatus": {
-      "initiated": "بدأت",
-      "requires_action": "تحتاج تحققاً",
-      "authorized": "محجوزة",
-      "captured": "مقبوضة",
-      "failed": "فشلت",
-      "expired": "منتهية",
-      "refunded": "مستردة",
-      "partially_refunded": "مستردة جزئياً"
-    },
     "passwordConfirm": "تأكيد كلمة المرور الجديدة",
     "passwordMismatch": "كلمتا المرور غير متطابقتين.",
     "invoiceDownload": "تحميل PDF",
@@ -588,12 +568,6 @@
     "giftNoneBought": "لم تشترِ بطاقات بعد.",
     "giftCardEnding": "تنتهي بـ {last4}",
     "giftRecipientFor": "إلى {name}",
-    "giftStatus": {
-      "active": "سارية",
-      "used": "مستبدلة",
-      "expired": "منتهية",
-      "cancelled": "ملغاة"
-    },
     "walletGiftCaption": "مُستبدلة من بطاقات هدايا · تُصرف أولاً",
     "navShowSidebar": "إظهار القائمة",
     "navHideSidebar": "إخفاء القائمة",
@@ -683,17 +657,11 @@
     "unreachable": "تعذّر الوصول إلى الخادم.",
     "none": "لا إقامات بانتظار تقييمك."
   },
-  "disputeKinds": {
+  "disputeReasons": {
     "property_unavailable": "المكان كان مغلقاً أو غير متاح عند وصولي",
     "not_as_described": "لم يكن مطابقاً للصور أو للوصف",
     "partner_no_response": "المضيف لم يردّ على حجزي",
     "complaint": "سبب آخر"
-  },
-  "disputeStatuses": {
-    "open": "مفتوح",
-    "investigating": "قيد الدراسة",
-    "resolved": "محسوم",
-    "rejected": "مرفوض"
   },
   "footer": {
     "about": "سفرة منصّة لحجز الإقامات في الوطن العربي، من ليلة واحدة إلى إقامة طويلة، بأسعار واضحة وشروط إلغاء مكتوبة قبل الدفع.",

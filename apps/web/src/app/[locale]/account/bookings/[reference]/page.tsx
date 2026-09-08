@@ -14,11 +14,11 @@ import { DateRange } from '@/components/date-range';
 import { StatusPill, customerBookingStatus } from '@/components/booking-status-pill';
 import { getAccountSummary, getMyBooking } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
-import { dynamicMessage } from '@/lib/dynamic-message';
 import { isBookingReference } from '@/lib/booking-reference';
 import { ltrIsolate } from '@/lib/bidi';
 import { localisedName } from '@/lib/localise';
 import { returnTo } from '@/lib/return-to';
+import { localStatus } from '@/lib/status-word';
 
 /**
  * One booking, as its customer sees it.
@@ -123,7 +123,7 @@ export default async function BookingDetailPage({
     >
       {/* The shell prints the heading; this row carries the state beside it. */}
       <div className="flex flex-wrap items-center gap-3">
-        <StatusPill status={shown} label={dynamicMessage(t, `status.${shown}`, shown)} />
+        <StatusPill status={shown} label={localStatus('bookingStatus', shown, locale)} />
       </div>
 
       <dl className="mt-6 divide-y divide-line rounded-card border border-line bg-card px-5">

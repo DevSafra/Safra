@@ -465,16 +465,6 @@
       "admin_adjustment": "Adjustment by SAFRA",
       "gift_card_transfer": "Gift card"
     },
-    "status": {
-      "draft": "Draft",
-      "pending_payment": "Awaiting payment",
-      "pending_confirmation": "Awaiting confirmation",
-      "confirmed": "Confirmed",
-      "cancelled": "Cancelled",
-      "checked_in": "Checked in",
-      "completed": "Completed",
-      "disputed": "Disputed"
-    },
     "navHeading": "My account",
     "navOverview": "Overview",
     "navBookings": "My bookings",
@@ -548,16 +538,6 @@
       "giftCard": "Gift card",
       "wallet": "Wallet"
     },
-    "paymentStatus": {
-      "initiated": "Started",
-      "requires_action": "Needs verification",
-      "authorized": "Held",
-      "captured": "Captured",
-      "failed": "Failed",
-      "expired": "Expired",
-      "refunded": "Refunded",
-      "partially_refunded": "Partially refunded"
-    },
     "passwordConfirm": "Confirm new password",
     "passwordMismatch": "The two passwords do not match.",
     "invoiceDownload": "Download PDF",
@@ -588,12 +568,6 @@
     "giftNoneBought": "You have not bought any cards yet.",
     "giftCardEnding": "Ending {last4}",
     "giftRecipientFor": "For {name}",
-    "giftStatus": {
-      "active": "Active",
-      "used": "Redeemed",
-      "expired": "Expired",
-      "cancelled": "Cancelled"
-    },
     "walletGiftCaption": "Redeemed from gift cards · spent first",
     "navShowSidebar": "Show menu",
     "navHideSidebar": "Hide menu",
@@ -683,17 +657,11 @@
     "unreachable": "Could not reach the server.",
     "none": "No stays are waiting for your review."
   },
-  "disputeKinds": {
+  "disputeReasons": {
     "property_unavailable": "The place was closed or unavailable when I arrived",
     "not_as_described": "It did not match the photos or the description",
     "partner_no_response": "The host never responded to my booking",
     "complaint": "Something else"
-  },
-  "disputeStatuses": {
-    "open": "Open",
-    "investigating": "Being investigated",
-    "resolved": "Settled",
-    "rejected": "Declined"
   },
   "footer": {
     "about": "SAFRA books stays across the Levant, from a single night to a long stay, with clear prices and cancellation terms written down before you pay.",

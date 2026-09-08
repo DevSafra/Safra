@@ -9,6 +9,7 @@ import { DisputeForm } from '@/components/dispute-form';
 import { getAccountSummary, getDisputableBookings, getMyDisputes } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
 import { ltrIsolate } from '@/lib/bidi';
+import { localStatus } from '@/lib/status-word';
 
 /**
  * النزاعات — raising a dispute about a stay that went wrong.
@@ -62,8 +63,12 @@ export default async function AccountDisputesPage({
   const cursor = typeof query['cursor'] === 'string' ? query['cursor'] : '';
 
   const t = await getTranslations('account');
-  const tKind = await getTranslations('disputeKinds');
-  const tStatus = await getTranslations('disputeStatuses');
+  /*
+    `disputeReasons` is the FORM's wording — first-person questions a guest picks from — and it
+    is deliberately not the canonical label. The label names the category on a list, in every
+    app; the question asks it, here, once (Bashar, 2026-09-08).
+  */
+  const tReason = await getTranslations('disputeReasons');
 
   const [disputes, disputable] = await Promise.all([
     getMyDisputes(cursor || undefined),
@@ -115,7 +120,7 @@ export default async function AccountDisputesPage({
             <DisputeForm
               locale={locale}
               bookings={bookings}
-              reasons={REASONS.map((value) => ({ value, label: tKind(value) }))}
+              reasons={REASONS.map((value) => ({ value, label: tReason(value) }))}
               labels={{
                 booking: t('disputesBooking'),
                 reason: t('disputesReason'),
@@ -160,7 +165,7 @@ export default async function AccountDisputesPage({
                           : 'border-warn/40 bg-warn/10 text-warn'
                     }`}
                   >
-                    {tStatus(dispute.status)}
+                    {localStatus('disputeStatus', dispute.status, locale)}
                   </span>
                 </div>
 
@@ -168,7 +173,9 @@ export default async function AccountDisputesPage({
                 <p className="mt-1.5 text-sm font-semibold text-text">
                   {renderRedactions(dispute.title, locale)}
                 </p>
-                <p className="mt-1 text-xs text-muted">{tKind(dispute.kind)}</p>
+                <p className="mt-1 text-xs text-muted">
+                  {localStatus('disputeKind', dispute.kind, locale)}
+                </p>
 
                 <p className="mt-2 text-xs text-faint">
                   {t('disputesOpened')} {dispute.openedAt.slice(0, 10)} ·{' '}

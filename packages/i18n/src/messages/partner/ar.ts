@@ -9,6 +9,8 @@
  * and the surrounding region. When a second language arrives it is one file plus one line in
  * `partner.ts`, and the compiler checks it key by key.
  */
+import { statusWords } from '../../statuses.js';
+
 export const ar = {
   /** The document title and the wordmark line. */
   /* A PIPE, never a dash — see the admin catalogue's `meta.title` for the reason. */
@@ -636,28 +638,24 @@ export const ar = {
   },
 
   /** Dispute kinds and statuses, keyed on the `dispute_kind` and `dispute_status` enums. */
-  disputeKind: {
-    property_unavailable: 'العقار غير متاح عند الوصول',
-    not_as_described: 'الوحدة لا تطابق الوصف',
-    partner_no_response: 'لم يرد الشريك على الطلب',
-    complaint: 'شكوى أخرى',
-  } as Record<string, string>,
+  /*
+    From the canonical status catalogue (Bashar, 2026-09-08): one word per state, in every app.
+    See `packages/i18n/src/statuses.ts` for each choice and the reason for it.
+  */
+  disputeKind: statusWords('disputeKind', 'ar'),
 
-  disputeStatus: {
-    open: 'مفتوح',
-    investigating: 'قيد الدراسة',
-    resolved: 'محسوم لصالح الضيف',
-    rejected: 'مرفوض',
-  } as Record<string, string>,
+  /*
+    From the canonical status catalogue (Bashar, 2026-09-08): one word per state, in every app.
+    See `packages/i18n/src/statuses.ts` for each choice and the reason for it.
+  */
+  disputeStatus: statusWords('disputeStatus', 'ar'),
 
   /** Violation kinds, keyed on the `violation_kind` enum. */
-  violationKind: {
-    no_response: 'تأخر الرد على طلب حجز',
-    rejected_after_payment: 'رفض الحجز بعد الدفع',
-    stale_calendar: 'تقويم غير محدَّث',
-    inaccurate_listing: 'بيانات إعلان غير دقيقة',
-    no_show: 'عدم استقبال الضيف',
-  } as Record<string, string>,
+  /*
+    From the canonical status catalogue (Bashar, 2026-09-08): one word per state, in every app.
+    See `packages/i18n/src/statuses.ts` for each choice and the reason for it.
+  */
+  violationKind: statusWords('violationKind', 'ar'),
 
   /**
    * Month names for the calendar heading.
@@ -1122,15 +1120,11 @@ export const ar = {
     maintenance: 'صيانة',
   } as Record<string, string>,
 
-  propertyStatus: {
-    published: 'منشور',
-    pending_review: 'قيد المراجعة',
-    approved: 'معتمد',
-    draft: 'مسودة',
-    rejected: 'مرفوض',
-    suspended: 'موقوف',
-    archived: 'مؤرشف',
-  } as Record<string, string>,
+  /*
+    From the canonical status catalogue (Bashar, 2026-09-08): one word per state, in every app.
+    See `packages/i18n/src/statuses.ts` for each choice and the reason for it.
+  */
+  propertyStatus: statusWords('propertyStatus', 'ar'),
 
   /**
    * صفات الرحلة — the ONE shared vocabulary (§5.6 and the acceptance checklist).
@@ -1380,11 +1374,11 @@ export const ar = {
       sham_cash: 'شام كاش',
       cash_office: 'مكتب صرافة',
     } as Record<string, string>,
-    status: {
-      pending: 'قيد المراجعة',
-      verified: 'موثَّق',
-      rejected: 'مرفوض',
-    } as Record<string, string>,
+    /*
+      From the canonical status catalogue (Bashar, 2026-09-08): one word per state, in every app.
+      See `packages/i18n/src/statuses.ts` for each choice and the reason for it.
+    */
+    status: statusWords('payoutAccountStatus', 'ar'),
     confirmRemove: {
       title: 'حذف حساب التحويل',
       message: 'سيُحذف هذا الحساب ولن تُحوَّل إليه أي مستحقات. هل تريد المتابعة؟',
@@ -1397,14 +1391,11 @@ export const ar = {
   },
 
   /** Payout state, in the partner's language. Same values and same colours as the console. */
-  payoutStatus: {
-    accruing: 'قيد التجميع',
-    pending_release: 'بانتظار الإفراج',
-    on_hold: 'معلَّق',
-    scheduled: 'مجدول',
-    paid: 'مدفوع',
-    cancelled: 'ملغى',
-  } as Record<string, string>,
+  /*
+    From the canonical status catalogue (Bashar, 2026-09-08): one word per state, in every app.
+    See `packages/i18n/src/statuses.ts` for each choice and the reason for it.
+  */
+  payoutStatus: statusWords('payoutStatus', 'ar'),
 
   reviews: {
     title: 'تقييمات ضيوفي',
@@ -1991,12 +1982,11 @@ export const ar = {
     waivedOn: 'أُلغيت بتاريخ {date}',
 
     /* The formal ladder. A stage is a fact about the record, not a description of the offence. */
-    stage: {
-      recorded: 'مسجّلة',
-      warned: 'تحذير',
-      fined: 'غرامة',
-      suspension: 'إيقاف',
-    } as Record<string, string>,
+    /*
+      From the canonical status catalogue (Bashar, 2026-09-08): one word per state, in every app.
+      See `packages/i18n/src/statuses.ts` for each choice and the reason for it.
+    */
+    stage: statusWords('violationStage', 'ar'),
 
     /* What the partner was TOLD, and when. Absent unless somebody actually warned them. */
     /* ── The detail screen (Bashar, 2026-08-24) ──────────────────────────── */
@@ -2033,13 +2023,14 @@ export const ar = {
     warnedOn: 'حُذّرت بتاريخ {date}',
     warningNote: 'نص التحذير: {note}',
 
-    kind: {
-      no_response: 'عدم الرد على طلب حجز',
-      rejected_after_payment: 'رفض حجز بعد الدفع',
-      stale_calendar: 'تقويم غير محدّث',
-      inaccurate_listing: 'وصف غير مطابق',
-      no_show: 'عدم استقبال الضيف',
-    } as Record<string, string>,
+    /*
+      From the canonical status catalogue (Bashar, 2026-09-08): one word per state, in every app.
+      See `packages/i18n/src/statuses.ts` for each choice and the reason for it.
+      This was the SECOND copy of the violation kinds inside this one catalogue, and it disagreed
+      with the table above it as well as with the console's — «رفض حجز بعد الدفع» here against
+      «رفض الحجز بعد الدفع» there. One reader, two words, same screen family.
+    */
+    kind: statusWords('violationKind', 'ar'),
 
     /*
       WHAT HAPPENED, for a violation nobody typed a description for.

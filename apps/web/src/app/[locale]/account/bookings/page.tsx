@@ -9,8 +9,8 @@ import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 import { formatMoney } from '@/lib/localise';
 import { getAccountSummary, getMyBookings } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
-import { dynamicMessage } from '@/lib/dynamic-message';
 import { returnParam } from '@/lib/return-to';
+import { localStatus } from '@/lib/status-word';
 
 /**
  * حجوزاتي — every booking, not the first twenty (handoff §6).
@@ -96,7 +96,7 @@ export default async function AccountBookingsPage({
                     <span className="flex items-center gap-3">
                       <StatusPill
                         status={shown}
-                        label={dynamicMessage(t, `status.${shown}`, shown)}
+                        label={localStatus('bookingStatus', shown, locale)}
                       />
                       {/* Money, not a bare decimal — see the note on the schema's `currency`. */}
                       <span className="text-sm text-gold" dir="ltr">

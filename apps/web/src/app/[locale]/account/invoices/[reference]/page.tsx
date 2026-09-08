@@ -18,6 +18,7 @@ import { formatMoney, localisedName } from '@/lib/localise';
 import { returnParam, returnTo } from '@/lib/return-to';
 import { getPublicSettings } from '@/lib/catalog';
 import type { Locale } from '@/i18n/routing';
+import { localStatus } from '@/lib/status-word';
 
 /**
  * One receipt in full — handoff §6, الفواتير.
@@ -153,10 +154,10 @@ export default async function AccountInvoicePage({
             </div>
             <StatusPill
               status={customerBookingStatus(invoice.bookingStatus)}
-              label={dynamicMessage(
-                t,
-                `status.${customerBookingStatus(invoice.bookingStatus)}`,
-                invoice.bookingStatus,
+              label={localStatus(
+                'bookingStatus',
+                customerBookingStatus(invoice.bookingStatus),
+                locale,
               )}
             />
           </div>
@@ -276,11 +277,7 @@ export default async function AccountInvoicePage({
                       {dynamicMessage(tm, payment.method, payment.method)}
                     </span>
                     <span className="mt-1 block text-xs text-muted">
-                      {dynamicMessage(
-                        t,
-                        `paymentStatus.${payment.status}`,
-                        payment.status,
-                      )}
+                      {localStatus('paymentStatus', payment.status, locale)}
                     </span>
                   </span>
 
