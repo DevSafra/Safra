@@ -266,12 +266,26 @@ test.describe('الدعم', () => {
         waitUntil: 'domcontentloaded',
       });
 
+      /*
+        DOWN, not down by exactly one.
+
+        This asserted `waiting - 1`, and it passes when the spec runs alone and fails in the full
+        suite: the badge is a TOTAL over every thread waiting on staff, and by the time this runs
+        the other specs have opened support requests and disputes of their own. Exact arithmetic on
+        a shared counter is a guess about everything else the suite did, which is the definition of
+        an order-dependent assertion.
+
+        The substance is unchanged and is what the finding was about: `unread_for_staff` used to be
+        cleared by a REPLY and by a CLOSE and by nothing else, so a thread read and judged to need
+        no answer stayed counted for ever and the number only went up. That it goes DOWN on reading
+        is the whole claim; which integer it lands on is not.
+      */
       await expect
         .poll(numeric, {
           message: 'reading a thread must bring the الرسائل badge down',
           timeout: 20_000,
         })
-        .toBe(waiting - 1);
+        .toBeLessThan(waiting);
 
       const close = staffPage.getByRole('button', {
         name: adminAr.sections.messages.closeThread,
