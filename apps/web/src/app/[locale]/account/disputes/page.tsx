@@ -5,6 +5,7 @@ import { getTranslations } from 'next-intl/server';
 import { renderRedactions } from '@safra/i18n';
 
 import { AccountShell } from '@/components/account-shell';
+import { StatusPill } from '@/components/booking-status-pill';
 import { DisputeForm } from '@/components/dispute-form';
 import { getAccountSummary, getDisputableBookings, getMyDisputes } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
@@ -156,17 +157,28 @@ export default async function AccountDisputesPage({
                   <span className="text-sm text-text">
                     {ltrIsolate(dispute.reference)}
                   </span>
-                  <span
-                    className={`rounded-full border px-2 py-0.5 text-xs ${
-                      dispute.status === 'resolved'
-                        ? 'border-ok/40 bg-ok/10 text-ok'
-                        : dispute.status === 'rejected'
-                          ? 'border-line bg-field text-faint'
-                          : 'border-warn/40 bg-warn/10 text-warn'
-                    }`}
-                  >
-                    {localStatus('disputeStatus', dispute.status, locale)}
-                  </span>
+                  {/*
+                    `StatusPill`, not three hand-written branches.
+
+                    They painted `resolved` green, `rejected` in `faint`, and everything else amber
+                    — and two of those disagreed with the rest of the platform. `statusTone` gives
+                    `open` CRIMSON, which read as amber here, and `rejected` **bad**, which read as
+                    `faint`: the tone «One status, one word, one colour» reserves for a status
+                    nobody has mapped. So a dispute decided in the host's favour was red on the
+                    console and grey to the guest, whose complaint it was.
+
+                    Bashar asked for exactly this to be legible (2026-09-08, decision 225): «If a
+                    dispute is resolved in favour of the partner, the customer should clearly see
+                    that outcome.» The WORD was already canonical — «محسوم لصالح الشريك» — and the
+                    colour was saying «no signal» underneath it.
+
+                    `navigation.spec.ts` holds the rule across the console's twenty sections and
+                    cannot see this app, which is how three branches drifted here unnoticed.
+                  */}
+                  <StatusPill
+                    status={dispute.status}
+                    label={localStatus('disputeStatus', dispute.status, locale)}
+                  />
                 </div>
 
                 {/* Redacted on the way in, so rendered for this reader on the way out. */}
