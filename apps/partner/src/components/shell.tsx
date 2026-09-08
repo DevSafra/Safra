@@ -133,7 +133,7 @@ export async function Shell({
             hideLabel={t.nav.hideSidebar}
           />
 
-          <h1 className="font-[family-name:var(--font-amiri)] text-[28px] leading-tight font-bold text-gold">
+          <h1 className="font-display text-[28px] leading-tight font-bold text-gold">
             {title}
           </h1>
 
