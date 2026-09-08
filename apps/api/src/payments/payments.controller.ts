@@ -19,6 +19,7 @@ import {
   type CreateRefundRequest,
   type StartPaymentRequest,
   createRefundSchema,
+  refundIdSchema,
   startPaymentSchema,
 } from '@safra/contracts';
 
@@ -185,6 +186,28 @@ export class PaymentsController {
    * computed from the policy the customer agreed to, so neither a mistake nor a
    * compromised staff account can choose an arbitrary figure.
    */
+  /**
+   * Finance confirming an OFFLINE refund has actually been sent (finding 222).
+   *
+   * `REFUND_CREATE`, the same permission that issues one: deciding money goes back and confirming
+   * it left are the same responsibility, and a second permission for the second half would be one
+   * more thing to get wrong in a role map without protecting anything new.
+   *
+   * Addressed by the refund's own id rather than by the booking, because a booking may carry
+   * several refunds and only some of them settleable. The id is a UUID, so it cannot be walked the
+   * way a sequential reference could — and the service answers `not_found` for a refund outside
+   * this reader's scope, which is the same answer as one that does not exist.
+   */
+  @Post('refunds/:refundId/settle')
+  @RequirePermissions(P.REFUND_CREATE)
+  @AuditExempt('RefundService records refund.settled inside the settlement transaction.')
+  async settleRefund(
+    @Param('refundId', new ZodValidationPipe(refundIdSchema)) refundId: string,
+    @CurrentUser() user: AccessTokenClaims | undefined,
+  ) {
+    return this.refunds.settle(refundId, user);
+  }
+
   @Post(':reference/refund')
   @RequirePermissions(P.REFUND_CREATE)
   @Throttle({ default: { limit: 20, ttl: 60_000 } })

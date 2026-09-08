@@ -14,7 +14,7 @@ import { ENV, type Env } from '../config/env.js';
 import { describeError } from '../common/errors/safe-error.js';
 import { PaymentProviderRegistry } from './providers/provider.registry.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
-import { ERROR, WALLET_NOTE } from '@safra/contracts';
+import { DEFAULT_MONEY_CURRENCY, ERROR, WALLET_NOTE } from '@safra/contracts';
 import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 
@@ -595,6 +595,150 @@ export class RefundService {
     `);
 
     return rows.rows[0]?.total ?? '0';
+  }
+
+  /**
+   * Finance confirming that an OFFLINE refund actually left SAFRA's account (finding 222).
+   *
+   * Bashar's decision, 2026-09-08: *«an offline refund must have an equivalent completion step,
+   * just like a payment capture… the refund should become completed, the ledger should be updated,
+   * partner payable adjustments should be applied, commission adjustments should be applied,
+   * treasury balances should remain correct.»* He called it a launch blocker.
+   *
+   * ## What was wrong
+   *
+   * The reversal of `partner_payable` and `safra_commission_partner` is posted only when a refund
+   * reaches `completed`, and that is correct: a refund still `processing` has returned nothing, so
+   * reversing early would take money off the partner before the customer had it. For a gateway the
+   * webhook posts it. For an OFFLINE rail nothing ever did — `ManualTransferProvider.refund()` can
+   * only report `processing` because a human executes the transfer, and `parseWebhook()` returns
+   * null because banks send none. `InternalCaptureProvider`, behind every staff-recorded capture,
+   * is identical.
+   *
+   * So 236 refunds worth $47,326.37 sat `processing` for ever: the customer's page said «in
+   * progress» indefinitely, and decision 198's proportional reduction never happened — SAFRA
+   * absorbed the refund and the partner kept the full payable. The provider's own comment said
+   * «the refund row stays open until finance confirms it», and there was nothing to confirm with.
+   *
+   * ## This is the mirror of «تأكيد استلام الحوالة»
+   *
+   * That control records money coming IN on a rail that cannot report for itself. This records
+   * money going OUT on the same kind of rail, and does the same two things the webhook path does:
+   * complete the row, then post the reversal. Nothing new about the accounting — only a person
+   * where a bank would have been.
+   *
+   * ## Restricted to an offline rail, deliberately
+   *
+   * A gateway refund is confirmed by its webhook. Letting a person settle one would post a
+   * reversal asserting money moved when no bank had said so — the exact error the deferral exists
+   * to prevent, arriving through a button instead.
+   *
+   * ## Idempotent, and atomically so
+   *
+   * The status update carries its own `WHERE status = 'processing'` and the caller acts on the row
+   * count, so two operators pressing at once produce one settlement and one conflict rather than
+   * two reversals. `reverseForRefund` is idempotent in its own right — it derives every figure
+   * from the ledger's credits minus what is already reversed — so even a retry that got past this
+   * could not double-post.
+   */
+  async settle(refundId: string, claims: AccessTokenClaims | undefined) {
+    const found = await this.db.execute<{
+      booking_id: string;
+      payment_id: string;
+      provider: string;
+      status: string;
+      amount: string;
+      reference: string;
+    }>(sql`
+      SELECT r.booking_id::text, r.payment_id::text, p.provider::text AS provider,
+             r.status::text AS status, r.amount::text AS amount, b.reference
+        FROM refunds r
+        JOIN payments p ON p.id = r.payment_id
+        JOIN bookings b ON b.id = r.booking_id
+       WHERE r.id = ${refundId}::uuid
+         AND r.deleted_at IS NULL
+         -- Scope, as a WHERE clause: "not in your cities" answers the same as "not there".
+         AND ${scopeFilter(claims, 'b.city_id')}
+    `);
+
+    const refund = found.rows[0];
+
+    if (!refund) throw notFound(ERROR.REFUND_NOT_FOUND);
+    if (refund.status !== 'processing') throw conflict(ERROR.REFUND_NOT_PENDING);
+
+    /*
+      Offline-ness is asked of the REGISTRY, not of a list of slugs here. The day Sham Cash is
+      contracted its answer comes from the same flag, and a provider retired since the row was
+      written reads as NOT offline — which refuses the settlement rather than allowing one nobody
+      can explain.
+    */
+    if (this.registry.bySlug(refund.provider)?.isOffline !== true) {
+      throw badRequest(ERROR.REFUND_NOT_OFFLINE);
+    }
+
+    await this.db.transaction(async (tx) => {
+      const settled = await tx.execute(sql`
+        UPDATE refunds
+           SET status = 'completed'::refund_status,
+               completed_at = now(),
+               updated_at = now()
+         WHERE id = ${refundId}::uuid AND status = 'processing'
+      `);
+
+      /* Somebody else settled it between the read above and here. One settlement, one conflict. */
+      if (settled.rowCount === 0) throw conflict(ERROR.REFUND_NOT_PENDING);
+
+      await tx.execute(sql`
+        UPDATE payments p
+           SET status = CASE
+                 WHEN r.refunded >= p.amount THEN 'refunded'::payment_status
+                 ELSE 'partially_refunded'::payment_status
+               END,
+               updated_at = now()
+          FROM (
+            SELECT COALESCE(SUM(amount), 0) AS refunded
+              FROM refunds
+             WHERE payment_id = ${refund.payment_id}::uuid
+               AND status IN ('pending','processing','completed')
+          ) r
+         WHERE p.id = ${refund.payment_id}::uuid
+      `);
+
+      /*
+        The accounting, inside the same transaction as the status it depends on.
+
+        `reverseForRefund` debits `safra_commission_partner` and `partner_payable` in proportion to
+        what was returned, reduces `bookings.partner_payable_amount` (which is what accrual reads),
+        and retotals any payout line the stay is on. Treasury balances derive from these same
+        entries, so they stay correct by construction rather than by a second write — and the
+        ledger's deferred balance trigger fires at COMMIT, which is why this cannot run outside.
+      */
+      await this.ledger.reverseForRefund(tx as unknown as Database, refund.booking_id);
+
+      await this.audit.record(
+        {
+          actorUserId: claims?.sub,
+          actorRole: claims?.role,
+          action: 'refund.settled',
+          subjectType: 'booking',
+          subjectId: refund.booking_id,
+          after: {
+            refundId,
+            amount: refund.amount,
+            currency: DEFAULT_MONEY_CURRENCY,
+            provider: refund.provider,
+          },
+        },
+        tx as unknown as Database,
+      );
+    });
+
+    this.logger.log(
+      `Refund ${refundId} on ${refund.reference} settled by ${claims?.sub ?? 'unknown'}: ` +
+        `${refund.amount} on ${refund.provider}, payable and commission reversed.`,
+    );
+
+    return { refundId, status: 'completed' as const, amount: refund.amount };
   }
 
   private async markPaymentRefundState(paymentId: string): Promise<void> {

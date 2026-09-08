@@ -2849,6 +2849,20 @@ export const ar = {
       fxSnapshot: '{amount} ل.س بسعر صرف {rate}، مثبَّت لحظة إنشاء الحجز.',
       attemptVia: '{method} عبر {provider} · {status}',
       refunded: 'استُرد {amount} {currency}',
+      /*
+        تأكيد المالية أن الاسترداد خرج فعلاً من الحساب (اكتشاف 222، باشار 2026-09-08).
+
+        نظير «تأكيد استلام الحوالة»: تلك تسجّل مالاً داخلاً على سكة لا تُبلّغ عن نفسها، وهذه تسجّل
+        مالاً خارجاً على السكة نفسها — وتنشر عكس مستحق الشريك وعمولة سفرة الذي كان الويب-هوك سينشره.
+      */
+      settleAction: 'تأكيد إرسال الاسترداد',
+      settleWorking: 'جارٍ التأكيد…',
+      settleTitle: 'تأكيد إرسال الاسترداد؟',
+      settleMessage:
+        'أنت تُقرّ بأن مبلغ {amount} {currency} خرج فعلاً من حساب سفرة إلى العميل. يُسجَّل الاسترداد مكتملاً، ويُعكس مستحق الشريك وعمولة سفرة بالنسبة المستردة، ولا يمكن التراجع.',
+      settleConfirm: 'نعم، أُرسل المبلغ',
+      settleUnavailable: 'يُؤكَّد هذا الاسترداد آلياً من مزوّد الدفع.',
+      settleUnreachable: 'تعذّر الوصول إلى الخادم.',
       refundedToWallet:
         'استُرد {amount} {currency} ({walletAmount} {currency} إلى المحفظة)',
       actorLine: 'بواسطة {who}',
@@ -3796,6 +3810,8 @@ export const ar = {
     'booking.confirmed': 'تأكيد الحجز من الشريك',
     /* And refusing it. «رفض الشريك للحجز» is the timeline's wording for the same act, kept in step. */
     'booking.rejected': 'رفض الحجز من الشريك',
+    /* تأكيد المالية أن الاسترداد خرج فعلاً — اللحظة التي عُكس فيها مستحق الشريك والعمولة. */
+    'refund.settled': 'تأكيد إرسال الاسترداد',
     'booking.checked_in': 'تسجيل وصول الضيف',
     'booking.check_in_undone': 'التراجع عن تسجيل الوصول',
     /* The ACT, not its content: the note itself never reaches the audit log — see the action. */

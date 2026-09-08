@@ -43,6 +43,15 @@ export const CUSTOMER_FACING_METHODS = [
 
 export type CustomerFacingMethod = (typeof CUSTOMER_FACING_METHODS)[number];
 
+/**
+ * A refund's own identifier, for the finance settlement route (finding 222).
+ *
+ * Validated at the boundary rather than trusted into a query: a UUID cannot be walked the way a
+ * sequential reference can, and rejecting a malformed one here keeps it away from the parameterised
+ * cast that would otherwise raise a database error a caller could read something from.
+ */
+export const refundIdSchema = z.string().uuid();
+
 export function isCustomerFacingMethod(value: string): value is CustomerFacingMethod {
   return (CUSTOMER_FACING_METHODS as readonly string[]).includes(value);
 }

@@ -449,6 +449,20 @@ export const ERROR = {
   BOOKING_NO_CAPTURED_PAYMENT: 'booking.no_captured_payment',
   BOOKING_NOT_PAYABLE_IN_STATUS: 'booking.not_payable_in_status',
   PAYMENT_REFUND_UNAVAILABLE: 'payment.refund_unavailable',
+
+  /*
+    Finance confirming an OFFLINE refund actually left the account (finding 222).
+
+    `NOT_FOUND` is the answer to a refund that is not there AND to one this reader may not touch —
+    "not yours" must answer the same as "not there", so a finance reader cannot walk refund ids.
+
+    `NOT_PENDING` covers both a refund already settled and one that never needed settling: a
+    gateway refund is confirmed by its webhook, and letting a person pre-empt that would post a
+    reversal claiming money moved when no bank had said so.
+  */
+  REFUND_NOT_FOUND: 'refund.not_found',
+  REFUND_NOT_PENDING: 'refund.not_pending',
+  REFUND_NOT_OFFLINE: 'refund.not_offline',
   PRICING_UNAVAILABLE: 'pricing.unavailable',
   WALLET_WRONG_ACCOUNT: 'wallet.wrong_account',
   WALLET_BALANCE_CHANGED: 'wallet.balance_changed',

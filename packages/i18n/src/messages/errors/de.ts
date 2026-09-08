@@ -378,6 +378,10 @@ export const de = {
     'Diese Buchung kann in ihrem aktuellen Status nicht bezahlt werden.',
   'payment.refund_unavailable':
     'Rückerstattungen über das ursprüngliche Zahlungsmittel sind vorübergehend nicht möglich.',
+  'refund.not_found': 'Keine Rückerstattung mit dieser Kennung.',
+  'refund.not_pending': 'Diese Rückerstattung läuft nicht, es gibt nichts zu bestätigen.',
+  'refund.not_offline':
+    'Diese Rückerstattung wird automatisch vom Zahlungsanbieter bestätigt, nicht manuell.',
   'pricing.unavailable':
     'Die Preisberechnung ist vorübergehend nicht möglich. Bitte in Kürze erneut versuchen.',
   'wallet.wrong_account':

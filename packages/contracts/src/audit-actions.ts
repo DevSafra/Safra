@@ -74,6 +74,15 @@ export const AUDIT_ACTIONS = [
     on the one screen where every other action reads in Arabic.
   */
   'booking.rejected',
+  /*
+    Finance confirming an offline refund actually left the account (finding 222).
+
+    Its own action, not folded into `refund.created`: those are two decisions taken at two times,
+    often by two people, and the second is the one that moved the money and reversed the partner's
+    payable. An auditor asking «when did SAFRA stop owing the partner for this stay» needs this row
+    and cannot get the answer from the first.
+  */
+  'refund.settled',
   'booking.sla_expired',
   'booking.exported',
   'booking.export_requested',

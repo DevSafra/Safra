@@ -610,17 +610,22 @@ export class BookingDetailService {
     `);
 
     const refunds = await this.db.execute<{
+      id: string;
       amount: string;
       wallet_amount: string;
       status: string;
       reason: string;
       created_at: string;
+      provider: string | null;
     }>(sql`
-      SELECT amount::text AS amount, wallet_amount::text AS wallet_amount,
-             status::text AS status, reason, ${utc('created_at')} AS created_at
-      FROM refunds
-      WHERE booking_id = ${bookingId} AND deleted_at IS NULL
-      ORDER BY created_at DESC
+      SELECT r.id::text AS id,
+             r.amount::text AS amount, r.wallet_amount::text AS wallet_amount,
+             r.status::text AS status, r.reason, ${utc('r.created_at')} AS created_at,
+             p.provider::text AS provider
+        FROM refunds r
+        LEFT JOIN payments p ON p.id = r.payment_id
+       WHERE r.booking_id = ${bookingId} AND r.deleted_at IS NULL
+       ORDER BY r.created_at DESC
     `);
 
     return {
@@ -634,11 +639,26 @@ export class BookingDetailService {
         createdAt: row.created_at,
       })),
       refunds: refunds.rows.map((row) => ({
+        id: row.id,
         amount: row.amount,
         walletAmount: row.wallet_amount,
         status: row.status,
         reason: row.reason,
         createdAt: row.created_at,
+        /*
+          Whether FINANCE has to confirm this one, decided here rather than in the console.
+
+          The rule is «still processing, on a rail that cannot report for itself» — the mirror of
+          `capturePayment` above, and settled from the same `isOffline` flag so the day Sham Cash is
+          contracted there is no second list to update. Computed server-side because the console
+          reimplementing it would be two answers to «can this be settled», and the API's is the one
+          the route enforces.
+        */
+        settleable:
+          row.status === 'processing' &&
+          (row.provider === null
+            ? false
+            : (this.providers.bySlug(row.provider)?.isOffline ?? false)),
       })),
     };
   }
