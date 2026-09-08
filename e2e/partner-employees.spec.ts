@@ -134,6 +134,42 @@ async function ensureRole(page: Page): Promise<void> {
   });
 }
 
+/** A role carrying ONE named capability, found by its own name or created. */
+const ARRIVALS_ROLE = 'استقبال الوصول (اختبار)';
+
+/**
+ * A role that CANNOT open the dashboard, so the redirect under test actually happens.
+ *
+ * `ensureRole` returns early when the account already has any role, and the invite then picked
+ * `{ index: 1 }` — whichever the dropdown happened to list first. So the employee's capabilities
+ * were whatever was in the database, and this test asserts a LANDING that depends on them:
+ * `dashboard` needs `booking.read_own` and `arrivals` needs `booking.check_in`
+ * (`PARTNER_SECTION_PERMISSIONS`). A role with `booking.read_own` opens the overview and the
+ * employee stays on `/`, which is what this assertion kept meeting.
+ *
+ * So the role is named and found by name, and carries `booking.check_in` and nothing else: it opens
+ * الوصولات, it does not open the overview, and the redirect the spec is about is the one that runs.
+ */
+async function ensureArrivalsRole(page: Page): Promise<string> {
+  await page.goto('/employee-roles');
+
+  const existing = page.locator('#employee-roles-list li', { hasText: ARRIVALS_ROLE });
+
+  if ((await existing.count()) > 0) return ARRIVALS_ROLE;
+
+  await page.getByLabel(t.employeeRoles.nameLabel).fill(ARRIVALS_ROLE);
+  await page
+    .getByLabel(t.employeeRoles.capability['booking.check_in'] ?? 'booking.check_in')
+    .check();
+  await page.getByRole('button', { name: t.employeeRoles.create }).click();
+
+  await expect(existing, 'the arrivals-only role exists').not.toHaveCount(0, {
+    timeout: 15_000,
+  });
+
+  return ARRIVALS_ROLE;
+}
+
 test.use({ baseURL: PARTNER_BASE });
 
 test.describe('الموظفون', () => {
@@ -211,12 +247,13 @@ test.describe('الموظفون', () => {
       });
       const ownerPage = await ownerContext.newPage();
 
-      await ensureRole(ownerPage);
+      const roleName = await ensureArrivalsRole(ownerPage);
+
       await ownerPage.goto('/employees');
 
       await ownerPage.getByLabel(t.employees.fullName).fill('سامر الاستقبال');
       await ownerPage.getByLabel(t.employees.email).fill(address);
-      await ownerPage.getByLabel(t.employees.role).selectOption({ index: 1 });
+      await ownerPage.getByLabel(t.employees.role).selectOption({ label: roleName });
       await ownerPage.getByRole('button', { name: t.employees.inviteSubmit }).click();
       await expect(ownerPage.getByText(t.employees.inviteSent)).toBeVisible({
         timeout: 15_000,
