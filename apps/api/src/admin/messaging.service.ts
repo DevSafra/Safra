@@ -1018,6 +1018,13 @@ export class MessagingService {
 
     return offsetPage(
       result.rows.map((row) => ({
+        /*
+          The row id, because the re-drive control addresses one notification and there is nothing
+          else on this row that identifies it — `subject_reference` is a BOOKING, and a booking can
+          own several notices. It is a UUIDv7 primary key of a log row behind `NOTIFICATION_READ`,
+          and the action it enables is itself permissioned, so the id is not the guard.
+        */
+        id: row.id,
         channel: row.channel,
         templateKey: row.template_key,
         locale: row.locale,
@@ -1063,6 +1070,7 @@ export class MessagingService {
 }
 
 export interface NotificationRow {
+  readonly id: string;
   readonly channel: string;
   readonly templateKey: string;
   readonly locale: string;

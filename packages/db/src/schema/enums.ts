@@ -457,11 +457,25 @@ export const notificationChannel = pgEnum('notification_channel', [
   'in_app',
 ]);
 
+/**
+ * `failed` means «an attempt failed and another is owed»; `abandoned` means «nobody will try again».
+ *
+ * They were one value until 2026-09-09, and that is the whole of finding 235: 1,041 rows sat in
+ * `failed`, 1,036 of them `booking.needs_action` — the notice telling a partner a booking is
+ * waiting on them — and every recovery mechanism keyed on `queued`, so none of them looked. A
+ * state that means both «wait» and «give up» cannot be alerted on, re-driven, or reported: any
+ * rule written for one meaning is wrong for the other.
+ *
+ * So the split is the fix, not a tidier vocabulary. `failed` is RETRYABLE and the re-drive job
+ * picks it up once the retry schedule can no longer be running; `abandoned` is terminal, written
+ * only when the attempts are exhausted, and moves only when a person decides it should.
+ */
 export const notificationStatus = pgEnum('notification_status', [
   'queued',
   'sent',
   'delivered',
   'failed',
+  'abandoned',
 ]);
 
 /** SRS §6.4 / §8.5: partner violations that carry fines and score penalties. */

@@ -9,7 +9,7 @@ import { Queue } from 'bullmq';
 import { DATABASE } from '../database/database.module.js';
 import { MailService, type OutgoingMail } from '../mail/mail.service.js';
 import { redactContactDetails } from '../messaging/redaction.js';
-import { JOB_OPTIONS } from '../queue/queue.definitions.js';
+import { JOB_OPTIONS, maxAttempts } from '../queue/queue.definitions.js';
 import { MAIL_JOB, mailJobId, type MailJobData } from '../queue/mail.job.js';
 import { MAIL_QUEUE } from '../queue/queue.tokens.js';
 import { describeError } from '../common/errors/safe-error.js';
@@ -212,6 +212,28 @@ export class NotificationService {
         { ...JOB_OPTIONS.mail, jobId: mailJobId(notificationId) },
       );
 
+      /*
+        Back to `queued`, because the row is once again a notice waiting on a worker.
+
+        Without this a re-driven `failed` row stays `failed` and the sweep finds it again on every
+        five-minute tick until it succeeds — no duplicate email, since `mailJobId` is deterministic
+        and BullMQ refuses the second job, but the batch fills with rows already in flight and the
+        count the job reports stops describing anything. The state should say where the notice IS.
+
+        `attempts` is deliberately NOT reset. It is the total across every attempt this notice has
+        ever had, so the abandonment boundary in `deliver` still bites: a row re-driven after four
+        failures gets one more and then becomes `abandoned`, rather than earning a fresh five every
+        time the recovery job touches it. A permanently bad address converges instead of looping.
+
+        Guarded on `failed`, so a row that raced to `sent` between the scan and here is never
+        dragged backwards.
+      */
+      await this.db.execute(sql`
+        UPDATE notifications
+        SET status = 'queued', queued_at = now()
+        WHERE id = ${notificationId} AND status = 'failed'
+      `);
+
       return true;
     } catch (error) {
       this.logger.error(
@@ -273,15 +295,46 @@ export class NotificationService {
       const reason = redactContactDetails(describeError(error)).body.slice(0, 300);
 
       /*
-        `failed` is written on EVERY attempt, not only the last one, and `attempts` counts up. So a
-        row that is retried reads as failed between attempts and becomes `sent` when one succeeds —
-        which is the honest description of where it is, and what the delivery log is for.
+        `failed` while another attempt is owed, `abandoned` once they are exhausted.
+
+        Both are written on the attempt itself, and `attempts` counts up either way, so the log
+        still shows every try rather than only the last. What changed on 2026-09-09 is that the two
+        outcomes stopped sharing a word.
+
+        **Why they had to be split.** `failed` used to mean both, and the consequence was finding
+        235: 1,041 rows sat in it — 1,036 of them `booking.needs_action` — with no way for any
+        mechanism to tell «being retried» from «given up on». The re-drive scanned `queued`, the
+        invariant scanned `queued`, and the dead-letter screen is only reached when a job exhausts
+        its attempts, which a LOST job never does. Nothing was watching the state they were in,
+        because that state described two situations and could be acted on for neither.
+
+        **The comparison is against the QUEUE's own policy**, read through `maxAttempts`, so the
+        boundary cannot drift from the number BullMQ actually enforces. `attempts` is the value
+        BEFORE this increment, hence `+ 1`.
       */
-      await this.db.execute(sql`
+      const attempted = await this.db.execute<{ attempts: number }>(sql`
         UPDATE notifications
-        SET status = 'failed', failure_reason = ${reason}, attempts = attempts + 1
+        SET status = CASE
+              WHEN attempts + 1 >= ${maxAttempts('mail')}::int THEN 'abandoned'::notification_status
+              ELSE 'failed'::notification_status
+            END,
+            failure_reason = ${reason},
+            attempts = attempts + 1,
+            failed_at = now()
         WHERE id = ${notificationId}
+        RETURNING attempts
       `);
+
+      if ((attempted.rows[0]?.attempts ?? 0) >= maxAttempts('mail')) {
+        /*
+          Loud, and at `error` rather than `warn`: this is the last thing that will ever happen to
+          this notice unless a person acts, and the gauge that alerts on it is a minute behind.
+        */
+        this.logger.error(
+          `Notification ${templateKey} (${notificationId}) ABANDONED after ` +
+            `${maxAttempts('mail')} attempts: ${reason}. It will not be retried automatically.`,
+        );
+      }
 
       this.logger.warn(`Notification ${templateKey} failed to send: ${reason}`);
 

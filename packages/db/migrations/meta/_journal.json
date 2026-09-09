@@ -526,6 +526,13 @@
       "when": 1788791950165,
       "tag": "0074_partner_dispute_participation",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1788955932404,
+      "tag": "0075_notification_abandoned",
+      "breakpoints": true
     }
   ]
 }

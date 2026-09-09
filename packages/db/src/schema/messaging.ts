@@ -211,6 +211,16 @@ export const notifications = pgTable(
     /** The log, newest first — the design's default view. */
     index('notifications_recent_idx').on(t.createdAt),
     index('notifications_status_idx').on(t.status, t.createdAt),
+    /*
+      The recovery scan (`NotificationRedriveService`), partial on the two recoverable states.
+
+      `sent` and `delivered` are almost the whole table and can never be candidates, so indexing
+      them would be paying for rows the query excludes by definition. Declared here as well as in
+      `0075_notification_abandoned.sql` so the schema and the database agree about what exists.
+    */
+    index('notifications_recovery_idx')
+      .on(t.queuedAt)
+      .where(sql`status IN ('queued', 'failed')`),
     index('notifications_booking_idx').on(t.bookingId),
     index('notifications_template_idx').on(t.templateKey, t.channel),
   ],

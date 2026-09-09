@@ -54,6 +54,20 @@ describeIfDb('re-driving lost notifications', () => {
   let notifications: NotificationService;
   let redrive: NotificationRedriveService;
 
+  /*
+    Unscoped, deliberately.
+
+    `redriveOne` applies the city filter the delivery log is read through, and these tests are
+    about the LIFECYCLE — failed, abandoned, delivered — not about geography. A scoped actor here
+    would make every one of them depend on which city the fixture happened to land in, and a green
+    result would mean «the scope let it through» rather than «the state machine works».
+  */
+  const anyCity = {
+    sub: undefined,
+    role: 'super_admin',
+    permissions: [],
+  } as unknown as Parameters<NotificationRedriveService['redriveOne']>[1];
+
   let partnerId = '';
   let partnerEmail = '';
   let bookingId = '';
@@ -74,9 +88,16 @@ describeIfDb('re-driving lost notifications', () => {
       Marking them terminal here scopes every count below to the rows this test writes. Nothing
       escapes the rollback, and the real rows are untouched — the first version of this test
       reported 35 where it expected 1, which is exactly how that mistake announces itself.
+
+      **`failed` joined the list on 2026-09-09.** The sweep used to look only at `queued`, which was
+      the whole of finding 235: 1,055 rows sat in `failed` — 1,050 of them `booking.needs_action`,
+      the oldest 32 days — and no recovery mechanism looked at that state at all. Now that it does,
+      the same reasoning applies to those rows and the same neutralising has to cover them, or every
+      count here measures the backlog instead of the fixture. It announced itself the same way:
+      «expected 2, got 400».
     */
     await db.execute(
-      sql`UPDATE notifications SET status = 'sent' WHERE status = 'queued'`,
+      sql`UPDATE notifications SET status = 'sent' WHERE status IN ('queued', 'failed')`,
     );
 
     queue = createInlineMailQueue();
@@ -122,6 +143,46 @@ describeIfDb('re-driving lost notifications', () => {
     return id;
   };
 
+  /**
+   * A row that an attempt tried and could not deliver — the state finding 235 is about.
+   *
+   * `attempts` matters: a row below the ceiling is retryable and one at it is `abandoned`, and the
+   * sweep must treat those oppositely. `failed_at` is set explicitly because the rows this finding
+   * found predate the column being written at all, which is why the query coalesces three columns
+   * to decide how old a failure is.
+   */
+  const failAt = async (
+    templateKey: string,
+    subject: { bookingId?: string; partnerId?: string },
+    options: { ageMinutes: number; attempts: number; status?: 'failed' | 'abandoned' },
+  ): Promise<string> => {
+    const inserted = await db.execute<{ id: string }>(sql`
+      INSERT INTO notifications (channel, template_key, locale, status, attempts,
+                                 queued_at, failed_at, booking_id, partner_id)
+      VALUES ('email', ${templateKey}, 'ar', ${options.status ?? 'failed'}::notification_status,
+              ${options.attempts}::int,
+              now() - (${options.ageMinutes}::int * INTERVAL '1 minute'),
+              now() - (${options.ageMinutes}::int * INTERVAL '1 minute'),
+              ${subject.bookingId ?? null}::uuid,
+              ${subject.partnerId ?? null}::uuid)
+      RETURNING id
+    `);
+
+    const id = inserted.rows[0]?.id;
+
+    if (!id) throw new Error('Notification fixture produced no row.');
+
+    return id;
+  };
+
+  const statusOf = async (id: string): Promise<string> => {
+    const found = await db.execute<{ status: string }>(
+      sql`SELECT status::text AS status FROM notifications WHERE id = ${id}::uuid`,
+    );
+
+    return found.rows[0]?.status ?? '(gone)';
+  };
+
   // ─── The drill ─────────────────────────────────────────────────────────────
 
   /**
@@ -155,6 +216,204 @@ describeIfDb('re-driving lost notifications', () => {
     expect(result['redriven']).toBe(1);
     expect(queue.jobs[0]?.mail.to).toBe(partnerEmail);
     expect(queue.jobs[0]?.mail.text).toContain('https://partner.safra.test/reviews');
+  });
+
+  // ─── The lifecycle finding 235 asked for ───────────────────────────────────
+
+  /**
+   * The state nothing looked at: an attempt failed, the job vanished, and the retry never fired.
+   *
+   * This is the exact shape of the 1,055 rows found on 2026-09-09 — `attempts = 1`, nothing in
+   * Redis, and older than any schedule could still be running. Before the split it was
+   * indistinguishable from a row whose retry was in flight, so no mechanism could act on either.
+   */
+  it('re-drives a failed notice once its retry schedule cannot still be running', async () => {
+    const id = await failAt(
+      'booking.needs_action',
+      { bookingId, partnerId },
+      {
+        ageMinutes: 120,
+        attempts: 1,
+      },
+    );
+
+    const result = await redrive.run();
+
+    expect(result['redriven']).toBe(1);
+    expect(queue.jobs).toHaveLength(1);
+    expect(queue.jobs[0]?.mail.to).toBe(partnerEmail);
+
+    /*
+      Back to `queued`, or the next tick finds it again and every count the job reports stops
+      describing anything. The state has to say where the notice IS.
+    */
+    expect(await statusOf(id)).toBe('queued');
+  });
+
+  /**
+   * And NOT while BullMQ may still be holding it.
+   *
+   * A recovery that argues with the retry mechanism about the same row is not a recovery. The
+   * window is derived from the queue's own policy — attempts × the backoff cap — so the two cannot
+   * drift apart.
+   */
+  it('leaves a failed notice alone while its retries are still owed', async () => {
+    const id = await failAt(
+      'booking.needs_action',
+      { bookingId, partnerId },
+      {
+        ageMinutes: 5,
+        attempts: 1,
+      },
+    );
+
+    const result = await redrive.run();
+
+    expect(result['redriven']).toBe(0);
+    expect(queue.jobs).toHaveLength(0);
+    expect(await statusOf(id)).toBe('failed');
+  });
+
+  /**
+   * `abandoned` is terminal, and the sweep must never resurrect it.
+   *
+   * Its attempts are spent. A timer that re-drove it anyway would be an infinite loop against a
+   * mail server that has already refused five times — which is why the split exists at all rather
+   * than simply widening the old query to «not sent».
+   */
+  it('never re-drives an abandoned notice on the timer, however old', async () => {
+    const id = await failAt(
+      'booking.needs_action',
+      { bookingId, partnerId },
+      {
+        ageMinutes: 60 * 24 * 30,
+        attempts: 5,
+        status: 'abandoned',
+      },
+    );
+
+    const result = await redrive.run();
+
+    expect(result['redriven']).toBe(0);
+    expect(queue.jobs).toHaveLength(0);
+    expect(await statusOf(id)).toBe('abandoned');
+  });
+
+  /** But a PERSON can, which is the whole reason the terminal state is safe to have. */
+  it('re-drives an abandoned notice when somebody asks for it by id', async () => {
+    const id = await failAt(
+      'booking.needs_action',
+      { bookingId, partnerId },
+      {
+        ageMinutes: 60 * 24 * 30,
+        attempts: 5,
+        status: 'abandoned',
+      },
+    );
+
+    const outcome = await redrive.redriveOne(id, anyCity);
+
+    expect(outcome).toBe('queued');
+    expect(queue.jobs).toHaveLength(1);
+    expect(queue.jobs[0]?.mail.to).toBe(partnerEmail);
+    expect(await statusOf(id)).toBe('queued');
+  });
+
+  /**
+   * The one way a manual re-drive could do harm: a second copy of something already received.
+   *
+   * Excluded by a `WHERE` clause rather than checked afterwards, so «already delivered» answers
+   * exactly like «no such row» — the same shape as every other authorization boundary here.
+   */
+  it('refuses to re-drive a notice that was already delivered', async () => {
+    const id = await failAt(
+      'booking.needs_action',
+      { bookingId, partnerId },
+      {
+        ageMinutes: 120,
+        attempts: 1,
+      },
+    );
+
+    await db.execute(
+      sql`UPDATE notifications SET status = 'delivered' WHERE id = ${id}::uuid`,
+    );
+
+    expect(await redrive.redriveOne(id, anyCity)).toBeNull();
+    expect(queue.jobs).toHaveLength(0);
+    expect(await statusOf(id)).toBe('delivered');
+  });
+
+  /**
+   * Attempts are never reset by a re-drive, so a notice cannot earn unlimited tries.
+   *
+   * A row re-driven after four failures gets ONE more and then abandons. Without this a permanently
+   * bad address would loop between `failed` and `queued` for ever, sending nothing and alerting
+   * nobody — a recovery mechanism that never converges is its own outage.
+   */
+  it('does not reset the attempt count when it re-drives', async () => {
+    const id = await failAt(
+      'booking.needs_action',
+      { bookingId, partnerId },
+      {
+        ageMinutes: 120,
+        attempts: 4,
+      },
+    );
+
+    await redrive.run();
+
+    const after = await db.execute<{ attempts: number }>(
+      sql`SELECT attempts FROM notifications WHERE id = ${id}::uuid`,
+    );
+
+    expect(after.rows[0]?.attempts).toBe(4);
+  });
+
+  /**
+   * Where `failed` becomes `abandoned`, which is the boundary the whole state model rests on.
+   *
+   * Driven through `deliver()` against a mail service that always refuses, because the boundary is
+   * a comparison against the QUEUE's declared attempt limit and a test that asserted the number
+   * directly would pass while the two drifted apart. Five is `JOB_OPTIONS.mail.attempts`; the
+   * fourth failure leaves a row retryable and the fifth retires it.
+   */
+  it('marks a notice failed while attempts remain and abandoned at the ceiling', async () => {
+    const refusing = {
+      send: () => Promise.reject(new Error('SMTP said no')),
+    } as unknown as MailService;
+
+    const service = new NotificationService(db, refusing, queue.queue);
+
+    const id = await failAt(
+      'booking.needs_action',
+      { bookingId, partnerId },
+      {
+        ageMinutes: 1,
+        attempts: 0,
+      },
+    );
+
+    const attempt = async (): Promise<void> => {
+      await service
+        .deliver(id, 'booking.needs_action', {
+          to: partnerEmail,
+          subject: 's',
+          text: 't',
+          html: '<p>t</p>',
+        })
+        /* `deliver` rethrows so BullMQ retries; here the throw is the expected outcome. */
+        .catch(() => undefined);
+    };
+
+    for (const expected of ['failed', 'failed', 'failed', 'failed']) {
+      await attempt();
+      expect(await statusOf(id)).toBe(expected);
+    }
+
+    await attempt();
+
+    expect(await statusOf(id)).toBe('abandoned');
   });
 
   // ─── What it must not do ───────────────────────────────────────────────────

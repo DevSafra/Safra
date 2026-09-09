@@ -22,6 +22,7 @@ import {
 import { TableToolbar } from '@/components/table-toolbar';
 import { fill, label, t, plural } from '@/lib/strings';
 import { statusTone } from '@/lib/status-tone';
+import { NotificationRedrive } from '@/components/notification-redrive';
 import { listParamsFor } from '@/lib/table-size';
 import { refuseSection } from '@/components/section-refusal';
 
@@ -261,11 +262,22 @@ const COLUMNS: readonly AdminColumn<NotificationItem>[] = [
           The failure reason and the attempt count, because a retry that hid the previous error
           would hide the pattern: one template failing for every German recipient is a bug.
         */}
-        {row.status === 'failed' ? (
-          <span className="text-[13px] leading-normal text-faint">
-            {plural(t.sections.comms.attempts, { n: row.attempts })}
-            {row.failureReason ? ` · ${renderRedactions(row.failureReason, 'ar')}` : ''}
-          </span>
+        {row.status === 'failed' || row.status === 'abandoned' ? (
+          <>
+            {/*
+              14px and `muted`, not 13px and `faint`.
+
+              The attempt count and the provider's reason are the two facts an operator acts on
+              when deciding whether to re-drive — «5 attempts · mailbox full» and «1 attempt ·
+              connection refused» call for opposite decisions. They were the quietest text on the
+              row (finding 248).
+            */}
+            <span className="text-[14px] leading-normal text-muted">
+              {plural(t.sections.comms.attempts, { n: row.attempts })}
+              {row.failureReason ? ` · ${renderRedactions(row.failureReason, 'ar')}` : ''}
+            </span>
+            <NotificationRedrive id={row.id} status={row.status} />
+          </>
         ) : null}
       </div>
     ),

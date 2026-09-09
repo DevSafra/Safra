@@ -115,3 +115,27 @@ export function jitteredBackoff(
   /* At least a second, so a jitter draw near zero does not become an immediate retry. */
   return Math.max(1_000, Math.round(random() * exponential));
 }
+
+/** How many times a job on this queue is attempted before BullMQ gives up on it. */
+export function maxAttempts(queue: QueueName): number {
+  return JOB_OPTIONS[queue].attempts ?? 1;
+}
+
+/**
+ * The longest a queue's retry schedule can still be running, from the first failure.
+ *
+ * Derived rather than written down, because a second copy of «eight minutes, five attempts» is a
+ * number that goes stale the first time the policy above is tuned — and the consequence would be a
+ * recovery job racing a retry that is still owed, or one waiting hours after the last attempt.
+ *
+ * An UPPER bound: every gap is capped at `MAX_BACKOFF_MS`, and full jitter draws uniformly from
+ * `[0, delay]`, so the real elapsed time is usually far less. Bounding high is the safe direction —
+ * the cost of waiting too long is a delayed re-drive, and the cost of waiting too little is a
+ * recovery mechanism arguing with the retry mechanism about the same row.
+ */
+export function retryWindowMs(queue: QueueName): number {
+  const cap = MAX_BACKOFF_MS[queue] ?? 60 * 60_000;
+
+  /* `attempts - 1` gaps between `attempts` tries. */
+  return Math.max(0, maxAttempts(queue) - 1) * cap;
+}

@@ -250,6 +250,15 @@ export const PERMISSIONS = {
    * confirm an invoice email was delivered without being able to read the thread.
    */
   NOTIFICATION_READ: 'notification.read',
+  /**
+   * Putting a notice that was never delivered back on the queue.
+   *
+   * Separate from `NOTIFICATION_READ` because it SENDS: the recovery job re-drives automatically,
+   * and this is the same action performed by a person for a row the job will not touch — one that
+   * exhausted its attempts and is `abandoned`. Reading the delivery log to answer «was the partner
+   * told» is a different question from deciding to tell them again.
+   */
+  NOTIFICATION_REDRIVE: 'notification.redrive',
 
   // ── Platform ──────────────────────────────────────────────────────────────
   /** §3 P-005: commissions, SLA windows and fines are configuration, not code. */
@@ -373,6 +382,7 @@ const SUPPORT_AGENT: Permission[] = [
   */
   P.REVIEW_MODERATE,
   P.NOTIFICATION_READ,
+  P.NOTIFICATION_REDRIVE,
   P.WALLET_READ,
   P.GIFT_CARD_READ,
 ];
@@ -441,6 +451,7 @@ const OPERATIONS_MANAGER: Permission[] = [
   /* Reports from partners land in the same queue operations already works. */
   P.REVIEW_MODERATE,
   P.NOTIFICATION_READ,
+  P.NOTIFICATION_REDRIVE,
   P.PARTNER_CONTRACT_READ,
   /**
    * The design marks "رفع وتعديل عقود الشراكة" as ○ for operations — allowed WITH manager

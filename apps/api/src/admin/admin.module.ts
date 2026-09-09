@@ -6,6 +6,16 @@ import { PaymentsModule } from '../payments/payments.module.js';
 import { WalletModule } from '../wallet/wallet.module.js';
 import { GiftCardModule } from '../gift-cards/gift-card.module.js';
 import { NotificationService } from '../notifications/notification.service.js';
+/*
+  Also provided in `worker.module.ts`, where the SCHEDULED sweep runs it.
+
+  Two providers of one class rather than a shared module, because the two processes want
+  different halves: the worker runs `run()` on a timer, the API exposes `redriveOne()` to a
+  person. Nest instantiates per module graph and the service holds no state, so the pair is a
+  duplication of WIRING, not of behaviour — and the alternative, importing the worker module
+  into the API, would drag the whole queue-processor graph into the request process.
+*/
+import { NotificationRedriveService } from '../notifications/notification-redrive.service.js';
 import { PartnerTwoFactorService } from '../auth/partner-two-factor.service.js';
 import { AdminGrantsController, AdminGrantsService } from './grants.controller.js';
 import { AdminController } from './admin.controller.js';
@@ -92,6 +102,7 @@ import { StaffScopeService } from './staff-scope.service.js';
     EnforcementController,
   ],
   providers: [
+    NotificationRedriveService,
     ReviewService,
     StaffRolesService,
     EnforcementNotifier,

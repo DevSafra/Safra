@@ -2097,6 +2097,8 @@ export async function getThread(reference: string) {
 }
 
 const notificationItemSchema = z.object({
+  /* Addresses the row for a re-drive. `subjectReference` is a booking, and a booking owns several. */
+  id: z.string(),
   channel: z.string(),
   templateKey: z.string(),
   locale: z.string(),

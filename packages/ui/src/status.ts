@@ -143,6 +143,16 @@ const STATUS_TONES: Record<string, Tone> = {
    * shows both.
    */
   due: 'gold',
+  /**
+   * A notice whose attempts are exhausted. Crimson, and deliberately NOT `failed`'s red.
+   *
+   * The two sit in one column on سجل المراسلات and mean opposite things to the person reading it:
+   * a `failed` row is being retried and needs nobody, an `abandoned` one is owed to a partner and
+   * will never arrive unless somebody acts. Painting them the same colour is what made 1,041 of
+   * the second kind invisible among the first.
+   */
+  abandoned: 'crimson',
+
   /** Orange: ran out. Not red — nothing went wrong — and not `failed`'s colour. */
   expired: 'orange',
   /** Also orange: a payout stopped on purpose is not a failure, and must not read as one. */
@@ -266,7 +276,7 @@ export const VOCABULARIES: Readonly<Record<string, readonly string[]>> = {
     `user` does not have, it needs its own entry and this note stops being true.
   */
   user: ['active', 'suspended', 'archived'],
-  notification: ['queued', 'sent', 'delivered', 'failed'],
+  notification: ['queued', 'sent', 'delivered', 'failed', 'abandoned'],
   /**
    * Whether a partner has taken up a coupon — `coupon_partner_status`.
    *

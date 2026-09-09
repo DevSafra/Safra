@@ -47,6 +47,7 @@ import { AdCreativeService } from './ad-creative.service.js';
 import { DisputeEvidenceService } from '../disputes/dispute-evidence.service.js';
 import { AdManagementService } from './ad-management.service.js';
 import { AdInvoiceService } from './ad-invoice.service.js';
+import { NotificationRedriveService } from '../notifications/notification-redrive.service.js';
 import {
   DisputeService,
   closeDisputeSchema,
@@ -124,6 +125,7 @@ export class CommsController {
     private readonly adManagement: AdManagementService,
     private readonly adCreative: AdCreativeService,
     private readonly adInvoices: AdInvoiceService,
+    private readonly redrive: NotificationRedriveService,
   ) {}
 
   // ── النزاعات ───────────────────────────────────────────────────────────────
@@ -412,6 +414,39 @@ export class CommsController {
       never been sent must still appear on the screen, which a query over the log cannot do.
     */
     return { ...page, counters, templates: NOTIFICATION_TEMPLATES };
+  }
+
+  /**
+   * Puts one undelivered notice back on the queue.
+   *
+   * ## Why a person needs this at all
+   *
+   * The scheduled sweep recovers a `failed` notice on its own once the retry schedule can no
+   * longer be running. It deliberately leaves `abandoned` alone — attempts exhausted, and a timer
+   * that ignored that would loop for ever against a mail server that has already refused five
+   * times. So the terminal state needs a human decision, and before 2026-09-09 the only way to
+   * make one was an UPDATE against the database.
+   *
+   * ## The guards, and where they live
+   *
+   * `NOTIFICATION_REDRIVE` rather than `NOTIFICATION_READ`: this SENDS, and finance legitimately
+   * reads the delivery log without being able to re-send from it. The «already delivered» case is
+   * a `WHERE` clause in the service, not a check here, so a delivered notice answers the same as
+   * one that does not exist — a person cannot use this to put a second copy of a message in
+   * somebody's inbox. And the throttle is low because the honest use is one row at a time.
+   */
+  @Post('notifications/:id/redrive')
+  @RequirePermissions(P.NOTIFICATION_REDRIVE)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  async redriveNotification(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const outcome = await this.redrive.redriveOne(id, user);
+
+    if (outcome === null) throw notFound(ERROR.REQUEST_NOT_FOUND);
+
+    return { outcome };
   }
 
   // ── الإعلانات ──────────────────────────────────────────────────────────────

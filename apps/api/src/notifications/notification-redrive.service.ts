@@ -4,6 +4,9 @@ import { sql } from 'drizzle-orm';
 import type { Database } from '@safra/db';
 
 import { DATABASE } from '../database/database.module.js';
+import { retryWindowMs } from '../queue/queue.definitions.js';
+import { scopeFilter } from '../rbac/scope.sql.js';
+import type { AccessTokenClaims } from '../auth/token.service.js';
 import { ENV, type Env } from '../config/env.js';
 import { NotificationService } from './notification.service.js';
 import {
@@ -21,6 +24,20 @@ import type { OutgoingMail } from '../mail/mail.service.js';
  * catastrophe, and short enough that a partner learns about a booking inside the §6.4 window.
  */
 const STALE_AFTER_MINUTES = 15;
+
+/**
+ * How long a `failed` row must sit before the retry schedule cannot still be running.
+ *
+ * Derived from the mail queue's own policy — attempts × the backoff cap — so this and BullMQ
+ * cannot disagree about when a retry is still owed. Five attempts at an eight-minute ceiling is
+ * thirty-two minutes; a minute is added so a row is never picked up in the same instant its last
+ * retry is due.
+ *
+ * Re-driving earlier would not duplicate anything: `mailJobId` is deterministic, so BullMQ refuses
+ * a second job while the first exists. The window is about honesty rather than safety — a row this
+ * old is one whose job is GONE, which is the case worth acting on.
+ */
+const RETRYABLE_AFTER_MINUTES = Math.ceil(retryWindowMs('mail') / 60_000) + 1;
 
 /** Bounded per run, so a re-drive after a long outage does not become its own incident. */
 const BATCH = 200;
@@ -84,13 +101,44 @@ export class NotificationRedriveService {
     private readonly notifications: NotificationService,
   ) {}
 
-  /** Finds lost notices, rebuilds what it can, and re-enqueues them. */
+  /**
+   * Finds lost notices, rebuilds what it can, and re-enqueues them.
+   *
+   * ## Two states, one recovery, and the second one is finding 235
+   *
+   * `queued` is a notice no worker ever took — the original case, a Redis loss. `failed` is one an
+   * attempt tried and could not deliver, and until 2026-09-09 nothing looked at it: 1,041 rows sat
+   * there, 1,036 of them `booking.needs_action`, all with `attempts = 1` and no job left in Redis.
+   * They had been attempted once and their retry never fired, so they were neither queued (nothing
+   * to take) nor exhausted (the dead-letter path never reached), and every safety net keyed on a
+   * state they were not in.
+   *
+   * A `failed` row is only swept once the retry schedule provably cannot still be running, so this
+   * never argues with BullMQ about a row it is still holding. `abandoned` is deliberately NOT swept:
+   * its attempts are spent, and re-driving it on a timer would be an infinite loop dressed as a
+   * recovery. That one waits for a person, which is what the console's control is for.
+   */
   async run(): Promise<Record<string, number>> {
     const stale = await this.db.execute<QueuedRow>(sql`
       SELECT id, template_key, locale, booking_id, customer_profile_id, partner_id
       FROM notifications
-      WHERE status = 'queued'
-        AND queued_at < now() - (${STALE_AFTER_MINUTES}::int * INTERVAL '1 minute')
+      WHERE (
+              status = 'queued'
+              AND queued_at < now() - (${STALE_AFTER_MINUTES}::int * INTERVAL '1 minute')
+            )
+         OR (
+              status = 'failed'
+              /*
+                failed_at was not written before 2026-09-09, so the rows this finding is about
+                carry NULL there. updated_at is when the failure was recorded for those, and
+                queued_at is the floor: a row can never be older than its own acceptance.
+
+                (No backticks in here. They terminate the sql template literal, which is how this
+                comment first broke the parse.)
+              */
+              AND coalesce(failed_at, updated_at, queued_at)
+                  < now() - (${RETRYABLE_AFTER_MINUTES}::int * INTERVAL '1 minute')
+            )
       ORDER BY queued_at
       LIMIT ${BATCH}
     `);
@@ -153,6 +201,84 @@ export class NotificationRedriveService {
       locale: recipient.locale,
       url,
     });
+  }
+
+  /**
+   * One notice, put back on the queue because a PERSON decided it should be.
+   *
+   * ## Why this exists beside the scheduled sweep
+   *
+   * The sweep deliberately refuses `abandoned` rows: their attempts are spent, and re-driving them
+   * on a timer would be a loop rather than a recovery. But «spent» is a statement about the mail
+   * server, not about whether the notice is still owed — the address has been corrected, the
+   * provider is back, the partner rang to say they never heard. Somebody has to be able to say
+   * «send it again», and without this the only answer was a database update.
+   *
+   * ## What it will not do
+   *
+   * It will not touch a notice that was DELIVERED. `sent` and `delivered` are excluded in the
+   * query rather than checked afterwards, so «already went out» answers exactly like «no such
+   * row» — a person cannot use this to send a partner a second copy of something they received,
+   * which is the one way a manual re-drive could do harm.
+   *
+   * Beyond that the same guarantees hold as for the sweep: `mailJobId` is derived from the row id,
+   * so pressing twice enqueues once, and `attempts` is never reset, so a notice cannot earn
+   * unlimited tries by being re-driven repeatedly.
+   */
+  async redriveOne(
+    notificationId: string,
+    claims: AccessTokenClaims | undefined,
+  ): Promise<'queued' | 'unreconstructable' | null> {
+    /*
+      The SAME city scope the delivery log is read through.
+
+      MessagingService.notifications filters on coalesce(b.city_id, p.city_id), so a support agent
+      scoped to Damascus sees Damascus rows. Without the identical filter here that agent could
+      re-send a notice about an Aleppo booking they cannot see — acting on a row outside their
+      scope by knowing its id, which is the gap this codebase closes by writing the scope into the
+      WHERE clause rather than checking after the read.
+
+      Caught by scope-coverage.test.ts rather than by review: the route reached business data,
+      declared no scope, and was not on the exemption list, so the sweep named it.
+    */
+    const found = await this.db.execute<QueuedRow>(sql`
+      SELECT n.id, n.template_key, n.locale, n.booking_id, n.customer_profile_id, n.partner_id
+      FROM notifications n
+      LEFT JOIN bookings b ON b.id = n.booking_id
+      LEFT JOIN partners p ON p.id = n.partner_id
+      WHERE n.id = ${notificationId}::uuid
+        AND n.deleted_at IS NULL
+        AND n.status IN ('queued', 'failed', 'abandoned')
+        AND ${scopeFilter(claims, 'coalesce(b.city_id, p.city_id)')}
+      LIMIT 1
+    `);
+
+    const row = found.rows[0];
+
+    if (!row) return null;
+
+    const mail = await this.rebuild(row);
+
+    if (!mail) return 'unreconstructable';
+
+    const sent = await this.notifications.reenqueue(row.id, row.template_key, mail);
+
+    if (!sent) return 'unreconstructable';
+
+    /*
+      `abandoned` is moved back by hand, because `reenqueue` only rescues a `failed` row.
+
+      That asymmetry is deliberate: the scheduled sweep must never resurrect an abandoned notice,
+      so the shared path leaves it alone, and the decision to spend more attempts on one belongs
+      here — where a person made it.
+    */
+    await this.db.execute(sql`
+      UPDATE notifications
+      SET status = 'queued', queued_at = now()
+      WHERE id = ${row.id}::uuid AND status = 'abandoned'
+    `);
+
+    return 'queued';
   }
 
   /** The one notice the row carries enough to rebuild exactly. */
