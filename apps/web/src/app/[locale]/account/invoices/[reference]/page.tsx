@@ -276,18 +276,18 @@ export default async function AccountInvoicePage({
                     <span className="mt-1 block text-sm text-text">
                       {dynamicMessage(tm, payment.method, payment.method)}
                     </span>
-                    <span className="mt-1 block text-xs text-muted">
+                    <span className="mt-1 block text-sm text-muted">
                       {localStatus('paymentStatus', payment.status, locale)}
                     </span>
                   </span>
 
                   <span className="flex flex-col items-end gap-1">
-                    <span className="text-sm text-text" dir="ltr">
+                    <span className="text-sm tabular-nums text-text" dir="ltr">
                       {formatMoney(payment.amount, payment.currencyCode, locale, {
                         exact: true,
                       })}
                     </span>
-                    <span className="text-xs text-faint">
+                    <span className="text-sm tabular-nums text-muted">
                       {payment.capturedAt ? payment.capturedAt.slice(0, 10) : ''}
                     </span>
                   </span>

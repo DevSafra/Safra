@@ -47,7 +47,7 @@ export function UnitCalendar({
     <div className="grid gap-4">
       <div className="flex flex-wrap items-center gap-3">
         <p className="text-[14px] font-bold text-text">{unit.nameAr}</p>
-        <p className="text-[13px] text-faint" dir="ltr">
+        <p className="text-[14px] text-muted" dir="ltr">
           {amount(unit.basePrice, unit.currencyCode)} {t.unitCalendar.perNight}
         </p>
         <p className="text-[13px] text-faint">

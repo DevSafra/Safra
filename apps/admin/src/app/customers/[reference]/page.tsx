@@ -143,7 +143,7 @@ export default async function CustomerPage({
                     is noise that trains people not to read the line.
                   */}
                   {Number(customer.wallet.restricted) > 0 ? (
-                    <span className="text-[14px] text-faint">
+                    <span className="text-[14px] text-muted">
                       {c.walletRestricted}{' '}
                       <Ltr>
                         {amount(

@@ -74,7 +74,7 @@ export function SafraRevenueSummary({ revenue }: { readonly revenue: SafraRevenu
               <span className="ms-auto text-text2">
                 {c.colAccrued}: {amount(row.accrued, 'SYP')}
               </span>
-              <span className="text-faint">
+              <span className="text-muted">
                 {c.colTransferred}: {amount(row.transferred, 'SYP')}
               </span>
             </li>

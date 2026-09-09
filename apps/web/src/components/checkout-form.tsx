@@ -294,7 +294,7 @@ export function CheckoutForm({
                   ),
                 })}
               </span>
-              <span className="block text-xs text-faint">
+              <span className="block text-sm text-muted">
                 {coversEverything(wallet)
                   ? t('walletCoversAll')
                   : t('walletRemaining') +

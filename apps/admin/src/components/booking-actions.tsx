@@ -663,7 +663,7 @@ function RefundForm({
             })}
           </Ltr>
           {Number(quote.walletAmount) > 0 ? (
-            <span className="block text-[14px] text-faint">
+            <span className="block text-[14px] text-muted">
               {fill(copy.refundToWallet, {
                 amount: money(quote.walletAmount),
                 currency: quote.currencyCode,

@@ -222,10 +222,10 @@ function Row({
         <span className="text-[14px] font-bold text-text">
           {label(t.enums.violationKind, violation.kind)}
         </span>
-        <span className="text-[13px] text-faint">
+        <span className="text-[14px] text-muted">
           {label(t.enums.violationStage, violation.stage)}
         </span>
-        <span className="text-[13px] text-faint">
+        <span className="text-[14px] text-muted">
           {fill(t.sections.enforcement.occurrenceNumber, {
             n: String(violation.occurrenceNumber),
           })}

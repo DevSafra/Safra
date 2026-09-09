@@ -409,7 +409,7 @@ function Fines({ rows }: { readonly rows: readonly PartnerFine[] }) {
 
             {/* Only when some has gone: «خُصم ٠» on a fresh fine is noise. */}
             {Number(row.collected) > 0 ? (
-              <span className="text-faint">
+              <span className="text-muted">
                 {t.payouts.fineCollected}:{' '}
                 <Ltr>{amount(row.collected, row.currencyCode)}</Ltr>
               </span>
@@ -493,7 +493,7 @@ function Recoveries({ rows }: { readonly rows: readonly PartnerRecovery[] }) {
               noise, and the outstanding figure beside it already implies it.
             */}
             {Number(row.recovered) > 0 ? (
-              <span className="text-faint">
+              <span className="text-muted">
                 {t.payouts.recoveryCollected}:{' '}
                 <Ltr>{amount(row.recovered, row.currencyCode)}</Ltr>
               </span>
@@ -756,7 +756,7 @@ function Card({ payout }: { readonly payout: PartnerPayout }) {
         </span>
 
         {fined ? (
-          <span className="text-[14px] text-faint">
+          <span className="text-[14px] text-muted">
             {fill(t.payouts.afterFine, {
               gross: amount(payout.grossAmount, payout.currencyCode),
               fine: amount(payout.fineAmount, payout.currencyCode),
@@ -773,7 +773,7 @@ function Card({ payout }: { readonly payout: PartnerPayout }) {
           so here from the start — and only when it is not zero, because «ناقص 0» is noise.
         */}
         {recovered ? (
-          <span className="text-[14px] text-faint">
+          <span className="text-[14px] text-muted">
             {fill(t.payouts.afterRecovery, {
               gross: amount(payout.grossAmount, payout.currencyCode),
               recovery: amount(payout.recoveryAmount, payout.currencyCode),

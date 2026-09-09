@@ -380,7 +380,7 @@ export default async function CalendarsPage({
                         </span>
                       ) : null}
                     </h3>
-                    <span className="text-[13px] text-faint" dir="ltr">
+                    <span className="text-[14px] text-muted" dir="ltr">
                       {amount(unit.basePrice, unit.currencyCode)}{' '}
                       {t.unitCalendar.perNight}
                     </span>

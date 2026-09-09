@@ -185,11 +185,11 @@ export default async function AccountDisputesPage({
                 <p className="mt-1.5 text-sm font-semibold text-text">
                   {renderRedactions(dispute.title, locale)}
                 </p>
-                <p className="mt-1 text-xs text-muted">
+                <p className="mt-1 text-sm text-muted">
                   {localStatus('disputeKind', dispute.kind, locale)}
                 </p>
 
-                <p className="mt-2 text-xs text-faint">
+                <p className="mt-2 text-sm text-muted">
                   {t('disputesOpened')} {dispute.openedAt.slice(0, 10)} ·{' '}
                   {ltrIsolate(dispute.bookingReference)}
                 </p>

@@ -234,7 +234,7 @@ const COLUMNS: readonly AdminColumn<WalletItem>[] = [
           line that matters.
         */}
         {Number(row.restrictedAmount) > 0 ? (
-          <span className="text-[13px] leading-normal text-faint">
+          <span className="text-[14px] leading-normal text-muted">
             {t.sections.wallet.restrictedPart}
             {/*
               The figure only when it differs from the amount above it.

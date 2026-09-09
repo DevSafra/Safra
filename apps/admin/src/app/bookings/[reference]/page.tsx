@@ -304,7 +304,7 @@ export default async function BookingPage({
           (Bashar, 2026-08-06). `rate()` drops trailing zeros without ROUNDING, because these two
           numbers have to multiply out by hand for the booking to reconcile.
         */}
-        <p className="mt-3 text-sm text-faint">
+        <p className="mt-3 text-sm text-muted">
           {fill(t.sections.bookingDetail.fxSnapshot, {
             amount: money(booking.money.totalSyp),
             rate: rate(booking.money.fxRateToSyp),
@@ -327,7 +327,7 @@ export default async function BookingPage({
                   <span className="font-mono text-xs text-faint">
                     <Ltr>{attempt.reference}</Ltr>
                   </span>
-                  <span className="text-text">
+                  <span className="tabular-nums text-text">
                     <Ltr>{amount(attempt.amount, booking.money.currencyCode)}</Ltr>
                   </span>
                   {/*
@@ -336,7 +336,7 @@ export default async function BookingPage({
                     Arabic screen (Bashar, 2026-08-06). Brands keep their names; `simulator` is
                     ours, not a brand.
                   */}
-                  <span className="text-xs text-muted">
+                  <span className="text-sm text-muted">
                     {fill(t.sections.bookingDetail.attemptVia, {
                       method: label(t.enums.paymentMethod, attempt.method),
                       provider: label(t.enums.paymentProvider, attempt.provider),
@@ -392,7 +392,7 @@ export default async function BookingPage({
                     on the money record — and the Arabic for it was already in the catalogue with
                     nothing reaching it. An operator's own words still pass through unchanged.
                   */}
-                  <span className="block text-xs text-faint">
+                  <span className="block text-sm text-muted">
                     {label(t.enums.paymentStatus, refund.status)} ·{' '}
                     {cancellationReason(refund.reason)}
                   </span>
@@ -452,7 +452,7 @@ export default async function BookingPage({
                   no email the actor is a type — `system`, `partner`, `customer` — and that is a
                   word, so it is translated.
                 */}
-                <p className="mt-0.5 text-xs text-muted">
+                <p className="mt-0.5 text-sm text-muted">
                   {fill(t.sections.bookingDetail.actorLine, {
                     who: event.actorEmail ?? label(t.enums.actorType, event.actorType),
                   })}
@@ -465,7 +465,7 @@ export default async function BookingPage({
                   2026-08-06).
                 */}
                 {payloadEntries(event.payload).length > 0 ? (
-                  <dl className="mt-2 grid gap-1 rounded border border-line bg-field p-2 text-xs">
+                  <dl className="mt-2 grid gap-1.5 rounded border border-line bg-field p-2.5 text-sm">
                     {payloadEntries(event.payload).map((entry) => (
                       <div key={entry.key} className="flex flex-wrap gap-x-2">
                         <dt className="text-faint">{entry.label}</dt>

@@ -317,7 +317,7 @@ export default async function PartnerPage({
                 className="flex items-center justify-between gap-3 rounded-lg border border-line bg-card px-4 py-3"
               >
                 <span className="text-text">{property.nameEn ?? property.nameAr}</span>
-                <span className="text-xs text-faint">
+                <span className="text-sm text-muted">
                   <Ltr>{property.reference}</Ltr> ·{' '}
                   {label(t.enums.propertyStatus, property.status)}
                 </span>

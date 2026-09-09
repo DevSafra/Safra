@@ -137,7 +137,7 @@ export default async function PropertyPage({
             {t.sections.propertyDetail.partnerVerified}
           </p>
         ) : (
-          <p className="mt-2 text-xs text-gold-read">
+          <p className="mt-2 text-sm text-gold-read">
             {fill(t.sections.propertyDetail.partnerNotVerified, {
               status: label(t.enums.verification, property.partner.verification),
             })}{' '}

@@ -249,7 +249,7 @@ export default async function BookingDetailPage({
                 const toWallet = Number(refund.walletAmount) > 0;
 
                 return (
-                  <li key={refund.createdAt} className="grid gap-0.5">
+                  <li key={refund.createdAt} className="grid gap-1">
                     <span className="font-semibold text-text">
                       {/*
                         `exact`, because this is a figure somebody reconciles against a bank
@@ -280,7 +280,7 @@ export default async function BookingDetailPage({
                       customer actually has and the reason they would otherwise write to support.
                       A completed one says WHEN, which is what they need to find it on a statement.
                     */}
-                    <span className="text-xs text-faint">
+                    <span className="text-sm text-muted">
                       {refund.completedAt === null
                         ? t('refundPending')
                         : t('refundDone', { date: refund.completedAt.slice(0, 10) })}
@@ -291,7 +291,7 @@ export default async function BookingDetailPage({
                       before any customer-facing screen read one.
                     */}
                     {refund.percent !== null ? (
-                      <span className="text-xs text-faint">
+                      <span className="text-sm text-muted">
                         {t('refundPolicy', { percent: refund.percent })}
                       </span>
                     ) : null}

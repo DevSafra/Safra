@@ -131,7 +131,7 @@ function Section({
                 ) : null}
               </div>
 
-              <p className="text-[13px] text-faint">
+              <p className="text-[14px] text-muted">
                 {t.coupons.colWindow}: {day(coupon.startsAt)} – {day(coupon.endsAt)}
                 {coupon.minBookingAmount ? (
                   <>

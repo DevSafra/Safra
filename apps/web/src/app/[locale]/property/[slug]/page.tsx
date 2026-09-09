@@ -684,7 +684,7 @@ export default async function PropertyPage({
                 <p className="mt-1 text-sm text-muted">
                   {policyDescription(property.cancellationPolicy, locale)}
                 </p>
-                <p className="mt-3 text-xs text-faint">
+                <p className="mt-3 text-sm text-muted">
                   {t('refundFloor', {
                     percent: property.cancellationPolicy.minRefundPercent,
                   })}

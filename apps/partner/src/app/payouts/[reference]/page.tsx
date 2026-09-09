@@ -164,7 +164,7 @@ export default async function PayoutPage({
                     {booking.bookingReference}
                   </Ltr>
                   <span className="text-[13px] text-muted">{booking.property ?? ''}</span>
-                  <Ltr className="text-[13px] text-faint">
+                  <Ltr className="text-[13px] tabular-nums text-muted">
                     {booking.checkIn} ← {booking.checkOut}
                   </Ltr>
                   <span className="ms-auto grid justify-items-end gap-0.5">

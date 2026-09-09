@@ -431,7 +431,7 @@ function Calendar({ calendar }: { readonly calendar: PartnerDashboard['calendar'
         <h2 className="text-[16px] font-extrabold text-gold-read">
           {fill(t.dashboard.calendarTitle, { month: monthName })}
         </h2>
-        <span className="text-[13px] text-faint">
+        <span className="text-[14px] text-muted">
           {/*
             Money interpolated into an Arabic sentence is ISOLATED — measured, not assumed.
 

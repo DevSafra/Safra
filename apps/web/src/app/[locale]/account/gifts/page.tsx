@@ -140,7 +140,7 @@ export default async function AccountGiftsPage({
                         exact: true,
                       })}
                     </span>
-                    <span className="text-xs text-muted">
+                    <span className="text-sm text-muted">
                       {localStatus('giftCardStatus', card.status, locale)}
                     </span>
                   </span>
