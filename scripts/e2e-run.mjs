@@ -75,7 +75,16 @@
  *     pnpm e2e:run --no-reset   # against the database as it stands; marked as such in the summary
  */
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import {
+  closeSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+  writeSync,
+  existsSync,
+} from 'node:fs';
 
 const BUDGET = JSON.parse(readFileSync('test-budget.json', 'utf8')).playwright;
 
@@ -211,6 +220,125 @@ function runProject(project, shard = 1, shards = 1) {
 }
 
 mkdirSync('test-reports', { recursive: true });
+
+/*
+  ONE run at a time, and the reason is a run this guard would have prevented.
+
+  On 2026-09-09 a previous session's run was still executing when a second was started. The second
+  ran `db:testbed` — truncating and reseeding — underneath the first's browser tests, and both then
+  reported numbers about a database neither of them owned. Nothing in either summary said so: a
+  spec whose fixture vanished mid-test fails exactly like a defect, which is the failure mode this
+  whole runner exists to eliminate.
+
+  So the lock is not about tidiness or wasted machine time. A suite sharing its database with
+  another suite CANNOT tell the truth about the platform, and that is the same reason a failed
+  reset stops the run below.
+
+  A killed run leaves its lock behind — today's case, since the stale run was terminated rather
+  than allowed to finish — so a lock whose process is gone is taken over rather than obeyed. That
+  is safe in the direction that matters: the check is «is that pid alive», and a live pid is never
+  overridden.
+*/
+const LOCK = 'test-reports/.e2e-run.lock';
+
+function alive(pid) {
+  try {
+    /* Signal 0 tests for the process without touching it. */
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/*
+  Refuses rather than falls through, which is the whole point of the retry count.
+
+  Two runners can see the SAME stale lock, both unlink it, and one loses the `wx` race — so a
+  retry is needed. But a loop that ends without claiming would return normally and the run would
+  proceed unlocked, which is precisely the state this guard exists to prevent. So exhausting the
+  attempts is a refusal: the fail-safe direction is «do not run», never «run anyway».
+*/
+const LOCK_ATTEMPTS = 5;
+
+function claimLock() {
+  for (let attempt = 0; attempt < LOCK_ATTEMPTS; attempt += 1) {
+    try {
+      const handle = openSync(LOCK, 'wx');
+
+      writeSync(
+        handle,
+        JSON.stringify({ pid: process.pid, at: new Date().toISOString() }),
+      );
+      closeSync(handle);
+
+      return;
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+
+      /*
+        A lock this cannot READ is a stale lock, never a reason to refuse.
+
+        The file is written by a process that can be killed between `openSync` and `writeSync`, so
+        a truncated or empty one is reachable — and `JSON.parse` throwing here would wedge every
+        future run with a parse error, which is a worse failure than the one being prevented. The
+        rule is the same as below: only a LIVE pid stops a run.
+      */
+      const held = (() => {
+        try {
+          const parsed = JSON.parse(readFileSync(LOCK, 'utf8'));
+
+          return typeof parsed?.pid === 'number' ? parsed : null;
+        } catch {
+          return null;
+        }
+      })();
+
+      if (held !== null && alive(held.pid)) {
+        console.error(
+          `\nAnother browser run is in progress — pid ${held.pid}, started ${held.at}.\n` +
+            'Refusing to start: two suites sharing one database report numbers about neither.',
+        );
+        process.exit(1);
+      }
+
+      console.log(
+        held === null
+          ? '\n── taking over an unreadable lock ───────────────────────'
+          : `\n── taking over a stale lock from pid ${held.pid} (${held.at}) ──`,
+      );
+      unlinkSync(LOCK);
+    }
+  }
+
+  console.error(
+    `\nCould not claim ${LOCK} in ${LOCK_ATTEMPTS} attempts — another run keeps taking it.\n` +
+      'Refusing to start rather than run unlocked.',
+  );
+  process.exit(1);
+}
+
+/*
+  Released however this process ends — but ONLY if the lock is still ours.
+
+  The unconditional version of this was a self-disarming guard, and the path is short: a second
+  run starts, finds the first alive, and refuses with `process.exit(1)` — at which point this
+  handler fired and deleted the FIRST run's lock. The guard would have worked exactly once, then
+  removed itself and let a third run proceed alongside. It reads the lock and compares the pid for
+  that reason, which also covers the rarer case of a later run having taken a lock we had left
+  behind.
+*/
+process.on('exit', () => {
+  try {
+    const held = JSON.parse(readFileSync(LOCK, 'utf8'));
+
+    if (held?.pid === process.pid) unlinkSync(LOCK);
+  } catch {
+    /* Gone, unreadable, or somebody else's — none of the three is ours to remove. */
+  }
+});
+
+claimLock();
 
 const reset = !process.argv.includes('--no-reset');
 const problems = [];
