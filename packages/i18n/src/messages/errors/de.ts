@@ -108,6 +108,9 @@ export const de = {
   'payout.nothing_to_pay': 'In diesem Zeitraum ist nichts auszuzahlen.',
   'payout.frozen_by_dispute':
     'Ein offener Fall sperrt die Auszahlung für diese Buchungen.',
+  'payout.unsupported_payable':
+    'Diese Auszahlung enthält Buchungen, deren Guthaben keine Buchung im Hauptbuch deckt. Sie ' +
+    'kann erst nach Klärung freigegeben werden.',
   'payout.partner_not_screened':
     'Diese Auszahlung kann erst nach der Sanktionsprüfung des Partners freigegeben werden.',
   'payout.no_verified_account':

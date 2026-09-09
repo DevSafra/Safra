@@ -169,6 +169,14 @@ export const ERROR = {
   PAYOUT_NOTHING_TO_PAY: 'payout.nothing_to_pay',
   /** A dispute that is open or investigating freezes the partner's entitlement. */
   PAYOUT_FROZEN_BY_DISPUTE: 'payout.frozen_by_dispute',
+  /**
+   * A payout item whose payable no ledger credit supports (Bashar, 2026-09-09).
+   *
+   * Checked at RELEASE as well as at accrual, because release is the last moment anybody looks and
+   * because 252 items worth $46,872 were already attached to open payouts when the accrual guard
+   * landed. Refusing here is what stops those being paid.
+   */
+  PAYOUT_UNSUPPORTED_PAYABLE: 'payout.unsupported_payable',
   PAYOUT_PARTNER_NOT_SCREENED: 'payout.partner_not_screened',
   /*
     §11.4 and Bashar, 2026-09-04: «A payout must never be released or marked as paid unless it is

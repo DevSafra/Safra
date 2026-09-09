@@ -80,6 +80,83 @@ describeIfDb('PayoutService', () => {
   let partnerId = '';
   let bookingIds: string[] = [];
 
+  /**
+   * Gives every paid booking that has none the ledger group a real capture would have written.
+   *
+   * Accrual refuses a payable with no `partner_payable` credit behind it (Bashar, 2026-09-09:
+   * "an unsupported payable cannot be released silently"), so a fixture that writes the column and
+   * not the ledger describes a booking the platform would correctly decline to pay — and every
+   * test using it would assert the guard rather than the thing it names. Twenty-two of these went
+   * red the moment the guard landed, which was the first evidence that it works.
+   *
+   * Posted through `postBookingPayment`, not by inserting entries: a second hand-written copy of
+   * the double-entry rules is free to drift from the one the platform uses, and a fixture that
+   * drifts is a test passing against a shape production never produces. Same argument as the
+   * testbed seeder's.
+   *
+   * Finds its own work rather than taking ids, because several tests build a further stay inline
+   * and would each have to remember to pass it.
+   */
+  async function backWithLedger(): Promise<void> {
+    const unbacked = await db.execute<{
+      id: string;
+      partner_id: string;
+      customer_profile_id: string;
+      currency_id: string;
+      fx_rate_to_syp: string;
+      total_amount: string;
+      customer_fee_amount: string;
+      partner_commission_amount: string;
+      partner_payable_amount: string;
+      reference: string;
+    }>(sql`
+      SELECT b.id, b.partner_id, b.customer_profile_id, b.currency_id,
+             b.fx_rate_to_syp::text, b.total_amount::text, b.customer_fee_amount::text,
+             b.partner_commission_amount::text, b.partner_payable_amount::text, b.reference
+      FROM bookings b
+      WHERE b.partner_id = ${partnerId}::uuid
+        AND b.paid_at IS NOT NULL
+        AND b.deleted_at IS NULL
+        AND b.partner_payable_amount > 0
+        AND NOT EXISTS (
+          SELECT 1 FROM ledger_entries le
+          WHERE le.booking_id = b.id
+            AND le.account = 'partner_payable'
+            AND le.direction = 'credit'
+        )
+    `);
+
+    for (const row of unbacked.rows) {
+      const payment = await db.execute<{ id: string }>(sql`
+        INSERT INTO payments (booking_id, method, provider, amount, currency_id, status, captured_at)
+        SELECT b.id, 'visa', 'simulator', b.total_amount, b.currency_id, 'captured', now()
+        FROM bookings b WHERE b.id = ${row.id}::uuid
+        RETURNING id
+      `);
+
+      const paymentId = payment.rows[0]?.id;
+
+      if (!paymentId) throw new Error('Booking fixture produced no payment.');
+
+      await ledger.postBookingPayment(
+        db,
+        {
+          id: row.id,
+          partnerId: row.partner_id,
+          customerProfileId: row.customer_profile_id,
+          currencyId: row.currency_id,
+          fxRateToSyp: row.fx_rate_to_syp,
+          totalAmount: row.total_amount,
+          customerFeeAmount: row.customer_fee_amount,
+          partnerCommissionAmount: row.partner_commission_amount,
+          partnerPayableAmount: row.partner_payable_amount,
+          reference: row.reference,
+        },
+        paymentId,
+      );
+    }
+  }
+
   beforeEach(async () => {
     await harness.begin();
 
@@ -152,6 +229,8 @@ describeIfDb('PayoutService', () => {
 
     partnerId = made.rows[0]?.partner_id ?? '';
     bookingIds = made.rows.map((row) => row.booking_id);
+
+    await backWithLedger();
 
     /*
       A VERIFIED destination, because that is the ordinary state of a partner SAFRA pays.
@@ -284,6 +363,148 @@ describeIfDb('PayoutService', () => {
     } finally {
       await (sweep as unknown as { $client: { end: () => Promise<void> } }).$client.end();
     }
+  });
+
+  /**
+   * A payable the BOOKS do not support is never released, and never quietly.
+   *
+   * Bashar, 2026-09-09: _«Apply the safest explicit operational treatment and document the decision
+   * so that an unsupported payable cannot be released silently.»_ Measured that day: 339 bookings
+   * carried $63,309.75 of payable with no `partner_payable` credit behind it, and 321 of them were
+   * `completed` — which is to say the next accrual run would have moved real money out of SAFRA
+   * against receipts that were never posted.
+   *
+   * Both halves are asserted, because either alone is the bug: withheld AND counted. A guard that
+   * silently skipped would replace «pays money it should not» with «loses money nobody can find»,
+   * and the second is harder to notice.
+   */
+  it('withholds a payable with no ledger credit behind it, and says how many', async () => {
+    if (bookingIds.length === 0) return;
+
+    /*
+      A DELTA, not an absolute.
+
+      `withheldUnsupported` is a platform figure, which is what the scheduled job should report —
+      and this database carries history from before the guard existed. Asserting «1» would be
+      asserting the state of the whole database rather than the effect of this test, and would
+      break for a reason with no relationship to the guard.
+    */
+    const before = (await service.accrue()).withheldUnsupported;
+
+    /* A further completed, paid stay for the same partner — with no books behind it. */
+    await db.execute(sql`
+      INSERT INTO bookings (customer_profile_id, unit_id, property_id, partner_id, city_id,
+                            check_in, check_out, guests_adults, status,
+                            base_amount, customer_fee_value, customer_fee_amount,
+                            partner_commission_rate, partner_commission_amount,
+                            total_amount, partner_payable_amount, currency_id,
+                            fx_rate_to_syp, total_syp, cancellation_policy_snapshot,
+                            paid_at, confirmed_at, completed_at)
+      SELECT b.customer_profile_id, b.unit_id, b.property_id, b.partner_id, b.city_id,
+             (now() - interval '9 day')::date, (now() - interval '7 day')::date,
+             2, 'completed',
+             b.base_amount, b.customer_fee_value, b.customer_fee_amount,
+             b.partner_commission_rate, b.partner_commission_amount,
+             b.total_amount, b.partner_payable_amount, b.currency_id,
+             b.fx_rate_to_syp, b.total_syp, b.cancellation_policy_snapshot,
+             now(), now(), now()
+        FROM bookings b WHERE b.id = ${bookingIds[0]!} LIMIT 1
+    `);
+
+    const result = await service.accrue();
+
+    expect(result.withheldUnsupported - before, 'the unsupported stay was counted').toBe(
+      1,
+    );
+
+    /* And it is not on the payout: the three backed ones are, the fourth is not. */
+    const attached = await db.execute<{ n: number }>(sql`
+      SELECT count(*)::int AS n
+      FROM partner_payout_items i
+      JOIN bookings b ON b.id = i.booking_id
+      WHERE b.partner_id = ${partnerId}::uuid
+    `);
+
+    expect(attached.rows[0]?.n, 'only the stays the ledger supports').toBe(
+      bookingIds.length,
+    );
+  });
+
+  /**
+   * The LAST gate, and the one that protects what was attached before the first gate existed.
+   *
+   * When the accrual guard landed, 252 items worth $46,872 across 84 partners were already on open
+   * payouts with no `partner_payable` credit behind them — one release away from real money. A
+   * guard only at accrual would have left every one of them payable.
+   *
+   * The item is attached directly here, which is the honest reproduction: that is precisely how
+   * those 252 got there, before anything checked.
+   */
+  it('refuses to release a payout carrying a payable the ledger does not support', async () => {
+    if (bookingIds.length === 0) return;
+
+    await service.accrue();
+
+    const payout = await db.execute<{ id: string }>(sql`
+      SELECT id FROM partner_payouts
+      WHERE partner_id = ${partnerId}::uuid AND status = 'accruing' AND deleted_at IS NULL
+      LIMIT 1
+    `);
+
+    const payoutId = payout.rows[0]?.id;
+
+    expect(payoutId, 'a payout to attach to').toBeDefined();
+
+    /* A stay with a payable and no books, attached the way the historical 252 were. */
+    const stray = await db.execute<{ id: string }>(sql`
+      INSERT INTO bookings (customer_profile_id, unit_id, property_id, partner_id, city_id,
+                            check_in, check_out, guests_adults, status,
+                            base_amount, customer_fee_value, customer_fee_amount,
+                            partner_commission_rate, partner_commission_amount,
+                            total_amount, partner_payable_amount, currency_id,
+                            fx_rate_to_syp, total_syp, cancellation_policy_snapshot,
+                            paid_at, confirmed_at, completed_at)
+      SELECT b.customer_profile_id, b.unit_id, b.property_id, b.partner_id, b.city_id,
+             (now() - interval '20 day')::date, (now() - interval '18 day')::date,
+             2, 'completed',
+             b.base_amount, b.customer_fee_value, b.customer_fee_amount,
+             b.partner_commission_rate, b.partner_commission_amount,
+             b.total_amount, b.partner_payable_amount, b.currency_id,
+             b.fx_rate_to_syp, b.total_syp, b.cancellation_policy_snapshot,
+             now(), now(), now()
+        FROM bookings b WHERE b.id = ${bookingIds[0]!} LIMIT 1
+      RETURNING id
+    `);
+
+    await db.execute(sql`
+      INSERT INTO partner_payout_items (payout_id, booking_id, amount)
+      SELECT ${payoutId}, ${stray.rows[0]?.id}::uuid, b.partner_payable_amount
+      FROM bookings b WHERE b.id = ${stray.rows[0]?.id}::uuid
+    `);
+
+    await db.execute(
+      sql`UPDATE partner_payouts SET status = 'pending_release' WHERE id = ${payoutId}`,
+    );
+
+    /*
+      The CODE, not merely «it threw».
+
+      Written as `rejects.toThrow()` first, and the mutation test caught it: removing the gate
+      entirely left the suite green, because release refuses for half a dozen other reasons and any
+      of them satisfies a bare throw. An assertion that cannot tell the reason apart is not testing
+      the reason.
+    */
+    await expect(
+      service.release(payoutId!, { scheduledFor: '2026-09-20' }, finance),
+    ).rejects.toMatchObject({
+      response: { code: 'payout.unsupported_payable' },
+    });
+
+    const after = await db.execute<{ status: string }>(
+      sql`SELECT status::text AS status FROM partner_payouts WHERE id = ${payoutId}`,
+    );
+
+    expect(after.rows[0]?.status, 'the transfer did not go').not.toBe('paid');
   });
 
   it('accrues completed, paid bookings into one open period per partner', async () => {
@@ -962,6 +1183,9 @@ describeIfDb('PayoutService', () => {
           FROM bookings b WHERE b.id = ${bookingIds[1]!} LIMIT 1
       `);
 
+      /* The books behind it, or accrual correctly refuses to pay it. */
+      await backWithLedger();
+
       await service.accrue();
 
       const next = await db.execute<{
@@ -1047,6 +1271,9 @@ describeIfDb('PayoutService', () => {
           FROM bookings b WHERE b.id = ${bookingIds[2]!} LIMIT 1
       `);
 
+      /* The books behind it, or accrual correctly refuses to pay it. */
+      await backWithLedger();
+
       await service.accrue();
 
       const next = await db.execute<{ gross: string; recovery: string; net: string }>(sql`
@@ -1112,6 +1339,9 @@ describeIfDb('PayoutService', () => {
           FROM bookings b WHERE b.id = ${bookingIds[1]!} LIMIT 1
       `);
 
+      /* The books behind it, or accrual correctly refuses to pay it. */
+      await backWithLedger();
+
       await service.accrue();
 
       const row = await db.execute<{ gross: string; recovery: string; net: string }>(sql`
@@ -1173,6 +1403,9 @@ describeIfDb('PayoutService', () => {
           FROM bookings b WHERE b.id = ${bookingIds[1]!} LIMIT 1
       `);
 
+      /* The books behind it, or accrual correctly refuses to pay it. */
+      await backWithLedger();
+
       await service.accrue();
 
       const open = await db.execute<{ id: string }>(sql`
@@ -1233,6 +1466,9 @@ describeIfDb('PayoutService', () => {
           FROM bookings b WHERE b.id = ${bookingIds[1]!} LIMIT 1
       `);
 
+      /* The books behind it, or accrual correctly refuses to pay it. */
+      await backWithLedger();
+
       await service.accrue();
 
       /*
@@ -1258,6 +1494,9 @@ describeIfDb('PayoutService', () => {
                now(), now(), now()
           FROM bookings b WHERE b.id = ${bookingIds[2]!} LIMIT 1
       `);
+
+      /* The books behind it, or accrual correctly refuses to pay it. */
+      await backWithLedger();
 
       await service.accrue();
       await service.accrue();
@@ -1506,6 +1745,9 @@ describeIfDb('PayoutService', () => {
                now(), now(), now()
           FROM bookings b WHERE b.id = ${bookingIds[1]!} LIMIT 1
       `);
+
+      /* The books behind it, or accrual correctly refuses to pay it. */
+      await backWithLedger();
 
       const next = await openTransfer();
 

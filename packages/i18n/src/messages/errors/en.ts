@@ -92,6 +92,9 @@ export const en = {
   'payout.already_final': 'This payout is final and cannot be changed.',
   'payout.nothing_to_pay': 'There is nothing payable in this period.',
   'payout.frozen_by_dispute': 'An open dispute freezes the payout for these bookings.',
+  'payout.unsupported_payable':
+    'This payout contains bookings whose payable is not backed by a ledger credit. It cannot be ' +
+    'released until they are resolved.',
   'payout.partner_not_screened':
     'This payout cannot be released before the partner has been screened.',
   'payout.no_verified_account':

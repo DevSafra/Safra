@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
@@ -59,6 +59,8 @@ import { actorName } from '../common/actor-name.sql.js';
  */
 @Injectable()
 export class PayoutService {
+  private readonly logger = new Logger(PayoutService.name);
+
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly audit: AuditService,
@@ -85,7 +87,12 @@ export class PayoutService {
    *
    * Returns what it did, so a scheduled job can log something meaningful.
    */
-  async accrue(): Promise<{ attached: number; payouts: number }> {
+  async accrue(): Promise<{
+    attached: number;
+    payouts: number;
+    /** Bookings whose payable no ledger credit supports. Never paid; always reported. */
+    withheldUnsupported: number;
+  }> {
     return this.db.transaction(async (tx) => {
       /*
         One statement for the whole platform rather than a loop per partner. `ON CONFLICT DO
@@ -108,6 +115,32 @@ export class PayoutService {
             WHERE d.booking_id = b.id
               AND d.status IN ('open', 'investigating')
               AND d.deleted_at IS NULL
+          )
+          AND EXISTS (
+            /*
+              The BOOKS have to support the payable before it can be released.
+
+              Bashar's instruction, 2026-09-09: "Apply the safest explicit operational treatment and
+              document the decision so that an unsupported payable cannot be released silently."
+
+              bookings.partner_payable_amount is a COLUMN — a number written when the booking was
+              priced. The ledger credit is the record that the money behind it actually arrived and
+              was apportioned. Normally the two are written in one transaction by postBookingPayment
+              and agree; where they do not, the column is an obligation nothing backs, and paying it
+              moves real money out of SAFRA against a receipt that was never posted. Measured on
+              2026-09-09: 339 such bookings, $63,309.75, of which 321 were completed and would have
+              accrued on the next run.
+
+              Withheld rather than corrected. Inventing the missing credits would be inventing money
+              movements that never happened, which is the one thing that must not be done to a
+              ledger — so the booking simply does not accrue, is counted, and waits for a person.
+
+              (No backticks in this comment: it lives inside a sql template literal, which they end.)
+            */
+            SELECT 1 FROM ledger_entries le
+            WHERE le.booking_id = b.id
+              AND le.account = 'partner_payable'
+              AND le.direction = 'credit'
           )
           AND NOT EXISTS (
             SELECT 1 FROM partner_payouts p
@@ -137,6 +170,32 @@ export class PayoutService {
               AND d.status IN ('open', 'investigating')
               AND d.deleted_at IS NULL
           )
+          AND EXISTS (
+            /*
+              The BOOKS have to support the payable before it can be released.
+
+              Bashar's instruction, 2026-09-09: "Apply the safest explicit operational treatment and
+              document the decision so that an unsupported payable cannot be released silently."
+
+              bookings.partner_payable_amount is a COLUMN — a number written when the booking was
+              priced. The ledger credit is the record that the money behind it actually arrived and
+              was apportioned. Normally the two are written in one transaction by postBookingPayment
+              and agree; where they do not, the column is an obligation nothing backs, and paying it
+              moves real money out of SAFRA against a receipt that was never posted. Measured on
+              2026-09-09: 339 such bookings, $63,309.75, of which 321 were completed and would have
+              accrued on the next run.
+
+              Withheld rather than corrected. Inventing the missing credits would be inventing money
+              movements that never happened, which is the one thing that must not be done to a
+              ledger — so the booking simply does not accrue, is counted, and waits for a person.
+
+              (No backticks in this comment: it lives inside a sql template literal, which they end.)
+            */
+            SELECT 1 FROM ledger_entries le
+            WHERE le.booking_id = b.id
+              AND le.account = 'partner_payable'
+              AND le.direction = 'credit'
+          )
         ON CONFLICT (booking_id) DO NOTHING
         RETURNING payout_id
       `);
@@ -149,7 +208,47 @@ export class PayoutService {
         await this.retotal(tx as unknown as Database, payoutId);
       }
 
-      return { attached: attached.rows.length, payouts: touched.size };
+      /*
+        What this run REFUSED to attach, so «unsupported» cannot be silent.
+
+        Counted after the inserts and inside the same transaction, so it describes exactly the set
+        the guard above excluded. Returned rather than only logged, because the scheduled job writes
+        its result into `scheduled_job_runs` — which is the record somebody reads afterwards — and a
+        number that only ever reached a log line would be invisible on the screen that reports the
+        job.
+      */
+      const withheld = await tx.execute<{ n: number; amount: string }>(sql`
+        SELECT count(*)::int AS n,
+               coalesce(sum(b.partner_payable_amount), 0)::text AS amount
+        FROM bookings b
+        WHERE b.status = 'completed'
+          AND b.paid_at IS NOT NULL
+          AND b.deleted_at IS NULL
+          AND b.partner_payable_amount > 0
+          AND NOT EXISTS (SELECT 1 FROM partner_payout_items i WHERE i.booking_id = b.id)
+          AND NOT EXISTS (
+            SELECT 1 FROM ledger_entries le
+            WHERE le.booking_id = b.id
+              AND le.account = 'partner_payable'
+              AND le.direction = 'credit'
+          )
+      `);
+
+      const unsupported = withheld.rows[0]?.n ?? 0;
+
+      if (unsupported > 0) {
+        this.logger.warn(
+          `Withheld ${unsupported} booking(s) from accrual carrying ` +
+            `${withheld.rows[0]?.amount ?? '0'} of payable with no ledger credit behind it. ` +
+            'They will not be paid until the books support them.',
+        );
+      }
+
+      return {
+        attached: attached.rows.length,
+        payouts: touched.size,
+        withheldUnsupported: unsupported,
+      };
     });
   }
 
@@ -556,6 +655,41 @@ export class PayoutService {
 
     if ((frozen.rows[0]?.n ?? 0) > 0) {
       throw conflict(ERROR.PAYOUT_FROZEN_BY_DISPUTE);
+    }
+
+    /*
+      Nothing leaves against a payable the BOOKS do not support — the last gate, and the literal
+      one Bashar asked for on 2026-09-09: "an unsupported payable cannot be released silently".
+
+      The accrual guard stops new ones being attached. It cannot help with what was attached before
+      it existed, and on the day it landed that was **252 items worth $46,872 across 84 partners**,
+      already sitting on open payouts and one release away from being real money. So the check is
+      repeated here for exactly the reason the dispute freeze and the suspension check are: release
+      is the last moment anybody looks.
+
+      A CONFLICT rather than a silent skip. Dropping the item would change the total somebody has
+      already reviewed, and doing that quietly is how an unexplained figure reaches a partner; the
+      transfer stops and names the problem instead.
+    */
+    const unsupported = await this.db.execute<{ n: number }>(sql`
+      SELECT count(*)::int AS n
+      FROM partner_payout_items i
+      WHERE i.payout_id = ${payoutId}
+        AND NOT EXISTS (
+          SELECT 1 FROM ledger_entries le
+          WHERE le.booking_id = i.booking_id
+            AND le.account = 'partner_payable'
+            AND le.direction = 'credit'
+        )
+    `);
+
+    if ((unsupported.rows[0]?.n ?? 0) > 0) {
+      this.logger.error(
+        `Refused to release payout ${payoutId}: ${unsupported.rows[0]?.n} item(s) carry a payable ` +
+          'with no ledger credit behind it.',
+      );
+
+      throw conflict(ERROR.PAYOUT_UNSUPPORTED_PAYABLE);
     }
 
     /*
