@@ -157,6 +157,33 @@
     the language is the opposite of unified. The `:lang()` switch and its token are deleted rather
     than left dormant — a dormant token is the next reader's puzzle.
 
+    ## Helvetica and Arial are deliberately ABSENT, and this is the load-bearing part
+
+    Bashar reported that the navigation still looked wrong, and it did: the stack as first approved
+    ended `… Roboto, Helvetica, Arial, sans-serif`, and on macOS **every Arabic glyph in the
+    platform was being rasterised in Arial**. Measured with Chromium's own
+    `CSS.getPlatformFontsForNode` rather than inferred: customer nav links came back «Arial (91
+    glyphs) · .SF NS (4)», the console sidebar «Arial (115) · .SF NS (15)».
+
+    The mechanism is coverage, not precedence. macOS's system UI face `.SF NS` contains **no
+    Arabic**, so the cascade walks past it; Segoe UI and Roboto are not installed; and the first
+    family in the list that DOES carry Arabic is Arial. Latin never reached either entry — `.SF NS`
+    always won it — so Helvetica and Arial had no effect on Latin at all and their only practical
+    job was capturing Arabic away from the native face.
+
+    Removing them lets Arabic fall through to `sans-serif`, which macOS resolves to **`.SF Arabic`**,
+    the real system Arabic face. Windows is unaffected either way: Segoe UI carries Arabic and wins
+    long before this point. Controlled measurement, same machine, same page:
+
+    | stack                         | Arabic      | Latin   |
+    | ----------------------------- | ----------- | ------- |
+    | … Roboto, Helvetica, Arial, … | Arial       | .SF NS  |
+    | … Roboto, sans-serif          | .SF Arabic  | .SF NS  |
+
+    So do not "restore" the two names for safety. `sans-serif` is the safety net, and it is a better
+    one: it resolves to whatever the operating system considers its sans face for the script being
+    drawn, which is the whole point of a system stack.
+
     ## Why the value is a literal list now
 
     It used to be `var(--default-font-family, …)`, Tailwind v4's own hook, so a host that defined
@@ -180,10 +207,8 @@
     This overrides the handoff's §4.1 pair (Amiri and IBM Plex Sans Arabic), which is Bashar's call
     to make; recorded here because a later reader will find §4.1 naming them and should know why.
   */
-  --font-sans:
-    BlinkMacSystemFont, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  --font-display:
-    BlinkMacSystemFont, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-sans: BlinkMacSystemFont, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: BlinkMacSystemFont, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
   --radius-card: 0.875rem;
   /*
