@@ -138,11 +138,16 @@
    * as `--color-text2` and `--ease-out-strong`.
    */
   /*
-    ONE font stack for the whole platform, and a second only where the LANGUAGE changes.
+    ONE font stack for the whole platform. One, and only one.
 
-    Bashar, 2026-09-09: *«I want the entire SAFRA platform to use the following system font stack
-    consistently across all applications»*, and then, for the Latin languages, *«for english and
-    deutsch use this font please»* — the two lists below, verbatim.
+    Bashar, 2026-09-09: *«I want the entire SAFRA platform to use the following font stack
+    consistently across all applications… I want a unified typography experience everywhere»*, with
+    "reduced design complexity" among the stated goals.
+
+    A Latin-specific stack for `en` and `de` was tried earlier the same day and is REMOVED by that
+    instruction: two stacks IS the complexity the goal names, and a platform whose face changes with
+    the language is the opposite of unified. The `:lang()` switch and its token are deleted rather
+    than left dormant — a dormant token is the next reader's puzzle.
 
     ## Why the value is a literal list now
 
@@ -171,14 +176,6 @@
     BlinkMacSystemFont, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-display:
     BlinkMacSystemFont, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  /*
-    English and German, applied by `:lang()` below.
-
-    Named as its own token rather than inlined twice, so the two places that switch cannot drift.
-  */
-  --font-latin:
-    'Geeza Pro', Tahoma, BlinkMacSystemFont, -apple-system, 'Segoe UI', Roboto, Helvetica,
-    Arial, sans-serif;
 
   --radius-card: 0.875rem;
   /*
@@ -791,21 +788,4 @@ body {
  */
 li:has([data-decided]) [data-deadline] {
   display: none;
-}
-
-/*
-  The Latin languages take their own stack (Bashar, 2026-09-09).
-
-  `:lang()` rather than a class, because it follows the `lang` attribute the document already sets
-  per locale — so the switch happens wherever the language does, including inside a page that mixes
-  them, and nothing has to remember to add a class.
-
-  The console and the partner portal are Arabic-only today, so this rule matches nothing there. It
-  is declared in all three anyway: the alternative is two apps that behave differently the day one
-  of them grows a second language, which is the drift this instruction exists to remove.
-*/
-:root:lang(en),
-:root:lang(de) {
-  --font-sans: var(--font-latin);
-  --font-display: var(--font-latin);
 }
