@@ -305,7 +305,7 @@ function Card({ property }: { readonly property: PartnerProperty }) {
 function StatusPill({ status }: { readonly status: string }) {
   return (
     <span
-      className={`rounded-full border px-2.5 py-0.5 text-[13px] font-bold ${TONES[statusTone(status)]}`}
+      className={`rounded-full border px-2.5 py-0.5 text-[14px] font-bold ${TONES[statusTone(status)]}`}
     >
       {propertyStatus(status)}
     </span>

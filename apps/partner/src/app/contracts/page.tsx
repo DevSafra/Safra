@@ -298,7 +298,7 @@ function ContractCard({ contract }: { readonly contract: PartnerContract }) {
           {contractKind(contract.kind)}
         </span>
         <span
-          className={`rounded-full border px-2.5 py-0.5 text-[13px] font-bold ${TONES[statusTone(contract.status)]}`}
+          className={`rounded-full border px-2.5 py-0.5 text-[14px] font-bold ${TONES[statusTone(contract.status)]}`}
         >
           {contractStatus(contract.status)}
         </span>
@@ -430,7 +430,7 @@ function ContractHistory({ contract }: { readonly contract: PartnerContract }) {
               two different meanings in one colour on one screen is exactly what that rule forbids.
             */}
             <span
-              className={`rounded-full border px-2 py-0.5 text-[13px] font-bold ${
+              className={`rounded-full border px-2 py-0.5 text-[14px] font-bold ${
                 event.superseded ? TONES[statusTone('superseded')] : TONES.teal
               }`}
             >

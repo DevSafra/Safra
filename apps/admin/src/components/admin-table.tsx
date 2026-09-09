@@ -241,7 +241,7 @@ export function StatusPill({ tone, children }: { tone: Tone; children: ReactNode
         every status looks the same; a rule that has to be remembered at each of the nineteen
         sections is one that will be forgotten at the twentieth.
       */
-      className={`inline-block w-fit whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[13px] font-bold ${TONES[tone]}`}
+      className={`inline-block w-fit whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[14px] font-bold ${TONES[tone]}`}
     >
       {children}
     </span>

@@ -110,7 +110,7 @@ export function StatusPill({
   return (
     <span
       data-status-pill
-      className={`rounded-full border px-2.5 py-0.5 text-xs ${TONES[statusTone(status)]}`}
+      className={`rounded-full border px-2.5 py-0.5 text-sm font-semibold ${TONES[statusTone(status)]}`}
     >
       {label}
     </span>

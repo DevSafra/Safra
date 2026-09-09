@@ -89,7 +89,7 @@ export default async function PayoutPage({
         <header className="flex flex-wrap items-center gap-3">
           <Ltr className="text-[16px] font-bold text-sky">{payout.reference}</Ltr>
           <span
-            className={`rounded-full border px-2.5 py-0.5 text-[13px] font-bold ${TONES[statusTone(payout.status)]}`}
+            className={`rounded-full border px-2.5 py-0.5 text-[14px] font-bold ${TONES[statusTone(payout.status)]}`}
           >
             {payoutStatus(payout.status)}
           </span>
@@ -164,7 +164,7 @@ export default async function PayoutPage({
                     {booking.bookingReference}
                   </Ltr>
                   <span className="text-[13px] text-muted">{booking.property ?? ''}</span>
-                  <Ltr className="text-[13px] tabular-nums text-muted">
+                  <Ltr className="text-[14px] tabular-nums text-muted">
                     {booking.checkIn} ← {booking.checkOut}
                   </Ltr>
                   <span className="ms-auto grid justify-items-end gap-0.5">

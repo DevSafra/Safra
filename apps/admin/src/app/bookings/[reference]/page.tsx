@@ -443,7 +443,7 @@ export default async function BookingPage({
                     {label(t.enums.timelineEvent, event.eventType)}
                   </span>
                   {/* `Ltr`, or the trailing UTC is reordered to lead: «UTC 21:49:33 2026-08-05». */}
-                  <span className="text-xs text-faint">
+                  <span className="text-sm tabular-nums text-muted">
                     <Ltr>{event.createdAt.slice(0, 19).replace('T', ' ')} UTC</Ltr>
                   </span>
                 </div>

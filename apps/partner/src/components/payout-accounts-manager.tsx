@@ -126,7 +126,7 @@ export function PayoutAccountsManager({
             <div className="flex flex-wrap items-center gap-2">
               <span
                 data-status-pill
-                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[13px] font-semibold ${TONES[statusTone(account.status)]}`}
+                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[14px] font-semibold ${TONES[statusTone(account.status)]}`}
               >
                 {c.status[account.status] ?? account.status}
               </span>

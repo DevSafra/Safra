@@ -73,7 +73,7 @@ export function ArrivalActions({ arrival }: { arrival: PartnerArrival }) {
       <div className="flex flex-wrap items-center gap-2">
         {checkedIn ? (
           <>
-            <span className="rounded-full border border-sky bg-sky/15 px-2.5 py-0.5 text-[13px] font-bold text-sky">
+            <span className="rounded-full border border-sky bg-sky/15 px-2.5 py-0.5 text-[14px] font-bold text-sky">
               {t.arrivals.checkedIn}
             </span>
             <button

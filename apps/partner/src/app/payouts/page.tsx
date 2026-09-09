@@ -716,7 +716,7 @@ function Card({ payout }: { readonly payout: PartnerPayout }) {
         <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
           <Ltr className="text-[14px] font-bold text-sky">{payout.reference}</Ltr>
           <span
-            className={`rounded-full border px-2.5 py-0.5 text-[13px] font-bold ${TONES[statusTone(payout.status)]}`}
+            className={`rounded-full border px-2.5 py-0.5 text-[14px] font-bold ${TONES[statusTone(payout.status)]}`}
           >
             {payoutStatus(payout.status)}
           </span>

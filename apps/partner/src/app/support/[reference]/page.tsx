@@ -86,7 +86,7 @@ export default async function SupportThreadPage({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Ltr className="text-[14px] text-text">{thread.reference}</Ltr>
           <span
-            className={`rounded-full border px-2 py-0.5 text-[13px] ${
+            className={`rounded-full border px-2 py-0.5 text-[14px] ${
               thread.closed
                 ? 'border-line bg-field text-faint'
                 : 'border-ok/40 bg-ok/10 text-ok'

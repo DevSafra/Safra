@@ -73,7 +73,7 @@ export default async function SupportPage() {
                   </span>
 
                   <span
-                    className={`shrink-0 rounded-full border px-2 py-0.5 text-[13px] ${
+                    className={`shrink-0 rounded-full border px-2 py-0.5 text-[14px] ${
                       ticket.closed
                         ? 'border-line bg-field text-faint'
                         : 'border-ok/40 bg-ok/10 text-ok'

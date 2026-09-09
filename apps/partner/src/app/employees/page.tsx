@@ -175,7 +175,7 @@ function Row({
 
         <div className="flex flex-wrap items-center gap-2">
           <span
-            className={`rounded-full border px-2.5 py-0.5 text-[13px] font-bold ${TONES[statusTone(employee.status)]}`}
+            className={`rounded-full border px-2.5 py-0.5 text-[14px] font-bold ${TONES[statusTone(employee.status)]}`}
           >
             {employee.status === 'suspended'
               ? t.employees.statusSuspended

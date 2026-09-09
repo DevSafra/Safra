@@ -202,7 +202,7 @@ export default async function PayoutPage({
                     </Td>
                     <Td>{booking.property ?? t.admin.noData}</Td>
                     <Td>
-                      <Ltr className="text-[13px] text-faint">
+                      <Ltr className="text-[14px] tabular-nums text-muted">
                         {booking.checkIn} ← {booking.checkOut}
                       </Ltr>
                     </Td>
