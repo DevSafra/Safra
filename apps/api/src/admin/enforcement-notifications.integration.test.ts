@@ -288,8 +288,21 @@ describeIfDb('what an enforcement action tells the partner', () => {
   it('records the decision and the delivery as separate audit entries', async () => {
     await enforcement.suspend(staff, reference, { reason: REASON });
 
+    /*
+      `created_at, id` — the id is the tie-break, and it is load-bearing.
+
+      Both rows are written inside ONE transaction, where `now()` is frozen, so they carry the
+      identical timestamp and `ORDER BY created_at` alone leaves their order undefined: whatever the
+      heap happens to return. It returned the expected order for weeks and then did not, which is
+      how this class of flake always announces itself.
+
+      `audit_log.id` is a UUIDv7, so it sorts by insertion — the causal order this test is actually
+      about. Same rule as every other newest-row read in this codebase.
+    */
     const actions = await db.execute<{ action: string }>(sql`
-      SELECT action FROM audit_log WHERE subject_id = ${partnerId}::uuid ORDER BY created_at
+      SELECT action FROM audit_log
+      WHERE subject_id = ${partnerId}::uuid
+      ORDER BY created_at, id
     `);
 
     expect(actions.rows.map((r) => r.action)).toStrictEqual([
