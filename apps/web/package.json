@@ -15,7 +15,7 @@
     "@safra/session": "workspace:*",
     "@safra/ui": "workspace:*",
     "libphonenumber-js": "^1.13.11",
-    "next": "^15.5.0",
+    "next": "^15.5.25",
     "next-intl": "^4.3.0",
     "playwright-core": "^1.62.1",
     "react": "^19.1.0",

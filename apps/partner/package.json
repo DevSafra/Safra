@@ -15,7 +15,7 @@
     "@safra/session": "workspace:*",
     "@safra/ui": "workspace:*",
     "intl-messageformat": "^11.2.13",
-    "next": "^15.5.0",
+    "next": "^15.5.25",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "zod": "^4.1.0"
