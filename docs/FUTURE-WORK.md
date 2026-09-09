@@ -179,6 +179,43 @@ treat "engineering complete" as a statement about planned scope, not about corre
 
 ## 1a. Launch blockers — the authoritative list
 
+### Engineering sign-off, 2026-09-09
+
+**Bashar signed off nine readiness dimensions on this date**, in these words, and this is the line
+between what engineering owns and what it does not:
+
+| Dimension              | Bashar, 2026-09-09 |
+| ---------------------- | ------------------ |
+| Software engineering   | **Approved**       |
+| Customer Application   | **Approved**       |
+| Partner Portal         | **Approved**       |
+| Super Admin Console    | **Approved**       |
+| Booking workflow       | **Approved**       |
+| Financial engine       | **Approved**       |
+| Security               | **Approved**       |
+| Auditability           | **Approved**       |
+| Test-suite reliability | **Approved**       |
+
+_«The remaining work is primarily operational and organisational rather than engineering
+implementation.»_
+
+**Operational readiness is deliberately NOT in that table**, and the omission is the point: it is
+the one dimension still open, and the ten below are what it consists of. Nothing was approved that
+has not been measured — the evidence for each line is in §10 and in findings 235, 244, 245, 246,
+248, 249 and 250.
+
+**One item to keep visible.** Bashar's own list of what remains named nine of the ten: sanctions
+feed, deployment target, backup and restore validation, monitoring and alert ownership, malware
+scanning, penetration testing, retention and erasure policy, WhatsApp provider, fine-deduction
+policy. **Blocker 10, load-testing execution, was not among them** — almost certainly because it is
+gated by blocker 1 and cannot start until a deployment target exists. It stays on this list rather
+than being quietly dropped, because a capacity number for 200K–1M users is a claim this project
+requires evidence for and none has been produced.
+
+**The readiness page is the authoritative engineering readiness record** (Bashar, 2026-09-09):
+<https://claude.ai/code/artifact/576aabf2-3e8e-4d73-a898-3a9a7366f7ad>. This register stays the
+authoritative record of OPEN WORK; the page is the record of readiness and carries the sign-off.
+
 **Agreed with Bashar, 2026-08-08.** SAFRA is engineering-complete; these ten are what stand between
 that and a launch. **Engineering-complete does not mean launch-ready**, and this list is the
 difference.
