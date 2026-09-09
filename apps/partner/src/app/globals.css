@@ -138,46 +138,47 @@
    * as `--color-text2` and `--ease-out-strong`.
    */
   /*
-    ONE font for the whole platform: the browser's own (Bashar, 2026-09-08).
+    ONE font stack for the whole platform, and a second only where the LANGUAGE changes.
 
-    *«Please use this default font on the entire system»*, with this exact stack. This app carried
-    no font token at all — `layout.tsx` applied `next/font`'s generated class straight to `<body>` —
-    so the token is introduced here and the loader removed, which puts all three apps on one
-    declaration instead of two mechanisms.
+    Bashar, 2026-09-09: *«I want the entire SAFRA platform to use the following system font stack
+    consistently across all applications»*, and then, for the Latin languages, *«for english and
+    deutsch use this font please»* — the two lists below, verbatim.
 
-    `--font-display` is an alias of the same stack: the display class still marks which text is a
-    heading, and the day a display face returns there is one value to set.
+    ## Why the value is a literal list now
+
+    It used to be `var(--default-font-family, …)`, Tailwind v4's own hook, so a host that defined
+    that variable would win. That is exactly the «different areas of the platform, different font»
+    outcome this instruction is against, and nothing here sets the hook, so the indirection bought
+    nothing and could only ever cost consistency.
+
+    ## `--font-display` is an ALIAS, still
+
+    Sixty-two components carry `font-display`. It resolves to the same stack as body text, so the
+    class marks which text is a display line without changing the face — one value to set on the
+    day a display face is wanted again, rather than sixty-two places to find.
+
+    ## No webfont, anywhere
+
+    No `next/font`, no Google download, no `@font-face`. Nothing is fetched, so nothing can arrive
+    late: no swap, no invisible text, no layout shift on a slow connection. That is most of the
+    «faster rendering» half of the instruction, and it is a property of loading nothing rather than
+    of choosing well.
+
+    This overrides the handoff's §4.1 pair (Amiri and IBM Plex Sans Arabic), which is Bashar's call
+    to make; recorded here because a later reader will find §4.1 naming them and should know why.
   */
-  --font-display: var(
-    --default-font-family,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    'Helvetica Neue',
-    'Noto Sans',
-    Arial,
-    sans-serif,
-    'Apple Color Emoji',
-    'Segoe UI Emoji',
-    'Segoe UI Symbol',
-    'Noto Color Emoji'
-  );
-  --font-sans: var(
-    --default-font-family,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    'Helvetica Neue',
-    'Noto Sans',
-    Arial,
-    sans-serif,
-    'Apple Color Emoji',
-    'Segoe UI Emoji',
-    'Segoe UI Symbol',
-    'Noto Color Emoji'
-  );
+  --font-sans:
+    BlinkMacSystemFont, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-display:
+    BlinkMacSystemFont, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  /*
+    English and German, applied by `:lang()` below.
+
+    Named as its own token rather than inlined twice, so the two places that switch cannot drift.
+  */
+  --font-latin:
+    'Geeza Pro', Tahoma, BlinkMacSystemFont, -apple-system, 'Segoe UI', Roboto, Helvetica,
+    Arial, sans-serif;
 
   --radius-card: 0.875rem;
   /*
@@ -790,4 +791,21 @@ body {
  */
 li:has([data-decided]) [data-deadline] {
   display: none;
+}
+
+/*
+  The Latin languages take their own stack (Bashar, 2026-09-09).
+
+  `:lang()` rather than a class, because it follows the `lang` attribute the document already sets
+  per locale — so the switch happens wherever the language does, including inside a page that mixes
+  them, and nothing has to remember to add a class.
+
+  The console and the partner portal are Arabic-only today, so this rule matches nothing there. It
+  is declared in all three anyway: the alternative is two apps that behave differently the day one
+  of them grows a second language, which is the drift this instruction exists to remove.
+*/
+:root:lang(en),
+:root:lang(de) {
+  --font-sans: var(--font-latin);
+  --font-display: var(--font-latin);
 }
