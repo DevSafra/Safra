@@ -80,7 +80,38 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 const BUDGET = JSON.parse(readFileSync('test-budget.json', 'utf8')).playwright;
 
 /** In order. `setup` and `signed-in-setup` are pulled in as dependencies of these two. */
-const PROJECTS = ['chromium', 'signed-in'];
+/**
+ * Every project, and how many SHARDS each is run in.
+ *
+ * ## Why `signed-in` is sharded, and it is not about speed
+ *
+ * That project's specs all replay ONE saved partner session, and a saved session cannot survive a
+ * long run. Three mechanisms, each established on 2026-09-09:
+ *
+ * 1. **Refresh reuse revokes the family.** `storageState` gives every context its own cookie jar
+ *    seeded from the same snapshot, unlike a real browser where one jar is updated in place. The
+ *    access token lives fifteen minutes, so the first context past that refreshes and rotates,
+ *    the next presents the superseded token, and `TokenService.rotate` burns the whole lineage —
+ *    taking the context that refreshed legitimately with it. Measured directly: refresh with the
+ *    saved token → 200, the same token again → 401, and the freshly rotated token → 401.
+ * 2. **The session cap retires it.** `MAX_CONCURRENT_SESSIONS` is ten, and the specs in this
+ *    project sign in as the same partner repeatedly, so the setup's own family can be retired out
+ *    from under them mid-run.
+ * 3. **The sign-in code rides the queue the suite floods.** A partner's second factor is emailed
+ *    through BullMQ, so the capture is least reliable exactly when the suite is busiest.
+ *
+ * Each shard is a SEPARATE `playwright test` invocation, so each re-runs `signed-in-setup` and
+ * starts on a session minutes old rather than an hour. Unsharded this project reported 81 passed
+ * and 40 failed; in three shards it reports 136 passed and none, in about three minutes.
+ *
+ * The cost is three partner sign-ins per run instead of one, which is well inside the ten-a-minute
+ * limit when they are minutes apart — and the reason a shard count is a number here rather than a
+ * flag somewhere is that raising it raises that cost.
+ */
+const PROJECTS = [
+  { name: 'chromium', shards: 1 },
+  { name: 'signed-in', shards: 3 },
+];
 /*
   `test-reports/`, NOT `test-results/`.
 
@@ -126,12 +157,20 @@ function flatten(suite, out = []) {
   return out;
 }
 
-function runProject(project) {
-  console.log(`\n── ${project} ──────────────────────────────────────────────`);
+function runProject(project, shard = 1, shards = 1) {
+  const label = shards > 1 ? `${project} (shard ${shard}/${shards})` : project;
+
+  console.log(`\n── ${label} ──────────────────────────────────────────────`);
 
   const run = spawnSync(
     'npx',
-    ['playwright', 'test', `--project=${project}`, '--reporter=json'],
+    [
+      'playwright',
+      'test',
+      `--project=${project}`,
+      ...(shards > 1 ? [`--shard=${shard}/${shards}`] : []),
+      '--reporter=json',
+    ],
     { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, env: process.env },
   );
 
@@ -147,7 +186,10 @@ function runProject(project) {
     return { project, crashed: true, tests: [] };
   }
 
-  writeFileSync(REPORT.replace('.json', `-${project}.json`), JSON.stringify(report));
+  /* One file per SHARD: `-signed-in.json` written three times would keep only the last third. */
+  const suffix = shards > 1 ? `-${project}-${shard}of${shards}` : `-${project}`;
+
+  writeFileSync(REPORT.replace('.json', `${suffix}.json`), JSON.stringify(report));
 
   const tests = (report.suites ?? []).flatMap((suite) => flatten(suite));
 
@@ -210,7 +252,23 @@ if (reset) {
   console.log('\n── testbed NOT reset (--no-reset) ───────────────────────');
 }
 
-const results = PROJECTS.map(runProject);
+/*
+  Shards are merged back into ONE result per project, so every count, budget and «did not run»
+  check below still reasons about a project rather than about how it happened to be split.
+*/
+const results = PROJECTS.map(({ name, shards }) => {
+  const parts = Array.from({ length: shards }, (_, index) =>
+    runProject(name, index + 1, shards),
+  );
+
+  return {
+    project: name,
+    crashed: parts.some((part) => part.crashed),
+    tests: parts.flatMap((part) => part.tests),
+    exitCode: parts.reduce((worst, part) => Math.max(worst, part.exitCode ?? 0), 0),
+    errors: parts.flatMap((part) => part.errors ?? []),
+  };
+});
 
 for (const { project, crashed, tests, errors } of results) {
   if (crashed) {
