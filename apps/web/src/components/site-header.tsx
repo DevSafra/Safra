@@ -62,6 +62,15 @@ import { ORNAMENT_BRAND } from '@safra/ui';
  * that differed, which is the half nobody thinks to check. From `sm` every control is 44px, so the
  * row has one top edge and one bottom edge.
  *
+ * **`h-11`, not `min-h-11`, and the difference is not pedantic.** A floor only holds while the
+ * content stays under it. On 2026-09-09 the font stack dropped Helvetica and Arial so that Arabic
+ * would render in the native `.SF Arabic` rather than Arial — and `.SF Arabic`'s glyph box is
+ * TALLER than the declared `line-height`, so these inline-flex controls grew straight past the
+ * floor: measured at 768px, «إنشاء حساب» came out 58px and «تسجيل الدخول» 56px against the brand's
+ * 56px and the menu's 44px, three distinct top edges where the rule above requires one. A fixed
+ * height cannot be walked past by a font's metrics, which is the whole point — the next face with
+ * different metrics will not reopen this.
+ *
  * **Hover is a gold WASH, never gold text** (Bashar, 2026-09-02: «I see a blue background»). Every
  * hover in here was `bg-field` under `text-sky` — a cool grey pill under #2e66a8 type, which was
  * the only blue anywhere on the header and belonged to nothing. Gold TEXT cannot replace it: at
@@ -153,7 +162,7 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
           exactly where the bar is tightest, and it still reads in the footer, which is the one
           place a strapline belongs.
         */}
-        <Link href={`/${locale}`} className="flex items-center gap-3">
+        <Link href={`/${locale}`} className="flex items-center gap-3 sm:h-11">
           <span
             aria-hidden
             className="grid size-10 shrink-0 place-items-center rounded-card border border-gold/40 text-lg text-gold-read sm:size-11 sm:text-xl"
@@ -214,7 +223,7 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
         */}
         <Link
           href={`/${locale}/partners/join`}
-          className="hidden min-h-10 items-center rounded-lg px-3 py-2 text-[14px] font-semibold text-muted transition-colors hover:bg-gold/10 hover:text-text sm:min-h-11 lg:inline-flex"
+          className="hidden min-h-10 items-center rounded-lg px-3 py-2 text-[14px] font-semibold text-muted transition-colors hover:bg-gold/10 hover:text-text sm:h-11 lg:inline-flex"
         >
           {home('partnersCta')}
         </Link>
@@ -255,7 +264,7 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
           {session ? (
             <Link
               href={`/${locale}/account`}
-              className="inline-flex min-h-10 max-w-[10rem] btn-gold items-center truncate rounded-lg px-4 py-2 text-sm font-bold transition-opacity hover:opacity-90 sm:min-h-11"
+              className="inline-flex min-h-10 max-w-[10rem] btn-gold items-center truncate rounded-lg px-4 py-2 text-sm font-bold transition-opacity hover:opacity-90 sm:h-11"
               title={session.user.email}
             >
               {auth('account')}
@@ -264,13 +273,13 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
             <>
               <Link
                 href={`/${locale}/register`}
-                className="inline-flex min-h-10 items-center rounded-lg border border-gold/60 px-4 py-2 text-sm font-semibold text-text transition-colors hover:border-gold hover:bg-gold/10 sm:min-h-11"
+                className="inline-flex min-h-10 items-center rounded-lg border border-gold/60 px-4 py-2 text-sm font-semibold text-text transition-colors hover:border-gold hover:bg-gold/10 sm:h-11"
               >
                 {auth('createAccount')}
               </Link>
               <Link
                 href={`/${locale}/login`}
-                className="inline-flex min-h-10 btn-gold items-center rounded-lg px-4 py-2 text-sm font-bold transition-opacity hover:opacity-90 sm:min-h-11"
+                className="inline-flex min-h-10 btn-gold items-center rounded-lg px-4 py-2 text-sm font-bold transition-opacity hover:opacity-90 sm:h-11"
               >
                 {auth('signIn')}
               </Link>

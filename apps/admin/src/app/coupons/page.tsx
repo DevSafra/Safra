@@ -42,7 +42,19 @@ export const dynamic = 'force-dynamic';
   The date column is the narrowest it can be because its two dates now STACK; everything else is
   sized to its content rather than to a guess.
 */
-const TEMPLATE = '.9fr .8fr .7fr .8fr .7fr .8fr .8fr .7fr';
+/*
+  code · type · discount · min · usage · period · action · STATUS
+
+  `status` was `.7fr`, the narrowest track, and it stopped fitting on 2026-09-09: status pills went
+  from 13px to 14px (an answer must not be the smallest text on the screen) and the font stack
+  dropped Arial for the native `.SF Arabic`, whose Arabic glyphs are wider. «موقوف» then needed 64px
+  in a 59px column and spilled into its neighbour at 1024, which `table-overflow.spec.ts` caught.
+
+  The share comes from `type`, which holds one short enum word and had slack. The total is
+  unchanged, so `minWidth` stays at 680 and no horizontal scrollbar comes back — the thing Bashar
+  asked to be rid of.
+*/
+const TEMPLATE = '.9fr .7fr .7fr .8fr .7fr .8fr .8fr .8fr';
 
 export default async function CouponsPage({
   searchParams,
