@@ -114,6 +114,7 @@ export class MetricsService {
       sla,
       deadLetters,
       imagePipeline,
+      unsupportedPayables,
     ] = await Promise.all([
       this.jobs(),
       this.notifications(),
@@ -123,6 +124,7 @@ export class MetricsService {
       this.sla(),
       this.deadLetters(),
       this.imagePipeline(),
+      this.unsupportedPayables(),
     ]);
 
     return [
@@ -134,6 +136,7 @@ export class MetricsService {
       ...sla,
       ...deadLetters,
       ...imagePipeline,
+      ...unsupportedPayables,
       {
         name: 'safra_media_reachable',
         help: '1 when the media bucket answers for a missing object, 0 when it refuses or is unreachable.',
@@ -214,17 +217,99 @@ export class MetricsService {
    * broken; ZERO notifications for hours means the calling code stopped enqueueing, which produces
    * no failures either and is invisible to a ratio.
    */
+  /**
+   * Payables no ledger credit supports — prevented at two gates, and visible here.
+   *
+   * Bashar, 2026-09-09: _«an unsupported payable cannot be released silently»_. Accrual refuses to
+   * attach one and release refuses to pay one, so the money is safe; this is the other half of
+   * «not silently», because a guard that quietly withholds is its own kind of silence — the
+   * partner is unpaid and nothing on any screen says why.
+   *
+   * Split by whether it has reached a payout, because the two mean different things to whoever is
+   * on call. `unattached` is the anomaly waiting to be understood. `attached` is one release away
+   * from real money and only the release gate is standing in front of it — on 2026-09-09 that was
+   * 252 items worth $46,872, all predating the accrual guard.
+   */
+  private async unsupportedPayables(): Promise<Gauge[]> {
+    const rows = await this.db.execute<{ attached: string; unattached: string }>(sql`
+      WITH unsupported AS (
+        SELECT b.id,
+               EXISTS (SELECT 1 FROM partner_payout_items i WHERE i.booking_id = b.id) AS attached
+        FROM bookings b
+        WHERE b.partner_payable_amount > 0
+          AND b.paid_at IS NOT NULL
+          AND b.deleted_at IS NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM ledger_entries le
+            WHERE le.booking_id = b.id
+              AND le.account = 'partner_payable'
+              AND le.direction = 'credit'
+          )
+      )
+      SELECT count(*) FILTER (WHERE attached)::text     AS attached,
+             count(*) FILTER (WHERE NOT attached)::text AS unattached
+      FROM unsupported
+    `);
+
+    const row = rows.rows[0];
+
+    return [
+      {
+        name: 'safra_unsupported_payables',
+        help: 'Bookings whose partner payable no ledger credit supports.',
+        samples: [
+          { labels: { state: 'attached' }, value: Number(row?.attached ?? 0) },
+          { labels: { state: 'unattached' }, value: Number(row?.unattached ?? 0) },
+        ],
+      },
+    ];
+  }
+
   private async notifications(): Promise<Gauge[]> {
     const rows = await this.db.execute<{
       sent: string;
       failed: string;
       queued: string;
+      abandoned: string;
     }>(sql`
-      SELECT count(*) FILTER (WHERE status = 'sent')::text   AS sent,
-             count(*) FILTER (WHERE status = 'failed')::text AS failed,
-             count(*) FILTER (WHERE status = 'queued')::text AS queued
+      SELECT count(*) FILTER (WHERE status = 'sent')::text      AS sent,
+             count(*) FILTER (WHERE status = 'failed')::text    AS failed,
+             count(*) FILTER (WHERE status = 'queued')::text    AS queued,
+             count(*) FILTER (WHERE status = 'abandoned')::text AS abandoned
       FROM notifications
       WHERE created_at > now() - INTERVAL '1 hour'
+    `);
+
+    /*
+      UNDELIVERED, and not bounded to an hour — which is the whole point of it.
+
+      `safra_notifications_1h` is a rate: it answers «how is delivery going right now» and a row
+      that failed yesterday leaves it the moment the window moves on. Finding 235 was 1,041 rows
+      spanning a MONTH, and an hourly gauge is structurally incapable of showing that — every one
+      of them was outside every window by the time anybody looked.
+
+      So this is a BACKLOG: how many notices are owed and undelivered, at this instant, however
+      long they have been owed. `booking.needs_action` is broken out by name because it is the one
+      whose loss has a consequence in the product rather than only in the log — a partner who is
+      never told is fined under §6.4 for not answering, and 1,036 of the 1,041 were exactly that.
+    */
+    const owed = await this.db.execute<{
+      template: string;
+      status: string;
+      n: string;
+      oldest_minutes: string;
+    }>(sql`
+      SELECT CASE WHEN template_key = 'booking.needs_action'
+                  THEN 'booking.needs_action' ELSE 'other' END AS template,
+             status::text AS status,
+             count(*)::text AS n,
+             coalesce(
+               max(extract(epoch FROM now() - coalesce(failed_at, updated_at, queued_at)) / 60),
+               0
+             )::int::text AS oldest_minutes
+      FROM notifications
+      WHERE status IN ('queued', 'failed', 'abandoned')
+      GROUP BY 1, 2
     `);
 
     const row = rows.rows[0];
@@ -238,10 +323,28 @@ export class MetricsService {
           { labels: { status: 'failed' }, value: Number(row?.failed ?? 0) },
           /*
             A row stuck at `queued` means the process died between writing it and finishing the
-            send. Nothing retries today, so this is the count of notices nobody will ever receive.
+            send, or the re-drive has just put it back. Persisting is the failure, not existing.
           */
           { labels: { status: 'queued' }, value: Number(row?.queued ?? 0) },
+          /* Attempts exhausted. Nothing automatic will move this; it is waiting on a person. */
+          { labels: { status: 'abandoned' }, value: Number(row?.abandoned ?? 0) },
         ],
+      },
+      {
+        name: 'safra_notifications_undelivered',
+        help: 'Notices accepted and not yet delivered, at this instant, by template and state.',
+        samples: owed.rows.map((entry) => ({
+          labels: { template: entry.template, status: entry.status },
+          value: Number(entry.n),
+        })),
+      },
+      {
+        name: 'safra_notifications_undelivered_oldest_minutes',
+        help: 'Age of the oldest undelivered notice, by template and state.',
+        samples: owed.rows.map((entry) => ({
+          labels: { template: entry.template, status: entry.status },
+          value: Number(entry.oldest_minutes),
+        })),
       },
     ];
   }

@@ -149,4 +149,80 @@ export const INVARIANTS: readonly Invariant[] = [
           GROUP BY n.template_key, n.status
           LIMIT 20`,
   },
+  {
+    name: 'nothing unsupported is queued for release',
+    /*
+      The assertion behind Bashar's instruction of 2026-09-09: "an unsupported payable cannot be
+      released silently".
+
+      `bookings.partner_payable_amount` is a column written when a booking is priced; the
+      `partner_payable` credit is the record that the money behind it arrived and was apportioned.
+      `postBookingPayment` writes both in one transaction, so they normally agree. Where they do
+      not, the column is an obligation nothing backs — and attaching it to a payout is the step
+      that turns it into real money leaving SAFRA.
+
+      So this checks the LAST safe moment rather than the anomaly itself: not «does an unsupported
+      payable exist» (339 did on 2026-09-09, all historical) but «has one reached a payout». The
+      accrual guard makes the answer no; this is what would notice if that guard were removed,
+      bypassed, or worked around by a manual insert.
+    */
+    consequence:
+      'A payout item exists for a booking whose payable no ledger credit supports. Releasing it ' +
+      'moves real money against a receipt that was never posted, and the books will not balance ' +
+      'against the transfer afterwards.',
+    sql: `SELECT b.reference AS booking, i.amount::text AS amount, p.status::text AS payout_status
+          FROM partner_payout_items i
+          JOIN bookings b ON b.id = i.booking_id
+          JOIN partner_payouts p ON p.id = i.payout_id
+          WHERE NOT EXISTS (
+            SELECT 1 FROM ledger_entries le
+            WHERE le.booking_id = b.id
+              AND le.account = 'partner_payable'
+              AND le.direction = 'credit'
+          )
+          ORDER BY i.amount DESC
+          LIMIT 20`,
+  },
+  {
+    name: 'no notification is stranded outside recovery',
+    /*
+      The check that would have caught finding 235 on the day it started.
+
+      1,055 rows sat in `failed` for up to 32 days — 1,050 of them `booking.needs_action`, the
+      notice that tells a partner a booking is waiting on them — and the invariant above could not
+      see any of it, because it asks about `queued` and these were not queued. Nor were they
+      exhausted, so the dead-letter screen never showed them either. They were in the one state
+      nothing was watching.
+
+      Two ways a notice is now stranded, and both are failures of the RECOVERY rather than of a
+      send:
+
+      - `failed` past the point where the re-drive should have collected it. The sweep runs every
+        five minutes and re-drives once the retry schedule cannot still be running (thirty-three
+        minutes for mail), so an hour is generous and anything beyond it means the sweep is not
+        running or not working.
+      - `abandoned` at all. It is terminal by design and only a person moves it, so its presence is
+        not a bug — but a queue of them nobody is clearing is exactly the silence this finding was.
+
+      Scoped to a day, like `every captured payment is in the books` above, so the historical
+      backlog cannot make this an alarm that always sounds and therefore never gets read. That
+      lesson is finding 246's, and it cost nine production advisories.
+    */
+    consequence:
+      'A notice was accepted and is neither delivered nor on its way: either the re-drive is not ' +
+      'collecting failed rows, or abandoned ones are piling up with nobody clearing them. Whichever ' +
+      'it is, somebody was not told and no screen says so.',
+    sql: `SELECT n.template_key, n.status::text AS status, count(*)::text AS n,
+                 max(extract(epoch FROM now() - coalesce(n.failed_at, n.updated_at, n.queued_at))
+                     / 3600)::int::text AS oldest_hours
+          FROM notifications n
+          WHERE n.created_at > now() - interval '24 hours'
+            AND (
+              (n.status = 'failed'
+               AND coalesce(n.failed_at, n.updated_at, n.queued_at) < now() - interval '1 hour')
+              OR n.status = 'abandoned'
+            )
+          GROUP BY n.template_key, n.status
+          LIMIT 20`,
+  },
 ];
