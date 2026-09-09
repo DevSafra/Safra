@@ -673,10 +673,19 @@ function starRatingFor(slug: string): number {
  *
  * Idempotent by key: a re-run overwrites the same three objects rather than growing the bucket.
  */
+/*
+  Under `properties/`, because that is the only prefix a stranger may read.
+
+  `bootstrap-media.ts` grants `s3:GetObject` on `properties/*`, `ads/*` and `cities/*` and nothing
+  else — `identity/` holds identity documents and `disputes/` holds photographs of the inside of
+  somebody's home, and `media-policy.integration.test.ts` holds all of that shut. A fixture written
+  anywhere else is stored correctly and 403s to the browser, which renders as the same blank gallery
+  it was meant to fix.
+*/
 const FIXTURE_IMAGE_KEYS = [
-  'testbed/fixture-photograph-1',
-  'testbed/fixture-photograph-2',
-  'testbed/fixture-photograph-3',
+  'properties/testbed/fixture-photograph-1',
+  'properties/testbed/fixture-photograph-2',
+  'properties/testbed/fixture-photograph-3',
 ] as const;
 
 const FIXTURE_IMAGE_SIZE = { width: 1600, height: 1067 };
@@ -1216,6 +1225,29 @@ async function build(db: Seeder): Promise<void> {
     SELECT id FROM properties WHERE partner_id IN (${testbedPartners}))`);
   await db.execute(sql`DELETE FROM property_images WHERE property_id IN (
     SELECT id FROM properties WHERE partner_id IN (${testbedPartners}))`);
+
+  /*
+    City photographs, trimmed back to two apiece.
+
+    Nothing seeds these: every one was uploaded by `geo.spec.ts`, which adds a photograph to a city
+    and does not take it away again. They accumulate — Damascus held THIRTY-TWO on 2026-09-09
+    against a cap of twelve — and the two geo tests that need a city with room then skip themselves
+    for ever with «every city is at its photograph cap». A reset that does not put back what the
+    suite consumes leaves the suite unable to run, which is the same class as the payouts in 202.
+
+    Trimmed rather than emptied: the geography screen and the customer's city pages both read these,
+    and a city with no photograph is a different fixture from a city with a few. Two leaves ten
+    slots, which is more than any single run has ever wanted.
+  */
+  await db.execute(sql`
+    DELETE FROM city_images
+    WHERE id IN (
+      SELECT id FROM (
+        SELECT id, row_number() OVER (PARTITION BY city_id ORDER BY created_at, id) AS seat
+        FROM city_images
+      ) ranked
+      WHERE ranked.seat > 2
+    )`);
   /*
     Favourites reference properties, so they go first.
 
@@ -2448,6 +2480,63 @@ async function reviews(db: Seeder): Promise<void> {
  * about a screen. This is also the pair the console cares most about: النزاعات carries the payout
  * freeze, and الرسائل is the one place customer, partner and SAFRA meet.
  */
+/**
+ * One evidence photograph, under the PRIVATE `disputes/` prefix.
+ *
+ * Kept separate from the listing photographs on purpose: `bootstrap-media.ts` grants anonymous read
+ * on `properties/`, `ads/` and `cities/` and nothing else, and `media-policy.integration.test.ts`
+ * holds `disputes/` shut. Evidence reaches the console through an authorised route, so the object
+ * has to exist without ever being publicly fetchable — which is exactly the shape the two console
+ * tests exercise, and exactly what a fixture written to a public prefix would quietly undo.
+ */
+async function seedDisputeEvidenceObject(): Promise<string | null> {
+  const bucket = process.env['S3_BUCKET'];
+  const endpoint = process.env['S3_ENDPOINT'];
+
+  if (!bucket || !endpoint) return null;
+
+  const { PutObjectCommand, S3Client } = await import('@aws-sdk/client-s3');
+  const sharp = (await import('sharp')).default;
+
+  const client = new S3Client({
+    region: process.env['S3_REGION'] ?? 'auto',
+    forcePathStyle: true,
+    endpoint,
+    credentials: {
+      accessKeyId: process.env['S3_ACCESS_KEY_ID'] ?? '',
+      secretAccessKey: process.env['S3_SECRET_ACCESS_KEY'] ?? '',
+    },
+  });
+  const key = 'disputes/testbed/evidence-1';
+
+  for (const width of FIXTURE_VARIANT_WIDTHS) {
+    const height = Math.round(
+      (width * FIXTURE_IMAGE_SIZE.height) / FIXTURE_IMAGE_SIZE.width,
+    );
+    const source = sharp({
+      create: { width, height, channels: 3, background: { r: 120, g: 70, b: 60 } },
+    });
+
+    for (const format of ['avif', 'webp'] as const) {
+      const body =
+        format === 'avif'
+          ? await source.clone().avif({ quality: 50 }).toBuffer()
+          : await source.clone().webp({ quality: 70 }).toBuffer();
+
+      await client.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: `${key}-${String(width)}.${format}`,
+          Body: body,
+          ContentType: `image/${format}`,
+        }),
+      );
+    }
+  }
+
+  return key;
+}
+
 async function conversation(db: Seeder, customerProfileId: string): Promise<void> {
   const [booking] = await db
     .select({
@@ -2460,16 +2549,52 @@ async function conversation(db: Seeder, customerProfileId: string): Promise<void
 
   if (!booking) return;
 
-  await db.insert(schema.disputes).values({
-    bookingId: booking.id,
-    partnerId: booking.partnerId,
-    customerProfileId,
-    kind: 'not_as_described',
-    status: 'open',
-    title: 'الغرفة لم تطابق الوصف المنشور',
-    description:
-      'الوصف يذكر إطلالة على الحديقة، والغرفة تطل على موقف السيارات. طلبت تغيير الغرفة ولم يتوفر بديل.',
-  });
+  const evidenceKey = await seedDisputeEvidenceObject();
+  const [profile] = await db
+    .select({ userId: schema.customerProfiles.userId })
+    .from(schema.customerProfiles)
+    .where(eq(schema.customerProfiles.id, customerProfileId))
+    .limit(1);
+  const customerUserId = profile?.userId ?? null;
+
+  const [dispute] = await db
+    .insert(schema.disputes)
+    .values({
+      bookingId: booking.id,
+      partnerId: booking.partnerId,
+      customerProfileId,
+      kind: 'not_as_described',
+      status: 'open',
+      title: 'الغرفة لم تطابق الوصف المنشور',
+      description:
+        'الوصف يذكر إطلالة على الحديقة، والغرفة تطل على موقف السيارات. طلبت تغيير الغرفة ولم يتوفر بديل.',
+    })
+    .returning({ id: schema.disputes.id });
+
+  /*
+    ONE photograph on the complaint, because a complaint about a room usually has one.
+
+    `dispute_evidence` was empty on every testbed and the reset only ever DELETED from it, so the
+    two console tests that read the evidence queue skipped themselves for ever — «No rendered
+    evidence in the queue» — and with them the review of the privacy boundary that decides whether a
+    guest's photograph reaches the host. That boundary is the whole of finding 223.
+
+    Under `disputes/`, which `bootstrap-media.ts` keeps PRIVATE and `media-policy.integration.test.ts`
+    holds shut: evidence is served through an authorised route, never straight from the bucket, and a
+    fixture written anywhere public would quietly weaken the thing it exists to exercise.
+  */
+  if (dispute && evidenceKey && customerUserId) {
+    await db.insert(schema.disputeEvidence).values({
+      disputeId: dispute.id,
+      kind: 'photo',
+      fileName: 'غرفة.jpg',
+      storageKey: evidenceKey,
+      contentType: 'image/jpeg',
+      sizeBytes: 5_800,
+      uploadedByUserId: customerUserId,
+      variantWidths: FIXTURE_VARIANT_WIDTHS,
+    });
+  }
 
   const [thread] = await db
     .insert(schema.conversations)
