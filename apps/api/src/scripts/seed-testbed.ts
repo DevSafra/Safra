@@ -8,6 +8,7 @@ import { PasswordService } from '../common/crypto/password.service.js';
 import type { Env } from '../config/env.js';
 import { describeError } from '../common/errors/safe-error.js';
 import { assertCascadeIsComplete } from './testbed-cascade.js';
+import { LedgerService } from '../ledger/ledger.service.js';
 
 /**
  * A small, hand-built dataset you can actually test against — three شركاء, one customer, and
@@ -2119,15 +2120,64 @@ async function bulk(
     n += 1;
 
     if (paid) {
-      await db.insert(schema.payments).values({
-        bookingId: booking.id,
-        method: i % 4 === 0 ? 'sham_cash' : 'visa',
-        provider: 'simulator',
-        amount: money(total),
-        currencyId: ctx.usd.id,
-        status: 'captured',
-        capturedAt: new Date(),
-      });
+      const [payment] = await db
+        .insert(schema.payments)
+        .values({
+          bookingId: booking.id,
+          method: i % 4 === 0 ? 'sham_cash' : 'visa',
+          provider: 'simulator',
+          amount: money(total),
+          currencyId: ctx.usd.id,
+          status: 'captured',
+          capturedAt: new Date(),
+        })
+        .returning({ id: schema.payments.id });
+
+      /*
+        The BOOKS, through the same service a real capture goes through.
+
+        Bashar's instruction, 2026-09-09: "fix the testbed seeder so every captured payment it
+        creates posts the corresponding balanced ledger group using the same supported accounting
+        path as runtime bookings. Do not add reference-based exemptions to the financial invariant."
+
+        ## What was wrong
+
+        The seeder captured money and wrote nothing to `ledger_entries`, so every reset left 53
+        payments that said money had arrived with no record of where it went. `every captured
+        payment is in the books` — the one invariant that would catch a REAL capture path that does
+        not post — therefore failed after every reset, and a check that always fails is a check
+        nobody reads. That is finding 246's lesson arriving in the financial safety net one day
+        later, which is why this is fixed here rather than excused there.
+
+        ## Why the service and not an INSERT
+
+        An insert here would be a second implementation of the double-entry rules — the customer
+        receipt, the SAFRA fee, the partner payable, the commission — free to drift from the one
+        the platform actually uses, and it would make the testbed agree with the invariant while
+        agreeing with nothing else. `postBookingPayment` is the path `markPaid` takes, so a change
+        to the accounting reaches the fixtures automatically and the two cannot disagree.
+
+        Constructed directly rather than injected: this is a script, not a Nest context, and the
+        service's only dependency is the database handle it is given.
+      */
+      if (payment) {
+        await new LedgerService(db as Database).postBookingPayment(
+          db as Database,
+          {
+            id: booking.id,
+            partnerId: property.partnerId,
+            customerProfileId: profileId,
+            currencyId: ctx.usd.id,
+            fxRateToSyp: FX_RATE_TO_SYP.toFixed(8),
+            totalAmount: money(total),
+            customerFeeAmount: money(CUSTOMER_FEE),
+            partnerCommissionAmount: money(commission),
+            partnerPayableAmount: money(base - commission),
+            reference: booking.reference,
+          },
+          payment.id,
+        );
+      }
     }
   }
 
