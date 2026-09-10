@@ -150,12 +150,39 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
   return (
     <HeaderShell>
       {/*
+        One line, above the bar (Bashar, 2026-09-10).
+
+        Who carries the risk is the first thing a guest wants to know and the last thing they want
+        to hunt for, so it sits above the navigation rather than inside it — the bar's five items
+        are already measured to the pixel at 768 and adding a sixth would push «تسجيل الدخول» onto
+        a second row.
+
+        A single line from `sm` up, and free to wrap below it. Both halves are deliberate.
+
+        He asked for one line, and one line it is at every width the Arabic is read at — «دعمك
+        وتعويضك مسؤوليتنا، لا مسؤولية العقار.» measures 42 characters and fits a 390px phone with
+        room to spare. The English and German renderings of the same promise do not: measured, both
+        overflowed a 390px viewport under `whitespace-nowrap` and pushed the PAGE sideways, which
+        `.claude/CLAUDE.md` forbids outright — «No page ever scrolls sideways».
+
+        So the nowrap starts at `sm`. A promise that takes two lines on the narrowest phone is a
+        small cost; a page that scrolls sideways hides content off the edge, and on this site it
+        took the whole header with it once before.
+      */}
+      <p className="border-b border-[rgba(168,122,31,0.12)] bg-[rgba(168,122,31,0.06)] px-4 py-1.5 text-center text-[12px] leading-relaxed font-semibold text-gold-read sm:text-[13px] sm:whitespace-nowrap">
+        {t('assurance')}
+      </p>
+
+      {/*
         `gap-x-5` from `lg`, which is the prototype's own header (`gap:20px`), and 12px below it.
         Not taste: at 768 the five visible items come to 654px inside a 736px bar, so 20px gaps
         plus the nav's start margin put it 10px over and dropped «تسجيل الدخول» onto a second row.
         The desktop bar is where the design's figure was measured and where there is room for it.
       */}
-      <div className="mx-auto flex max-w-7xl items-center gap-x-3 px-4 py-3 sm:py-4 lg:h-[var(--header-h)] lg:gap-x-5 lg:py-0">
+      <div
+        data-header-bar
+        className="mx-auto flex max-w-7xl items-center gap-x-3 px-4 py-3 sm:py-4 lg:h-[var(--header-h)] lg:gap-x-5 lg:py-0"
+      >
         {/*
           The wordmark alone. The tagline «إقامات في الوطن العربي · من ليلة واحدة» sat under it and
           is gone (Bashar, 2026-09-02) — booking.com's header carries none, it cost a second line

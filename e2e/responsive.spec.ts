@@ -486,7 +486,15 @@ test.describe('the customer site', () => {
         cannot be broken by a wrapper.
       */
       const edges = await page.evaluate(() => {
-        const bar = document.querySelector('header')?.firstElementChild;
+        /*
+          `[data-header-bar]`, not `firstElementChild`.
+
+          Position was an incidental way to find the bar and it stopped being true on 2026-09-10,
+          when an assurance line was added above it: the walk then found a `<p>` with no controls
+          in it and reported zero edges — a test failing because the thing it measures MOVED, not
+          because the alignment it protects broke.
+        */
+        const bar = document.querySelector('header [data-header-bar]');
 
         return Array.from(bar?.querySelectorAll('a, button') ?? [])
           .map((element) => element.getBoundingClientRect())
