@@ -161,12 +161,15 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
               >
                 {ORNAMENT_BRAND}
               </span>
-              <span className="leading-tight">
-                <span className="block font-display text-xl font-bold text-gold">
-                  {brand('name')} <span className="text-text2/60">|</span>{' '}
-                  {brand('latin')}
-                </span>
-                <span className="block text-[14px] text-muted">{brand('tagline')}</span>
+              {/*
+                The wordmark alone — the tagline was removed on 2026-09-10 (Bashar), not replaced.
+
+                The header dropped it earlier for the same reason; this was the last place it
+                appeared. `leading-tight` stays: it is what keeps the wordmark's box aligned with
+                the 44px ornament beside it.
+              */}
+              <span className="leading-tight font-display text-xl font-bold text-gold">
+                {brand('name')} <span className="text-text2/60">|</span> {brand('latin')}
               </span>
             </Link>
 
