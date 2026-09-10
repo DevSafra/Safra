@@ -234,7 +234,7 @@ export function PartnerContractPanel({
           onClick={() =>
             void post('/api/contracts/generate', { partnerReference, kind: 'base' })
           }
-          className="cursor-pointer rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60"
+          className="cursor-pointer rounded-lg btn-gold px-3 py-1.5 text-xs font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy
             ? t.sections.partnerContract.generating
@@ -283,7 +283,7 @@ export function PartnerContractPanel({
             type="button"
             disabled={busy}
             onClick={() => void post(`/api/contracts/${current.id}/reopen`, {})}
-            className="cursor-pointer rounded-lg border border-gold/50 px-3 py-1.5 text-xs text-gold-read hover:bg-gold hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
+            className="cursor-pointer rounded-lg border border-gold/50 px-3 py-1.5 text-xs text-gold-read btn-gold-hover hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy
               ? t.sections.partnerContract.reopening
@@ -345,7 +345,7 @@ export function PartnerContractPanel({
             <button
               type="submit"
               disabled={busy || !file}
-              className="w-fit cursor-pointer rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-fit cursor-pointer rounded-lg btn-gold px-3 py-1.5 text-xs font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60"
             >
               {busy
                 ? t.sections.partnerContract.uploading

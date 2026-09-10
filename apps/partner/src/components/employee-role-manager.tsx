@@ -222,7 +222,7 @@ function RoleForm({
         <button
           type="submit"
           disabled={busy}
-          className="cursor-pointer rounded-lg bg-gold px-5 py-2.5 text-sm font-semibold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          className="cursor-pointer rounded-lg btn-gold px-5 py-2.5 text-sm font-semibold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy
             ? editing

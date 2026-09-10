@@ -385,7 +385,7 @@ function AccountForm({
         <button
           type="submit"
           disabled={busy}
-          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg bg-gold px-4 text-[14px] font-semibold text-ink transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:py-2"
+          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg btn-gold px-4 text-[14px] font-semibold text-ink transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:py-2"
         >
           {c.save}
         </button>

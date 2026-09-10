@@ -88,7 +88,7 @@ export function FindBookingForm({ locale }: { locale: Locale }) {
       <button
         type="submit"
         disabled={submitting}
-        className="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-lg bg-gold px-4 py-2.5 text-sm font-bold text-ink hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-lg btn-gold px-4 py-2.5 text-sm font-bold text-ink hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {submitting ? t('findSending') : t('findSubmit')}
       </button>

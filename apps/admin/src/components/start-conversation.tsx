@@ -198,7 +198,7 @@ export function StartConversation({
           type="button"
           disabled={busy || !ready}
           onClick={() => void send()}
-          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg bg-gold px-4.5 py-2 text-xs font-bold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg btn-gold px-4.5 py-2 text-xs font-bold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
         >
           {busy ? c.composeSending : c.composeSend}
         </button>

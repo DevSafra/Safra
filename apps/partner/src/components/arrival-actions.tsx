@@ -110,7 +110,7 @@ export function ArrivalActions({ arrival }: { arrival: PartnerArrival }) {
             disabled={busy}
             aria-label={fill(t.arrivals.checkInLabel, { name: arrival.guestName })}
             onClick={() => void send('check-in')}
-            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg bg-gold px-4 text-sm font-semibold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 lg:py-2"
+            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg btn-gold px-4 text-sm font-semibold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 lg:py-2"
           >
             {busy ? t.arrivals.working : t.arrivals.checkIn}
           </button>

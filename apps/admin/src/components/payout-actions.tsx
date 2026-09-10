@@ -223,7 +223,7 @@ export function PayoutActions({
             <button
               type="submit"
               disabled={busy}
-              className="min-h-10 cursor-pointer rounded-lg bg-gold px-4 py-2 text-[14px] font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
+              className="min-h-10 cursor-pointer rounded-lg btn-gold px-4 py-2 text-[14px] font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
             >
               {busy ? t.sections.payouts.working : t.sections.payouts.confirm}
             </button>
@@ -271,7 +271,7 @@ function Button({
       title={hint}
       className={`min-h-10 cursor-pointer rounded-lg px-4 py-2 text-[14px] font-semibold lg:min-h-0 ${
         primary
-          ? 'bg-gold text-ink'
+          ? 'btn-gold text-ink'
           : danger
             ? 'border border-bad/50 text-bad'
             : 'border border-line text-muted'

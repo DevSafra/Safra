@@ -147,7 +147,7 @@ export function TwoFactorEnrolment() {
             */
             reloadInto('/');
           }}
-          className="min-h-10 cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-ink"
+          className="min-h-10 cursor-pointer rounded-lg btn-gold px-5 py-3 font-semibold text-ink"
         >
           {t.twoFactor.savedContinue}
         </button>
@@ -204,7 +204,7 @@ export function TwoFactorEnrolment() {
         <button
           type="submit"
           disabled={busy || !setup}
-          className="min-h-10 cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60"
+          className="min-h-10 cursor-pointer rounded-lg btn-gold px-5 py-3 font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy ? t.twoFactor.checking : t.twoFactor.submit}
         </button>

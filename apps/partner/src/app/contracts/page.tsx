@@ -325,7 +325,7 @@ function ContractCard({ contract }: { readonly contract: PartnerContract }) {
       */}
       <a
         href={`/api/contracts/${encodeURIComponent(contract.id)}/file`}
-        className="inline-flex min-h-10 w-fit items-center rounded-lg border border-gold px-4 text-[14px] text-gold-read transition-colors hover:bg-gold hover:text-ink lg:min-h-0 lg:py-2"
+        className="inline-flex min-h-10 w-fit items-center rounded-lg border border-gold px-4 text-[14px] text-gold-read transition-colors btn-gold-hover hover:text-ink lg:min-h-0 lg:py-2"
       >
         {/* Names which copy: after SAFRA signs, this link serves the document carrying that
             signature rather than the blank original the partner was previously given. */}

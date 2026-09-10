@@ -89,7 +89,7 @@ export function EmployeeInvite({ roles }: { roles: PartnerEmployeeRole[] }) {
         <p className="text-sm text-muted">{t.employees.noRoles}</p>
         <Link
           href="/employee-roles"
-          className="inline-flex min-h-10 w-fit items-center rounded-lg bg-gold px-4 text-sm font-semibold text-ink transition-opacity hover:opacity-90 lg:min-h-0 lg:py-2"
+          className="inline-flex min-h-10 w-fit items-center rounded-lg btn-gold px-4 text-sm font-semibold text-ink transition-opacity hover:opacity-90 lg:min-h-0 lg:py-2"
         >
           {t.employees.defineRoles}
         </Link>
@@ -198,7 +198,7 @@ export function EmployeeInvite({ roles }: { roles: PartnerEmployeeRole[] }) {
       <button
         type="submit"
         disabled={busy}
-        className="w-fit cursor-pointer rounded-lg bg-gold px-5 py-2.5 text-sm font-semibold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-fit cursor-pointer rounded-lg btn-gold px-5 py-2.5 text-sm font-semibold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {busy ? t.employees.inviting : t.employees.inviteSubmit}
       </button>

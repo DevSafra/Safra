@@ -114,7 +114,7 @@ export function SupportForm({ reference }: { readonly reference?: string }) {
       <button
         type="submit"
         disabled={busy}
-        className="min-h-10 w-fit cursor-pointer rounded-lg bg-gold px-5 text-[14px] font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 lg:py-2"
+        className="min-h-10 w-fit cursor-pointer rounded-lg btn-gold px-5 text-[14px] font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 lg:py-2"
       >
         {busy
           ? t.support.submitting

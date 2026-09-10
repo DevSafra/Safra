@@ -295,7 +295,7 @@ export function PartnerLoginForm({ next }: { readonly next: string }) {
           <button
             type="submit"
             disabled={busy}
-            className="mt-2 cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2 cursor-pointer rounded-lg btn-gold px-5 py-3 font-semibold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy ? t.login.codeChecking : t.login.codeSubmit}
           </button>
@@ -343,7 +343,7 @@ export function PartnerLoginForm({ next }: { readonly next: string }) {
           <button
             type="submit"
             disabled={busy}
-            className="mt-2 cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2 cursor-pointer rounded-lg btn-gold px-5 py-3 font-semibold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy ? t.login.signingIn : t.login.submit}
           </button>

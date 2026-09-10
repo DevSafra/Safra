@@ -955,3 +955,18 @@ body {
 :root:not([data-theme='dark']) .warn-ink {
   color: #7a5410;
 }
+
+/*
+  The same gradient, for a control that only becomes gold on hover.
+
+  Bashar, 2026-09-10, with two screenshots: every gold button carries the gradient, and the flat
+  fill is the one he rejected. An outline button whose `hover:bg-gold` painted a flat block landed
+  on exactly that flat look the moment somebody pointed at it — the rejected treatment, reachable
+  only by hovering, which is why it survived a static review.
+
+  A class rather than a Tailwind variant because `hover:` cannot prefix a custom utility.
+*/
+.btn-gold-hover:hover {
+  background-image: linear-gradient(135deg, #f0cb7c, #c4923e);
+  color: #241a05;
+}

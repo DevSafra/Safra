@@ -814,3 +814,60 @@ body {
 li:has([data-decided]) [data-deadline] {
   display: none;
 }
+
+/**
+ * The primary action — the prototype's gold, and the one control that does NOT follow the theme.
+ *
+ * Taken verbatim from `SAFRA - موقع سفرة 20.08.html` (Bashar, 2026-09-02, with a screenshot of
+ * «احجز الآن»): `linear-gradient(135deg, #f0cb7c, #c4923e)` under `#241a05`.
+ *
+ * ## Why these are literals when everything else on the page is a token
+ *
+ * `--color-gold` is not one colour, it is two: #e8bc66 against night and #a87a1f against white,
+ * because a gold that reads on one is invisible on the other. That works for TEXT and for borders,
+ * where the theme also moves the surface behind them. It does not work for a filled button, whose
+ * surface IS the gold: routed through the token, the light theme paints a dark ochre block with
+ * near-white text at 3.56:1 — under the floor, and nothing like the screenshot.
+ *
+ * So the pair is fixed. The button carries its own foreground and background, the contrast between
+ * them is a property of the pair rather than of the page, and it is therefore identical in both
+ * themes — which is what the screenshot shows and what makes a primary action recognisable.
+ *
+ * ## Contrast, measured across the gradient
+ *
+ * `#241a05` on the LIGHTEST stop is 11.0:1 and on the DARKEST stop is 6.1:1. A gradient has to be
+ * checked at the dark end, because that is where a light-on-dark reading fails and it is the end
+ * nobody looks at.
+ *
+ * `background-image` rather than `background`, so a `bg-*` utility cannot half-override it.
+ */
+.btn-gold {
+  background-image: linear-gradient(135deg, #f0cb7c, #c4923e);
+  color: #241a05;
+}
+
+/*
+  Paper prints the label, not the fill: a gradient block behind dark text costs ink and gains
+  nothing, and the customer's receipt is the one page that reaches a printer.
+*/
+@media print {
+  .btn-gold {
+    background-image: none;
+    color: #000000;
+  }
+}
+
+/*
+  The same gradient, for a control that only becomes gold on hover.
+
+  Bashar, 2026-09-10, with two screenshots: every gold button carries the gradient, and the flat
+  fill is the one he rejected. An outline button whose `hover:bg-gold` painted a flat block landed
+  on exactly that flat look the moment somebody pointed at it — the rejected treatment, reachable
+  only by hovering, which is why it survived a static review.
+
+  A class rather than a Tailwind variant because `hover:` cannot prefix a custom utility.
+*/
+.btn-gold-hover:hover {
+  background-image: linear-gradient(135deg, #f0cb7c, #c4923e);
+  color: #241a05;
+}

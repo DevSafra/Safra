@@ -95,7 +95,7 @@ export function ReviewModeration({ reference }: { readonly reference: string }) 
           <button
             type="submit"
             disabled={busy}
-            className="min-h-10 cursor-pointer rounded-lg bg-gold px-4 py-2 text-[14px] font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-lg btn-gold px-4 py-2 text-[14px] font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
           >
             {busy
               ? t.sections.reviewModeration.working

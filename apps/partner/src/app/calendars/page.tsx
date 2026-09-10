@@ -338,7 +338,7 @@ export default async function CalendarsPage({
 
                 <button
                   type="submit"
-                  className="min-h-10 cursor-pointer rounded-lg border border-gold px-4 text-[14px] text-gold-read transition-colors hover:bg-gold hover:text-ink lg:min-h-0 lg:py-2"
+                  className="min-h-10 cursor-pointer rounded-lg border border-gold px-4 text-[14px] text-gold-read transition-colors btn-gold-hover hover:text-ink lg:min-h-0 lg:py-2"
                 >
                   {t.calendars.searchAction}
                 </button>

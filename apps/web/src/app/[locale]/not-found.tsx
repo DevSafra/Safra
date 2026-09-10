@@ -57,7 +57,7 @@ export default async function LocaleNotFound() {
         */}
         <Link
           href={`/${locale}/search`}
-          className="inline-flex min-h-11 items-center rounded-lg bg-gold px-5 text-sm font-bold text-ink transition-opacity duration-200 ease-out-strong hover:opacity-90"
+          className="inline-flex min-h-11 items-center rounded-lg btn-gold px-5 text-sm font-bold text-ink transition-opacity duration-200 ease-out-strong hover:opacity-90"
         >
           {t('search')}
         </Link>

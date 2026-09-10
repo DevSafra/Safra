@@ -211,7 +211,7 @@ export function ScreeningPanel({
           type="button"
           onClick={() => void run()}
           disabled={busy}
-          className="cursor-pointer rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-ink disabled:opacity-60 disabled:cursor-not-allowed"
+          className="cursor-pointer rounded-lg btn-gold px-3 py-1.5 text-xs font-semibold text-ink disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {busy
             ? t.sections.panels.screeningSearching
@@ -252,7 +252,7 @@ export function ScreeningPanel({
               type="button"
               onClick={() => void run(override)}
               disabled={busy}
-              className="cursor-pointer rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-ink disabled:opacity-60 disabled:cursor-not-allowed"
+              className="cursor-pointer rounded-lg btn-gold px-3 py-1.5 text-xs font-semibold text-ink disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {t.sections.screening.confirmOverride}
             </button>
