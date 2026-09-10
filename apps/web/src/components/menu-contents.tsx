@@ -71,7 +71,18 @@ export function MenuContents({
 
       <Link
         href={`/${locale}/partners/join`}
-        className="inline-flex min-h-11 w-full items-center rounded-lg px-3 text-[16px] font-semibold text-muted transition-colors duration-200 ease-out-strong hover:bg-gold/10 hover:text-text"
+        /*
+        `min-h-12`, not `min-h-11`, and 44 was the bug rather than the target.
+
+        `table-overflow`'s sibling assertion in `responsive.spec.ts` requires every menu row to be
+        at least 44px, and these sat at EXACTLY 44 — compliant, and balanced on the threshold, so a
+        sub-pixel of layout rounding tipped them under it. It failed about one run in five once the
+        Arabic face changed the metrics on 2026-09-10.
+
+        48 is also what the four rows around them already used, so this is one row height in the
+        sheet rather than two, which is the reason to prefer it over nudging the assertion.
+      */
+        className="inline-flex min-h-12 w-full items-center rounded-lg px-3 text-[16px] font-semibold text-muted transition-colors duration-200 ease-out-strong hover:bg-gold/10 hover:text-text"
       >
         {partnerLabel}
       </Link>
