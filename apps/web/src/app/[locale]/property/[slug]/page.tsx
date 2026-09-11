@@ -8,6 +8,7 @@ import { confirmationWindowLabel } from '@/lib/operating-rules';
 import { isLocale, routing, type Locale } from '@/i18n/routing';
 import { MAX_BASKET_ROOMS } from '@/lib/basket-limits';
 import { readableDate } from '@/lib/readable-date';
+import { AmenityIcon } from '@/components/icons';
 import { SaveButton } from '@/components/save-button';
 import { ShareButton } from '@/components/share-button';
 import { PropertyGallery } from '@/components/property-gallery';
@@ -618,11 +619,16 @@ export default async function PropertyPage({
                 Bordered cells, as booking.com draws them — scannable in a way a bulleted list is
                 not, and this is a list people scan for one word.
 
-                **No icon, deliberately.** The `amenities` catalogue carries an `icon` column and it
-                is populated for 0 of 12 rows, so the honest alternatives were twelve identical
-                marks or none. Twelve identical ticks is decoration pretending to be information,
-                and a unicode glyph standing in for an icon system is the one substitution the
-                craft floor names outright.
+                **One drawing per amenity** (Bashar, 2026-09-11). This note used to say there were
+                no icons on purpose: the catalogue's `icon` column is populated for 0 of 12 rows, so
+                the choice was twelve identical marks or none, and twelve identical ticks is
+                decoration pretending to be information. That reasoning argued for drawing them
+                rather than for going without, and `AmenityIcon` is keyed by CODE — so a pool gets
+                a pool and an amenity added tomorrow gets a mark that claims nothing until somebody
+                draws it, instead of a blank where a typo'd icon name used to be.
+
+                `aria-hidden`, because the name is right beside it and a screen reader announcing
+                both says «مسبح مسبح».
 
                 This list used to be the CHEAPEST UNIT's amenities under the heading «المرافق»,
                 which told a guest the building had whatever the smallest room happened to have.
@@ -631,9 +637,12 @@ export default async function PropertyPage({
                   {property.amenityCodes.map((code) => (
                     <li
                       key={code}
-                      className="rounded-lg border border-line bg-card px-3 py-2.5 text-sm text-text"
+                      className="flex items-center gap-2.5 rounded-lg border border-line bg-card px-3 py-2.5 text-sm text-text"
                     >
-                      {dynamicMessage(ta, code, code)}
+                      <span aria-hidden className="shrink-0 text-gold-read">
+                        <AmenityIcon code={code} />
+                      </span>
+                      <span className="min-w-0">{dynamicMessage(ta, code, code)}</span>
                     </li>
                   ))}
                 </ul>

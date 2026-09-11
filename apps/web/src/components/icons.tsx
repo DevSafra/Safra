@@ -204,3 +204,178 @@ export const STAY_TYPE_ICONS: Record<string, () => React.JSX.Element> = {
   rural_house: RuralHouseIcon,
   camp: CampIcon,
 };
+
+/* ── Amenities ───────────────────────────────────────────────────────────────
+ *
+ * One drawing per amenity CODE, in the spec above.
+ *
+ * The property page carried a note explaining why it had no icons: the `amenities` catalogue has
+ * an `icon` column, it is populated for 0 of 12 rows, and the honest alternatives were twelve
+ * identical marks or none — twelve identical ticks being decoration pretending to be information.
+ * Bashar asked for icons on 2026-09-11, and the answer that note anticipated is this one: draw
+ * them, so each says what it means.
+ *
+ * Keyed by `code` rather than by the `icon` column, deliberately. That column would put the choice
+ * in an operator's hands as a free-text name, where a typo is an invisible blank; a code is what
+ * the catalogue already guarantees. An amenity added tomorrow gets `AmenityFallback` — a mark that
+ * claims nothing — until somebody draws it.
+ */
+
+function WifiIcon() {
+  return (
+    <svg {...ICON}>
+      <path d="M2.6 8.6a14.6 14.6 0 0 1 18.8 0" />
+      <path d="M5.6 12.1a10.2 10.2 0 0 1 12.8 0" />
+      <path d="M8.6 15.6a5.8 5.8 0 0 1 6.8 0" />
+      <circle cx="12" cy="19.1" r="1.05" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+/** The universal parking mark: a P in a rounded square, which reads at 18px where a car does not. */
+function ParkingIcon() {
+  return (
+    <svg {...ICON}>
+      <rect x="3.4" y="3.4" width="17.2" height="17.2" rx="4.2" />
+      <path d="M9.9 16.8V7.6h3.3a2.85 2.85 0 0 1 0 5.7H9.9" />
+    </svg>
+  );
+}
+
+function PoolIcon() {
+  return (
+    <svg {...ICON}>
+      <path d="M8.2 15.2V6.6a2.4 2.4 0 0 1 4.8 0" />
+      <path d="M8.2 10.3H13" />
+      <path d="M2.8 18.4c1.45 0 1.45-1.15 2.9-1.15s1.45 1.15 2.9 1.15 1.45-1.15 2.9-1.15 1.45 1.15 2.9 1.15 1.45-1.15 2.9-1.15 1.45 1.15 2.9 1.15" />
+    </svg>
+  );
+}
+
+function BreakfastIcon() {
+  return (
+    <svg {...ICON}>
+      <path d="M4.6 9.2h10.6v4.9a4.1 4.1 0 0 1-4.1 4.1H8.7a4.1 4.1 0 0 1-4.1-4.1Z" />
+      <path d="M15.2 10.6h1.7a2.55 2.55 0 0 1 0 5.1h-1.7" />
+      <path d="M3.4 20.6h13.2" />
+      <path d="M8.1 6.2c0-.85.95-.85.95-1.8M11.6 6.2c0-.85.95-.85.95-1.8" />
+    </svg>
+  );
+}
+
+function AirConditioningIcon() {
+  return (
+    <svg {...ICON}>
+      <path d="M12 2.9v18.2M4.1 7.4l15.8 9.2M19.9 7.4 4.1 16.6" />
+      <path d="m9.8 4.7 2.2 1.9 2.2-1.9M9.8 19.3l2.2-1.9 2.2 1.9" />
+    </svg>
+  );
+}
+
+function KitchenIcon() {
+  return (
+    <svg {...ICON}>
+      <path d="M5 10.2h14v4.6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4Z" />
+      <path d="M3.2 10.2h17.6" />
+      <path d="M8.8 7.4V5.2M12 7.4V5.2M15.2 7.4V5.2" />
+    </svg>
+  );
+}
+
+function HeatingIcon() {
+  return (
+    <svg {...ICON}>
+      <rect x="4.4" y="5.8" width="15.2" height="11.4" rx="2.2" />
+      <path d="M8.2 5.8v11.4M12 5.8v11.4M15.8 5.8v11.4" />
+      <path d="M7 19.6v1.6M17 19.6v1.6" />
+    </svg>
+  );
+}
+
+/** A clock, not a bell: the label already says «استقبال», and what it adds is «24 ساعة». */
+function ReceptionIcon() {
+  return (
+    <svg {...ICON}>
+      <circle cx="12" cy="12" r="8.6" />
+      <path d="M12 6.9V12l3.3 2.1" />
+    </svg>
+  );
+}
+
+function SeaViewIcon() {
+  return (
+    <svg {...ICON}>
+      <circle cx="12" cy="8.4" r="3.3" />
+      <path d="M2.8 17c1.45 0 1.45-1.15 2.9-1.15S7.15 17 8.6 17s1.45-1.15 2.9-1.15S12.95 17 14.4 17s1.45-1.15 2.9-1.15S18.75 17 20.2 17" />
+      <path d="M2.8 20.6c1.45 0 1.45-1.15 2.9-1.15s1.45 1.15 2.9 1.15 1.45-1.15 2.9-1.15 1.45 1.15 2.9 1.15 1.45-1.15 2.9-1.15 1.45 1.15 2.9 1.15" />
+    </svg>
+  );
+}
+
+function PetsIcon() {
+  return (
+    <svg {...ICON}>
+      <ellipse cx="7.2" cy="9.4" rx="1.75" ry="2.25" />
+      <ellipse cx="12" cy="7.7" rx="1.85" ry="2.45" />
+      <ellipse cx="16.8" cy="9.4" rx="1.75" ry="2.25" />
+      <path d="M12 12.6c-2.8 0-5.1 2-5.1 4.2 0 1.6 1.3 2.6 2.9 2.6h4.4c1.6 0 2.9-1 2.9-2.6 0-2.2-2.3-4.2-5.1-4.2Z" />
+    </svg>
+  );
+}
+
+function FamilyIcon() {
+  return (
+    <svg {...ICON}>
+      <circle cx="8.4" cy="6.4" r="2.3" />
+      <path d="M4.8 20.4v-4.3a3.6 3.6 0 0 1 7.2 0v4.3" />
+      <circle cx="16.9" cy="10.2" r="1.8" />
+      <path d="M14.1 20.4v-3.2a2.8 2.8 0 0 1 5.6 0v3.2" />
+    </svg>
+  );
+}
+
+function AccessibleIcon() {
+  return (
+    <svg {...ICON}>
+      <circle cx="12.7" cy="4.5" r="1.95" />
+      <path d="M10.9 8.2v4.6h4.4l2.5 5.5" />
+      <path d="M15.4 14.6a5.2 5.2 0 1 1-5.7-3.2" />
+    </svg>
+  );
+}
+
+/** An amenity with no drawing yet. A ring claims nothing, which is the point. */
+function AmenityFallback() {
+  return (
+    <svg {...ICON}>
+      <circle cx="12" cy="12" r="4.2" />
+    </svg>
+  );
+}
+
+const AMENITY_ICONS: Record<string, () => React.JSX.Element> = {
+  wifi: WifiIcon,
+  parking: ParkingIcon,
+  pool: PoolIcon,
+  breakfast: BreakfastIcon,
+  air_conditioning: AirConditioningIcon,
+  kitchen: KitchenIcon,
+  heating: HeatingIcon,
+  reception_24h: ReceptionIcon,
+  sea_view: SeaViewIcon,
+  pets_allowed: PetsIcon,
+  family_friendly: FamilyIcon,
+  accessible: AccessibleIcon,
+};
+
+/**
+ * The drawing for one amenity code.
+ *
+ * `aria-hidden` is the caller's to set, per this file's convention — here the label sits beside it,
+ * so the icon repeats what a screen reader already reads and must be hidden from one.
+ */
+export function AmenityIcon({ code }: { readonly code: string }) {
+  const Glyph = AMENITY_ICONS[code] ?? AmenityFallback;
+
+  return <Glyph />;
+}
