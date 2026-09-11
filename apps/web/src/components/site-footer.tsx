@@ -250,11 +250,22 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
               bounded on both axes and centred, landing at roughly 13, 17 and 20px tall — optically
               even, because a wider mark reads as larger at the same height.
 
-              ## Driven by what exists
+              ## A method with no mark shows its NAME, set to look like one
 
-              `PAYMENT_MARKS` decides membership. `sham_cash` is in `CUSTOMER_FACING_METHODS` and
-              has no official mark available — its own site is unreachable — so it is absent here
-              and returns the day the file lands, with no code change.
+              `sham_cash` has no official artwork available — its own site is unreachable — so it
+              would have dropped out of a strip built on assets alone, and SAFRA would have stopped
+              saying it accepts a rail it does accept. Bashar's answer, 2026-09-11: «then write it
+              like this "ShamCash"».
+
+              So the tile is the same tile and the name sits in it as a wordmark: same size, same
+              ground, same border, weighted and tracked so it reads as a mark rather than as a
+              caption that lost its logo. The day the file lands it joins `PAYMENT_MARKS` and this
+              branch stops applying to it, with no other change.
+
+              «ShamCash» in Latin, in the Arabic catalogue too — which is consistency rather than
+              anglicisation: Visa, Mastercard and Klarna are all already Latin there, and this was
+              the only one transliterated, and inconsistently at that (both «شام كاش» and
+              «Sham Cash» were live in different screens).
             */}
             <ul
               aria-label={payment('heading')}
@@ -263,7 +274,33 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
               {CUSTOMER_FACING_METHODS.map((method) => {
                 const mark = PAYMENT_MARKS[method];
 
-                if (!mark) return null;
+                if (!mark) {
+                  return (
+                    <li
+                      key={method}
+                      /*
+                        HEIGHT is fixed and width is not, for this tile only.
+
+                        The height is what gives the row its rhythm; the width is what a wordmark
+                        needs and a logo does not. Pinned at `w-14` the word was measurably clipped
+                        — «ShamCash» is wider than 56px at any size still worth reading — and
+                        shrinking the type until it fitted would have made it the one item on the
+                        strip nobody can read. `min-w-14` keeps it no NARROWER than the marks, so
+                        the row stays even.
+                      */
+                      className="flex h-9 min-w-14 items-center justify-center rounded-lg border border-black/10 bg-white px-2"
+                    >
+                      {/*
+                        `#1d2333` rather than a token: the tile is white in both themes, so the
+                        text on it has to be too. A themed colour would turn near-white on
+                        near-white the moment somebody switched to the dark theme.
+                      */}
+                      <span className="text-[10px] leading-none font-bold tracking-tight text-[#1d2333]">
+                        {payment(method)}
+                      </span>
+                    </li>
+                  );
+                }
 
                 return (
                   <li
