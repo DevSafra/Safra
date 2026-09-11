@@ -166,6 +166,12 @@ export function UnitSelector({
                     to the hotel, which is the whole reason to key icons by code rather than draw
                     them per screen.
 
+                    **The same CELL as the building's list** (Bashar, 2026-09-11: «make the items
+                    bigger… same as booking.com»). Same padding, same type size, same ground, same
+                    two-then-three-column grid — so a room's amenities and the hotel's read as one
+                    treatment rather than as a large list and a small one on the same page. They
+                    were tight inline pills at 4px/10px; they are cells at 10px/12px now.
+
                     **`border-line`, not `border-line2`** (Bashar, 2026-09-11: «I do not like the
                     black border»). It was not styled black — it was not styled at all.
                     `--color-line2` is declared in the console and the portal and NOT in this app,
@@ -178,12 +184,12 @@ export function UnitSelector({
                   {room.amenities.length > 0 ? (
                     <ul
                       aria-label={copy.amenitiesLabel}
-                      className="mt-2.5 flex flex-wrap gap-1.5"
+                      className="mt-2.5 grid grid-cols-2 gap-2 sm:grid-cols-3"
                     >
                       {room.amenities.map((amenity) => (
                         <li
                           key={amenity.code}
-                          className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1 text-[14px] text-text2"
+                          className="flex items-center gap-2.5 rounded-lg border border-line bg-card px-3 py-2.5 text-sm text-text"
                         >
                           {/*
                             `aria-hidden`, like the building's list: the name is in the same chip,
