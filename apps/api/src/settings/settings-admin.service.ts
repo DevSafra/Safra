@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import { isSanctionsPolicy, type Role } from '@safra/contracts';
+import { isAnnouncement, isSanctionsPolicy, type Role } from '@safra/contracts';
 
 import { actorName } from '../common/actor-name.sql.js';
 import { AuditService } from '../common/audit/audit.service.js';
@@ -310,6 +310,29 @@ function validate(value: unknown, valueSchema: string, key: string): unknown {
       }
 
       return value;
+    }
+
+    /**
+     * The site announcement — an object of one string per locale.
+     *
+     * Validated through the CONTRACT rather than a copy of its rules, so the API, the console's
+     * editor and the customer app cannot disagree about what a valid announcement is. The check
+     * rejects a stray key as well as a wrong type: a payload carrying `{ ar, en, de, fr }` would
+     * otherwise put an unvalidated string into a row every page of the site reads.
+     *
+     * An EMPTY string per locale is deliberately allowed. It is how a super admin hides the banner
+     * from one language without hiding it from the others, and without deleting the wording he
+     * will want back.
+     */
+    case 'localisedText': {
+      if (!isAnnouncement(value)) {
+        throw badRequest(ERROR.SETTING_VALUE_LOCALISED_TEXT, { key });
+      }
+
+      /* Stored trimmed, so a trailing space cannot make a one-line banner wrap. */
+      return Object.fromEntries(
+        Object.entries(value).map(([locale, text]) => [locale, String(text).trim()]),
+      );
     }
 
     /**

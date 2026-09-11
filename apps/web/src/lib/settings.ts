@@ -100,3 +100,35 @@ export function todayInDamascus(): string {
   // en-CA yields YYYY-MM-DD.
   return parts;
 }
+
+/**
+ * The header announcement for this reader, or nothing.
+ *
+ * Bashar, 2026-09-11: the banner stays and «the super admin should be able to manage it example
+ * hide/show and write the message himself». So two settings decide it, and they mean different
+ * things:
+ *
+ * - `site.announcement_enabled` is «no banner for anybody» — the switch to reach for during an
+ *   incident, which must not require re-typing the wording to use.
+ * - an EMPTY string for a locale is «no banner for readers of that language», which is how a
+ *   notice written in Arabic and not yet translated stays off the German site rather than
+ *   greeting a German reader in Arabic.
+ *
+ * Returns null for both, because the caller's question is «is there a banner», not «which of the
+ * two reasons was it».
+ */
+export function announcementFor(
+  settings: Record<string, unknown>,
+  locale: string,
+): string | null {
+  if (settings['site.announcement_enabled'] !== true) return null;
+
+  const text = settings['site.announcement_text'];
+
+  if (typeof text !== 'object' || text === null) return null;
+
+  const line = (text as Record<string, unknown>)[locale];
+
+  /* Trimmed here as well as on the way in: a row written before the validator existed may not be. */
+  return typeof line === 'string' && line.trim().length > 0 ? line.trim() : null;
+}

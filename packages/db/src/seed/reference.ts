@@ -764,6 +764,36 @@ export const SETTINGS: {
     descriptionEn: 'Contracting entity that collects payment (ADR 0002)',
   },
   {
+    /*
+      The header banner, and it is DATA rather than copy (Bashar, 2026-09-11).
+
+      He asked to keep the line and to own it: «the super admin should be able to manage it example
+      hide/show and write the message himself». Two rows rather than one object, because the switch
+      and the words are edited at different moments and by different reasoning — turning a notice
+      off during an incident should not require re-typing it.
+
+      Seeded with the sentence he wrote on 2026-09-10, so the banner behaves exactly as it did
+      before this became configurable and the first edit is his, not a migration's.
+    */
+    key: 'site.announcement_enabled',
+    value: true,
+    valueSchema: 'boolean',
+    descriptionAr: 'إظهار شريط الإعلان أعلى الموقع',
+    descriptionEn: 'Show the announcement bar at the top of the customer site',
+  },
+  {
+    key: 'site.announcement_text',
+    value: {
+      ar: 'دعمك وتعويضك مسؤوليتنا، لا مسؤولية العقار.',
+      en: "Your support and compensation are our responsibility, not the property's.",
+      de: 'Support und Entschädigung liegen bei uns, nicht bei der Unterkunft.',
+    },
+    valueSchema: 'localisedText',
+    descriptionAr: 'نص شريط الإعلان بكل لغة — اتركه فارغاً لإخفائه عن قرّاء تلك اللغة',
+    descriptionEn:
+      'Announcement text per language — leave one empty to hide it from that language',
+  },
+  {
     key: 'search.max_nights',
     value: 90,
     valueSchema: 'positiveInt',

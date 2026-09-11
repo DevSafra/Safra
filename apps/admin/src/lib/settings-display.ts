@@ -64,6 +64,7 @@ const EDITABLE = new Set([
   'boolean',
   'feeMode',
   'sanctionsPolicy',
+  'localisedText',
 ]);
 
 export function isEditableSchema(valueSchema: string): boolean {
@@ -172,6 +173,30 @@ export function settingDisplay(
           ? t.sections.settings.alwaysUsdNote
           : null,
     };
+  }
+
+  /*
+    The announcement reads as the SENTENCE, not as the object it is stored as.
+
+    Falling through to `json` would print `{"ar":"…","en":"…","de":"…"}` in a monospace block —
+    the least legible thing on the screen and, for the one setting whose whole content is a
+    sentence a person wrote, the least useful. The console is Arabic-only, so the Arabic line is
+    the one to show; the other two are visible the moment the reader opens the editor.
+
+    An empty Arabic line falls back to whichever language HAS words, so a notice written only in
+    English still shows an operator what is live rather than an empty row.
+  */
+  if (valueSchema === 'localisedText') {
+    if (typeof value !== 'object' || value === null) return { kind: 'missing' };
+
+    const lines = value as Record<string, unknown>;
+    const written = ['ar', 'en', 'de']
+      .map((locale) => lines[locale])
+      .find((line) => typeof line === 'string' && line.trim().length > 0);
+
+    return typeof written === 'string'
+      ? { kind: 'text', text: written.trim() }
+      : { kind: 'missing' };
   }
 
   if (valueSchema === 'json') {
@@ -416,6 +441,16 @@ export function moneyOf(value: unknown): { amount: string; currency: string } | 
 export function editableText(setting: DisplayableSetting): string {
   if (setting.valueSchema === 'money') return moneyOf(setting.value)?.amount ?? '';
 
+  /*
+    The announcement travels as JSON through the row's single `typed` field.
+
+    `SettingRow` holds ONE string of edit state, which fits every other schema here. Rather than
+    give the row a second shape for one setting, the three locale strings ride as JSON and the
+    input renders them as three boxes — the reader never sees the encoding, and every other schema
+    keeps the code path it already had.
+  */
+  if (setting.valueSchema === 'localisedText') return JSON.stringify(setting.value ?? {});
+
   const { value } = setting;
 
   if (typeof value === 'string') return value;
@@ -432,6 +467,7 @@ export function schemaHint(valueSchema: string): string {
   if (valueSchema === 'percent') return hints.hintPercent;
   if (valueSchema === 'hourOfDay') return hints.hintHourOfDay;
   if (valueSchema === 'money') return hints.hintMoney;
+  if (valueSchema === 'localisedText') return hints.hintAnnouncement;
 
   return hints.hintInt;
 }

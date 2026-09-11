@@ -3,7 +3,8 @@ import { getTranslations } from 'next-intl/server';
 
 import type { Locale } from '@/i18n/routing';
 import { getSession } from '@/lib/session-server';
-import { getCurrencyCatalogue } from '@/lib/catalog';
+import { getCurrencyCatalogue, getPublicSettings } from '@/lib/catalog';
+import { announcementFor } from '@/lib/settings';
 import { DISPLAY_CURRENCIES, displayCurrency } from '@/lib/currency';
 import { HeaderMenus } from '@/components/header-menus';
 import { HeaderNav } from '@/components/header-nav';
@@ -101,6 +102,20 @@ import { ORNAMENT_BRAND } from '@safra/ui';
  * the current item in gold, so they are.
  */
 export async function SiteHeader({ locale }: { locale: Locale }) {
+  /*
+    The announcement is DATA now, not copy (Bashar, 2026-09-11).
+
+    He asked to keep the line and to own it: «the super admin should be able to manage it example
+    hide/show and write the message himself». That makes this one of the few sentences on the site
+    that legitimately lives outside `@safra/i18n` — `docs/i18n.md` exists so a translator can find
+    every string, and nobody can translate a message that does not exist until an operator types
+    one. The three locale fields are edited together on الإعدادات, so no language is forgotten.
+
+    `getPublicSettings` is TAGGED, so an edit in the console reaches this banner on the next render
+    rather than waiting out a cache — the same mechanism the customer-fee note already relies on.
+  */
+  const announcement = announcementFor(await getPublicSettings(), locale);
+
   const t = await getTranslations('nav');
   const brand = await getTranslations('brand');
   const auth = await getTranslations('auth');
@@ -150,28 +165,19 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
   return (
     <HeaderShell>
       {/*
-        One line, above the bar (Bashar, 2026-09-10).
+        Shown only when the switch is ON and this language has words — see `announcementFor`.
 
-        Who carries the risk is the first thing a guest wants to know and the last thing they want
-        to hunt for, so it sits above the navigation rather than inside it — the bar's five items
-        are already measured to the pixel at 768 and adding a sixth would push «تسجيل الدخول» onto
-        a second row.
-
-        A single line from `sm` up, and free to wrap below it. Both halves are deliberate.
-
-        He asked for one line, and one line it is at every width the Arabic is read at — «دعمك
-        وتعويضك مسؤوليتنا، لا مسؤولية العقار.» measures 42 characters and fits a 390px phone with
-        room to spare. The English and German renderings of the same promise do not: measured, both
-        overflowed a 390px viewport under `whitespace-nowrap` and pushed the PAGE sideways, which
-        `.claude/CLAUDE.md` forbids outright — «No page ever scrolls sideways».
-
-        So the nowrap starts at `sm`. A promise that takes two lines on the narrowest phone is a
-        small cost; a page that scrolls sideways hides content off the edge, and on this site it
-        took the whole header with it once before.
+        A single line from `sm` up and free to wrap below it, which is measured rather than
+        preferred: the Arabic fits a 390px phone, and longer translations of the same notice did
+        not — under `whitespace-nowrap` they pushed the PAGE sideways, which `.claude/CLAUDE.md`
+        forbids outright. The 120-character cap in the contract is what keeps an operator from
+        writing a paragraph into a bar that has one line to give.
       */}
-      <p className="border-b border-[rgba(168,122,31,0.12)] bg-[rgba(168,122,31,0.06)] px-4 py-1.5 text-center text-[12px] leading-relaxed font-semibold text-gold-read sm:text-[13px] sm:whitespace-nowrap">
-        {t('assurance')}
-      </p>
+      {announcement ? (
+        <p className="border-b border-[rgba(168,122,31,0.12)] bg-[rgba(168,122,31,0.06)] px-4 py-1.5 text-center text-[12px] leading-relaxed font-semibold text-gold-read sm:text-[13px] sm:whitespace-nowrap">
+          {announcement}
+        </p>
+      ) : null}
 
       {/*
         `gap-x-5` from `lg`, which is the prototype's own header (`gap:20px`), and 12px below it.

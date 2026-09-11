@@ -115,3 +115,39 @@ export const createRefundSchema = z
   .strict();
 
 export type CreateRefundRequest = z.infer<typeof createRefundSchema>;
+
+/**
+ * The site-wide announcement a super admin writes, in every language the site serves.
+ *
+ * Bashar, 2026-09-11: the header banner stays, and «the super admin should be able to manage it
+ * example hide/show and write the message himself». So the WORDS are data, not copy — the one
+ * place `docs/i18n.md` allows a sentence to live outside `@safra/i18n`, because nobody can
+ * translate a message that does not exist until an operator types it.
+ *
+ * Every locale the customer app serves has a field, and each may be empty: a banner with no
+ * German text simply does not show to a German reader, which is better than showing them Arabic.
+ */
+export const ANNOUNCEMENT_LOCALES = ['ar', 'en', 'de'] as const;
+
+export type AnnouncementLocale = (typeof ANNOUNCEMENT_LOCALES)[number];
+
+/** One line, so the header stays one line. Long enough for a sentence, short enough to refuse a paragraph. */
+export const ANNOUNCEMENT_MAX_LENGTH = 120;
+
+export type Announcement = Record<AnnouncementLocale, string>;
+
+/** True when `value` is an announcement every surface can render without guessing. */
+export function isAnnouncement(value: unknown): value is Announcement {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+
+  const entries = Object.entries(value as Record<string, unknown>);
+
+  /* Exactly the locales, so a stray key cannot ride along unvalidated into the payload. */
+  if (entries.length !== ANNOUNCEMENT_LOCALES.length) return false;
+
+  return ANNOUNCEMENT_LOCALES.every((locale) => {
+    const text = (value as Record<string, unknown>)[locale];
+
+    return typeof text === 'string' && text.trim().length <= ANNOUNCEMENT_MAX_LENGTH;
+  });
+}

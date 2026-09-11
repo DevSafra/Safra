@@ -2812,6 +2812,11 @@ export const ar = {
       hintHourOfDay: 'ساعة من 0 إلى 23 بتوقيت المدينة',
       hintInt: 'رقم صحيح',
       hintMoney: 'مبلغ موجب — العملة تبقى كما هي',
+      hintAnnouncement:
+        'سطر واحد لكل لغة، 120 حرفاً كحد أقصى — اترك لغةً فارغة لإخفاء الشريط عن قرّائها',
+      announcementAr: 'نص الشريط — العربية',
+      announcementEn: 'نص الشريط — الإنجليزية',
+      announcementDe: 'نص الشريط — الألمانية',
       feeFlat: 'ثابت — مبلغ لكل حجز',
       feePercent: 'نسبة — حصة من قيمة الإقامة',
 

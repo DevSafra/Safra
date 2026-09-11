@@ -444,6 +444,16 @@ export class CatalogService {
       */
       'booking.same_day_cutoff_enabled',
       'refund.minimum_percent',
+      /*
+        The header banner, both halves (Bashar, 2026-09-11).
+
+        PUBLIC by nature: it is a sentence printed at the top of every page of the customer site, so
+        there is nothing here a visitor cannot already read. The flag travels with the text for the
+        same reason `booking.same_day_cutoff_enabled` does — a surface given the words and not the
+        switch can only be precise and wrong.
+      */
+      'site.announcement_enabled',
+      'site.announcement_text',
     ];
 
     const rows = await this.db.query.settings.findMany({

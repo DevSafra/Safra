@@ -177,6 +177,9 @@ export const ERROR = {
    * landed. Refusing here is what stops those being paid.
    */
   PAYOUT_UNSUPPORTED_PAYABLE: 'payout.unsupported_payable',
+
+  /** The site announcement: an object of `{ ar, en, de }` strings, each within the length cap. */
+  SETTING_VALUE_LOCALISED_TEXT: 'setting.value_localised_text',
   PAYOUT_PARTNER_NOT_SCREENED: 'payout.partner_not_screened',
   /*
     §11.4 and Bashar, 2026-09-04: «A payout must never be released or marked as paid unless it is

@@ -108,6 +108,8 @@ export const de = {
   'payout.nothing_to_pay': 'In diesem Zeitraum ist nichts auszuzahlen.',
   'payout.frozen_by_dispute':
     'Ein offener Fall sperrt die Auszahlung für diese Buchungen.',
+  'setting.value_localised_text':
+    'Die Nachricht muss für jede Sprache (Arabisch, Englisch, Deutsch) Text sein, höchstens 120 Zeichen.',
   'payout.unsupported_payable':
     'Diese Auszahlung enthält Buchungen, deren Guthaben keine Buchung im Hauptbuch deckt. Sie ' +
     'kann erst nach Klärung freigegeben werden.',

@@ -3,7 +3,11 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { SANCTIONS_POLICIES } from '@safra/contracts';
+import {
+  ANNOUNCEMENT_LOCALES,
+  ANNOUNCEMENT_MAX_LENGTH,
+  SANCTIONS_POLICIES,
+} from '@safra/contracts';
 import type { ConfirmRequest } from '@safra/ui';
 
 import type { EditableSetting } from '@/lib/api';
@@ -534,6 +538,63 @@ function ValueInput({
   const common =
     'w-full rounded-lg border border-line bg-card px-3 py-2.5 text-[14px] text-text';
 
+  /*
+    The announcement: one box per language, because that is what a person is editing.
+
+    The three strings ride in `typed` as JSON (see `editableText`) so the row keeps its single
+    field of edit state. Each box patches its own locale and re-encodes, which means a half-typed
+    German line can never overwrite the Arabic one.
+
+    `maxLength` is the contract's own cap rather than a number repeated here, so the box cannot
+    accept what the server will refuse. An empty box is allowed and meaningful: it hides the banner
+    from that language without deleting the wording for the others.
+  */
+  if (setting.valueSchema === 'localisedText') {
+    let current: Record<string, string> = {};
+
+    try {
+      const parsed: unknown = JSON.parse(typed || '{}');
+
+      if (typeof parsed === 'object' && parsed !== null) {
+        current = parsed as Record<string, string>;
+      }
+    } catch {
+      /* A malformed string means the row is mid-edit; an empty set of boxes is the honest view. */
+    }
+
+    const labels = {
+      ar: t.sections.settings.announcementAr,
+      en: t.sections.settings.announcementEn,
+      de: t.sections.settings.announcementDe,
+    } as const;
+
+    return (
+      <div className="grid gap-3 sm:col-span-2">
+        {ANNOUNCEMENT_LOCALES.map((locale, index) => (
+          <label key={locale} className="grid content-start gap-1">
+            <span className="text-[13px] text-faint">{labels[locale]}</span>
+            <input
+              ref={
+                index === 0
+                  ? (node) => {
+                      fieldRef.current = node;
+                    }
+                  : undefined
+              }
+              type="text"
+              value={current[locale] ?? ''}
+              maxLength={ANNOUNCEMENT_MAX_LENGTH}
+              onChange={(event) =>
+                onTyped(JSON.stringify({ ...current, [locale]: event.target.value }))
+              }
+              className={common}
+            />
+          </label>
+        ))}
+      </div>
+    );
+  }
+
   if (setting.valueSchema === 'feeMode') {
     return (
       <label className="grid content-start gap-1">
@@ -637,6 +698,21 @@ function coerce(text: string, valueSchema: string, current: unknown): unknown {
 
   /* A boolean never reaches here — the switch posts a real boolean, with no form in between. */
   if (valueSchema === 'feeMode' || valueSchema === 'sanctionsPolicy') return trimmed;
+
+  /*
+    The announcement is already an object; `typed` is only its transport.
+
+    Parsed rather than passed through as a string, so what reaches the API is the shape the
+    contract validates. A parse failure returns the value UNCHANGED — saving nothing is the right
+    answer to a string this cannot read, and the server would refuse it anyway.
+  */
+  if (valueSchema === 'localisedText') {
+    try {
+      return JSON.parse(trimmed || '{}');
+    } catch {
+      return current;
+    }
+  }
 
   /**
    * Money keeps whichever shape it already had.
