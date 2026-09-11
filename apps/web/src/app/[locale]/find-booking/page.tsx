@@ -31,8 +31,17 @@ export default async function FindBookingPage({
 
   return (
     <div className="mx-auto max-w-md px-4 py-16">
-      <h1 className="font-display text-3xl font-bold text-gold">{t('findTitle')}</h1>
-      <p className="mt-2 text-sm text-muted">{t('findSubtitle')}</p>
+      {/*
+        Centred (Bashar, 2026-09-11).
+
+        On the heading and the line under it, not on the wrapper: the form below keeps its own
+        alignment, and `text-center` on the container would drag the field labels and the button's
+        text to the middle with it — which is the change nobody asked for and the one people notice.
+      */}
+      <h1 className="text-center font-display text-3xl font-bold text-gold">
+        {t('findTitle')}
+      </h1>
+      <p className="mt-2 text-center text-sm text-muted">{t('findSubtitle')}</p>
 
       <div className="mt-8 rounded-card border border-line bg-card p-6">
         <FindBookingForm locale={locale} />
