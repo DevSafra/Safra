@@ -6,7 +6,7 @@ import { HeaderMenus } from '@/components/header-menus';
 import { getCities, getCurrencyCatalogue } from '@/lib/catalog';
 import { DISPLAY_CURRENCIES, displayCurrency } from '@/lib/currency';
 import { localisedName } from '@/lib/localise';
-import { CUSTOMER_FACING_METHODS } from '@safra/contracts';
+import { CUSTOMER_FACING_METHODS, type CustomerFacingMethod } from '@safra/contracts';
 import { ORNAMENT_BRAND } from '@safra/ui';
 
 /**
@@ -66,6 +66,29 @@ import { ORNAMENT_BRAND } from '@safra/ui';
  * surfaces already make, and they run concurrently. A footer on every page must not add a round
  * trip of its own; these add none.
  */
+/**
+ * The payment marks SAFRA can show, and where each one came from.
+ *
+ * Membership is by ASSET, not by intention: a method with no mark is absent from the strip. That
+ * is what keeps the footer honest while `sham_cash` has no official artwork available, rather than
+ * showing a placeholder or leaving one word beside three logos.
+ *
+ * Provenance, recorded here rather than in a commit nobody will find:
+ *
+ * - `visa.png` — Visa's own CDN, `cdn.visa.com/v2/assets/images/logos/visa/blue/logo.png`.
+ * - `klarna.svg` — Klarna's own badge CDN, the file titled "Klarna Payment Badge".
+ * - `mastercard.svg` — DRAWN to the published geometry. Mastercard's servers answer 403 to every
+ *   automated request, and their symbol is two circles rather than a wordmark, so it can be
+ *   constructed exactly. The arithmetic is in the file's own comment.
+ */
+const PAYMENT_MARKS: Partial<
+  Record<CustomerFacingMethod, { src: string; width: number; height: number }>
+> = {
+  visa: { src: '/payments/visa.png', width: 208, height: 68 },
+  mastercard: { src: '/payments/mastercard.svg', width: 152, height: 108 },
+  klarna: { src: '/payments/klarna.svg', width: 145, height: 61 },
+};
+
 export async function SiteFooter({ locale }: { locale: Locale }) {
   const t = await getTranslations('footer');
   const brand = await getTranslations('brand');
@@ -205,18 +228,72 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
               No fetch, so the footer costs nothing extra on every page of the site — which the
               per-country version did.
             */}
+            {/*
+              Marks, not words (Bashar, 2026-09-11).
+
+              ## The tile is WHITE in both themes, and that is the design decision
+
+              A payment mark carries its own colours and cannot follow ours: Visa's `#1434CB` on
+              the dark theme's `#17142f` card is unreadable, and Klarna's pink is washed out on the
+              light one. So each mark sits on its own white tile, as it does on every card terminal
+              and checkout page — the contrast is a property of the mark and its ground rather than
+              of the page, which is the reasoning `.btn-gold` already applies to the primary button.
+
+              The border is `black/10` rather than `border-line` for the same reason: that token
+              tracks the PAGE, and on a white tile in the dark theme it would disappear.
+
+              ## Equal tiles, unequal marks — which is what balance looks like here
+
+              The three marks have different aspect ratios (Visa 3.06:1, Klarna 2.38:1, Mastercard
+              1.41:1). Fixing the HEIGHT would make the wordmarks tower over the circles; fixing the
+              WIDTH would shrink them to nothing. So the tiles are identical and each mark is
+              bounded on both axes and centred, landing at roughly 13, 17 and 20px tall — optically
+              even, because a wider mark reads as larger at the same height.
+
+              ## Driven by what exists
+
+              `PAYMENT_MARKS` decides membership. `sham_cash` is in `CUSTOMER_FACING_METHODS` and
+              has no official mark available — its own site is unreachable — so it is absent here
+              and returns the day the file lands, with no code change.
+            */}
             <ul
               aria-label={payment('heading')}
               className="mt-5 flex flex-wrap items-center gap-2"
             >
-              {CUSTOMER_FACING_METHODS.map((method) => (
-                <li
-                  key={method}
-                  className="rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs font-medium text-text2"
-                >
-                  {payment(method)}
-                </li>
-              ))}
+              {CUSTOMER_FACING_METHODS.map((method) => {
+                const mark = PAYMENT_MARKS[method];
+
+                if (!mark) return null;
+
+                return (
+                  <li
+                    key={method}
+                    className="flex h-9 w-14 items-center justify-center rounded-lg border border-black/10 bg-white"
+                  >
+                    {/*
+                      `alt` carries the brand NAME, so the strip is icons-only to the eye and still
+                      says «Visa» to a screen reader. Width and height are the file's own, so the
+                      row cannot shift as the marks load.
+                    */}
+                    {/*
+                      eslint-disable-next-line @next/next/no-img-element --
+                      `next/image` guards LCP and bandwidth. Neither is at stake: these are three
+                      static marks totalling under 10 kB, below the fold, lazy, and given their
+                      own intrinsic width and height so they reserve their space without the
+                      optimiser. Routing them through it would add a server round trip per mark to
+                      save nothing.
+                    */}
+                    <img
+                      src={mark.src}
+                      alt={payment(method)}
+                      width={mark.width}
+                      height={mark.height}
+                      loading="lazy"
+                      className="max-h-5 max-w-10 object-contain"
+                    />
+                  </li>
+                );
+              })}
             </ul>
 
             {/*
