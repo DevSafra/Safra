@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 152.4 108" role="img" aria-label="Mastercard">
+  <title>Mastercard</title>
+  <!--
+    The Mastercard symbol, drawn to its published geometry rather than approximated.
+
+    Mastercard's own servers refuse automated requests (403 from brand.mastercard.com and every
+    regional site), so this is constructed from the specification instead of downloaded. That is
+    only defensible because this mark is GEOMETRIC: two circles of equal radius whose centres sit
+    0.9r apart, with the intersection in a third colour. A wordmark could not be reconstructed this
+    way, which is why Visa's and Klarna's are the brands' own files and this one is not.
+
+    Two circles, r = 36, centres (60, 54) and (92.4, 54) — separation 32.4 = 0.90r.
+    They meet at x = 76.2, y = 54 ± sqrt(36² − 16.2²) = 54 ± 32.149.
+    Each half of the lens is a 126.6° arc, so both are small arcs (large-arc-flag 0) swept
+    clockwise (sweep-flag 1) — the left circle's right edge, then the right circle's left edge.
+
+    Colours are Mastercard's: #EB001B, #F79E1B, and #FF5F00 where they overlap.
+  -->
+  <circle cx="60" cy="54" r="36" fill="#EB001B" />
+  <circle cx="92.4" cy="54" r="36" fill="#F79E1B" />
+  <path
+    d="M76.2 21.851A36 36 0 0 1 76.2 86.149A36 36 0 0 1 76.2 21.851Z"
+    fill="#FF5F00"
+  />
+</svg>
