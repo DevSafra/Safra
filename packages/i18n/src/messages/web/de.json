@@ -276,13 +276,6 @@
     "body": "Der Link ist vielleicht veraltet, die Unterkunft nicht mehr verfügbar oder die Adresse falsch geschrieben.",
     "search": "Unterkunft suchen"
   },
-  "calendar": {
-    "title": "Verfügbarkeit: kommende Tage",
-    "available": "Verfügbar",
-    "booked": "Gebucht",
-    "closed": "Geschlossen",
-    "maintenance": "In Wartung"
-  },
   "checkout": {
     "title": "Buchung abschließen",
     "subtitle": "Sie zahlen jetzt den vollen Betrag an SAFRA · die Buchung ist „ausstehend“ bis der Partner bestätigt",

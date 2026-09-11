@@ -168,7 +168,6 @@ export default async function PropertyPage({
   const confirmationWindow = await confirmationWindowLabel();
   const ts = await getTranslations('starRating');
   const tc = await getTranslations('city');
-  const tcal = await getTranslations('calendar');
   /* The stepper's «زيادة {field}» / «إنقاص {field}», shared with the search form's steppers. */
   const tstep = await getTranslations('search');
 
@@ -641,37 +640,6 @@ export default async function PropertyPage({
               </section>
             ) : null}
 
-            {/* ── Availability calendar with all four states (§5.6) ─────────── */}
-            <section>
-              <h2 className="font-display text-xl text-text">{tcal('title')}</h2>
-              <ol className="mt-4 flex flex-wrap gap-1.5">
-                {property.calendar.slice(0, 28).map((day) => (
-                  <li
-                    key={day.date}
-                    title={`${day.date} · ${tcal(day.status)}`}
-                    className={`flex w-14 flex-col items-center rounded-lg border px-1 py-1.5 text-center ${dayClasses(day.status)}`}
-                  >
-                    <span className="text-[13px] opacity-70">{day.date.slice(8)}</span>
-                    <span aria-hidden className="text-xs">
-                      {dayGlyph(day.status)}
-                    </span>
-                  </li>
-                ))}
-              </ol>
-              <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-faint">
-                {(['available', 'booked', 'closed', 'maintenance'] as const).map(
-                  (state) => (
-                    <li key={state} className="flex items-center gap-1.5">
-                      <span aria-hidden className={legendDot(state)}>
-                        ●
-                      </span>
-                      {tcal(state)}
-                    </li>
-                  ),
-                )}
-              </ul>
-            </section>
-
             {/* ── Cancellation policy (§7.4) ────────────────────────────────── */}
             <section>
               <h2 className="font-display text-xl text-text">
@@ -1055,32 +1023,6 @@ function policyDescription(
   if (locale === 'en') return policy.descriptionEn;
   if (locale === 'de') return policy.descriptionDe;
   return policy.descriptionAr;
-}
-
-/**
- * Amenity labels come from a fixed message namespace, but the codes come from the
- * database — an admin can add one before a translation exists. Falling back to the
- * raw code beats crashing the page.
- */
-function dayClasses(status: string): string {
-  if (status === 'available') return 'border-ok/40 bg-ok/10 text-ok';
-  if (status === 'booked') return 'border-pend/40 bg-pend/10 text-pend';
-  if (status === 'maintenance') return 'border-warn/40 bg-warn/10 text-warn';
-  return 'border-line bg-field text-faint';
-}
-
-function legendDot(status: string): string {
-  if (status === 'available') return 'text-ok';
-  if (status === 'booked') return 'text-pend';
-  if (status === 'maintenance') return 'text-warn';
-  return 'text-faint';
-}
-
-function dayGlyph(status: string): string {
-  if (status === 'available') return '✓';
-  if (status === 'booked') return '●';
-  if (status === 'maintenance') return '⚒';
-  return '×';
 }
 
 /**

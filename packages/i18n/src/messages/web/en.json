@@ -276,13 +276,6 @@
     "body": "The link may be old, the property may no longer be listed, or the address may be mistyped.",
     "search": "Search for a stay"
   },
-  "calendar": {
-    "title": "Availability: coming days",
-    "available": "Available",
-    "booked": "Booked",
-    "closed": "Closed",
-    "maintenance": "Under maintenance"
-  },
   "checkout": {
     "title": "Complete your booking",
     "subtitle": "You pay SAFRA in full now · the booking becomes “pending confirmation” until the partner approves",
