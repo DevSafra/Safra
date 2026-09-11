@@ -355,7 +355,7 @@
     "visa": "Visa",
     "mastercard": "Mastercard",
     "klarna": "Klarna",
-    "sham_cash": "شام كاش",
+    "sham_cash": "ShamCash",
     "klarnaHint": "ادفع لاحقاً أو بالتقسيط عبر Klarna",
     "cardHint": "يتم التحقق من البطاقة عبر مصرفك (3-D Secure)",
     "shamCashHint": "محفظة إلكترونية داخل سوريا",

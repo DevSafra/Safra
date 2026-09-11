@@ -355,7 +355,7 @@
     "visa": "Visa",
     "mastercard": "Mastercard",
     "klarna": "Klarna",
-    "sham_cash": "Sham Cash",
+    "sham_cash": "ShamCash",
     "klarnaHint": "Später zahlen oder in Raten mit Klarna",
     "cardHint": "Ihre Bank prüft die Karte (3-D Secure)",
     "shamCashHint": "Mobile Wallet innerhalb Syriens",

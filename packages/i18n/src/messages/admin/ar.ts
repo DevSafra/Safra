@@ -3323,7 +3323,7 @@ export const ar = {
       },
       methods: {
         bank_transfer: 'حوالة مصرفية',
-        sham_cash: 'شام كاش',
+        sham_cash: 'ShamCash',
         cash_office: 'مكتب صرافة',
       } as Record<string, string>,
       rejectDialog: {
@@ -4142,7 +4142,7 @@ export const ar = {
     paymentMethod: {
       visa: 'Visa',
       mastercard: 'Mastercard',
-      sham_cash: 'Sham Cash',
+      sham_cash: 'ShamCash',
       klarna: 'Klarna',
       gift_card: 'بطاقة هدية',
       wallet: 'محفظة',
@@ -4159,7 +4159,7 @@ export const ar = {
     */
     payoutMethod: {
       bank_transfer: 'حوالة مصرفية',
-      sham_cash: 'شام كاش',
+      sham_cash: 'ShamCash',
       cash_office: 'مكتب صرافة',
     } as Record<string, string>,
 
@@ -4179,7 +4179,7 @@ export const ar = {
      */
     paymentProvider: {
       simulator: 'محاكاة',
-      sham_cash: 'Sham Cash',
+      sham_cash: 'ShamCash',
       stripe: 'Stripe',
       klarna: 'Klarna',
     } as Record<string, string>,
@@ -4743,7 +4743,7 @@ export const ar = {
 
       /* The payout rails, as `PAYOUT_METHODS` spells them. */
       bank_transfer: 'حوالة مصرفية',
-      sham_cash: 'شام كاش',
+      sham_cash: 'ShamCash',
       cash_office: 'مكتب صرافة',
 
       'EC-001': 'أُغلقت صفحة الدفع قبل إتمامه، فانتهت مهلة الحجز وأُعيدت التواريخ',

@@ -1399,7 +1399,7 @@ export const ar = {
     masked: 'ينتهي بـ',
     methods: {
       bank_transfer: 'حوالة مصرفية',
-      sham_cash: 'شام كاش',
+      sham_cash: 'ShamCash',
       cash_office: 'مكتب صرافة',
     } as Record<string, string>,
     /*
