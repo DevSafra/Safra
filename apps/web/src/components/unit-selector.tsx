@@ -165,6 +165,15 @@ export function UnitSelector({
                     building's list uses — so «تكييف» is one mark whether it belongs to the room or
                     to the hotel, which is the whole reason to key icons by code rather than draw
                     them per screen.
+
+                    **`border-line`, not `border-line2`** (Bashar, 2026-09-11: «I do not like the
+                    black border»). It was not styled black — it was not styled at all.
+                    `--color-line2` is declared in the console and the portal and NOT in this app,
+                    and Tailwind v4 emits no utility for a token that does not exist, so the border
+                    fell through to the CSS default of `currentColor` — the chip's own dark ink.
+                    `--color-line` is this app's real hairline and is what the building's amenity
+                    chips already use, so the two lists now match in their frame as well as in
+                    their marks.
                   */}
                   {room.amenities.length > 0 ? (
                     <ul
@@ -174,7 +183,7 @@ export function UnitSelector({
                       {room.amenities.map((amenity) => (
                         <li
                           key={amenity.code}
-                          className="flex items-center gap-1.5 rounded-lg border border-line2 px-2.5 py-1 text-[14px] text-text2"
+                          className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1 text-[14px] text-text2"
                         >
                           {/*
                             `aria-hidden`, like the building's list: the name is in the same chip,
@@ -201,7 +210,7 @@ export function UnitSelector({
                   the same separating work, and it only appears from `sm` up — below that the row is
                   one column and a divider across it would read as a horizontal rule.
                 */}
-                <div className="flex flex-col items-stretch gap-1 border-line2 sm:w-48 sm:items-end sm:border-s sm:ps-5">
+                <div className="flex flex-col items-stretch gap-1 border-line sm:w-48 sm:items-end sm:border-s sm:ps-5">
                   {/*
                     THE STAY TOTAL, not the nightly rate.
 
