@@ -355,7 +355,14 @@ export default async function PropertyPage({
           : ` · ${t('unitNightsMax', { count: unit.maxNights })}`
       }`,
       policyText: policyName(property.cancellationPolicy, locale),
-      amenityNames: unit.amenityCodes.map((code) => dynamicMessage(ta, code, code)),
+      /*
+        Code AND name. The name is resolved here, where the catalogue and the reader's locale both
+        are; the code travels with it so the chip can draw the right mark without a second lookup.
+      */
+      amenities: unit.amenityCodes.map((code) => ({
+        code,
+        name: dynamicMessage(ta, code, code),
+      })),
       perNightText: shown(
         priceWithCustomerFee(unit.basePrice, unit.currencyCode, property.fees),
       ),

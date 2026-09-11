@@ -279,8 +279,8 @@ export function BookingSummaryCard({
 
             <p className="text-[14px] leading-relaxed text-faint">
               {copy.policy}: {line.room.policyText}
-              {line.room.amenityNames.length > 0
-                ? ` · ${line.room.amenityNames.join(' · ')}`
+              {line.room.amenities.length > 0
+                ? ` · ${line.room.amenities.map((amenity) => amenity.name).join(' · ')}`
                 : ''}
             </p>
           </li>

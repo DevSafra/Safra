@@ -29,7 +29,7 @@ export interface BasketRoom {
   readonly perRoomAmount: string;
   readonly currencyCode: string;
   readonly policyText: string;
-  readonly amenityNames: readonly string[];
+  readonly amenities: readonly { readonly code: string; readonly name: string }[];
 }
 
 /** One line of the basket: a type, and how many of it. */

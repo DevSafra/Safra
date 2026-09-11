@@ -1,5 +1,6 @@
 'use client';
 
+import { AmenityIcon } from '@/components/icons';
 import { useBookingSelection, type BasketRoom } from '@/components/booking-selection';
 
 /**
@@ -27,7 +28,14 @@ export interface RoomView {
   readonly occupancyText: string;
   readonly termsText: string;
   readonly policyText: string;
-  readonly amenityNames: readonly string[];
+  /**
+   * The CODE beside the name, because the chip draws an icon from it.
+   *
+   * It was `readonly string[]` — names only, resolved on the server where the catalogue lives. The
+   * name still is; what the code adds is the one thing a translated string cannot carry, which is
+   * which amenity it is.
+   */
+  readonly amenities: readonly { readonly code: string; readonly name: string }[];
   readonly perNightText: string;
   /** «$72 لليلة · ليلتان» — how the headline total was reached. */
   readonly stayCaption: string;
@@ -152,18 +160,32 @@ export function UnitSelector({
                     reader nothing they could not see — a kettle and a balcony announce themselves.
                     The label survives as `aria-label`, so the list is still named for anybody who
                     cannot see the shape of it.
+
+                    Each chip carries its own drawing (Bashar, 2026-09-11), from the same set the
+                    building's list uses — so «تكييف» is one mark whether it belongs to the room or
+                    to the hotel, which is the whole reason to key icons by code rather than draw
+                    them per screen.
                   */}
-                  {room.amenityNames.length > 0 ? (
+                  {room.amenities.length > 0 ? (
                     <ul
                       aria-label={copy.amenitiesLabel}
                       className="mt-2.5 flex flex-wrap gap-1.5"
                     >
-                      {room.amenityNames.map((name) => (
+                      {room.amenities.map((amenity) => (
                         <li
-                          key={name}
-                          className="rounded-lg border border-line2 px-2.5 py-1 text-[14px] text-text2"
+                          key={amenity.code}
+                          className="flex items-center gap-1.5 rounded-lg border border-line2 px-2.5 py-1 text-[14px] text-text2"
                         >
-                          {name}
+                          {/*
+                            `aria-hidden`, like the building's list: the name is in the same chip,
+                            and a reader hearing «تكييف تكييف» is worse served than one hearing it
+                            once. The drawings are the same set, so a room's air conditioning and
+                            the building's are the same mark.
+                          */}
+                          <span aria-hidden className="shrink-0 text-gold-read">
+                            <AmenityIcon code={amenity.code} />
+                          </span>
+                          {amenity.name}
                         </li>
                       ))}
                     </ul>
@@ -280,6 +302,6 @@ function toBasketRoom(room: RoomView): BasketRoom {
     perRoomAmount: room.perRoomAmount,
     currencyCode: room.currencyCode,
     policyText: room.policyText,
-    amenityNames: room.amenityNames,
+    amenities: room.amenities,
   };
 }
