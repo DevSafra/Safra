@@ -466,40 +466,36 @@ export default async function CheckoutPage({
                 The fee is charged, recorded and posted identically in both modes. This is a
                 display decision and nothing else.
               */}
-              <dl className="space-y-2 text-sm">
-                {feeVisible ? (
-                  <>
-                    <div className="flex justify-between">
-                      <dt className="text-muted">{t('accommodation')}</dt>
-                      <dd className="text-text2">
-                        {formatMoney(priced.baseAmount, priced.currencyCode, locale, {
-                          exact: true,
-                        })}
-                      </dd>
-                    </div>
-                    <div className="flex justify-between">
-                      <dt className="text-muted">{t('serviceFee')}</dt>
-                      <dd className="text-text2">
-                        {formatMoney(
-                          priced.customerFeeAmount,
-                          priced.currencyCode,
-                          locale,
-                        )}
-                      </dd>
-                    </div>
-                  </>
-                ) : null}
+              {feeVisible ? (
+                <dl className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <dt className="text-muted">{t('accommodation')}</dt>
+                    <dd className="text-text2">
+                      {formatMoney(priced.baseAmount, priced.currencyCode, locale, {
+                        exact: true,
+                      })}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-muted">{t('serviceFee')}</dt>
+                    <dd className="text-text2">
+                      {formatMoney(priced.customerFeeAmount, priced.currencyCode, locale)}
+                    </dd>
+                  </div>
+                </dl>
+              ) : null}
 
-                {/* Falls when a coupon applies — see `CheckoutTotal`. */}
-                <CheckoutTotal
-                  total={priced.totalAmount}
-                  currencyCode={priced.currencyCode}
-                  locale={locale}
-                  label={t('dueNow')}
-                  discountLabel={t('couponApplied')}
-                />
-              </dl>
+              {/*
+                The code is asked for BEFORE the total is stated (Bashar, 2026-09-13). It used to
+                sit under «المطلوب الآن», which put the one field that CHANGES that figure after
+                the figure itself — a customer read the amount, then found the thing that alters
+                it, then had to read the amount again.
 
+                Two `dl`s rather than one with the field in the middle: a `dl` may hold only `dt`
+                and `dd` (or `div`s of them), so the field cannot live inside it. The discount row
+                stays with the total, where `CheckoutTotal` renders it — the code is entered above,
+                and what it took off is stated immediately beside what is left to pay.
+              */}
               <CouponField
                 locale={locale}
                 unitId={unitId}
@@ -523,6 +519,17 @@ export default async function CheckoutPage({
                   messages: couponMessages(locale),
                 }}
               />
+
+              <dl className="mt-4 space-y-2 text-sm">
+                {/* Falls when a coupon applies — see `CheckoutTotal`. */}
+                <CheckoutTotal
+                  total={priced.totalAmount}
+                  currencyCode={priced.currencyCode}
+                  locale={locale}
+                  label={t('dueNow')}
+                  discountLabel={t('couponApplied')}
+                />
+              </dl>
 
               {/*
                 §6.1: booking is not instant, and saying so BEFORE payment is the point.
