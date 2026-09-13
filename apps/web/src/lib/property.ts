@@ -17,6 +17,11 @@ const propertyDetailSchema = z.object({
   slug: z.string(),
   name: translated,
   description: translated,
+  /*
+    The partner's one line above the description. `translated` is already all-nullable, which is
+    the right shape — most listings have none, and that is not a missing field.
+  */
+  headline: translated,
   addressApproximate: z.string(),
   latitude: z.string().nullable(),
   longitude: z.string().nullable(),

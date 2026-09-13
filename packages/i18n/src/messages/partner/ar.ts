@@ -731,6 +731,18 @@ export const ar = {
     nameAr: 'اسم العقار بالعربية',
     nameEn: 'الاسم بالإنجليزية (اختياري)',
     nameDe: 'الاسم بالألمانية (اختياري)',
+    /*
+      «الجملة التعريفية», NOT «العنوان الجذّاب».
+
+      «العنوان» is this form's ADDRESS field, and Arabic uses the same word for a title. Two labels
+      on one form both opening with it is a partner misreading which box is which — and it showed
+      up first as three browser tests resolving «العنوان» to four inputs, which is the same defect
+      seen from the other side.
+    */
+    headlineAr: 'الجملة التعريفية بالعربية (اختياري)',
+    headlineEn: 'الجملة التعريفية بالإنجليزية (اختياري)',
+    headlineDe: 'الجملة التعريفية بالألمانية (اختياري)',
+    headlineHint: 'سطر واحد يظهر فوق الوصف في صفحة العقار. اتركه فارغاً لإزالته.',
     descriptionAr: 'الوصف بالعربية',
     descriptionEn: 'الوصف بالإنجليزية (اختياري)',
     descriptionDe: 'الوصف بالألمانية (اختياري)',

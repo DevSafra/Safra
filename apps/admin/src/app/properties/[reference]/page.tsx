@@ -207,6 +207,17 @@ export default async function PropertyPage({
           />
         </dl>
 
+        {/*
+          The partner's headline, above their description exactly as a customer meets it. A
+          reviewer approves what will be PUBLISHED, so a line of copy that never reaches this
+          screen is a line nobody moderates.
+        */}
+        {property.headlineAr || property.headlineEn ? (
+          <p className="mt-3 font-semibold text-text">
+            {property.headlineAr ?? property.headlineEn}
+          </p>
+        ) : null}
+
         {property.descriptionAr || property.descriptionEn ? (
           /*
             Arabic first, English only when the partner wrote no Arabic. It was the other way

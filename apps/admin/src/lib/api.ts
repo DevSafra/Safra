@@ -445,6 +445,8 @@ const propertyDetailSchema = z.object({
   nameEn: z.string().nullable(),
   descriptionAr: z.string().nullable(),
   descriptionEn: z.string().nullable(),
+  headlineAr: z.string().nullable(),
+  headlineEn: z.string().nullable(),
   address: z.string(),
   /* The official classification a reviewer checks against the partner's papers before approving. */
   starRating: z.number().int().min(1).max(5).nullable(),

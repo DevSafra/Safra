@@ -174,6 +174,7 @@ export default async function PropertyPage({
 
   const name = localisedText(property.name, locale);
   const description = localisedText(property.description, locale);
+  const headline = localisedText(property.headline, locale);
   const cityName = localisedName(property.city, locale);
   /*
     The word beside the number. A bare «4.8» asks the reader to know what the scale is; the word is
@@ -603,6 +604,15 @@ export default async function PropertyPage({
                   sentence is per-property CONTENT and there is no column for one here.
                 */}
                 <h2 className="font-display text-xl text-text">{t('aboutTitle')}</h2>
+                {/*
+                  The partner's own line, above their paragraph — booking.com's «اشعر وكأنك نجم…».
+                  Most listings have none, so this is the common case rendering nothing at all: it
+                  must not leave a gap behind, which is why the margin is on the element that IS
+                  there rather than a fixed space between two that may not be.
+                */}
+                {headline ? (
+                  <p className="mt-3 font-semibold text-text">{headline}</p>
+                ) : null}
                 <p className="mt-3 whitespace-pre-line text-muted">{description}</p>
               </section>
             ) : null}

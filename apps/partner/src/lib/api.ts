@@ -678,6 +678,12 @@ const partnerPropertySchema = z.object({
     en: z.string().nullable(),
     de: z.string().nullable(),
   }),
+  /** The one line above the description. Null in every language on a listing with none. */
+  headline: z.object({
+    ar: z.string().nullable(),
+    en: z.string().nullable(),
+    de: z.string().nullable(),
+  }),
   address: z.string(),
   /** «رقم الغرفة/الوحدة». Null where the partner had nothing to put. */
   roomNumber: z.string().nullable(),

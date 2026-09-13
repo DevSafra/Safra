@@ -362,7 +362,7 @@ test.describe('the suspension a partner meets', () => {
     /* ── ④ A WRITE is refused, and it says the account is on hold ──────────── */
     await portal.goto(`${BASE}/properties/${draft}/edit`);
 
-    const address = portal.getByLabel(t.editProperty.address);
+    const address = portal.getByLabel(t.editProperty.address, { exact: true });
 
     await expect(address).toBeVisible();
 
@@ -383,7 +383,9 @@ test.describe('the suspension a partner meets', () => {
 
     /* And it did NOT save — a refusal that stores the value is worse than one that does not. */
     await portal.reload();
-    await expect(portal.getByLabel(t.editProperty.address)).toHaveValue(original);
+    await expect(portal.getByLabel(t.editProperty.address, { exact: true })).toHaveValue(
+      original,
+    );
 
     /* ── ⑤ المحفظة says the transfers are FROZEN, not missing ──────────────── */
     await portal.goto(`${BASE}/payouts`);
@@ -459,15 +461,19 @@ test.describe('the suspension a partner meets', () => {
       is put straight back afterwards so the next run starts where this one did.
     */
     await portal.goto(`${BASE}/properties/${draft}/edit`);
-    await portal.getByLabel(t.editProperty.address).fill(`${original} — تعديل اختباري`);
+    await portal
+      .getByLabel(t.editProperty.address, { exact: true })
+      .fill(`${original} — تعديل اختباري`);
     await portal.getByRole('button', { name: t.editProperty.save }).click();
     await expect(banner(portal)).toContainText(t.editProperty.saved, WAIT);
 
-    await portal.getByLabel(t.editProperty.address).fill(original);
+    await portal.getByLabel(t.editProperty.address, { exact: true }).fill(original);
     await portal.getByRole('button', { name: t.editProperty.save }).click();
     await expect(banner(portal)).toContainText(t.editProperty.saved, WAIT);
     await portal.reload();
-    await expect(portal.getByLabel(t.editProperty.address)).toHaveValue(original);
+    await expect(portal.getByLabel(t.editProperty.address, { exact: true })).toHaveValue(
+      original,
+    );
 
     /* And the listings are discoverable again. */
     await site.goto(searchUrl());

@@ -117,7 +117,7 @@ test.describe('تعديل العقار', () => {
 
     await page.goto(`${BASE}/properties/${reference}/edit`);
 
-    const address = page.getByLabel(t.editProperty.address);
+    const address = page.getByLabel(t.editProperty.address, { exact: true });
 
     await expect(address).toBeVisible();
 
@@ -131,15 +131,19 @@ test.describe('تعديل العقار', () => {
 
     /* Stored, not merely acknowledged. */
     await page.reload();
-    await expect(page.getByLabel(t.editProperty.address)).toHaveValue(edited);
+    await expect(page.getByLabel(t.editProperty.address, { exact: true })).toHaveValue(
+      edited,
+    );
 
     /* Put it back, so the next run starts where this one did. */
-    await page.getByLabel(t.editProperty.address).fill(original);
+    await page.getByLabel(t.editProperty.address, { exact: true }).fill(original);
     await page.getByRole('button', { name: t.editProperty.save }).click();
     await expect(banner(page)).toContainText(t.editProperty.saved);
 
     await page.reload();
-    await expect(page.getByLabel(t.editProperty.address)).toHaveValue(original);
+    await expect(page.getByLabel(t.editProperty.address, { exact: true })).toHaveValue(
+      original,
+    );
   });
 
   test('a published listing explains the refusal instead of showing a form', async ({
@@ -160,7 +164,7 @@ test.describe('تعديل العقار', () => {
       not the verified address §8.1 freezes — but that section names its own action «حفظ المرافق»,
       so this assertion stays about the structural form and reads as one sentence again.
     */
-    await expect(page.getByLabel(t.editProperty.address)).toHaveCount(0);
+    await expect(page.getByLabel(t.editProperty.address, { exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: t.editProperty.save })).toHaveCount(0);
 
     /* And it names what IS still editable, so the screen is not a dead end. */
@@ -179,7 +183,7 @@ test.describe('تعديل العقار', () => {
     await expect(page.getByText(/العنوان في الوثائق/)).toBeVisible();
 
     /* Reopened for editing, because that is the whole point of telling somebody what was wrong. */
-    await expect(page.getByLabel(t.editProperty.address)).toBeVisible();
+    await expect(page.getByLabel(t.editProperty.address, { exact: true })).toBeVisible();
   });
 });
 
@@ -365,7 +369,7 @@ test.describe('الوحدات', () => {
     await page.goto(`${BASE}/properties/${reference}/edit`);
 
     /* The address form is absent — that half is genuinely closed. */
-    await expect(page.getByLabel(t.editProperty.address)).toHaveCount(0);
+    await expect(page.getByLabel(t.editProperty.address, { exact: true })).toHaveCount(0);
 
     /* The unit form is not. */
     const unit = page.locator('[data-unit]').first();

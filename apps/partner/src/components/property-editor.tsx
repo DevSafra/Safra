@@ -7,7 +7,7 @@ import type { PartnerPropertyDetail, PropertyFormReference } from '@/lib/api';
 import { codeOfResponse, refusalFor } from '@/lib/refusal';
 import { STAR_VALUES } from '@/lib/stars';
 import { t, tripAttribute } from '@/lib/strings';
-import { TRIP_ATTRIBUTES, usesStarRating } from '@safra/contracts';
+import { PROPERTY_HEADLINE_MAX, TRIP_ATTRIBUTES, usesStarRating } from '@safra/contracts';
 
 /**
  * تعديل العقار — the form, for a listing that may still be edited.
@@ -48,6 +48,9 @@ export function PropertyEditor({
     descriptionAr: property.description.ar ?? '',
     descriptionEn: property.description.en ?? '',
     descriptionDe: property.description.de ?? '',
+    headlineAr: property.headline.ar ?? '',
+    headlineEn: property.headline.en ?? '',
+    headlineDe: property.headline.de ?? '',
     address: property.address,
     roomNumber: property.roomNumber ?? '',
     citySlug: property.citySlug,
@@ -95,6 +98,27 @@ export function PropertyEditor({
       (form.descriptionDe.trim() || null) !== property.description.de
     ) {
       patch['description'] = description;
+    }
+
+    /*
+      All three languages, every time — unlike the description above.
+
+      The description sends only the languages that have text, so emptying one sends it as ABSENT
+      and the API reads that as «leave it alone»: a partner cannot clear an English description
+      through this form. A headline is decoration that gets added and removed, so its contract
+      accepts `''` and its update path treats `''` as «remove». Sending all three keys is what
+      turns an emptied box into a cleared headline instead of a silent no-op.
+    */
+    if (
+      form.headlineAr.trim() !== (property.headline.ar ?? '') ||
+      form.headlineEn.trim() !== (property.headline.en ?? '') ||
+      form.headlineDe.trim() !== (property.headline.de ?? '')
+    ) {
+      patch['headline'] = {
+        ar: form.headlineAr.trim(),
+        en: form.headlineEn.trim(),
+        de: form.headlineDe.trim(),
+      };
     }
 
     if (form.address.trim() !== property.address) patch['address'] = form.address.trim();
@@ -300,6 +324,37 @@ export function PropertyEditor({
         />
       </div>
 
+      {/*
+        The headline sits ABOVE the description here for the same reason it does on the property
+        page: it is the line a guest reads first, and a form that asks for it after four rows of
+        prose invites a partner to write a fifth.
+      */}
+      <Field
+        label={t.editProperty.headlineAr}
+        value={form.headlineAr}
+        onChange={set('headlineAr')}
+        dir="rtl"
+        maxLength={PROPERTY_HEADLINE_MAX}
+        hint={t.editProperty.headlineHint}
+      />
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field
+          label={t.editProperty.headlineEn}
+          value={form.headlineEn}
+          onChange={set('headlineEn')}
+          dir="ltr"
+          maxLength={PROPERTY_HEADLINE_MAX}
+        />
+        <Field
+          label={t.editProperty.headlineDe}
+          value={form.headlineDe}
+          onChange={set('headlineDe')}
+          dir="ltr"
+          maxLength={PROPERTY_HEADLINE_MAX}
+        />
+      </div>
+
       <Area
         label={t.editProperty.descriptionAr}
         value={form.descriptionAr}
@@ -392,6 +447,7 @@ function Field({
   dir,
   required,
   hint,
+  maxLength,
 }: {
   readonly label: string;
   readonly value: string;
@@ -399,6 +455,8 @@ function Field({
   readonly dir: 'rtl' | 'ltr';
   readonly required?: boolean;
   readonly hint?: string;
+  /** The contract's own cap, where it is shorter than the 300 this field allows by default. */
+  readonly maxLength?: number;
 }) {
   return (
     <label className="grid gap-1">
@@ -418,7 +476,7 @@ function Field({
       <input
         value={value}
         required={required}
-        maxLength={300}
+        maxLength={maxLength ?? 300}
         onChange={(event) => onChange(event.target.value)}
         className={`min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text lg:min-h-0 ${
           dir === 'ltr' ? 'field-ltr' : ''
