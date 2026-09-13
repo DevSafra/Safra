@@ -294,10 +294,25 @@ export function BookingSummaryCard({
       <div className="gold-rule my-3.5" />
 
       <dl className="grid gap-1.5 text-[14px]">
-        <div className="flex items-baseline justify-between gap-3">
+        {/*
+          The arrow sits BETWEEN the dates, not against the check-out (Bashar, 2026-09-13). The row
+          was `justify-between` with the arrow inside the `dd`, so all the free space opened on one
+          side of it and the glyph read as part of the second date rather than as the span between
+          them.
+
+          `flex-1` on the `dd` plus `mx-auto` on the arrow: auto margins absorb the free space and
+          split it equally, so the gap either side of the glyph is the same whatever the two dates
+          measure — a September date and a «كانون الأول» one do not move it. `px-3` is the floor for
+          the day the dates are wide enough that there is no free space left to split.
+
+          The arrow stays INSIDE the `dd`: a `<dl><div>` may hold only `dt` then `dd`, so a third
+          element between them would be markup a screen reader is entitled to mis-group.
+        */}
+        <div className="flex items-baseline">
           <dt className="text-text2">{stay.checkInText}</dt>
-          <dd className="text-text2">
-            {rangeArrow(locale)} {stay.checkOutText}
+          <dd className="flex flex-1 items-baseline text-text2">
+            <span className="mx-auto px-3">{rangeArrow(locale)}</span>
+            <span>{stay.checkOutText}</span>
           </dd>
         </div>
         <div className="flex items-baseline justify-between gap-3">
