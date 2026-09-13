@@ -243,7 +243,6 @@
     "unitsCount": "{count, plural, zero {لا غرف} one {غرفة واحدة} two {غرفتان} few {# غرف} many {# غرفة} other {# غرفة}}",
     "summaryFee": "رسوم سفرة",
     "basketSelected": "سلّة الحجز",
-    "basketAddMore": "أضف غرفة أخرى",
     "basketClear": "إفراغ السلّة",
     "basketRemoveLine": "إزالة",
     "basketAdd": "أضف إلى الحجز",

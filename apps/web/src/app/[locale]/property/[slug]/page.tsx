@@ -874,7 +874,6 @@ export default async function PropertyPage({
                       selected: t('basketSelected'),
                       remove: t('basketRemoveLine'),
                       clear: t('basketClear'),
-                      addMore: t('basketAddMore'),
                       roomsLabel: t('summaryRooms'),
                       /*
                         The same two templates the search form's steppers use, not a second pair.

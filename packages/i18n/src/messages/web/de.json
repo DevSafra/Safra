@@ -243,7 +243,6 @@
     "unitsCount": "{count, plural, one {1 Zimmer} other {# Zimmer}}",
     "summaryFee": "SAFRA-Gebühr",
     "basketSelected": "Ihre Buchung",
-    "basketAddMore": "Weiteres Zimmer",
     "basketClear": "Auswahl leeren",
     "basketRemoveLine": "Entfernen",
     "basketAdd": "Zur Buchung",

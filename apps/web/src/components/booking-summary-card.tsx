@@ -83,7 +83,6 @@ export function BookingSummaryCard({
     selected: string;
     remove: string;
     clear: string;
-    addMore: string;
     roomsLabel: string;
     increase: string;
     decrease: string;
@@ -183,13 +182,13 @@ export function BookingSummaryCard({
         <span className="text-[13px] font-bold tracking-wide text-faint">
           {copy.selected}
         </span>
-        <span className="-my-2 ms-auto flex gap-3">
-          <a
-            href="#units"
-            className="inline-flex min-h-10 items-center text-[13px] text-gold-read underline underline-offset-2 lg:min-h-0"
-          >
-            {copy.addMore}
-          </a>
+        {/*
+          «امسح» alone (Bashar, 2026-09-13: «remove أضف غرفة أخرى from the left cart»). There used
+          to be an «أضف غرفة أخرى» link beside it, jumping to `#units`. `flex` stays — it is what
+          makes `-my-2` pull the 40px tap target back into the heading's line; `gap-3` went with the
+          second control it used to separate.
+        */}
+        <span className="-my-2 ms-auto flex">
           <button
             type="button"
             onClick={clear}

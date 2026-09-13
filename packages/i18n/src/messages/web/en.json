@@ -243,7 +243,6 @@
     "unitsCount": "{count, plural, one {1 room} other {# rooms}}",
     "summaryFee": "SAFRA fee",
     "basketSelected": "Your booking",
-    "basketAddMore": "Add another room",
     "basketClear": "Empty basket",
     "basketRemoveLine": "Remove",
     "basketAdd": "Add to booking",
