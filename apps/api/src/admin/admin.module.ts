@@ -37,6 +37,7 @@ import { MeService } from './me.service.js';
 import { StaffController, StaffInvitationController } from './staff.controller.js';
 import { StaffService } from './staff.service.js';
 import { AuthModule } from '../auth/auth.module.js';
+import { SettingsModule } from '../settings/settings.module.js';
 import { SettingsAdminService } from '../settings/settings-admin.service.js';
 import { CatalogueController } from './catalogue.controller.js';
 import { CatalogueService } from './catalogue.service.js';
@@ -85,6 +86,8 @@ import { StaffScopeService } from './staff-scope.service.js';
     PaymentsModule,
     WalletModule,
     GiftCardModule,
+    /* For `SettingsRevalidationService` — a city image change purges the customer app's cache. */
+    SettingsModule,
   ],
   controllers: [
     PropertyTypesController,

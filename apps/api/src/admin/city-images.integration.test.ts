@@ -5,6 +5,7 @@ import { ERROR } from '@safra/contracts';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
+import type { SettingsRevalidationService } from '../settings/settings-revalidation.service.js';
 import { CityImagesController } from './city-images.controller.js';
 import { GeoService } from './geo.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
@@ -33,10 +34,27 @@ describeIfDb('managing a city photograph', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   const db: Database = harness.db;
   /* Nothing here uploads, so the pipeline is never reached. */
+  /*
+    Records what the controller ASKED to be purged, rather than reaching a front end.
+
+    The real service fans out over HTTP and is best-effort by design, so a stub here is not
+    a shortcut: what this file can prove is that a write asks at all, which is the half that
+    silently stopped working when somebody added a fourth write and forgot the call.
+  */
+  const purged: string[] = [];
+  const revalidation = {
+    revalidateCatalogue: (reason: string) => {
+      purged.push(reason);
+
+      return Promise.resolve();
+    },
+  } as unknown as SettingsRevalidationService;
+
   const controller = new CityImagesController(
     db,
     { remove: () => Promise.resolve() } as unknown as ImageService,
     new AuditService(db),
+    revalidation,
   );
 
   let staffId = '';
@@ -286,5 +304,27 @@ describeIfDb('managing a city photograph', () => {
     await expect(
       controller.update(staff(), slug, id, { altAr: 'لا' }),
     ).rejects.toMatchObject({ response: { code: ERROR.IMAGE_NOT_FOUND } });
+  });
+
+  /**
+   * The landing page is prerendered, so a photograph is not "changed" until the cache is told.
+   *
+   * Bashar replaced the picture for دمشق on 2026-09-13 and watched الرئيسية serve the old one for
+   * five minutes. `revalidate = 300` was doing exactly what it says; what was missing is the
+   * purge. This asserts the ASK — that every write reaches for it — because the fan-out itself is
+   * best-effort and untestable from here without a front end to answer.
+   */
+  it('asks the customer app to drop its cache after every change to a photograph', async () => {
+    const before = purged.length;
+
+    await controller.update(staff(), slug, ids[0] as string, { credit: 'مصدر' });
+
+    expect(purged.length, 'an edit asks').toBe(before + 1);
+    expect(purged.at(-1)).toContain(slug);
+
+    await controller.remove(slug, ids[1] as string);
+
+    expect(purged.length, 'an archive asks too').toBe(before + 2);
+    expect(purged.at(-1)).toContain(slug);
   });
 });

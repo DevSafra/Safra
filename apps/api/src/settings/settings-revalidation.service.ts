@@ -1,13 +1,19 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 
-import { OPERATING_SETTINGS_TAG } from '@safra/contracts';
+import { CATALOGUE_TAG, OPERATING_SETTINGS_TAG } from '@safra/contracts';
 
 import { describeError } from '../common/errors/safe-error.js';
 import type { Env } from '../config/env.js';
 import { ENV } from '../config/env.js';
 
 /**
- * Tells the front ends that a setting changed, so a save is visible at once.
+ * Tells the front ends that something they cache changed, so a save is visible at once.
+ *
+ * Two things now: the operating SETTINGS, and the REFERENCE data — cities and their photographs,
+ * property types, amenities. Each has its own tag and its own route on the customer app, so a fee
+ * change does not throw away the city list and a new city photograph does not throw away the fee.
+ * The fan-out, the timeout, the best-effort contract and the logging are shared, because those are
+ * the parts that were worth getting right once.
  *
  * Bashar, 2026-09-08: *"I would like configuration changes to become visible immediately after a
  * settings update… the platform should reflect those updates without requiring users to wait
@@ -51,6 +57,35 @@ export class SettingsRevalidationService {
    * bounds the whole fan-out, and the settings write has already committed by the time this runs.
    */
   async revalidate(key: string): Promise<void> {
+    await this.purge('revalidate-settings', OPERATING_SETTINGS_TAG, key);
+  }
+
+  /**
+   * Asks the customer app to drop its cached view of the reference data.
+   *
+   * Bashar, 2026-09-13: a new photograph for دمشق took five minutes to reach الرئيسية. Called
+   * after a city image is added, altered or removed.
+   *
+   * The CONSOLE is not called, and that is not an omission: it reads the catalogue through
+   * `staffFetch`, which does not cache it, so a route there would be a capability with nothing
+   * behind it — the same reasoning that leaves the partner portal out of the settings fan-out.
+   */
+  async revalidateCatalogue(reason: string): Promise<void> {
+    await this.purge('revalidate-catalogue', CATALOGUE_TAG, reason, ['customer']);
+  }
+
+  /**
+   * One purge, fanned out to the apps that cache the thing.
+   *
+   * `only` names which targets cache it; everything else — the secret check, the bounded call, the
+   * best-effort contract, the two log lines — is the same whatever changed.
+   */
+  private async purge(
+    route: string,
+    tag: string,
+    key: string,
+    only?: readonly string[],
+  ): Promise<void> {
     const secret = this.env.REVALIDATE_SECRET;
 
     if (!secret) {
@@ -68,15 +103,17 @@ export class SettingsRevalidationService {
       return;
     }
 
-    const targets: readonly { name: string; url: string }[] = [
-      { name: 'customer', url: this.env.APP_URL },
-      { name: 'console', url: this.env.ADMIN_URL },
-    ];
+    const targets = (
+      [
+        { name: 'customer', url: this.env.APP_URL },
+        { name: 'console', url: this.env.ADMIN_URL },
+      ] as const
+    ).filter(({ name }) => only === undefined || only.includes(name));
 
     await Promise.all(
       targets.map(async ({ name, url }) => {
         try {
-          const response = await fetch(`${url}/api/revalidate-settings`, {
+          const response = await fetch(`${url}/api/${route}`, {
             method: 'POST',
             headers: { 'x-safra-revalidate': secret },
             signal: AbortSignal.timeout(3_000),
@@ -107,8 +144,6 @@ export class SettingsRevalidationService {
       }),
     );
 
-    this.logger.log(
-      `Asked the front ends to drop "${OPERATING_SETTINGS_TAG}" after "${key}".`,
-    );
+    this.logger.log(`Asked the front ends to drop "${tag}" after "${key}".`);
   }
 }

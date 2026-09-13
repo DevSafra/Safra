@@ -23,6 +23,7 @@ import {
 
 import { Audited, AuditExempt } from '../common/audit/audit.interceptor.js';
 import { AuditService } from '../common/audit/audit.service.js';
+import { SettingsRevalidationService } from '../settings/settings-revalidation.service.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { DATABASE } from '../database/database.module.js';
 import { ImageService } from '../storage/image.service.js';
@@ -44,6 +45,13 @@ export class CityImagesController {
     @Inject(DATABASE) private readonly db: Database,
     private readonly images: ImageService,
     private readonly audit: AuditService,
+    /*
+      Why a controller reaches for this at all: الرئيسية is prerendered with `revalidate = 300`, so
+      a photograph replaced here sat behind the old one for five minutes (Bashar, 2026-09-13). The
+      write is already committed when this runs and the call is best-effort — a customer app that
+      is restarting must never fail an upload that succeeded.
+    */
+    private readonly revalidation: SettingsRevalidationService,
   ) {}
 
   @Post()
@@ -98,6 +106,8 @@ export class CityImagesController {
       .returning({ id: schema.cityImages.id });
 
     if (!row) throw new Error('City image insert returned no row.');
+
+    await this.revalidation.revalidateCatalogue(`city_image.uploaded ${slug}`);
 
     return {
       id: row.id,
@@ -197,6 +207,8 @@ export class CityImagesController {
       );
     });
 
+    await this.revalidation.revalidateCatalogue(`city_image.updated ${slug}`);
+
     return { id: image.id };
   }
 
@@ -283,6 +295,8 @@ export class CityImagesController {
         `);
       }
     });
+
+    await this.revalidation.revalidateCatalogue(`city_image.archived ${slug}`);
 
     return { id: imageId, archived: true };
   }
