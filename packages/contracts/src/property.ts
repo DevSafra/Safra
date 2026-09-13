@@ -17,6 +17,29 @@ import { ERROR } from './error-codes.js';
  * their own rating would make the entire ranking meaningless.
  */
 
+/**
+ * How long a listing's headline may be.
+ *
+ * One line beside a 4,000-character description. 120 is roughly two lines of Arabic on a phone and
+ * one on a laptop — long enough for «فندق خمس نجوم في قلب دمشق القديمة» and short enough that it
+ * cannot quietly become a second description.
+ */
+export const PROPERTY_HEADLINE_MAX = 120;
+
+/**
+ * A headline per language, where an empty string is how a partner REMOVES one.
+ *
+ * `.partial()` so a form may send one language and leave the others untouched; a key that IS sent
+ * is honoured exactly, `''` included.
+ */
+const headlineText = z
+  .object({
+    ar: z.string().trim().max(PROPERTY_HEADLINE_MAX),
+    en: z.string().trim().max(PROPERTY_HEADLINE_MAX),
+    de: z.string().trim().max(PROPERTY_HEADLINE_MAX),
+  })
+  .partial();
+
 const translatedText = (max: number) =>
   z.object({
     ar: z.string().trim().min(1).max(max),
@@ -73,6 +96,22 @@ const propertyBaseSchema = z
     cancellationPolicyCode: z.string().trim().min(1).max(40),
     name: translatedText(160),
     description: translatedText(4000).partial({ ar: true }).optional(),
+    /**
+     * The listing's own one line, shown above the description (Bashar, 2026-09-13).
+     *
+     * NOT `translatedText`, and the difference is deliberate: this one is CLEARABLE.
+     *
+     * `translatedText` puts `.min(1)` on every language, so an empty string is a validation error
+     * and the only way to send "nothing" is to omit the key — which the update path reads as «leave
+     * it alone». That is why an emptied English description cannot currently be cleared through the
+     * editor: the form omits it and the service keeps the old value. A description is written once
+     * and lived with, so nobody has hit it. A headline is decoration a partner adds and removes, so
+     * the same shape would be a defect on its first day.
+     *
+     * Here `''` is VALID and MEANS cleared, and the service maps it to NULL. Capped short — the
+     * point is one line above a paragraph; a headline that wraps to four is a second description.
+     */
+    headline: headlineText.optional(),
     address: z.string().trim().min(3).max(300),
     /**
      * «رقم الغرفة/الوحدة» — the room or unit this listing occupies (Bashar, 2026-08-19).

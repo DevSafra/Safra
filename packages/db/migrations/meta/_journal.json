@@ -533,6 +533,13 @@
       "when": 1788955932404,
       "tag": "0075_notification_abandoned",
       "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1789309701671,
+      "tag": "0076_property_headline",
+      "breakpoints": true
     }
   ]
 }

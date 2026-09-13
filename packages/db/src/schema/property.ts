@@ -110,6 +110,20 @@ export const properties = pgTable(
     descriptionAr: text('description_ar'),
     descriptionEn: text('description_en'),
     descriptionDe: text('description_de'),
+    /**
+     * One line above the description on the property page — booking.com's «اشعر وكأنك نجم…».
+     *
+     * A partner writes it about their OWN listing, which is why it is a column and not a catalogue
+     * string: «فندق في قلب دمشق القديمة» is not a label this product can supply. Nullable in all
+     * three languages, exactly like the description beside it — 2,700 listings predate it, and a
+     * partner with nothing to say here leaves it empty rather than being made to invent something.
+     *
+     * The 120-character cap is `PROPERTY_HEADLINE_MAX` in `@safra/contracts`, not a column type:
+     * it is a rule about what reads as one line, and the forms that send this read it from there.
+     */
+    headlineAr: text('headline_ar'),
+    headlineEn: text('headline_en'),
+    headlineDe: text('headline_de'),
     address: text('address').notNull(),
     /**
      * The room or unit number this listing occupies — «رقم الغرفة/الوحدة» (Bashar, 2026-08-19).
