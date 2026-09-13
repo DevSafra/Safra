@@ -760,8 +760,13 @@ export default async function PropertyPage({
           {/*
           `scroll-mt` so the sticky header does not land on top of the panel the anchor just jumped
           to — the same reason every row on the console carries one.
+
+          **It does NOT follow the scroll** (Bashar, 2026-09-13: «unfix the left carts position»).
+          It used to be `lg:sticky lg:top-24`, so the rating and the price rode down the page beside
+          the room list and the reviews. `lg:self-start` stays: without it the panel is a stretched
+          grid item and its cards sit in the middle of a column as tall as the whole page.
         */}
-          <aside id="booking" className="scroll-mt-28 lg:sticky lg:top-24 lg:self-start">
+          <aside id="booking" className="scroll-mt-28 lg:self-start">
             {/*
             The score, the count, and one thing a guest actually said — booking.com's card, and the
             reason it sits ABOVE the price is that it answers the question the price provokes. A
