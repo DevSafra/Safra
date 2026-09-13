@@ -753,9 +753,19 @@ function StayTypeCard({
       href={`/${locale}/search${stay}&propertyTypeCode=${encodeURIComponent(type.code)}`}
       className="flex h-full flex-col items-center justify-center gap-2 rounded-card border border-line bg-card px-3 py-4 text-center transition-[border-color,background-color] duration-200 ease-out-strong hover:border-gold/60 hover:bg-gold/5"
     >
+      {/*
+        No ring, and the mark carries the card (Bashar, 2026-09-13: «make the icons bigger and
+        remove the circle around them»). It was an 18px glyph inside a 36px `rounded-full` hairline,
+        so the ring was the largest thing in the cell and the drawing the smallest thing inside it.
+
+        The size is on the SPAN, not in `ICON`: every glyph is `1.15em`, so `text-[28px]` here
+        draws 32px without touching the search bar or the amenity cells. `type.glyph` — the emoji
+        staff chose for a type nobody has drawn yet — scales with it, which is the other reason the
+        size belongs on the container rather than on the svg.
+      */}
       <span
         aria-hidden
-        className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-gold/35 text-base text-gold-read"
+        className="inline-flex shrink-0 items-center justify-center text-[28px] leading-none text-gold-read"
       >
         {Drawn ? <Drawn /> : (type.glyph ?? <StayIcon />)}
       </span>
