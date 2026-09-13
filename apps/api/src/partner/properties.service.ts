@@ -198,6 +198,9 @@ export class PropertiesService {
       description_ar: string | null;
       description_en: string | null;
       description_de: string | null;
+      headline_ar: string | null;
+      headline_en: string | null;
+      headline_de: string | null;
       address: string;
       room_number: string | null;
       star_rating: number | null;
@@ -214,6 +217,7 @@ export class PropertiesService {
       SELECT pr.id, pr.reference, pr.slug, pr.status::text AS status,
              pr.name_ar, pr.name_en, pr.name_de,
              pr.description_ar, pr.description_en, pr.description_de,
+             pr.headline_ar, pr.headline_en, pr.headline_de,
              pr.address, pr.room_number, pr.star_rating, pr.latitude, pr.longitude,
              pr.attributes,
              ci.slug AS city_slug, ci.name_ar AS city_name_ar,
@@ -308,6 +312,11 @@ export class PropertiesService {
         ar: row.description_ar,
         en: row.description_en,
         de: row.description_de,
+      },
+      headline: {
+        ar: row.headline_ar,
+        en: row.headline_en,
+        de: row.headline_de,
       },
       address: row.address,
       roomNumber: row.room_number,
@@ -563,6 +572,10 @@ export class PropertiesService {
           descriptionAr: input.description?.ar ?? null,
           descriptionEn: input.description?.en ?? null,
           descriptionDe: input.description?.de ?? null,
+          /* `||`, not `??` — an empty box is no headline, not a headline of nothing. */
+          headlineAr: input.headline?.ar || null,
+          headlineEn: input.headline?.en || null,
+          headlineDe: input.headline?.de || null,
           address: input.address,
           /* Empty means none: the field is optional, and `''` would be a room called nothing. */
           roomNumber: input.roomNumber?.trim() || null,
@@ -689,6 +702,17 @@ export class PropertiesService {
       if (input.description.ar) patch['descriptionAr'] = input.description.ar;
       if (input.description.en) patch['descriptionEn'] = input.description.en;
       if (input.description.de) patch['descriptionDe'] = input.description.de;
+    }
+    /*
+      `!== undefined` rather than truthiness, because `''` is a real instruction here: it is how a
+      partner removes a headline. The description above cannot express that — see the contract.
+    */
+    if (input.headline) {
+      const { ar, en, de } = input.headline;
+
+      if (ar !== undefined) patch['headlineAr'] = ar || null;
+      if (en !== undefined) patch['headlineEn'] = en || null;
+      if (de !== undefined) patch['headlineDe'] = de || null;
     }
     if (input.address !== undefined) patch['address'] = input.address;
     /*

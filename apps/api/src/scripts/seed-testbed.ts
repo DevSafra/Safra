@@ -125,6 +125,14 @@ interface PropertySpec {
   readonly type: string;
   readonly address: string;
   readonly descriptionAr: string;
+  /**
+   * The one line above the description. OPTIONAL on purpose.
+   *
+   * Most real listings will have none, so a testbed where every fixture carries one would only
+   * ever exercise the present case — and the absent case is the one that must not leave a gap on
+   * the property page. Two fixtures have one; the rest deliberately do not.
+   */
+  readonly headlineAr?: string;
   /** From `TRIP_ATTRIBUTES` — the ONE shared vocabulary (§5.6). Never a list forked here. */
   readonly attributes: readonly string[];
   readonly units: readonly UnitSpec[];
@@ -260,6 +268,7 @@ const PARTNERS: readonly PartnerSpec[] = [
         citySlug: 'damascus',
         type: 'hotel',
         address: 'شارع الثورة، دمشق',
+        headlineAr: 'أقم في قلب دمشق القديمة، على بعد خطوات من الجامع الأموي.',
         descriptionAr:
           'فندق خمس نجوم في وسط دمشق، بثلاث عشرة غرفة موزّعة على أربعة أنواع، ومرافق كاملة.',
         /* Strict, so the refund ladder on this listing differs from every other fixture's. */
@@ -508,6 +517,7 @@ const PARTNERS: readonly PartnerSpec[] = [
         citySlug: 'latakia',
         type: 'chalet',
         address: 'بلوران، اللاذقية',
+        headlineAr: 'استيقظ على صوت البحر، ونم على ضوء المرفأ.',
         descriptionAr: 'شاليهات على البحر مباشرة، مع مسبح مشترك.',
         units: [
           { nameAr: 'شاليه عائلي', nameEn: 'Family Chalet', price: 110, maxGuests: 6 },
@@ -1567,6 +1577,10 @@ async function build(db: Seeder): Promise<void> {
           descriptionAr: property.descriptionAr,
           descriptionEn: property.descriptionAr,
           descriptionDe: property.descriptionAr,
+          /* `?? null`, so the fixtures WITHOUT one seed a listing that genuinely has none. */
+          headlineAr: property.headlineAr ?? null,
+          headlineEn: property.headlineAr ?? null,
+          headlineDe: property.headlineAr ?? null,
           address: property.address,
           status: property.status ?? 'published',
           ...(property.reviewNotes ? { reviewNotes: property.reviewNotes } : {}),

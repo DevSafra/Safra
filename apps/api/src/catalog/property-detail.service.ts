@@ -45,6 +45,7 @@ export class PropertyDetailService {
         p.reference, p.slug,
         p.name_ar, p.name_en, p.name_de,
         p.description_ar, p.description_en, p.description_de,
+        p.headline_ar, p.headline_en, p.headline_de,
         p.address, p.latitude, p.longitude,
         p.star_rating, p.rating, p.reviews_count, p.badges, p.attributes,
         /*
@@ -104,6 +105,11 @@ export class PropertyDetailService {
         ar: row['description_ar'],
         en: row['description_en'],
         de: row['description_de'],
+      },
+      headline: {
+        ar: row['headline_ar'],
+        en: row['headline_en'],
+        de: row['headline_de'],
       },
       // The street address is withheld entirely until a booking is confirmed
       // (P-001: the customer's relationship is with SAFRA, not the property).

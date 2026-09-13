@@ -329,6 +329,9 @@ export class ReviewService {
         nameEn: true,
         descriptionAr: true,
         descriptionEn: true,
+        /* Partner-written and customer-facing, so it is part of what is being reviewed. */
+        headlineAr: true,
+        headlineEn: true,
         address: true,
         /* The classification a reviewer checks against the documents before approving. */
         starRating: true,
