@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 
+import Link from 'next/link';
+
 import { useCoupon } from './coupon-context';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -42,6 +44,7 @@ export function CheckoutForm({
   propertySlug,
   methods,
   wallet,
+  signInHref,
   signedIn,
   account,
 }: {
@@ -76,6 +79,8 @@ export function CheckoutForm({
    * advisory, and the API recomputes what it actually applies.
    */
   wallet: { balance: string; currencyCode: string; total: string } | null;
+  /** Where the signed-out wallet note leads, carrying this screen as its return target. */
+  signInHref: string;
   signedIn: boolean;
   /**
    * The signed-in customer's own details, for prefilling.
@@ -316,9 +321,12 @@ export function CheckoutForm({
          * open, so this must never read as "you must sign in" — it says only that
          * there is a balance feature and an account is how to reach it.
          */
-        <p className="mt-6 rounded-lg border border-line bg-card p-3 text-xs text-faint">
+        <Link
+          href={signInHref}
+          className="mt-6 block rounded-lg border border-line bg-card p-3 text-xs text-gold-read underline underline-offset-2 transition-colors duration-200 ease-out-strong hover:border-gold/60 hover:bg-gold/5"
+        >
           {t('walletSignedOut')}
-        </p>
+        </Link>
       )}
 
       {/* ── Payment method (§7.1) ────────────────────────────────────────── */}

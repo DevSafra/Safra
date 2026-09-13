@@ -143,6 +143,22 @@ export default async function CheckoutPage({
     );
   }
 
+  /* This exact screen, to return to after signing in — every value already parsed and clamped. */
+  const backHere = `/${locale}/checkout?${new URLSearchParams({
+    property: slug,
+    unitId,
+    rooms: String(rooms),
+    ...(additionalLines.length > 0
+      ? { lines: additionalLines.map((line) => `${line.unitId}:${line.rooms}`).join(',') }
+      : {}),
+    checkIn,
+    checkOut,
+    /* `adults` is the one that is not clamped above, so it is the one that can arrive as NaN. */
+    adults: String(Number.isFinite(adults) ? adults : 2),
+    children: String(children),
+    infants: String(infants),
+  }).toString()}`;
+
   const property = await getProperty(slug);
   if (!property) notFound();
 
@@ -306,6 +322,16 @@ export default async function CheckoutPage({
                   }
                 : null
             }
+            /*
+              Where «سجّل الدخول لاستخدام رصيدك» goes, and where it comes BACK to.
+
+              Rebuilt from the VALIDATED values above rather than echoed from `query` — the same
+              rule the console's `returnQuery` follows. A helper that forwarded whatever the URL
+              happened to carry would reflect arbitrary attacker-chosen parameters into a link on
+              our own page, and `next` is a redirect target, which is the worst place for one.
+              `safeRedirect` on the login page refuses anything off-site regardless.
+            */
+            signInHref={`/${locale}/login?next=${encodeURIComponent(backHere)}`}
             signedIn={session !== null}
             account={account}
           />
