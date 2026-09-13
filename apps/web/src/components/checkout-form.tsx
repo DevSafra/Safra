@@ -124,6 +124,9 @@ export function CheckoutForm({
   /* Shared with the summary, where the coupon is entered — see `CouponProvider`. */
   const { applied } = useCoupon();
 
+  /* «{signIn} لاستخدام رصيدك في سفرة.» around its one link. */
+  const signedOutParts = t('walletSignedOut').split('{signIn}');
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitting) return;
@@ -321,12 +324,29 @@ export function CheckoutForm({
          * open, so this must never read as "you must sign in" — it says only that
          * there is a balance feature and an account is how to reach it.
          */
-        <Link
-          href={signInHref}
-          className="mt-6 block rounded-lg border border-line bg-card p-3 text-xs text-gold-read underline underline-offset-2 transition-colors duration-200 ease-out-strong hover:border-gold/60 hover:bg-gold/5"
-        >
-          {t('walletSignedOut')}
-        </Link>
+        <p className="mt-6 rounded-lg border border-line bg-card p-3 text-xs text-faint">
+          {/*
+            Only «سجّل الدخول» is the link (Bashar, 2026-09-13); the rest stays a label. The whole
+            sentence was one link, which is not what he asked for.
+
+            Split on a `{signIn}` PLACEHOLDER rather than concatenating two keys, because two
+            adjacent keys freeze the word order at the point they are written — and the link does
+            not open every language's sentence. The placeholder can sit anywhere in the string, so
+            a translator moves it and this renders it where they put it.
+
+            `completeness.test.ts` already asserts every locale carries the same placeholders, so a
+            translation that drops `{signIn}` fails the build rather than losing the link silently.
+            The `?? ''` is for the shape that test would catch, not a case anyone expects.
+          */}
+          {signedOutParts[0]}
+          <Link
+            href={signInHref}
+            className="text-gold-read underline underline-offset-2 transition-colors duration-200 ease-out-strong hover:text-gold"
+          >
+            {t('walletSignIn')}
+          </Link>
+          {signedOutParts[1] ?? ''}
+        </p>
       )}
 
       {/* ── Payment method (§7.1) ────────────────────────────────────────── */}
