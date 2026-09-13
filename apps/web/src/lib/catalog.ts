@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { OPERATING_SETTINGS_TAG } from '@safra/contracts';
+import { CATALOGUE_TAG, OPERATING_SETTINGS_TAG } from '@safra/contracts';
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
 
@@ -15,6 +15,16 @@ const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
  * degraded home page that still renders its search form is far better than a 500
  * because a reference endpoint blipped.
  */
+/**
+ * The five minutes every reference read already used, named so the tagged calls state it.
+ *
+ * It stays as a FLOOR rather than being raised now that a purge exists: if the API's revalidation
+ * call never arrives — the app was restarting, the network blipped — the data is stale for five
+ * minutes rather than pinned until the next deploy. Exactly the reasoning `getPublicSettings`
+ * records for its thirty seconds.
+ */
+const REFERENCE_TTL = 300;
+
 async function read<T>(
   path: string,
   schema: z.ZodType<T>,
@@ -90,7 +100,7 @@ const citySchema = z.object({
 export type City = z.infer<typeof citySchema>;
 
 export async function getCities(): Promise<City[]> {
-  return read('/cities', z.array(citySchema), []);
+  return read('/cities', z.array(citySchema), [], REFERENCE_TTL, [CATALOGUE_TAG]);
 }
 
 /**
@@ -164,7 +174,13 @@ export type CityDetail = z.infer<typeof cityDetailSchema>;
 
 /** Returns null for an unknown slug, so the page can render a proper 404. */
 export async function getCity(slug: string): Promise<CityDetail | null> {
-  return read(`/cities/${encodeURIComponent(slug)}`, cityDetailSchema.nullable(), null);
+  return read(
+    `/cities/${encodeURIComponent(slug)}`,
+    cityDetailSchema.nullable(),
+    null,
+    REFERENCE_TTL,
+    [CATALOGUE_TAG],
+  );
 }
 
 const propertyTypeSchema = z.object({
@@ -179,7 +195,9 @@ const propertyTypeSchema = z.object({
 export type PropertyType = z.infer<typeof propertyTypeSchema>;
 
 export async function getPropertyTypes(): Promise<PropertyType[]> {
-  return read('/property-types', z.array(propertyTypeSchema), []);
+  return read('/property-types', z.array(propertyTypeSchema), [], REFERENCE_TTL, [
+    CATALOGUE_TAG,
+  ]);
 }
 
 const amenitySchema = z.object({
@@ -203,7 +221,7 @@ const amenitySchema = z.object({
 export type Amenity = z.infer<typeof amenitySchema>;
 
 export async function getAmenities(): Promise<Amenity[]> {
-  return read('/amenities', z.array(amenitySchema), []);
+  return read('/amenities', z.array(amenitySchema), [], REFERENCE_TTL, [CATALOGUE_TAG]);
 }
 
 /**

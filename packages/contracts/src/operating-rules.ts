@@ -66,6 +66,21 @@ export { SAME_DAY_CUTOFF_ENABLED_SETTING };
  */
 export const OPERATING_SETTINGS_TAG = 'safra:operating-settings';
 
+/**
+ * The tag under which the customer app caches REFERENCE data — cities and their photographs,
+ * property types, amenities.
+ *
+ * A second tag rather than reusing the settings one, so a fee change does not also throw away the
+ * city list and a new city photograph does not throw away the settings. They change for different
+ * reasons, at different rates, from different screens.
+ *
+ * It exists because الرئيسية is prerendered with `revalidate = 300`: staff uploaded a new
+ * photograph for دمشق and it appeared five minutes later (Bashar, 2026-09-13). Same reasoning as
+ * above — the tag invalidates the FETCH and every prerendered page whose render consumed it, so a
+ * future screen that lists cities is covered without anybody maintaining a list of paths.
+ */
+export const CATALOGUE_TAG = 'safra:catalogue';
+
 /** `booking.confirmation_window_minutes` — how long a partner has to answer a request (§6.4). */
 export const CONFIRMATION_WINDOW_SETTING = 'booking.confirmation_window_minutes';
 
