@@ -385,7 +385,16 @@ describeIfDb('a booking that holds several identical rooms', () => {
   it('a booking for different dates starts its own trip', async () => {
     const one = stay(9);
     const two = stay(10);
-    const type = await roomType(one);
+    /*
+      Free across the WHOLE span, not just the first stay.
+
+      This asked `roomType(one)`, which proves a unit is free for week 9 and says nothing about
+      week 10 — then booked week 10 on that same unit. It passed for as long as nothing else
+      occupied those nights. On 2026-09-13 the browser suite made a confirmed booking for
+      2027-08-17→19, which overlaps week 10, and this failed with «Those dates were just taken»:
+      the exclusion constraint doing its job against a precondition the test never established.
+    */
+    const type = await roomType({ checkIn: one.checkIn, checkOut: two.checkOut });
 
     expect(type).toBeDefined();
 
