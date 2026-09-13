@@ -592,7 +592,18 @@ export default async function PropertyPage({
           <div className="space-y-8">
             {description ? (
               <section>
-                <p className="whitespace-pre-line text-muted">{description}</p>
+                {/*
+                  The description was the ONE section on this page without a heading (Bashar,
+                  2026-09-13, against booking.com's own property page). «مرافق العقار», «سياسة
+                  الإلغاء», «الموقع», «تقييمات الضيوف» and «اختر وحدتك» all announce themselves;
+                  this paragraph started mid-air, so a guest scrolling past the gallery met prose
+                  with nothing saying what it was about.
+
+                  A section heading, not the property's own marketing line — booking.com's bold
+                  sentence is per-property CONTENT and there is no column for one here.
+                */}
+                <h2 className="font-display text-xl text-text">{t('aboutTitle')}</h2>
+                <p className="mt-3 whitespace-pre-line text-muted">{description}</p>
               </section>
             ) : null}
 
