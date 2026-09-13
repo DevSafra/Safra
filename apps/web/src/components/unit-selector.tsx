@@ -196,8 +196,14 @@ export function UnitSelector({
                             and a reader hearing «تكييف تكييف» is worse served than one hearing it
                             once. The drawings are the same set, so a room's air conditioning and
                             the building's are the same mark.
+
+                            **The size lives HERE, not in `ICON`** (Bashar, 2026-09-13: «make the
+                            icons bigger»). Every glyph is drawn at `1.15em`, so `text-xl` on this
+                            span takes the mark to ~23px while the name stays at 14px. Raising
+                            `ICON` itself would have grown the search bar's pin and the home page's
+                            stay types too — surfaces nobody asked about.
                           */}
-                          <span aria-hidden className="shrink-0 text-gold-read">
+                          <span aria-hidden className="shrink-0 text-xl text-gold-read">
                             <AmenityIcon code={amenity.code} />
                           </span>
                           {amenity.name}

@@ -646,7 +646,9 @@ export default async function PropertyPage({
                       key={code}
                       className="flex items-center gap-2.5 rounded-lg border border-line bg-card px-3 py-2.5 text-sm text-text"
                     >
-                      <span aria-hidden className="shrink-0 text-gold-read">
+                      {/* `text-xl` against a `1.15em` glyph — see the room list for why the size
+                          sits on the span rather than in `ICON`. */}
+                      <span aria-hidden className="shrink-0 text-xl text-gold-read">
                         <AmenityIcon code={code} />
                       </span>
                       <span className="min-w-0">{dynamicMessage(ta, code, code)}</span>
