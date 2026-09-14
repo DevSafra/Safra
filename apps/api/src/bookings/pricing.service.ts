@@ -294,7 +294,15 @@ export class PricingService {
     const feeRule = await customerFeeRule(this.settings);
     const feeMode = feeRule.mode;
     const feeValue = feeRule.value;
-    const customerFeeMinorAmount = customerFeeMinor(baseMinor, feeRule, scale);
+    /*
+      `lines.length` — one per unit TYPE on this booking, not per room. See `customerFeeMinor`.
+    */
+    const customerFeeMinorAmount = customerFeeMinor(
+      baseMinor,
+      feeRule,
+      scale,
+      lines.length,
+    );
 
     // ── Partner commission (§2.1) ───────────────────────────────────────────
     /*

@@ -34,18 +34,34 @@ export async function customerFeeRule(
 /**
  * The fee on a base amount, in minor units.
  *
- * **A flat fee is per BOOKING, not per night.** The approved settings screen says «رسوم ثابتة تضاف
- * على كل حجز» — a fixed fee added to every booking — and charging it per night would quietly
- * multiply it by the length of the stay. That sentence lived in `PricingService` and moved here
- * with the arithmetic it describes, because it is the part a second caller is most likely to get
- * wrong.
+ * **A flat fee is per UNIT TYPE, and never per night or per room.**
+ *
+ * Per night would quietly multiply it by the length of the stay, which is what the approved
+ * settings screen forbids: «رسوم ثابتة تضاف على كل حجز». Per ROOM would charge a family taking
+ * three of the same room three times for one arrival.
+ *
+ * Per TYPE is Bashar's rule (2026-09-14): «the رسوم سفرة should be added on every unit art only
+ * one time if the client book the unit many +1. By multiple different units booking should it be
+ * on every one unit art also.» Three double rooms is one fee; a double room and a suite is two.
+ * It was once per BOOKING until that date, so a mixed basket now costs one fee more per extra type.
+ *
+ * **`unitTypes` does NOT apply to a percentage fee**, and that is not an oversight: a percentage is
+ * already proportional to the basket, so a second type has already raised it. Multiplying it again
+ * would charge the second type twice — once through the larger base and once through the count.
+ *
+ * The default of 1 keeps every single-unit caller — the search service's browse prices, above all —
+ * charging exactly what it charged before.
  */
 export function customerFeeMinor(
   baseMinor: bigint,
   rule: CustomerFeeRule,
   scale: number,
+  unitTypes = 1,
 ): bigint {
-  return rule.mode === 'percent'
-    ? applyRate(baseMinor, rule.value)
-    : toMinor(rule.value.toFixed(scale), scale);
+  if (rule.mode === 'percent') return applyRate(baseMinor, rule.value);
+
+  /* Guarded, because a count of zero would make the fee vanish rather than fail loudly. */
+  const types = BigInt(Math.max(1, Math.trunc(unitTypes)));
+
+  return toMinor(rule.value.toFixed(scale), scale) * types;
 }
