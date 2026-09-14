@@ -81,6 +81,34 @@ export const OPERATING_SETTINGS_TAG = 'safra:operating-settings';
  */
 export const CATALOGUE_TAG = 'safra:catalogue';
 
+/**
+ * How a slug is allowed to look before it is built into a cache tag.
+ *
+ * `slugify` in the API produces exactly this — lowercase Latin, digits, single hyphens between —
+ * so anything else was not made by us. Checked at the front end's revalidation route BEFORE the
+ * tag is assembled, because a tag is a key into a cache and an unvalidated one is a caller
+ * choosing which key to write.
+ */
+export const PROPERTY_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/** Nothing we generate is longer; `slugify` slices at 70. */
+export const PROPERTY_SLUG_MAX = 80;
+
+/**
+ * The tag under which the customer app caches ONE listing's page.
+ *
+ * Per listing rather than one tag for all of them, because partners change photographs constantly
+ * and 2,700 listings sharing a tag would mean every upload threw away every other listing's cached
+ * page — and the city list with it, if this reused `CATALOGUE_TAG`. A tag per listing purges
+ * exactly the page whose pictures changed.
+ *
+ * Built HERE so neither side types the prefix. A mistyped tag purges nothing, fails nowhere, and
+ * looks exactly like a cache that is working.
+ */
+export function propertyTag(slug: string): string {
+  return `safra:property:${slug}`;
+}
+
 /** `booking.confirmation_window_minutes` — how long a partner has to answer a request (§6.4). */
 export const CONFIRMATION_WINDOW_SETTING = 'booking.confirmation_window_minutes';
 

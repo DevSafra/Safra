@@ -2,7 +2,11 @@ import { z } from 'zod';
 
 import { mediaBase, mediaUrl } from '@safra/session';
 
-import { CUSTOMER_FACING_METHODS, type CustomerFacingMethod } from '@safra/contracts';
+import {
+  CUSTOMER_FACING_METHODS,
+  type CustomerFacingMethod,
+  propertyTag,
+} from '@safra/contracts';
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
 
@@ -164,7 +168,14 @@ export async function getProperty(
           So a request that ASKS about a stay is live, and a request with no dates keeps the minute.
           Measured on 2026-09-06: the count still read six immediately after a booking took one.
         */
-        next: { revalidate: stay ? 0 : 60 },
+        /*
+          TAGGED as well as timed, so a partner's new photograph does not wait out the minute.
+
+          Only the cached branch carries a tag: the stay request is already live, and tagging a
+          `revalidate: 0` fetch would be a tag nothing ever holds. Per SLUG — see `propertyTag` —
+          so one listing's upload cannot throw away the other 2,699.
+        */
+        next: stay ? { revalidate: 0 } : { revalidate: 60, tags: [propertyTag(slug)] },
       },
     );
 
