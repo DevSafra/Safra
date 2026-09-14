@@ -426,26 +426,29 @@ export default async function CheckoutPage({
               */}
               <div className="gold-rule my-4" />
 
-              <ul className="space-y-1 text-sm">
-                {priced.nightly.map((night) => (
-                  <li key={night.date} className="flex justify-between gap-4">
-                    {/*
-                      A date on its own line, between two rules, naming nothing — which is what it
-                      became when the amounts went (Bashar, 2026-09-03, with the screenshot). Every
-                      other line in this panel is a caption at the start and its value at the end;
-                      this one now reads the same way.
-                    */}
-                    <span className="text-muted">{t('nightLabel')}</span>
-                    {/*
-                      Isolated, and the DATE only. «2026-09-03» is a left-to-right run of digits and
-                      hyphens; unisolated next to Arabic the bidi algorithm can reorder it, and the
-                      year ends up on the wrong end. Never isolate the label with it — that would
-                      put the caption inside the same run and reverse the pair.
-                    */}
-                    <span className="text-text2">{ltrIsolate(night.date)}</span>
-                  </li>
-                ))}
-              </ul>
+              <dl className="space-y-1 text-sm">
+                {/*
+                  WHEN the stay starts and ends, not a row per night (Bashar, 2026-09-14).
+
+                  This listed every night as its own «ليلة 2026-09-14» row — a date naming nothing a
+                  guest had asked about, and on a four-night stay four of them. The two facts
+                  somebody checks before paying are the day they arrive and the day they leave, so
+                  those are what the panel states.
+
+                  `ltrIsolate` on the DATES only: «2026-09-14» is a left-to-right run of digits and
+                  hyphens, and unisolated beside Arabic the bidi algorithm can put the year on the
+                  wrong end. Never isolate the label with it — that pulls the caption into the same
+                  run and reverses the pair.
+                */}
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted">{t('checkInLabel')}</dt>
+                  <dd className="text-text2">{ltrIsolate(checkIn)}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted">{t('checkOutLabel')}</dt>
+                  <dd className="text-text2">{ltrIsolate(checkOut)}</dd>
+                </div>
+              </dl>
 
               <div className="gold-rule my-4" />
 
