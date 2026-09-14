@@ -904,6 +904,8 @@ export default async function PropertyPage({
                       increase: tstep('increase'),
                       decrease: tstep('decrease'),
                       fee: t('summaryFee'),
+                      /* One per reachable basket size — a client component takes no formatter. */
+                      feeTimes: countedTexts((count) => t('summaryFeeTimes', { count })),
                       total: t('summaryTotal'),
                       policy: t('summaryPolicy'),
                       amenities: t('summaryAmenities'),

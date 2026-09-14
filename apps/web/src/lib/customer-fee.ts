@@ -38,6 +38,15 @@ export function priceWithCustomerFee(
   base: string,
   currency: string,
   fees: { readonly customerFeeMode: string; readonly customerFeeValue: number },
+  /**
+   * How many unit TYPES the price covers. One, unless this is a mixed basket.
+   *
+   * Mirrors `customerFeeMinor` in the API exactly, including the part that looks like an
+   * inconsistency: a flat fee multiplies by the count, a percentage does not, because a percentage
+   * has already grown with the larger base. Two rules here would be a card and a checkout
+   * disagreeing about money, which is the whole reason this file exists.
+   */
+  unitTypes = 1,
 ): string {
   const scale = currencyDecimals(currency);
   const baseMinor = moneyToMinor(base, scale);
@@ -54,8 +63,9 @@ export function priceWithCustomerFee(
   }
 
   const flatMinor = moneyToMinor(fees.customerFeeValue.toFixed(scale), scale) ?? 0n;
+  const types = BigInt(Math.max(1, Math.trunc(unitTypes)));
 
-  return moneyFromMinor(baseMinor + flatMinor, scale);
+  return moneyFromMinor(baseMinor + flatMinor * types, scale);
 }
 
 /** One breakdown line as the invoice endpoint sends it. */

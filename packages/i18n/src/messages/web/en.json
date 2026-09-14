@@ -243,6 +243,7 @@
     "summaryRoomsAll": "That is every room of this type still free.",
     "unitsCount": "{count, plural, one {1 room} other {# rooms}}",
     "summaryFee": "SAFRA fee",
+    "summaryFeeTimes": "SAFRA fee ×{count}",
     "basketSelected": "Your booking",
     "basketClear": "Empty basket",
     "basketRemoveLine": "Remove",

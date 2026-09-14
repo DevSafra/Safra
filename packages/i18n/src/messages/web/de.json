@@ -243,6 +243,7 @@
     "summaryRoomsAll": "Das sind alle noch freien Zimmer dieses Typs.",
     "unitsCount": "{count, plural, one {1 Zimmer} other {# Zimmer}}",
     "summaryFee": "SAFRA-Gebühr",
+    "summaryFeeTimes": "SAFRA-Gebühr ×{count}",
     "basketSelected": "Ihre Buchung",
     "basketClear": "Auswahl leeren",
     "basketRemoveLine": "Entfernen",

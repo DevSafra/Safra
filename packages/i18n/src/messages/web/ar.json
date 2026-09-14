@@ -243,6 +243,7 @@
     "summaryRoomsAll": "اخترت كل الغرف المتاحة من هذا النوع.",
     "unitsCount": "{count, plural, zero {لا غرف} one {غرفة واحدة} two {غرفتان} few {# غرف} many {# غرفة} other {# غرفة}}",
     "summaryFee": "رسوم سفرة",
+    "summaryFeeTimes": "رسوم سفرة ×{count}",
     "basketSelected": "سلّة الحجز",
     "basketClear": "إفراغ السلّة",
     "basketRemoveLine": "إزالة",

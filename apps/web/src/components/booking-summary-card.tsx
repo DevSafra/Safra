@@ -87,6 +87,8 @@ export function BookingSummaryCard({
     increase: string;
     decrease: string;
     fee: string;
+    /** «رسوم سفرة ×{count}», indexed BY the count — see `countedTexts`. */
+    feeTimes: readonly string[];
     total: string;
     policy: string;
     amenities: string;
@@ -156,7 +158,18 @@ export function BookingSummaryCard({
     (sum, line) => addMoney(sum, subtotalOf(line), money.currencyCode),
     '0',
   );
-  const withFee = priceWithCustomerFee(accommodation, money.currencyCode, money.fees);
+  /*
+    The fee is charged once per unit TYPE (Bashar, 2026-09-14) — `lines.length`, not the number of
+    rooms. Three doubles is one fee; a double and a suite is two. The API charges exactly this,
+    through the same rule in `customerFeeMinor`; a second arithmetic here would be a card and a
+    checkout disagreeing about money.
+  */
+  const withFee = priceWithCustomerFee(
+    accommodation,
+    money.currencyCode,
+    money.fees,
+    lines.length,
+  );
   const fee = subtract(withFee, accommodation, money.currencyCode);
 
   /* The lead line is the first type chosen; the rest travel as `lines` on the link. */
@@ -338,7 +351,18 @@ export function BookingSummaryCard({
           <dd className="tabular-nums text-text">{show(accommodation)}</dd>
         </div>
         <div className="flex items-baseline justify-between gap-3">
-          <dt className="text-muted">{copy.fee}</dt>
+          {/*
+            ONE line carrying «×2», not a row per type (Bashar, 2026-09-14: «so you do not write it
+            in multiple lanes»). The charge is per type, so a basket with two types pays it twice —
+            and a reader who sees «رسوم سفرة» twice reads it as a mistake rather than as a count.
+
+            The multiplier is inside the CATALOGUE string, not «{label} ×{n}» assembled here: a
+            translator decides where the count sits in their own phrase, and `countedTexts` resolves
+            every reachable count on the server because a client component takes no formatter.
+          */}
+          <dt className="text-muted">
+            {lines.length > 1 ? (copy.feeTimes[lines.length] ?? copy.fee) : copy.fee}
+          </dt>
           <dd className="tabular-nums text-text">{show(fee)}</dd>
         </div>
       </dl>
