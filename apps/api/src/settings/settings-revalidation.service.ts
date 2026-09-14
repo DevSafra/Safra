@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 
-import { CATALOGUE_TAG, OPERATING_SETTINGS_TAG } from '@safra/contracts';
+import { CATALOGUE_TAG, OPERATING_SETTINGS_TAG, propertyTag } from '@safra/contracts';
 
 import { describeError } from '../common/errors/safe-error.js';
 import type { Env } from '../config/env.js';
@@ -75,6 +75,22 @@ export class SettingsRevalidationService {
   }
 
   /**
+   * Asks the customer app to drop its cached view of ONE listing.
+   *
+   * Bashar, 2026-09-13: a partner's new photograph waited out the property page's minute. Called
+   * after any change to a listing's gallery.
+   *
+   * A slug rather than a tag on the wire: the route assembles the tag itself, so nothing here or
+   * on the network names a key in another app's cache. See the route for the rest of that
+   * reasoning.
+   */
+  async revalidateProperty(slug: string, reason: string): Promise<void> {
+    await this.purge('revalidate-property', propertyTag(slug), reason, ['customer'], {
+      slug,
+    });
+  }
+
+  /**
    * One purge, fanned out to the apps that cache the thing.
    *
    * `only` names which targets cache it; everything else — the secret check, the bounded call, the
@@ -85,6 +101,7 @@ export class SettingsRevalidationService {
     tag: string,
     key: string,
     only?: readonly string[],
+    body?: Record<string, string>,
   ): Promise<void> {
     const secret = this.env.REVALIDATE_SECRET;
 
@@ -115,7 +132,11 @@ export class SettingsRevalidationService {
         try {
           const response = await fetch(`${url}/api/${route}`, {
             method: 'POST',
-            headers: { 'x-safra-revalidate': secret },
+            headers: {
+              'x-safra-revalidate': secret,
+              ...(body ? { 'content-type': 'application/json' } : {}),
+            },
+            ...(body ? { body: JSON.stringify(body) } : {}),
             signal: AbortSignal.timeout(3_000),
           });
 

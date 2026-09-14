@@ -13,6 +13,7 @@ import {
 } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
+import { SettingsRevalidationService } from '../settings/settings-revalidation.service.js';
 import { DATABASE } from '../database/database.module.js';
 import { ImageService } from '../storage/image.service.js';
 import { StorageService } from '../storage/storage.service.js';
@@ -59,6 +60,7 @@ export class PropertyImageService {
     private readonly storage: StorageService,
     private readonly audit: AuditService,
     @Inject(MEDIA_QUEUE) private readonly media: Queue,
+    private readonly revalidation: SettingsRevalidationService,
   ) {}
 
   /** What this property currently has, in display order. */
@@ -218,6 +220,8 @@ export class PropertyImageService {
       );
     }
 
+    await this.purgePage(property.slug, 'uploaded');
+
     return {
       id: inserted.id,
       fileKey,
@@ -312,6 +316,8 @@ export class PropertyImageService {
       );
     });
 
+    await this.purgePage(property.slug, 'archived');
+
     return { id: imageId, archived: true as const };
   }
 
@@ -363,6 +369,8 @@ export class PropertyImageService {
       );
     });
 
+    await this.purgePage(property.slug, 'reordered');
+
     return { reordered: input.imageIds.length };
   }
 
@@ -409,6 +417,8 @@ export class PropertyImageService {
       );
     });
 
+    await this.purgePage(property.slug, 'cover_set');
+
     return { id: imageId, isCover: true as const };
   }
 
@@ -445,6 +455,8 @@ export class PropertyImageService {
 
     if (!updated[0]) throw notFound(ERROR.IMAGE_NOT_FOUND);
 
+    await this.purgePage(property.slug, 'alt_set');
+
     return { id: imageId, updated: true as const };
   }
 
@@ -454,6 +466,21 @@ export class PropertyImageService {
    * A 404 for another partner's reference — never a 403. The two must be indistinguishable, or the
    * endpoint becomes a way to discover which references exist.
    */
+  /**
+   * Tells the customer app this listing's page is out of date.
+   *
+   * Bashar, 2026-09-13: a photograph a partner changed waited out the page's minute. Every write in
+   * this file calls it AFTER its transaction, because a purge that runs before the change lands
+   * re-caches the old picture and makes the wait permanent instead of shorter.
+   *
+   * Best effort by construction — `SettingsRevalidationService` swallows and logs — so a customer
+   * app that is restarting cannot fail an upload that already succeeded. The page's own sixty
+   * seconds stays as the floor.
+   */
+  private async purgePage(slug: string, what: string): Promise<void> {
+    await this.revalidation.revalidateProperty(slug, `property_image.${what} ${slug}`);
+  }
+
   private async requireOwn(claims: AccessTokenClaims | undefined, reference: string) {
     const partnerId = requirePartnerId(claims, P.PROPERTY_MANAGE_OWN);
 
@@ -463,7 +490,8 @@ export class PropertyImageService {
         eq(schema.properties.partnerId, partnerId),
         isNull(schema.properties.deletedAt),
       ),
-      columns: { id: true, reference: true, status: true },
+      /* `slug` so a write can purge the customer app's cached page — see `purgePage`. */
+      columns: { id: true, reference: true, status: true, slug: true },
     });
 
     if (!property) throw notFound(ERROR.PROPERTY_NOT_FOUND);

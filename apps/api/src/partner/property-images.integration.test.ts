@@ -5,6 +5,7 @@ import { createRollbackDatabase, type Database } from '@safra/db';
 import { PERMISSIONS as P } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
+import type { SettingsRevalidationService } from '../settings/settings-revalidation.service.js';
 import { PropertyImageService } from './property-images.service.js';
 import type { ImageService } from '../storage/image.service.js';
 import type { StorageService } from '../storage/storage.service.js';
@@ -98,12 +99,29 @@ describeIfDb('PropertyImageService', () => {
 
   const mediaQueue = createInlineMediaQueue();
 
+  /*
+    Records what the service ASKED to be purged rather than reaching a front end.
+
+    The real fan-out is HTTP and best-effort by design, so what this file can hold to account is
+    that every write asks at all — which is precisely what silently stops working when a sixth
+    write is added and the call is forgotten.
+  */
+  const purged: string[] = [];
+  const revalidation = {
+    revalidateProperty: (slug: string, reason: string) => {
+      purged.push(`${slug}:${reason}`);
+
+      return Promise.resolve();
+    },
+  } as unknown as SettingsRevalidationService;
+
   const service = new PropertyImageService(
     db,
     images,
     storage,
     new AuditService(db),
     mediaQueue.queue,
+    revalidation,
   );
 
   let partnerId = '';
@@ -620,6 +638,47 @@ describeIfDb('PropertyImageService', () => {
         'property_image.reordered',
         'property_image.archived',
       ]);
+    });
+  });
+
+  /**
+   * The property page is prerendered for a minute, so a new photograph is not "changed" until the
+   * cache is told — the same defect Bashar met on الرئيسية with a city photograph on 2026-09-13.
+   *
+   * Asserted per WRITE rather than once: five methods change a gallery, and the failure this
+   * guards against is a sixth being added without the call. The fan-out itself is HTTP and
+   * best-effort, so what is provable from here is the ask.
+   */
+  describe('telling the customer app its cached page is stale', () => {
+    it('asks after every kind of change to the gallery', async () => {
+      const first = await add();
+      const second = await add();
+
+      /* Recorded as «slug:action slug»; this is the action alone. */
+      const asked = (from: number) =>
+        purged.slice(from).map((line) => line.split(' ')[0]?.split(':')[1]);
+      const start = purged.length;
+
+      await service.reorder(partner(), reference, { imageIds: [second.id, first.id] });
+      await service.setCover(partner(), reference, second.id);
+      await service.setAlt(partner(), reference, second.id, { ar: 'غرفة' });
+      await service.archive(partner(), reference, second.id);
+
+      expect(asked(start)).toEqual([
+        'property_image.reordered',
+        'property_image.cover_set',
+        'property_image.alt_set',
+        'property_image.archived',
+      ]);
+    });
+
+    it('names the SLUG, because that is what the page is cached under', async () => {
+      const before = purged.length;
+
+      await add();
+
+      expect(purged.length, 'an upload asks').toBe(before + 1);
+      expect(purged.at(-1)).toMatch(/^[a-z0-9-]+:property_image\.uploaded /);
     });
   });
 });
