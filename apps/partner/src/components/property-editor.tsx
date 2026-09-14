@@ -20,12 +20,13 @@ import { PROPERTY_HEADLINE_MAX, TRIP_ATTRIBUTES, usesStarRating } from '@safra/c
  * string, if that language was never filled in. Comparing against the loaded value keeps a save
  * to the size of the edit.
  *
- * ## Arabic is required, the other two are not
+ * ## Arabic is required for the NAME, and nothing else
  *
  * `translatedText` requires `ar` and leaves `en`/`de` optional, so a partner is never blocked on
- * writing German. An emptied optional language is sent as absent rather than as `''`, because the
- * contract's `.min(1)` refuses an empty string and the partner would get a validation error for
- * clearing a field they were told was optional.
+ * writing German. The description and the headline use `clearableText` instead, which accepts an
+ * empty string and means «remove this one» — so those two send every language on every save, and
+ * an emptied box clears rather than being read as «leave it alone». That was a real defect: until
+ * 2026-09-14 an English description could be written and never taken away.
  */
 export function PropertyEditor({
   property,
@@ -86,18 +87,24 @@ export function PropertyEditor({
       patch['name'] = name;
     }
 
-    const description = {
-      ...(form.descriptionAr.trim() ? { ar: form.descriptionAr.trim() } : {}),
-      ...(form.descriptionEn.trim() ? { en: form.descriptionEn.trim() } : {}),
-      ...(form.descriptionDe.trim() ? { de: form.descriptionDe.trim() } : {}),
-    };
+    /*
+      All three languages, every time — the same shape the headline uses.
 
+      This used to send only the languages that had text, so emptying one sent it as ABSENT and the
+      API read that as «leave it alone»: a partner could not clear an English description at all.
+      The contract now accepts `''` and the service treats it as «remove», and sending every key is
+      what turns an emptied box into a cleared description rather than a silent no-op.
+    */
     if (
-      (form.descriptionAr.trim() || null) !== property.description.ar ||
-      (form.descriptionEn.trim() || null) !== property.description.en ||
-      (form.descriptionDe.trim() || null) !== property.description.de
+      form.descriptionAr.trim() !== (property.description.ar ?? '') ||
+      form.descriptionEn.trim() !== (property.description.en ?? '') ||
+      form.descriptionDe.trim() !== (property.description.de ?? '')
     ) {
-      patch['description'] = description;
+      patch['description'] = {
+        ar: form.descriptionAr.trim(),
+        en: form.descriptionEn.trim(),
+        de: form.descriptionDe.trim(),
+      };
     }
 
     /*

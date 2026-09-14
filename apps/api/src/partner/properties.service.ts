@@ -569,9 +569,10 @@ export class PropertiesService {
           nameAr: input.name.ar,
           nameEn: input.name.en ?? input.name.ar,
           nameDe: input.name.de ?? input.name.ar,
-          descriptionAr: input.description?.ar ?? null,
-          descriptionEn: input.description?.en ?? null,
-          descriptionDe: input.description?.de ?? null,
+          /* `||`, as for the headline below — an empty box is no description, not one of nothing. */
+          descriptionAr: input.description?.ar || null,
+          descriptionEn: input.description?.en || null,
+          descriptionDe: input.description?.de || null,
           /* `||`, not `??` — an empty box is no headline, not a headline of nothing. */
           headlineAr: input.headline?.ar || null,
           headlineEn: input.headline?.en || null,
@@ -698,10 +699,18 @@ export class PropertiesService {
       if (input.name.en) patch['nameEn'] = input.name.en;
       if (input.name.de) patch['nameDe'] = input.name.de;
     }
+    /*
+      `!== undefined`, not truthiness — `''` is a partner CLEARING a language, not saying nothing.
+
+      This read `if (input.description.ar)`, so an emptied box was indistinguishable from an
+      untouched one and the old copy survived the save. See `clearableText` in the contract.
+    */
     if (input.description) {
-      if (input.description.ar) patch['descriptionAr'] = input.description.ar;
-      if (input.description.en) patch['descriptionEn'] = input.description.en;
-      if (input.description.de) patch['descriptionDe'] = input.description.de;
+      const { ar, en, de } = input.description;
+
+      if (ar !== undefined) patch['descriptionAr'] = ar || null;
+      if (en !== undefined) patch['descriptionEn'] = en || null;
+      if (de !== undefined) patch['descriptionDe'] = de || null;
     }
     /*
       `!== undefined` rather than truthiness, because `''` is a real instruction here: it is how a

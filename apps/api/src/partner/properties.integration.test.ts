@@ -1102,4 +1102,92 @@ describeIfDb('PropertiesService.readOwn', () => {
       ).toBe(ERROR.PROPERTY_UNIT_REQUIRED);
     });
   });
+
+  /**
+   * Text a partner can take back.
+   *
+   * The description and the headline are the two fields whose contract accepts `''` and means
+   * «remove this». Everything else that is optional is optional by being ABSENT, which the patch
+   * path reads as «leave it alone» — so the distinction only exists if the service acts on the
+   * empty string, and that is what these assert.
+   *
+   * Placed here rather than in the contract file on purpose: `property.test.ts` proves the parse
+   * KEEPS `''`, which is necessary and not sufficient. Reverting this service to `if (input.…ar)`
+   * left all 56 tests in this file green on 2026-09-14, which is how the gap was found.
+   */
+  describe('the two fields a partner can clear', () => {
+    /* Read from the reference data, like every other block here — never invented codes. */
+    let codes = { citySlug: '', propertyTypeCode: '', cancellationPolicyCode: '' };
+
+    beforeEach(async () => {
+      const row = await db.execute<{ city: string; type: string; policy: string }>(sql`
+        SELECT (SELECT slug FROM cities LIMIT 1)                AS city,
+               (SELECT code FROM property_types LIMIT 1)        AS type,
+               (SELECT code FROM cancellation_policies LIMIT 1) AS policy
+      `);
+
+      const found = row.rows[0];
+
+      codes = {
+        citySlug: found?.city ?? '',
+        propertyTypeCode: found?.type ?? '',
+        cancellationPolicyCode: found?.policy ?? '',
+      };
+    });
+
+    const draft = () => ({
+      ...codes,
+      name: { ar: `عقار ${Math.random().toString(36).slice(2, 8)}` },
+      address: 'شارع الاختبار ٧',
+      attributes: [],
+    });
+
+    it('clears a description language with an empty string, and leaves the others', async () => {
+      const { reference } = await service.create(partner(), {
+        ...draft(),
+        description: { ar: 'وصف عربي', en: 'English copy', de: 'Deutscher Text' },
+      });
+
+      await service.update(partner(), reference, {
+        description: { ar: 'وصف عربي', en: '', de: 'Deutscher Text' },
+      });
+
+      const after = await service.readOwn(partner(), reference);
+
+      expect(after.description.en, 'the emptied one is gone').toBeNull();
+      expect(after.description.ar, 'the others are untouched').toBe('وصف عربي');
+      expect(after.description.de).toBe('Deutscher Text');
+    });
+
+    it('clears a headline the same way', async () => {
+      const { reference } = await service.create(partner(), {
+        ...draft(),
+        headline: { ar: 'سطر واحد', en: 'One line' },
+      });
+
+      await service.update(partner(), reference, {
+        headline: { ar: '', en: 'One line' },
+      });
+
+      const after = await service.readOwn(partner(), reference);
+
+      expect(after.headline.ar).toBeNull();
+      expect(after.headline.en).toBe('One line');
+    });
+
+    /* The opposite control: an ABSENT language is still «leave it alone», not «clear it». */
+    it('leaves a language the patch does not mention', async () => {
+      const { reference } = await service.create(partner(), {
+        ...draft(),
+        description: { ar: 'وصف عربي', en: 'English copy' },
+      });
+
+      await service.update(partner(), reference, { description: { ar: 'وصف جديد' } });
+
+      const after = await service.readOwn(partner(), reference);
+
+      expect(after.description.ar).toBe('وصف جديد');
+      expect(after.description.en, 'not mentioned, so not touched').toBe('English copy');
+    });
+  });
 });
