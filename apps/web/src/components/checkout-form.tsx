@@ -127,6 +127,9 @@ export function CheckoutForm({
   /* «{signIn} لاستخدام رصيدك في سفرة.» around its one link. */
   const signedOutParts = t('walletSignedOut').split('{signIn}');
 
+  /* The check-in notice around the document list it emphasises. */
+  const docsParts = t('checkInDocsBody').split('{documents}');
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitting) return;
@@ -403,6 +406,32 @@ export function CheckoutForm({
           </div>
         )}
       </fieldset>
+
+      {/*
+        What to bring to the door, said BEFORE the money (Bashar, 2026-09-14).
+
+        Placed in this column rather than in the summary aside: the aside stacks BELOW the form on a
+        phone, so a notice there would sit under the button it is meant to be read before. Here it
+        is above the button on every width.
+
+        `text-sm`, not `text-xs`: this is an operational condition of the stay, and the standing
+        rule is that something a guest must act on is never the smallest text on the screen.
+
+        The document list is a `{documents}` PLACEHOLDER rather than markup in this file, for the
+        reason the wallet note records — a translator decides where the emphasised run sits in their
+        own sentence, and `completeness.test.ts` fails the build if a locale drops it.
+      */}
+      <section
+        role="note"
+        className="mt-6 rounded-card border border-warn/40 bg-warn/10 p-5"
+      >
+        <h2 className="warn-ink text-sm font-bold">{t('checkInDocsTitle')}</h2>
+        <p className="mt-2 text-sm leading-relaxed text-text2">
+          {docsParts[0]}
+          <strong className="font-semibold text-text">{t('checkInDocsList')}</strong>
+          {docsParts[1] ?? ''}
+        </p>
+      </section>
 
       <button
         type="submit"
