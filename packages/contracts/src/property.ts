@@ -27,18 +27,30 @@ import { ERROR } from './error-codes.js';
 export const PROPERTY_HEADLINE_MAX = 120;
 
 /**
- * A headline per language, where an empty string is how a partner REMOVES one.
+ * Text per language, where an empty string is how a partner REMOVES it.
  *
- * `.partial()` so a form may send one language and leave the others untouched; a key that IS sent
- * is honoured exactly, `''` included.
+ * The difference from `translatedText` is one missing `.min(1)`, and it is the whole point.
+ *
+ * With `.min(1)`, `''` is a validation error, so the only way a form can say "nothing" is to omit
+ * the key — and the update path reads an omitted key as «leave it alone». That made clearing
+ * impossible: a partner who emptied the English description saved successfully and found the old
+ * copy still there, with nothing to tell them why. Reported as a consequence of building the
+ * headline (2026-09-13), fixed for both on 2026-09-14.
+ *
+ * Here a key that is SENT is honoured exactly, `''` included, and the service maps `''` to NULL.
+ * `.partial()` so a form may still send one language and leave the others untouched.
+ *
+ * `name` deliberately keeps `translatedText`: a listing with no name is not a listing, so there
+ * the absence of an empty-string spelling is the rule rather than a gap in it.
  */
-const headlineText = z
-  .object({
-    ar: z.string().trim().max(PROPERTY_HEADLINE_MAX),
-    en: z.string().trim().max(PROPERTY_HEADLINE_MAX),
-    de: z.string().trim().max(PROPERTY_HEADLINE_MAX),
-  })
-  .partial();
+const clearableText = (max: number) =>
+  z
+    .object({
+      ar: z.string().trim().max(max),
+      en: z.string().trim().max(max),
+      de: z.string().trim().max(max),
+    })
+    .partial();
 
 const translatedText = (max: number) =>
   z.object({
@@ -95,7 +107,8 @@ const propertyBaseSchema = z
     propertyTypeCode: z.string().trim().min(1).max(40),
     cancellationPolicyCode: z.string().trim().min(1).max(40),
     name: translatedText(160),
-    description: translatedText(4000).partial({ ar: true }).optional(),
+    /* Clearable — see `clearableText`. Nothing requires a listing to carry a description. */
+    description: clearableText(4000).optional(),
     /**
      * The listing's own one line, shown above the description (Bashar, 2026-09-13).
      *
@@ -111,7 +124,7 @@ const propertyBaseSchema = z
      * Here `''` is VALID and MEANS cleared, and the service maps it to NULL. Capped short — the
      * point is one line above a paragraph; a headline that wraps to four is a second description.
      */
-    headline: headlineText.optional(),
+    headline: clearableText(PROPERTY_HEADLINE_MAX).optional(),
     address: z.string().trim().min(3).max(300),
     /**
      * «رقم الغرفة/الوحدة» — the room or unit this listing occupies (Bashar, 2026-08-19).

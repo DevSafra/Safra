@@ -52,6 +52,32 @@ describe('the property patch schema', () => {
     expect(parsed.headline).toStrictEqual({ ar: '', en: '', de: '' });
   });
 
+  /**
+   * The same clearing the headline gets, for the field that needed it first and never had it.
+   *
+   * Until 2026-09-14 `translatedText`'s `.min(1)` made `''` a validation error, so a partner who
+   * emptied the English description sent nothing, the service kept the old copy, and the save
+   * reported success. The parse is where that becomes expressible.
+   */
+  it('keeps an emptied description as an empty string, not as absence', () => {
+    const parsed = propertyUpdateSchema.parse({
+      description: { ar: '', en: '', de: '' },
+    });
+
+    expect(parsed.description).toStrictEqual({ ar: '', en: '', de: '' });
+  });
+
+  it('still refuses a description past its cap', () => {
+    expect(() =>
+      propertyUpdateSchema.parse({ description: { ar: 'ا'.repeat(4001) } }),
+    ).toThrow();
+  });
+
+  /* A NAME is not clearable: a listing with no name is not a listing. */
+  it('refuses an emptied name, which is not the same kind of field', () => {
+    expect(() => propertyUpdateSchema.parse({ name: { ar: '' } })).toThrow();
+  });
+
   it('accepts a headline in one language without demanding the others', () => {
     const parsed = propertyUpdateSchema.parse({
       headline: { ar: 'على بعد خطوات من الجامع' },
