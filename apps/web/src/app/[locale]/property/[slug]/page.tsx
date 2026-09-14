@@ -411,7 +411,13 @@ export default async function PropertyPage({
       the other at once. A provider spanning them is the only way to share that state — see
       `booking-selection.tsx`.
     */
-    <BookingSelectionProvider>
+    <BookingSelectionProvider
+      propertySlug={property.slug}
+      /* The stay the prices below were computed for — a basket belongs to one. */
+      stay={{ checkIn: stayWindow.checkIn, checkOut: stayWindow.checkOut }}
+      /* This render's types, so a restored basket carries THIS page's money. */
+      available={rooms}
+    >
       <article className="mx-auto max-w-7xl px-4 py-8">
         <nav aria-label={tnav('breadcrumb')} className="text-sm text-faint">
           {/* Both breadcrumb links are controls — see the note on the city page. */}

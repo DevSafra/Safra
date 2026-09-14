@@ -1,6 +1,13 @@
 'use client';
 
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 
 import { MAX_BASKET_ROOMS } from '@/lib/basket-limits';
 
@@ -84,8 +91,161 @@ const BasketContext = createContext<Basket | null>(null);
  * already computed with the currency converted — and two places deriving one price is how they
  * come to disagree.
  */
-export function BookingSelectionProvider({ children }: { readonly children: ReactNode }) {
+/**
+ * Where one property's basket is remembered, and for which stay.
+ *
+ * Per PROPERTY, because a basket holds rooms of one hotel — restoring it on another hotel's page
+ * would offer a guest rooms that are not there. Per STAY as well, because the amounts in it are
+ * whole-stay figures: a basket built for two nights, restored onto a four-night page, would price
+ * the wrong trip.
+ */
+function storageKey(propertySlug: string, stay: StayKey): string {
+  return `safra.basket.${propertySlug}.${stay.checkIn}.${stay.checkOut}`;
+}
+
+/** The stay a basket belongs to. */
+export interface StayKey {
+  readonly checkIn: string;
+  readonly checkOut: string;
+}
+
+/** What is actually STORED: the choice, never the money. See `BookingSelectionProvider`. */
+interface StoredLine {
+  readonly unitId: string;
+  readonly rooms: number;
+}
+
+/** Whatever was in storage, believed only as far as its shape. */
+function storedLines(raw: string | null): readonly StoredLine[] {
+  if (raw === null) return [];
+
+  try {
+    const parsed: unknown = JSON.parse(raw);
+
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.flatMap((entry: unknown) => {
+      if (typeof entry !== 'object' || entry === null) return [];
+
+      const { unitId, rooms } = entry as { unitId?: unknown; rooms?: unknown };
+
+      if (typeof unitId !== 'string' || unitId === '') return [];
+      if (typeof rooms !== 'number' || !Number.isInteger(rooms) || rooms < 1) return [];
+
+      return [{ unitId, rooms }];
+    });
+  } catch {
+    /* Unreadable is EMPTY, never a throw: a corrupt entry must not take the page down with it. */
+    return [];
+  }
+}
+
+export function BookingSelectionProvider({
+  children,
+  propertySlug,
+  stay,
+  available,
+}: {
+  readonly children: ReactNode;
+  readonly propertySlug: string;
+  readonly stay: StayKey;
+  /**
+   * The types this page is currently offering, with THIS stay's prices.
+   *
+   * The basket is rebuilt from these on restore rather than from anything stored, which is the
+   * whole design — see the provider's note.
+   */
+  readonly available: readonly BasketRoom[];
+}) {
   const [lines, setLines] = useState<readonly BasketLine[]>([]);
+
+  /*
+    ── Surviving a reload (Bashar, 2026-09-14) ───────────────────────────────
+
+    Only `{unitId, rooms}` is stored — the CHOICE. Never `BasketRoom`, which carries whole-stay
+    amounts, capacity, the policy sentence and the facilities: those are this render's figures for
+    this stay, and a stored copy would come back stale the moment a price, a policy or availability
+    moved. Restoring rebuilds each line from `available`, so the money on screen is always the money
+    this page just computed.
+
+    What that buys, beyond freshness: a type that has since sold out simply does not come back, and
+    a quantity larger than what is now free is clamped to it rather than being offered and refused
+    at checkout.
+
+    In an EFFECT, so the server and the first client render agree on an empty basket; reading
+    storage during render is a hydration mismatch. The cost is one frame with the basket empty,
+    which is invisible next to the page's own load.
+  */
+  useEffect(() => {
+    const raw = (() => {
+      try {
+        return window.localStorage.getItem(storageKey(propertySlug, stay));
+      } catch {
+        /* Private windows, blocked site data, a browser that throws on access. Not an error. */
+        return null;
+      }
+    })();
+
+    const remembered = storedLines(raw);
+
+    if (remembered.length === 0) return;
+
+    const byId = new Map(available.map((room) => [room.unitId, room]));
+    let taken = 0;
+
+    const restored = remembered.flatMap<BasketLine>((line) => {
+      const room = byId.get(line.unitId);
+
+      /* Gone from this page — sold out, withdrawn, or too short a stay for it now. */
+      if (!room) return [];
+
+      const ceiling = Math.min(room.maxRooms, MAX_BASKET_ROOMS - taken);
+
+      if (ceiling < 1) return [];
+
+      const rooms = Math.min(line.rooms, ceiling);
+
+      taken += rooms;
+
+      return [{ room, rooms }];
+    });
+
+    if (restored.length > 0) setLines(restored);
+    /*
+      ONCE, on mount — the empty list is deliberate and not an oversight.
+
+      `available` is a fresh array on every render of the server component above this one, so
+      depending on it would re-run the restore and overwrite whatever the guest has since chosen.
+      `propertySlug` and `stay` are equally fixed for the life of this page: a change to either
+      arrives as a navigation, which mounts a new provider.
+    */
+  }, []);
+
+  /* Written on every change, including the change that empties it — «إفراغ السلّة» must stick. */
+  useEffect(() => {
+    const key = storageKey(propertySlug, stay);
+
+    try {
+      if (lines.length === 0) {
+        window.localStorage.removeItem(key);
+
+        return;
+      }
+
+      window.localStorage.setItem(
+        key,
+        JSON.stringify(
+          lines.map<StoredLine>((line) => ({
+            unitId: line.room.unitId,
+            rooms: line.rooms,
+          })),
+        ),
+      );
+    } catch {
+      /* Storage full or refused. The basket still works for this visit; it just will not outlive it. */
+    }
+    /* The VALUES, not the object: a server component hands down a fresh `stay` every render. */
+  }, [lines, propertySlug, stay.checkIn, stay.checkOut]);
 
   const value = useMemo<Basket>(() => {
     const rooms = lines.reduce((sum, line) => sum + line.rooms, 0);

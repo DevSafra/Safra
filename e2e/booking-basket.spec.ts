@@ -305,3 +305,73 @@ test('an empty basket quotes a from-price and points at the list', async ({ page
   await expect(choose).toBeVisible();
   await expect(choose).toHaveAttribute('href', '#units');
 });
+
+/**
+ * The basket outlives a reload (Bashar, 2026-09-14: «when I select rooms and reload the page, the
+ * left cart will get clear. I want you to keep them»).
+ *
+ * A browser test because there is nothing else that can see it: the state lives in `localStorage`
+ * and the restore runs in an effect after hydration, so neither a unit test nor an HTTP check can
+ * tell a basket that survives from one that was silently rebuilt empty.
+ */
+test('the basket survives a reload, and emptying it survives one too', async ({
+  page,
+}) => {
+  await page.goto(HOTEL, { waitUntil: 'domcontentloaded' });
+
+  const rows = await addableIndices(page);
+  const card = page.locator('aside#booking');
+
+  await adder(page, rows[0]!).click();
+  await adder(page, rows[1]!).click();
+  await expect(card.locator('[data-basket-line]')).toHaveCount(2);
+
+  const total = await card
+    .locator('[data-summary-total]')
+    .getAttribute('data-summary-total');
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+
+  await expect(card.locator('[data-basket-line]'), 'both types come back').toHaveCount(2);
+  /*
+    The MONEY as well as the count. The restore rebuilds each line from the page's own freshly
+    priced types rather than from anything stored, and this is what holds that: a version that
+    stored the amounts would pass the count assertion above and fail here the day a price moved.
+  */
+  await expect(card.locator('[data-summary-total]')).toHaveAttribute(
+    'data-summary-total',
+    total ?? '',
+  );
+
+  /* Emptying is a choice too, and a reload that undid it would be the same bug in reverse. */
+  await card.getByRole('button', { name: 'إفراغ السلّة' }).click();
+  await expect(card.locator('[data-basket-line]')).toHaveCount(0);
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(card.locator('[data-basket-line]'), 'it stays empty').toHaveCount(0);
+});
+
+/**
+ * A basket belongs to ONE stay, because its amounts are whole-stay figures.
+ *
+ * Without this, a basket built for two nights would restore onto a four-night page carrying the
+ * two-night price — money on screen that nothing would charge.
+ */
+test('a basket built for one stay does not reappear on another', async ({ page }) => {
+  await page.goto(HOTEL, { waitUntil: 'domcontentloaded' });
+
+  const rows = await addableIndices(page);
+  const card = page.locator('aside#booking');
+
+  await adder(page, rows[0]!).click();
+  await expect(card.locator('[data-basket-line]')).toHaveCount(1);
+
+  await page.goto(`${HOTEL}?checkIn=2026-11-02&checkOut=2026-11-06`, {
+    waitUntil: 'domcontentloaded',
+  });
+
+  await expect(
+    card.locator('[data-basket-line]'),
+    'different dates, empty basket',
+  ).toHaveCount(0);
+});
