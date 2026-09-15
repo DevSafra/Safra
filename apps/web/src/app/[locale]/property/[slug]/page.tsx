@@ -591,26 +591,21 @@ export default async function PropertyPage({
             {description ? (
               <section>
                 {/*
-                  The description was the ONE section on this page without a heading (Bashar,
-                  2026-09-13, against booking.com's own property page). «مرافق العقار», «سياسة
-                  الإلغاء», «الموقع», «تقييمات الضيوف» and «اختر وحدتك» all announce themselves;
-                  this paragraph started mid-air, so a guest scrolling past the gallery met prose
-                  with nothing saying what it was about.
+                  NO heading (Bashar, 2026-09-15: «remove عن هذا العقار from the single hotel
+                  page»). It carried one for two days, added on 2026-09-13 because this was the one
+                  section that announced nothing while «مرافق العقار», «سياسة الإلغاء», «الموقع»,
+                  «تقييمات الضيوف» and «اختر وحدتك» all did.
 
-                  A section heading, not the property's own marketing line — booking.com's bold
-                  sentence is per-property CONTENT and there is no column for one here.
+                  The partner's own line leads instead, above their paragraph — booking.com's
+                  «اشعر وكأنك نجم…». Most listings have none, so the common case is a bare
+                  paragraph; neither element carries a top margin, because the section's own
+                  `space-y-8` already separates it from the gallery and a margin here would open a
+                  gap above whichever of the two happens to be first.
                 */}
-                <h2 className="font-display text-xl text-text">{t('aboutTitle')}</h2>
-                {/*
-                  The partner's own line, above their paragraph — booking.com's «اشعر وكأنك نجم…».
-                  Most listings have none, so this is the common case rendering nothing at all: it
-                  must not leave a gap behind, which is why the margin is on the element that IS
-                  there rather than a fixed space between two that may not be.
-                */}
-                {headline ? (
-                  <p className="mt-3 font-semibold text-text">{headline}</p>
-                ) : null}
-                <p className="mt-3 whitespace-pre-line text-muted">{description}</p>
+                {headline ? <p className="font-semibold text-text">{headline}</p> : null}
+                <p className={`whitespace-pre-line text-muted${headline ? ' mt-3' : ''}`}>
+                  {description}
+                </p>
               </section>
             ) : null}
 
