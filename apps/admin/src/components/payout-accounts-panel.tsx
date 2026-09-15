@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { CURRENCY_CATALOGUE, PAYOUT_METHODS, preferredCurrency } from '@safra/contracts';
+import { offerableCurrencies, PAYOUT_METHODS, preferredCurrency } from '@safra/contracts';
 import { useConfirm } from '@safra/ui';
 
 import { Ltr, StatusPill } from '@/components/admin-table';
@@ -309,7 +309,7 @@ function AccountForm({
   const [swift, setSwift] = useState(account?.swiftCode ?? '');
   /* The platform's standard currency — the same rule the partner's own form follows. */
   const [currency, setCurrency] = useState(
-    account?.currency ?? preferredCurrency(CURRENCY_CATALOGUE.map((one) => one.code)),
+    account?.currency ?? preferredCurrency(offerableCurrencies().map((one) => one.code)),
   );
 
   const ready = holder.trim().length >= 2 && number.trim().length >= 4;
@@ -366,7 +366,8 @@ function AccountForm({
           onChange={setCurrency}
           name="currency"
         >
-          {CURRENCY_CATALOGUE.map((one) => (
+          {/* USD, plus whatever this account already is — see `offerableCurrencies`. */}
+          {offerableCurrencies(currency).map((one) => (
             <option key={one.code} value={one.code}>
               {one.nameAr} ({one.code})
             </option>

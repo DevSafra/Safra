@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { CURRENCY_CATALOGUE, PAYOUT_METHODS, preferredCurrency } from '@safra/contracts';
+import { offerableCurrencies, PAYOUT_METHODS, preferredCurrency } from '@safra/contracts';
 import { useConfirm } from '@safra/ui';
 
 import { AdminTable, StatusPill, type AdminColumn } from '@/components/admin-table';
@@ -339,7 +339,7 @@ function AddAccount({ onClose }: { readonly onClose: () => void }) {
       still posted in the accounting currency, so opening this up changes what an operator can
       describe and nothing about what is counted.
     */
-    currency: preferredCurrency(CURRENCY_CATALOGUE.map((one) => one.code)),
+    currency: preferredCurrency(offerableCurrencies().map((one) => one.code)),
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -418,7 +418,8 @@ function AddAccount({ onClose }: { readonly onClose: () => void }) {
       </Row>
       <Row>
         <SelectField label={c.currency} value={form.currency} onChange={set('currency')}>
-          {CURRENCY_CATALOGUE.map((one) => (
+          {/* USD, plus whatever this account already is — see `offerableCurrencies`. */}
+          {offerableCurrencies(form.currency).map((one) => (
             <option key={one.code} value={one.code}>
               {one.nameAr} ({one.code})
             </option>

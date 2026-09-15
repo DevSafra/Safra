@@ -113,11 +113,28 @@ export default async function GeoPage({
         <div className="grid gap-4">
           {/* Two cards side by side, as the design lays them out. */}
           <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+            {/*
+              The ACCOUNTING currency is held but not shown (Bashar, 2026-09-14, third time, with
+              the screenshot of «ليرة سورية ل.س · العملة المحاسبية»).
+
+              Filtered HERE and not in the query, which matters: `AddCurrency` excludes what the
+              platform already holds, so it reads the unfiltered list. Hiding SYP in the API made
+              the form start offering to ADD the one currency that is already there — which is how
+              this was got wrong the first time.
+
+              Nothing is lost by hiding it. «It cannot be withdrawn» is enforced by the API and
+              asserted in `geo-write.integration.test.ts`; the row was only the place that SAID so.
+            */}
             <Countries
               rows={result.countries}
-              currencies={result.currencies.map((one) => one.code)}
+              currencies={result.currencies
+                .filter((one) => !one.isAccounting)
+                .map((one) => one.code)}
             />
-            <Currencies rows={result.currencies} />
+            <Currencies
+              rows={result.currencies.filter((one) => !one.isAccounting)}
+              held={result.currencies.map((one) => one.code)}
+            />
           </div>
 
           <ConsolePanel>
@@ -222,24 +239,30 @@ function Countries({
   );
 }
 
-function Currencies({ rows }: { rows: Geography['currencies'] }) {
+function Currencies({
+  rows,
+  held,
+}: {
+  /** What the screen LISTS — the offered currencies. */
+  rows: Geography['currencies'];
+  /** What the platform HOLDS, accounting currency included, so nothing is offered twice. */
+  held: readonly string[];
+}) {
   return (
     <ConsolePanel>
-      <AddCurrency
-        title={t.sections.geo.currencies}
-        existing={rows.map((one) => one.code)}
-      />
+      <AddCurrency title={t.sections.geo.currencies} existing={held} />
 
       <CurrencyRows rows={rows} />
 
-      <FootNote>{t.sections.geo.note}</FootNote>
       {/*
-        A note, not a link. This pointed at `/settings` for an exchange-rates section that does not
-        exist there — and the endpoints that would have backed it had no caller in any application,
-        so the only way to set a rate was a request by hand. The rate is a field in the currency
-        editor now, beside the figure this panel already shows.
+        Both footnotes went with the exchange rate (Bashar, 2026-09-14).
+
+        One said prices are shown «حسب البلد أو العملة المختارة» — there is no currency to choose
+        any more — and the other said the rate is edited from the «تعديل» button, which no longer
+        offers it. A true sentence in the wrong place is the defect class this codebase keeps
+        finding; a sentence describing a control that has been removed is the same thing, later.
       */}
-      <FootNote>{t.sections.geo.fxHere}</FootNote>
+      <FootNote>{t.sections.geo.currencyNote}</FootNote>
     </ConsolePanel>
   );
 }

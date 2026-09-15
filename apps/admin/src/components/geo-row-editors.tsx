@@ -15,8 +15,6 @@ import {
   SelectField,
 } from '@/components/geo-form';
 import type { Geography } from '@/lib/api';
-import { Ltr } from '@/components/admin-table';
-import { money, shortDate } from '@/lib/format';
 import { t, apiErrorOf, fill } from '@/lib/strings';
 
 type Country = Geography['countries'][number];
@@ -319,23 +317,17 @@ export function CurrencyRows({ rows }: { readonly rows: readonly Currency[] }) {
 
             <span className="ms-auto flex items-center gap-2 text-[13px]">
               {/*
-                A missing rate is called out in RED rather than shown as a dash. The platform
-                refuses to price a booking without one, so an unconfigured currency is a live
-                defect waiting for a customer to find. «ل.س» sits inside the same span as the
-                figure, which is what lets `money()` be used rather than `amount()`.
+                NO exchange rate on the row (Bashar, 2026-09-14: «I do not want to see any ل.س on
+                the entire system. I want you to remove it completely»).
+
+                It printed «= 13,000.00 ل.س» — the platform's rate against the accounting currency,
+                and the last Syrian pound left on any screen. With one currency there is no exchange
+                for an operator to maintain, so the figure and the field that set it both went.
+
+                The LEDGER is untouched: `ledger_entries.amount_syp` is still written from the
+                stored rate. Ending that means moving the accounting unit itself to the dollar,
+                which is a migration over financial records rather than a screen edit.
               */}
-              {row.rateToSyp === null ? (
-                <span className="font-bold text-bad">{c.noRate}</span>
-              ) : (
-                <Ltr className="text-muted">
-                  = {money(row.rateToSyp)} ل.س
-                  {row.rateSetAt ? (
-                    <span className="ms-1.5 text-[13px] text-faint">
-                      {shortDate(row.rateSetAt)}
-                    </span>
-                  ) : null}
-                </Ltr>
-              )}
               <button
                 type="button"
                 data-currency-edit={row.code}
@@ -371,16 +363,6 @@ function CurrencyForm({
   const [nameEn, setNameEn] = useState(currency.nameEn);
   const [nameDe, setNameDe] = useState(currency.nameDe);
   const [isActive, setIsActive] = useState(currency.isActive);
-  /*
-    The rate, as a STRING and starting from whatever is on record.
-
-    A string because that is what the contract takes: SYP rates are five significant digits and
-    climbing, and a JSON number arrives as an IEEE-754 double — the point of the decimal string is
-    that these figures stop being quietly wrong. `?? ''` rather than a zero, because a currency
-    with NO rate must present as empty and not as a rate of nothing.
-  */
-  const [rate, setRate] = useState(currency.rateToSyp ?? '');
-  const [source, setSource] = useState<'manual' | 'central_bank' | 'provider'>('manual');
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -415,37 +397,6 @@ function CurrencyForm({
         setError(apiErrorOf(await response.json().catch(() => null)));
 
         return;
-      }
-
-      /*
-        Then the RATE, and only when it changed.
-
-        A separate call because it is a separate record: `fx_rates` is append-only, so setting a
-        rate INSERTS a row and history is never rewritten — a booking that snapshotted an earlier
-        rate stays explicable. Posting it unchanged would add an identical row on every save and
-        make the audit trail unreadable.
-
-        Second, not first, and reported distinctly if it fails: the currency's own details are the
-        cheaper thing to lose, and an operator told «حُفظت بيانات العملة، وتعذّر حفظ سعر الصرف»
-        knows which half to retry. One «تعذّر» over two writes would not.
-      */
-      const changed = rate.trim() !== '' && rate.trim() !== (currency.rateToSyp ?? '');
-
-      if (changed && !currency.isAccounting) {
-        const posted = await fetch('/api/fx-rates', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ currency: currency.code, rate: rate.trim(), source }),
-        });
-
-        if (!posted.ok) {
-          setError(
-            `${c.fxRateFailed} ${apiErrorOf(await posted.json().catch(() => null))}`,
-          );
-          router.refresh();
-
-          return;
-        }
       }
 
       onClose();
@@ -549,32 +500,14 @@ function CurrencyForm({
           and the contract refuses it, so there is nothing here to grey out. Said, so an operator
           who came looking is not left wondering.
         */}
-        {currency.isAccounting ? (
-          <p className="text-[13px] text-faint">{c.fxRateAccounting}</p>
-        ) : (
-          <Row>
-            <Field
-              label={c.fxRateLabel}
-              value={rate}
-              onChange={setRate}
-              hint={c.fxRateHint}
-              className="field-ltr"
-              inputMode="decimal"
-            />
-            {/* `SelectField`, so a row of both lines up — it exists for exactly that. */}
-            <SelectField
-              label={c.fxRateSource}
-              value={source}
-              onChange={(value) =>
-                setSource(value as 'manual' | 'central_bank' | 'provider')
-              }
-            >
-              <option value="manual">{c.fxSourceManual}</option>
-              <option value="central_bank">{c.fxSourceCentralBank}</option>
-              <option value="provider">{c.fxSourceProvider}</option>
-            </SelectField>
-          </Row>
-        )}
+        {/*
+          The rate FIELD went with the figure on the row: its label read «سعر الصرف مقابل الليرة
+          السورية», and the note beside it for the accounting currency named the pound outright.
+
+          `POST /admin/fx-rates` is deliberately NOT deleted with it. The ledger reads that rate on
+          every posting, and an endpoint kept without a screen is recoverable; a rate the platform
+          cannot record at all is not.
+        */}
 
         <CheckboxField
           label={c.currencyActive}

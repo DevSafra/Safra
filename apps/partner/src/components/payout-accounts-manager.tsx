@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { CURRENCY_CATALOGUE, preferredCurrency, PAYOUT_METHODS } from '@safra/contracts';
+import { offerableCurrencies, preferredCurrency, PAYOUT_METHODS } from '@safra/contracts';
 import { statusTone, useConfirm } from '@safra/ui';
 import { errorMessage } from '@safra/i18n';
 
@@ -267,7 +267,7 @@ function AccountForm({
     what the platform actually prices in.
   */
   const [currency, setCurrency] = useState(
-    account?.currency ?? preferredCurrency(CURRENCY_CATALOGUE.map((one) => one.code)),
+    account?.currency ?? preferredCurrency(offerableCurrencies().map((one) => one.code)),
   );
 
   return (
@@ -367,7 +367,8 @@ function AccountForm({
           required
           className="cursor-pointer rounded-lg border border-line bg-bg px-3 py-2 text-sm text-text"
         >
-          {CURRENCY_CATALOGUE.map((one) => (
+          {/* USD, plus whatever this account already is — see `offerableCurrencies`. */}
+          {offerableCurrencies(currency).map((one) => (
             <option key={one.code} value={one.code}>
               {one.nameAr} ({one.code})
             </option>

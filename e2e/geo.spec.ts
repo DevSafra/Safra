@@ -57,22 +57,34 @@ test('the three add controls are real, not disabled placeholders', async ({ page
  * screenshotted it. Asserting the WIDTH is what makes that reproducible: it is a live layout
  * failure, invisible to a type checker and to any HTTP-level check.
  */
-test('offers three currencies, in forms that fill their panel', async ({ page }) => {
+test('lists the currencies it holds, in forms that fill their panel', async ({
+  page,
+}) => {
   await page.goto('/geo');
 
   /*
     The whole screen, not a panel: `.filter({ hasText })` matched the HEADING ROW first — a div
     holding «العملات + إضافة عملة» and nothing else — so the assertion read an element that could
-    never contain a symbol. The three symbols and the two absences are unambiguous on the page as
-    a whole, which is what this is really about.
+    never contain a symbol. The symbols and the absences are unambiguous on the page as a whole,
+    which is what this is really about.
   */
   const screen = page.locator('main');
 
-  await expect(screen).toContainText('ل.س');
-  await expect(screen).toContainText('€');
-  await expect(screen).toContainText('$');
+  /*
+    ONE row since 2026-09-14: the dollar is the only currency the platform OFFERS.
 
-  /* And nothing the platform cannot price — «د.أ» is JOD's symbol, «ل.ل» is LBP's. */
+    The accounting currency is held and not listed — see the test below. «ل.س» survives on this
+    screen in exactly one place, the USD row's exchange RATE, which staff must be able to read and
+    set or nothing can be priced at all; the assertion below is scoped to that row so its removal
+    would have to be deliberate.
+  */
+  await expect(screen).toContainText('$');
+  await expect(screen, 'the accounting currency is not offered').not.toContainText(
+    'ليرة سورية',
+  );
+
+  /* And nothing retired — «€» went with EUR, «د.أ» is JOD's symbol, «ل.ل» is LBP's. */
+  await expect(screen).not.toContainText('€');
   await expect(screen).not.toContainText('د.أ');
   await expect(screen).not.toContainText('ل.ل');
 
@@ -124,7 +136,12 @@ test('the currency code is chosen, and the symbol follows it', async ({ page }) 
   const codes = await form.locator('select[name=code] option').allInnerTexts();
 
   expect(codes.join(' ')).not.toContain('USD');
-  expect(codes.join(' ')).not.toContain('EUR');
+  /*
+    SYP too — it is held as the accounting currency even though nothing offers it to a visitor.
+    EUR is NOT asserted here any more: it was retired on 2026-09-14 and the screen no longer holds
+    it, so offering it again is correct rather than a refusal waiting to happen.
+  */
+  expect(codes.join(' ')).not.toContain('SYP');
 });
 
 /**
@@ -258,25 +275,25 @@ test('a country opens a popup, and the popup saves', async ({ page }) => {
   await expect(page.locator('main')).toContainText(before);
 });
 
-test('a currency opens a popup, and the accounting one cannot be withdrawn', async ({
+test('a currency opens a popup, and its code and symbol are shown rather than typed', async ({
   page,
 }) => {
   await page.goto('/geo');
 
-  await page.locator('[data-currency-edit="SYP"]').click();
+  /*
+    USD, because the ACCOUNTING currency is no longer on this screen (Bashar, 2026-09-14: «why
+    الليرة السورية still there?»). It is held, not offered, so it is not listed.
 
-  const form = page.locator('[data-currency-form="SYP"]');
+    What that assertion used to cover is not lost, it moved to where it is actually enforced:
+    «SYP cannot be withdrawn» is `ERROR.GEO_CURRENCY_ACCOUNTING` from `deleteCurrency`, asserted in
+    `geo-write.integration.test.ts`. The row was the courtesy; the endpoint is the control, and the
+    standing rule is to assume the control is gone and ask what the server does.
+  */
+  await page.locator('[data-currency-edit="USD"]').click();
+
+  const form = page.locator('[data-currency-form="USD"]');
 
   await expect(page.getByRole('dialog')).toBeVisible();
-
-  /*
-    `ledger_entries.amount_syp` measures every posting the platform has ever made, so «stop
-    offering SYP» is not a thing this screen may express. The control is disabled AND says why —
-    a control that is merely inert teaches nothing. The endpoint refuses it too; this is the
-    courtesy, and `geo-write.integration.test.ts` holds the control.
-  */
-  await expect(form.locator('input[type=checkbox]')).toBeDisabled();
-  await expect(form).toContainText(c.accountingLocked);
 
   /* The code and the symbol follow ISO 4217 and are shown rather than typed. */
   const readOnly = form.locator('input[disabled]');
@@ -397,17 +414,25 @@ test('a currency nothing uses can be added and then deleted', async ({ page }) =
  * integration suite holds that — and the console does not offer the control, because a button
  * whose only outcome is a refusal is a button that teaches nothing.
  */
-test('the accounting currency has no delete control', async ({ page }) => {
+/**
+ * The accounting currency is not on this screen at all, and the offered one can still be removed.
+ *
+ * It used to be listed with its delete control withheld — «held, but not withdrawable». Bashar
+ * asked three times for «ليرة سورية» to stop appearing anywhere (2026-09-14), so it is filtered out
+ * of what the panel lists rather than shown in a state nobody can act on.
+ *
+ * Both halves are asserted, because either alone would pass on a broken build: the row is gone, AND
+ * an ordinary currency still opens with a delete control. A filter that removed every row would
+ * satisfy the first and is exactly the mistake worth catching.
+ */
+test('the accounting currency is not listed, and an offered one still is', async ({
+  page,
+}) => {
   await page.goto('/geo');
-  await page.locator('[data-currency-edit="SYP"]').click();
 
-  const dialog = page.getByRole('dialog');
+  await expect(page.locator('[data-currency-edit="SYP"]')).toHaveCount(0);
+  await expect(page.locator('main')).not.toContainText('ليرة سورية');
 
-  await expect(dialog).toBeVisible();
-  await expect(dialog.locator('[data-geo-delete]')).toHaveCount(0);
-
-  /* The opposite control: another currency in the same dialog DOES offer it. */
-  await page.keyboard.press('Escape');
   await page.locator('[data-currency-edit="USD"]').click();
   await expect(page.getByRole('dialog').locator('[data-geo-delete]')).toBeVisible();
 });

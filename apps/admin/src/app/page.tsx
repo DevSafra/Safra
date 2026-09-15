@@ -199,11 +199,15 @@ function Overview({
           valueClass="text-sky"
           sub={`${t.admin.ofWhich} ${count(counters.sla_expiring_soon)} ${t.admin.kpiPendingSub}`}
         />
+        {/*
+          The dollar figure alone (Bashar, 2026-09-14). The same number stood here in Syrian pounds
+          underneath, from the day the platform priced in five currencies and a reader needed both.
+          It prices in one now, and a second rendering of one figure is a second thing to reconcile.
+        */}
         <Kpi
           label={t.admin.kpiRevenue}
           value={amount(counters.revenue_today_usd, 'USD')}
           valueClass="text-gold-read"
-          sub={amount(counters.revenue_today_syp, 'SYP')}
         />
         <Kpi
           label={t.admin.kpiCancelled}
@@ -587,14 +591,16 @@ function Kpi({
 }: {
   label: string;
   value: string;
-  sub: string;
+  /** Optional since 2026-09-14: the revenue tile's second line was the same figure in SYP. */
+  sub?: string;
   valueClass?: string;
 }) {
   return (
     <div className="rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-4">
       <p className="text-[13px] text-faint">{label}</p>
       <p className={`mt-1.5 text-2xl font-extrabold ${valueClass}`}>{value}</p>
-      <p className="mt-1 text-[14px] text-muted">{sub}</p>
+      {/* A tile with nothing more to say leaves no empty line where a figure used to be. */}
+      {sub ? <p className="mt-1 text-[14px] text-muted">{sub}</p> : null}
     </div>
   );
 }

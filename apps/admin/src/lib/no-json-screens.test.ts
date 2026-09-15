@@ -171,7 +171,6 @@ describe('routes a browser navigates to', () => {
       'web/api/ads/*/click',
       /* §6.5's voucher — an `<a href>`, so every failure path redirects rather than answering. */
       'web/api/bookings/*/voucher',
-      'web/currency',
     ]);
   });
 });
