@@ -214,6 +214,12 @@ export class GeoService {
       -- Retired currencies are gone from the screen, not greyed out on it: this list has no
       -- status column, so a retired row would read as an offer the platform still makes.
       -- JOD and LBP were retired on 2026-08-30 -- see post/0017.
+      --
+      -- The ACCOUNTING currency IS listed, and that was tried the other way on 2026-09-14 and put
+      -- back the same day. Hiding it made the platform look single-currency and cost two real
+      -- things: nothing could be added any more (the add form offers what is not already held), and
+      -- the guarantee that SYP cannot be WITHDRAWN lost the row it is attached to. This screen
+      -- manages currencies; the one the books are denominated in belongs on it.
       WHERE c.deleted_at IS NULL
       ORDER BY (c.code = 'SYP') DESC, c.code
     `);

@@ -249,7 +249,7 @@ describeIfDb('a gift card issued by staff', () => {
     }
   });
 
-  /** The control: each of the three that ARE allowed is accepted. */
+  /** The control: every currency that IS allowed is accepted. One, since 2026-09-14. */
   it('accepts each currency a card may be issued in', async () => {
     for (const currency of GIFT_CARD_CURRENCIES) {
       const result = await issue({ currency, amount: '50.00' });
@@ -259,22 +259,19 @@ describeIfDb('a gift card issued by staff', () => {
   });
 
   /**
-   * The ceiling is per CURRENCY, because one number cannot serve both.
+   * The ceiling is looked up BY currency, and there is one currency to look up.
    *
-   * SYP and USD differ by four orders of magnitude. A flat cap of 1000 — which is what this was
-   * before SYP was offered — would have limited a SYP card to about eight US cents and made the
-   * currency unusable the moment it appeared in the picker.
+   * This used to prove that SYP and USD carry different ceilings — they differ by four orders of
+   * magnitude, so a flat 1,000 would have capped a SYP card at about eight US cents. Only the
+   * dollar is issuable since 2026-09-14, so what remains provable is that the ceiling applies at
+   * all and that the figure just under it goes through.
    */
-  it('caps each currency on its own scale', async () => {
+  it('caps the currency a card may be issued in', async () => {
     await expect(issue({ amount: '1001', currency: 'USD' })).rejects.toBeDefined();
 
-    /* The same figure is ordinary in SYP, and must go through. */
-    const syp = await issue({ amount: '1001', currency: 'SYP' });
+    const ok = await issue({ amount: '1000', currency: 'USD' });
 
-    expect(syp.card.originalAmount).toBe('1001.000');
-
-    /* And SYP has a ceiling of its own. */
-    await expect(issue({ amount: '15000001', currency: 'SYP' })).rejects.toBeDefined();
+    expect(ok.card.originalAmount).toBe('1000.000');
   });
 
   /**

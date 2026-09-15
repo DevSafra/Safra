@@ -187,15 +187,25 @@ describeIfDb('the default currency model', () => {
     }
   });
 
+  /**
+   * It is refused for being UNSUPPORTED now, not for having no rate (Bashar, 2026-09-14).
+   *
+   * Until the platform reduced to one currency this reached the FX layer and was turned away with
+   * `pricing.unavailable`, because `fx_rates` holds one pair and a euro could not be converted.
+   * `GIFT_CARD_CURRENCIES` is `['USD']`, so it is now turned away at the boundary instead — a
+   * better refusal, and an earlier one. What the test protects is unchanged: no euro card, no
+   * liability, and emphatically not a card booked as dollars.
+   */
   it('refuses a EUR gift card rather than booking it as dollars', async () => {
     await expect(
       cards.issue(STAFF(staffId), {
         amount: '40.00',
-        currency: 'EUR',
+        /* Cast, because the type no longer admits it — which is the point being tested. */
+        currency: 'EUR' as unknown as 'USD',
         recipientEmail: 'guest@example.test',
         reason: 'اختبار الرفض.',
       }),
-    ).rejects.toMatchObject({ response: { code: ERROR.PRICING_UNAVAILABLE } });
+    ).rejects.toMatchObject({ response: { code: ERROR.VALIDATION_CURRENCY_CODE } });
 
     /* And nothing was left behind: no card, no liability, no half-written group. */
     const cardsWritten = await db.execute<{ n: string }>(sql`
@@ -244,17 +254,21 @@ describeIfDb('the default currency model', () => {
     expect(Number(usd), 'a real USD→SYP rate, not an identity').toBeGreaterThan(1);
 
     /*
-      And the rest REFUSE rather than falling back. Asked of every active currency rather than the
-      three that happen to be unconfigured today, so a currency added later is covered by
-      construction.
+      And anything else REFUSES rather than falling back.
+
+      Asked of every currency the table HOLDS rather than every currency it offers, which is the
+      change of 2026-09-14: the platform now offers one, so «every OTHER active currency» is an
+      empty set and a loop over it would prove nothing while looking like it proved something. The
+      rows are still there — EUR, JOD, LBP, TRY — and `rateToSyp` must still refuse each of them,
+      because a retired currency reaching the FX layer by any route must not convert at parity.
     */
-    const active = await db.execute<{ code: string }>(sql`
-      SELECT code FROM currencies WHERE is_active AND code NOT IN ('SYP', 'USD')
+    const others = await db.execute<{ code: string }>(sql`
+      SELECT code FROM currencies WHERE code NOT IN ('SYP', 'USD') ORDER BY code
     `);
 
-    expect(active.rows.length, 'there are other currencies to check').toBeGreaterThan(0);
+    expect(others.rows.length, 'there are other currencies to check').toBeGreaterThan(0);
 
-    for (const { code } of active.rows) {
+    for (const { code } of others.rows) {
       await expect(
         fx.rateToSyp(code),
         `${code} must refuse, never default`,

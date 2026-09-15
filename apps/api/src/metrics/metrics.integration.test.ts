@@ -269,8 +269,12 @@ describeIfDb('MetricsService', () => {
     it('reports -1 for a currency holding no rate at all', async () => {
       const metrics = await scrape();
 
-      expect(metrics[`${AGE}{currency="EUR"}`]).toBe(-1);
+      /*
+        USD alone: the gauge covers OFFERED currencies (`is_active`, SYP excluded), and since
+        2026-09-14 the dollar is the only one. EUR was asserted here while it was still offered.
+      */
       expect(metrics[`${AGE}{currency="USD"}`]).toBe(-1);
+      expect(metrics[`${AGE}{currency="EUR"}`], 'no longer offered').toBeUndefined();
     });
 
     it('reports the age once a rate exists', async () => {
