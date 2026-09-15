@@ -13,6 +13,7 @@ import { SaveButton } from '@/components/save-button';
 import { ShareButton } from '@/components/share-button';
 import { PropertyGallery } from '@/components/property-gallery';
 import { BookingSelectionProvider } from '@/components/booking-selection';
+import { CardSlider } from '@/components/card-slider';
 import { BookingSummaryCard } from '@/components/booking-summary-card';
 import { UnitSelector } from '@/components/unit-selector';
 import {
@@ -191,7 +192,23 @@ export default async function PropertyPage({
   );
 
   /* The most recent review with something to read; a one-word review is not a highlight. */
-  const highlight = property.reviews?.find((one) => (one.body ?? '').trim().length > 40);
+  /**
+   * The reviews the booking panel quotes.
+   *
+   * Every one with something to say rather than the first (Bashar, 2026-09-15: «add a slider here
+   * same as booking.com»). It was `.find(...)` — one review, on the reasoning that a panel paging
+   * through them would compete with the price beside it for attention. He has asked for the pager,
+   * so that reasoning is retired.
+   *
+   * Capped at six. A rail a guest can reach the end of says «this is what people said»; one that
+   * runs to forty says «keep scrolling», and the full set is a section down the page for anybody
+   * who wants it. The 40-character floor is unchanged: «جيد» quoted in a panel is not a reason.
+   */
+  const quotable = (property.reviews ?? [])
+    .filter((one) => (one.body ?? '').trim().length > 40)
+    .slice(0, 6);
+
+  const highlight = quotable[0];
 
   const cheapest = property.units[0];
   const defaultStay = firstAvailableWindow(property.calendar, cheapest?.minNights ?? 1);
@@ -788,8 +805,15 @@ export default async function PropertyPage({
             rating with no sentence under it is a number; a sentence with a name under it is a
             reason.
             
-            One review, not a carousel: the full set is a section further down, and a panel that
-            paged through them would compete with the thing beside it for the same attention.
+            A SLIDER since 2026-09-15, as booking.com has (Bashar). It used to be one review, on
+            the reasoning that paging would compete with the price beside it for attention; that is
+            his call rather than mine, and the rail is bounded at six to keep it a sample rather
+            than the whole section.
+
+            `CardSlider` is the site's one slider, the same component the home page's destinations
+            use — not a second one written for this panel. What it needed was two knobs: no bleed,
+            because there is no page padding to cancel inside a card, and arrows on a phone,
+            because a one-item rail shows no neighbour peeking to say it moves.
           */}
             {property.rating ? (
               <div className="mb-3 rounded-card border border-line bg-card p-5">
@@ -808,22 +832,45 @@ export default async function PropertyPage({
                 </div>
 
                 {highlight ? (
-                  <figure className="mt-4 border-t border-line pt-4">
-                    <figcaption className="text-xs font-semibold text-muted">
-                      {t('guestsLoved')}
-                    </figcaption>
+                  <div className="mt-4 border-t border-line pt-4">
+                    <p className="text-xs font-semibold text-muted">{t('guestsLoved')}</p>
+
                     {/*
-                    A real quotation mark pair, not the ASCII kind, and the body is clamped to three
-                    lines: a panel quote is a snippet somebody reads at a glance, and the whole
-                    review is one section down for anybody who wants it.
-                  */}
-                    <blockquote className="mt-2 line-clamp-3 text-sm leading-relaxed text-text">
-                      “{highlight.body}”
-                    </blockquote>
-                    {highlight.author ? (
-                      <p className="mt-2 text-xs text-faint">{highlight.author}</p>
-                    ) : null}
-                  </figure>
+                      One review is a figure, several are a rail. Rendering the slider for a single
+                      quote would draw a control with nowhere to go — the shape this review keeps
+                      finding — so the rail appears only when there is a second review to reach.
+                    */}
+                    {quotable.length > 1 ? (
+                      <div className="mt-2">
+                        <CardSlider
+                          bleed={false}
+                          arrowsOnPhone
+                          arrows="below"
+                          labels={{
+                            previous: t('reviewPrevious'),
+                            next: t('reviewNext'),
+                          }}
+                        >
+                          {quotable.map((review) => (
+                            <li
+                              key={review.reference}
+                              /*
+                                `w-full shrink-0`, so each review is exactly one rail-width and the
+                                arrows page one review at a time. `snap-start` parks it flush.
+                              */
+                              className="w-full shrink-0 snap-start"
+                            >
+                              <Quote body={review.body} author={review.author} />
+                            </li>
+                          ))}
+                        </CardSlider>
+                      </div>
+                    ) : (
+                      <div className="mt-2">
+                        <Quote body={highlight.body} author={highlight.author} />
+                      </div>
+                    )}
+                  </div>
                 ) : null}
               </div>
             ) : null}
@@ -966,6 +1013,41 @@ function PinIcon() {
       <path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Z" />
       <circle cx="12" cy="10" r="2.5" />
     </svg>
+  );
+}
+
+/**
+ * One quoted review, as the booking panel prints it.
+ *
+ * Extracted when the panel gained a slider (2026-09-15): the same markup renders once on a listing
+ * with a single quotable review and once per slide on one with several, and two copies of it would
+ * be two places for the clamp and the quotation marks to drift apart.
+ *
+ * A real quotation mark pair, not the ASCII kind, and the body is clamped to three lines: a panel
+ * quote is a snippet somebody reads at a glance, and the whole review is one section down for
+ * anybody who wants it.
+ *
+ * No `min-h`: the slides are flex items and a flex row already stretches them to the tallest, so
+ * the rail's height is the longest quote's whatever the others hold. A floor on the blockquote was
+ * tried and only padded the SHORT ones, opening a band of empty card between a two-line review and
+ * the arrows under it — measured, then removed.
+ */
+function Quote({
+  body,
+  author,
+}: {
+  readonly body: string;
+  readonly author: string | null;
+}) {
+  return (
+    <figure>
+      <blockquote className="line-clamp-3 text-sm leading-relaxed text-text">
+        “{body}”
+      </blockquote>
+      {author ? (
+        <figcaption className="mt-2 text-xs text-faint">{author}</figcaption>
+      ) : null}
+    </figure>
   );
 }
 

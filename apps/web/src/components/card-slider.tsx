@@ -36,9 +36,42 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 export function CardSlider({
   children,
   labels,
+  bleed = true,
+  arrowsOnPhone = false,
+  arrows = 'float',
 }: {
   children: React.ReactNode;
   labels: { previous: string; next: string };
+  /**
+   * Whether the rail runs to the container's edge, as the home page's rows do.
+   *
+   * `-mx-4 px-4` cancels the page's own padding so a card can sit half-off the edge and say «there
+   * is more this way». Inside a PANEL there is no padding to cancel and nothing to bleed past, so
+   * the rail keeps its box — see the reviews in the booking card (Bashar, 2026-09-15).
+   */
+  readonly bleed?: boolean;
+  /**
+   * Whether the arrows appear below `sm`.
+   *
+   * Off for a row of destinations: a phone scrolls that with a thumb, and two 40px targets
+   * floating over the first and last card take a press meant for the card underneath. On where
+   * the rail is ONE item wide — there is no neighbour peeking to say the rail moves, so without
+   * arrows a phone reader has no way to know a second review exists.
+   */
+  readonly arrowsOnPhone?: boolean;
+  /**
+   * Where the arrows sit.
+   *
+   * `float` is the home page's arrangement: the pair hovers over the rail's two edges, half over
+   * the first and last card. That works because those cards are PHOTOGRAPHS — a circle resting on
+   * an image hides nothing anybody was reading.
+   *
+   * `below` is for a rail of TEXT. Measured on the booking panel's reviews (2026-09-15): the
+   * floating arrow landed squarely on the second line of a quote and covered two words. A control
+   * that hides the content it pages through is worse than one that costs a row of height, so here
+   * the pair sits under the rail instead.
+   */
+  readonly arrows?: 'float' | 'below';
 }) {
   const rail = useRef<HTMLUListElement>(null);
   const [mounted, setMounted] = useState(false);
@@ -118,7 +151,9 @@ export function CardSlider({
       <ul
         ref={rail}
         onScroll={measure}
-        className="slider-rail -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 sm:gap-4"
+        className={`slider-rail flex snap-x snap-mandatory overflow-x-auto pb-1 ${
+          bleed ? '-mx-4 gap-3 px-4 sm:gap-4' : 'gap-3'
+        }`}
       >
         {children}
       </ul>
@@ -129,21 +164,54 @@ export function CardSlider({
         control with nothing left to do. `pointer-events-none` goes with the fade so an invisible
         button cannot still take the click meant for the card under it.
       */}
-      {mounted ? (
+      {mounted && arrows === 'float' ? (
         <>
           <Arrow
             label={labels.previous}
             hidden={atStart}
+            onPhone={arrowsOnPhone}
             onClick={() => step(false)}
-            className="start-0 -translate-x-0"
+            className="absolute top-[38%] start-0 -translate-x-0 -translate-y-1/2"
           />
           <Arrow
             label={labels.next}
             hidden={atEnd}
+            onPhone={arrowsOnPhone}
             onClick={() => step(true)}
-            className="end-0 rotate-180"
+            className="absolute top-[38%] end-0 -translate-y-1/2 rotate-180"
           />
         </>
+      ) : null}
+
+      {/*
+        Under the rail, at the reading START, and only the arrows that can still do something.
+
+        Start rather than end, which was measured rather than preferred: at the first slide only
+        «next» is drawn, and against `justify-end` it sat alone in the far corner with the width of
+        the hidden «previous» between it and the edge — a control adrift in empty card. Under the
+        first word of the quote it reads as belonging to the text it pages.
+
+        Hidden at the ends rather than disabled, which keeps one rule for both placements: an arrow
+        with nothing left to reach is not a control that failed. It still RESERVES its space, so the
+        pair does not shuffle sideways as a reader moves through the rail.
+      */}
+      {mounted && arrows === 'below' ? (
+        <div className="mt-1 flex justify-start gap-1.5">
+          <Arrow
+            label={labels.previous}
+            hidden={atStart}
+            onPhone={arrowsOnPhone}
+            onClick={() => step(false)}
+            className=""
+          />
+          <Arrow
+            label={labels.next}
+            hidden={atEnd}
+            onPhone={arrowsOnPhone}
+            onClick={() => step(true)}
+            className="rotate-180"
+          />
+        </div>
       ) : null}
     </div>
   );
@@ -207,11 +275,14 @@ function Arrow({
   label,
   hidden,
   onClick,
+  onPhone,
   className,
 }: {
   label: string;
   hidden: boolean;
   onClick: () => void;
+  /** Whether this arrow is drawn below `sm` — see `arrowsOnPhone`. */
+  onPhone: boolean;
   className: string;
 }) {
   return (
@@ -221,7 +292,9 @@ function Arrow({
       aria-label={label}
       tabIndex={hidden ? -1 : 0}
       aria-hidden={hidden}
-      className={`absolute top-[38%] z-10 hidden size-10 -translate-y-1/2 cursor-pointer place-items-center rounded-full border border-line bg-card text-text shadow-[var(--shadow-lift)] transition-[opacity,box-shadow,background-color] ease-out-strong hover:bg-field hover:shadow-[var(--shadow-lift-hover)] sm:grid ${
+      className={`z-10 size-10 shrink-0 cursor-pointer place-items-center rounded-full border border-line bg-card text-text shadow-[var(--shadow-lift)] transition-[opacity,box-shadow,background-color] ease-out-strong hover:bg-field hover:shadow-[var(--shadow-lift-hover)] ${
+        onPhone ? 'grid' : 'hidden sm:grid'
+      } ${
         hidden
           ? 'pointer-events-none opacity-0 duration-140 lg:scale-90'
           : 'opacity-100 duration-200 lg:scale-100'
