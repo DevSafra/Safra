@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 
-import { CURRENCY_CATALOGUE, currencyOption, preferredCurrency } from '@safra/contracts';
+import { preferredCurrency } from '@safra/contracts';
 
 import type { CategoryOption } from '@/components/geo-city-editor';
 import {
@@ -16,119 +16,6 @@ import {
   TimezoneField,
 } from '@/components/geo-form';
 import { t, apiErrorOf } from '@/lib/strings';
-
-/**
- * «+ إضافة دولة» / «+ إضافة عملة» / «+ إضافة مدينة» — the three buttons that did nothing.
- *
- * ## What they were
- *
- * Rendered `aria-disabled` with «لم يُبنَ بعد» as a title, on the reasoning that each needed its
- * own validated form and audit entry. That reasoning was right and the outcome was not: P-005 says
- * launch geography is an OPERATIONAL value staff adjust, and a control that renders and does
- * nothing reads as coverage. Bashar asked for all three (2026-08-30).
- *
- * ## Collapsed until asked for
- *
- * Three permanently-open forms above three small lists would bury the lists, which are what the
- * screen is for. The trigger stays where the disabled button was.
- *
- * ## Nothing here decides anything
- *
- * Each posts to the API, whose schema is the authority on shape and whose `GEO_MANAGE` check is
- * the authority on permission. A currency's code is validated as ISO 4217 there, not here.
- */
-export function AddCurrency({
-  title,
-  existing,
-}: {
-  readonly title: string;
-  /** Codes already on the platform — offering one of them would only earn a 409. */
-  readonly existing: readonly string[];
-}) {
-  const c = t.sections.geo;
-  const [code, setCode] = useState('');
-  const [nameAr, setNameAr] = useState('');
-  const [nameEn, setNameEn] = useState('');
-  const [nameDe, setNameDe] = useState('');
-
-  const available = CURRENCY_CATALOGUE.filter((one) => !existing.includes(one.code));
-  const chosen = currencyOption(code);
-
-  /**
-   * Choosing a code fills everything the code decides, and the names it is usually read by.
-   *
-   * The symbol and the minor-unit digits are not editable — they are properties of ISO 4217, and
-   * the API takes them from the code regardless of what a form sends. The NAMES are prefilled
-   * rather than fixed: «دولار أمريكي» is a translation, and a catalogue's suggestion is a starting
-   * point somebody may legitimately word differently.
-   */
-  function choose(next: string): void {
-    setCode(next);
-
-    const option = currencyOption(next);
-
-    if (!option) return;
-
-    setNameAr(option.nameAr);
-    setNameEn(option.nameEn);
-    setNameDe(option.nameDe);
-  }
-
-  return (
-    <AddForm
-      title={title}
-      label={c.addCurrency}
-      heading={c.addCurrencyTitle}
-      marker="currency"
-      ready={code !== '' && nameAr !== ''}
-      path="/api/geo/currencies"
-      body={{ code, nameAr, nameEn: nameEn || nameAr, nameDe: nameDe || nameAr }}
-    >
-      <Row>
-        {/*
-          A MENU, not a text box (Bashar, 2026-08-30). A currency code is an identifier from a
-          standard, and typing one lets «USD» be saved beside «€» — every dollar on the platform
-          then renders with a euro sign, and nothing refuses it.
-        */}
-        <SelectField
-          label={c.currencyCode}
-          name="code"
-          value={code}
-          onChange={choose}
-          hint={c.currencyCodeHint}
-        >
-          <option value="" disabled>
-            {c.currencyChoose}
-          </option>
-          {available.map((one) => (
-            <option key={one.code} value={one.code}>
-              {`${one.code} · ${one.nameAr}`}
-            </option>
-          ))}
-        </SelectField>
-
-        {/*
-          Disabled and filled from the code above. It is shown rather than hidden because an
-          operator adding a currency should SEE what will be printed beside every amount in it —
-          a field that is absent teaches nothing, and one that is editable is a way to get it
-          wrong. `decimals` is not shown at all: it changes no rendering an operator can check.
-        */}
-        <Field
-          label={c.symbol}
-          name="symbol"
-          value={chosen?.symbol ?? ''}
-          disabled
-          hint={c.symbolFromCode}
-        />
-      </Row>
-      <Row>
-        <Field label={c.nameAr} value={nameAr} onChange={setNameAr} />
-        <Field label={c.nameEn} value={nameEn} onChange={setNameEn} />
-        <Field label={c.nameDe} value={nameDe} onChange={setNameDe} />
-      </Row>
-    </AddForm>
-  );
-}
 
 export function AddCountry({
   title,

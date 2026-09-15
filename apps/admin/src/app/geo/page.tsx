@@ -6,7 +6,7 @@ import { TableToolbar } from '@/components/table-toolbar';
 import { t } from '@/lib/strings';
 import { listParams } from '@/lib/search-params';
 import { mediaBase, mediaUrl } from '@safra/session';
-import { AddCity, AddCountry, AddCurrency } from '@/components/geo-add-forms';
+import { AddCity, AddCountry } from '@/components/geo-add-forms';
 import { CountryRows, CurrencyRows } from '@/components/geo-row-editors';
 import { GeoCities } from '@/components/geo-city-editor';
 import { refuseSection } from '@/components/section-refusal';
@@ -114,13 +114,11 @@ export default async function GeoPage({
           {/* Two cards side by side, as the design lays them out. */}
           <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
             {/*
-              The ACCOUNTING currency is held but not shown (Bashar, 2026-09-14, third time, with
-              the screenshot of «ليرة سورية ل.س · العملة المحاسبية»).
+              The ACCOUNTING currency is held but not shown (Bashar, 2026-09-14, with the screenshot
+              of «ليرة سورية ل.س · العملة المحاسبية»).
 
-              Filtered HERE and not in the query, which matters: `AddCurrency` excludes what the
-              platform already holds, so it reads the unfiltered list. Hiding SYP in the API made
-              the form start offering to ADD the one currency that is already there — which is how
-              this was got wrong the first time.
+              Filtered HERE and not in the query: the API still returns it, because the ledger and
+              the geography read both need it, and only this panel has a reason to leave it out.
 
               Nothing is lost by hiding it. «It cannot be withdrawn» is enforced by the API and
               asserted in `geo-write.integration.test.ts`; the row was only the place that SAID so.
@@ -131,10 +129,7 @@ export default async function GeoPage({
                 .filter((one) => !one.isAccounting)
                 .map((one) => one.code)}
             />
-            <Currencies
-              rows={result.currencies.filter((one) => !one.isAccounting)}
-              held={result.currencies.map((one) => one.code)}
-            />
+            <Currencies rows={result.currencies.filter((one) => !one.isAccounting)} />
           </div>
 
           <ConsolePanel>
@@ -239,18 +234,21 @@ function Countries({
   );
 }
 
-function Currencies({
-  rows,
-  held,
-}: {
-  /** What the screen LISTS — the offered currencies. */
-  rows: Geography['currencies'];
-  /** What the platform HOLDS, accounting currency included, so nothing is offered twice. */
-  held: readonly string[];
-}) {
+/**
+ * The currencies panel, which is INFORMATION and no longer a control.
+ *
+ * Bashar, 2026-09-15: «disable this card and hide the edit button… keep it just as an information».
+ *
+ * There is one currency and no rate to maintain, so «+ إضافة عملة» and «تعديل» have both gone and
+ * the panel states a fact instead of offering an action. `AddCurrency` still exists for the country
+ * and city panels beside it; only this one stopped using it.
+ */
+function Currencies({ rows }: { rows: Geography['currencies'] }) {
   return (
     <ConsolePanel>
-      <AddCurrency title={t.sections.geo.currencies} existing={held} />
+      <h2 className="mb-2.5 text-[16px] font-extrabold text-gold-read">
+        {t.sections.geo.currencies}
+      </h2>
 
       <CurrencyRows rows={rows} />
 

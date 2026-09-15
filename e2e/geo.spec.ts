@@ -27,10 +27,14 @@ const c = t.sections.geo;
 /** `MAX_IMAGES_PER_CITY` in `city-images.controller.ts` — the API's refusal, mirrored. */
 const MAX_CITY_IMAGES = 12;
 
-test('the three add controls are real, not disabled placeholders', async ({ page }) => {
+test('the add controls are real, not disabled placeholders', async ({ page }) => {
   await page.goto('/geo');
 
-  for (const marker of ['currency', 'country', 'city']) {
+  /*
+    Two, not three. The currencies panel stopped being a control on 2026-09-15 — one currency, no
+    rate, nothing to add — so «+ إضافة عملة» went with the editor behind it.
+  */
+  for (const marker of ['country', 'city']) {
     const trigger = page.locator(`[data-geo-add="${marker}"]`);
 
     await expect(trigger, `«+ إضافة» for ${marker} must be a control`).toBeEnabled();
@@ -101,47 +105,6 @@ test('lists the currencies it holds, in forms that fill their panel', async ({
 
     await page.locator(`[data-geo-add="${marker}"]`).click();
   }
-});
-
-/**
- * The currency code is a MENU, and the symbol follows it (Bashar, 2026-08-30).
- *
- * A code is an identifier from a standard, and the symbol and the minor-unit digits are properties
- * OF it. As free text, «USD» could be saved beside «€» — every dollar on the platform then renders
- * with a euro sign and nothing refuses it — and JOD could be stored with two decimals, which
- * truncates 10.125 to 10.13 on the way in. The API takes both from the code regardless of what a
- * form sends; this asserts the FORM cannot even suggest otherwise.
- */
-test('the currency code is chosen, and the symbol follows it', async ({ page }) => {
-  await page.goto('/geo');
-  await page.locator('[data-geo-add="currency"]').click();
-
-  const form = page.locator('[data-geo-form="currency"]');
-  const symbol = form.locator('input[name=symbol]');
-
-  await expect(symbol, 'the symbol is not something to type').toBeDisabled();
-
-  await form.locator('select[name=code]').selectOption('TRY');
-
-  await expect(symbol).toHaveValue('₺');
-
-  /* Choosing a different code moves it — a stale symbol would be the same defect, one step later. */
-  await form.locator('select[name=code]').selectOption('GBP');
-  await expect(symbol).toHaveValue('£');
-
-  /*
-    And a currency the platform already holds is not offered: choosing one could only earn a 409,
-    and a menu whose entries are refusals teaches the operator nothing.
-  */
-  const codes = await form.locator('select[name=code] option').allInnerTexts();
-
-  expect(codes.join(' ')).not.toContain('USD');
-  /*
-    SYP too — it is held as the accounting currency even though nothing offers it to a visitor.
-    EUR is NOT asserted here any more: it was retired on 2026-09-14 and the screen no longer holds
-    it, so offering it again is correct rather than a refusal waiting to happen.
-  */
-  expect(codes.join(' ')).not.toContain('SYP');
 });
 
 /**
@@ -275,32 +238,6 @@ test('a country opens a popup, and the popup saves', async ({ page }) => {
   await expect(page.locator('main')).toContainText(before);
 });
 
-test('a currency opens a popup, and its code and symbol are shown rather than typed', async ({
-  page,
-}) => {
-  await page.goto('/geo');
-
-  /*
-    USD, because the ACCOUNTING currency is no longer on this screen (Bashar, 2026-09-14: «why
-    الليرة السورية still there?»). It is held, not offered, so it is not listed.
-
-    What that assertion used to cover is not lost, it moved to where it is actually enforced:
-    «SYP cannot be withdrawn» is `ERROR.GEO_CURRENCY_ACCOUNTING` from `deleteCurrency`, asserted in
-    `geo-write.integration.test.ts`. The row was the courtesy; the endpoint is the control, and the
-    standing rule is to assume the control is gone and ask what the server does.
-  */
-  await page.locator('[data-currency-edit="USD"]').click();
-
-  const form = page.locator('[data-currency-form="USD"]');
-
-  await expect(page.getByRole('dialog')).toBeVisible();
-
-  /* The code and the symbol follow ISO 4217 and are shown rather than typed. */
-  const readOnly = form.locator('input[disabled]');
-
-  await expect(readOnly.first()).toBeDisabled();
-});
-
 /**
  * Every box in a row is the same height (Bashar, 2026-08-30, with two screenshots).
  *
@@ -315,7 +252,11 @@ test('a currency opens a popup, and its code and symbol are shown rather than ty
 test('every field on both forms is the same height', async ({ page }) => {
   await page.goto('/geo');
 
-  for (const marker of ['currency', 'country', 'city']) {
+  /*
+    Two forms, not three: the currency one went when its panel became information (2026-09-15).
+    The name is still «both forms» because that is now literally what is left.
+  */
+  for (const marker of ['country', 'city']) {
     await page.locator(`[data-geo-add="${marker}"]`).click();
 
     const boxes = page.locator(
@@ -375,35 +316,44 @@ test('a country holding cities refuses to be deleted, and says why', async ({ pa
 });
 
 /**
- * A currency added and then removed — the happy path, end to end, leaving nothing behind.
+ * The currencies panel is INFORMATION, not a control (Bashar, 2026-09-15: «disable this card and
+ * hide the edit button… keep it just as an information»).
  *
- * TRY is in the catalogue, is not seeded, and nothing prices anything in it, so it is the one code
- * this can use without touching a currency the platform trades in. The spec creates it precisely
- * so that deleting it is safe: a spec that deleted a REAL row would be a spec that breaks the
- * environment it runs in.
+ * This replaces two specs that drove the panel's controls — one that added a currency and deleted
+ * it again, one that checked the code/symbol pairing on the add form. Neither describes anything
+ * the console does now, and both are recoverable from git if the panel is ever given its controls
+ * back.
+ *
+ * What is asserted is the ABSENCE, because that is the requirement: a panel that quietly regrew an
+ * edit button is exactly the regression worth catching.
  */
-test('a currency nothing uses can be added and then deleted', async ({ page }) => {
+test('the currencies panel offers nothing to press', async ({ page }) => {
   await page.goto('/geo');
 
-  await page.locator('[data-geo-add="currency"]').click();
+  const panel = page.locator('main');
 
-  const form = page.locator('[data-geo-form="currency"]');
+  /* It still SAYS something — the dollar, and the sentence explaining that it is the only one. */
+  await expect(panel).toContainText('$');
 
-  await form.locator('select[name=code]').selectOption('TRY');
-  await form.getByRole('button', { name: c.create }).click();
+  await expect(page.locator('[data-geo-add="currency"]'), 'no add control').toHaveCount(
+    0,
+  );
+  await expect(page.locator('[data-currency-edit]'), 'no edit control').toHaveCount(0);
 
-  const row = page.locator('[data-currency-edit="TRY"]');
+  /*
+    And the accounting currency is not listed at all (Bashar, 2026-09-14, asked three times). Its
+    «cannot be withdrawn» guarantee is enforced by the API — `ERROR.GEO_CURRENCY_ACCOUNTING` from
+    `deleteCurrency`, asserted in `geo-write.integration.test.ts` — so hiding the row costs nothing.
+  */
+  await expect(panel, 'no Syrian pound anywhere').not.toContainText('ليرة سورية');
+  await expect(panel).not.toContainText('ل.س');
 
-  await expect(row).toBeVisible({ timeout: 20_000 });
-
-  await row.click();
-  await page.getByRole('dialog').locator('[data-geo-delete]').click();
-  await page
-    .getByRole('alertdialog')
-    .getByRole('button', { name: t.sections.dialog.confirm })
-    .click();
-
-  await expect(row, 'the row is gone from the list').toBeHidden({ timeout: 20_000 });
+  /*
+    The opposite control, because «nothing to press» would also pass on a screen that failed to
+    render: the panels beside it DO still offer theirs.
+  */
+  await expect(page.locator('[data-geo-add="country"]')).toBeEnabled();
+  await expect(page.locator('[data-geo-add="city"]')).toBeEnabled();
 });
 
 /**
@@ -414,28 +364,6 @@ test('a currency nothing uses can be added and then deleted', async ({ page }) =
  * integration suite holds that — and the console does not offer the control, because a button
  * whose only outcome is a refusal is a button that teaches nothing.
  */
-/**
- * The accounting currency is not on this screen at all, and the offered one can still be removed.
- *
- * It used to be listed with its delete control withheld — «held, but not withdrawable». Bashar
- * asked three times for «ليرة سورية» to stop appearing anywhere (2026-09-14), so it is filtered out
- * of what the panel lists rather than shown in a state nobody can act on.
- *
- * Both halves are asserted, because either alone would pass on a broken build: the row is gone, AND
- * an ordinary currency still opens with a delete control. A filter that removed every row would
- * satisfy the first and is exactly the mistake worth catching.
- */
-test('the accounting currency is not listed, and an offered one still is', async ({
-  page,
-}) => {
-  await page.goto('/geo');
-
-  await expect(page.locator('[data-currency-edit="SYP"]')).toHaveCount(0);
-  await expect(page.locator('main')).not.toContainText('ليرة سورية');
-
-  await page.locator('[data-currency-edit="USD"]').click();
-  await expect(page.getByRole('dialog').locator('[data-geo-delete]')).toBeVisible();
-});
 
 /**
  * A city's prose and tags, written from the console rather than by a migration.
