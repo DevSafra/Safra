@@ -66,12 +66,31 @@ export function CardSlider({
    * the first and last card. That works because those cards are PHOTOGRAPHS — a circle resting on
    * an image hides nothing anybody was reading.
    *
-   * `below` is for a rail of TEXT. Measured on the booking panel's reviews (2026-09-15): the
-   * floating arrow landed squarely on the second line of a quote and covered two words. A control
-   * that hides the content it pages through is worse than one that costs a row of height, so here
-   * the pair sits under the rail instead.
+   * `below` is for a rail of TEXT with no room beside it. Measured on the booking panel's reviews
+   * (2026-09-15): the floating arrow landed squarely on the second line of a quote and covered two
+   * words. A control that hides the content it pages through is worse than one that costs a row of
+   * height, so in the panel the pair sits under the rail instead.
+   *
+   * `side` is booking.com's own arrangement for its guest-review rail, and Bashar asked for it by
+   * screenshot (2026-09-15). It is the answer to the same problem `below` solves, not a relapse
+   * into it: the pair sits vertically centred and SIXTEEN PIXELS OUTSIDE the rail, so a 40px
+   * button reaches exactly 24px inside — which is `p-6`, the card's own padding. Those two numbers
+   * are one decision: a caller using `side` owes its cards 24px of padding, and a card that drops
+   * to `p-4` puts the circle back on top of the prose.
+   *
+   * Measured at both edges rather than assumed, because they do not behave alike. `snap-mandatory`
+   * parks a card FLUSH at the rail's start, so the «previous» arrow lands on that card's padding
+   * and covers no text at all — at scroll 380 on the property page, zero overlap with any
+   * paragraph. At the far edge there is no snap and the rail cuts a card mid-width, so «next»
+   * covers the outermost 24px of a card the overflow has already truncated mid-sentence. That is
+   * the honest description of what this placement costs: not a covered word, a narrower peek.
+   *
+   * Sixteen is also the largest outward shift the page can afford. Every column that hosts a rail
+   * begins one page padding (`px-4`) in, so -16px lands the button flush with the viewport edge
+   * and -20px would push it past — which on an RTL page means a horizontal scrollbar, and «no page
+   * ever scrolls sideways» is a rule with no exceptions.
    */
-  readonly arrows?: 'float' | 'below';
+  readonly arrows?: 'float' | 'below' | 'side';
 }) {
   const rail = useRef<HTMLUListElement>(null);
   const [mounted, setMounted] = useState(false);
@@ -179,6 +198,32 @@ export function CardSlider({
             onPhone={arrowsOnPhone}
             onClick={() => step(true)}
             className="absolute top-[38%] end-0 -translate-y-1/2 rotate-180"
+          />
+        </>
+      ) : null}
+
+      {/*
+        Beside the rail, centred on it, half in the gutter and half on the card's own padding.
+
+        Hidden at the ends like the other two placements, and for the same reason: at rest the
+        «previous» arrow is not drawn at all, so nothing rests on the first card until a reader has
+        moved the rail and the card under the circle is a partial one anyway.
+      */}
+      {mounted && arrows === 'side' ? (
+        <>
+          <Arrow
+            label={labels.previous}
+            hidden={atStart}
+            onPhone={arrowsOnPhone}
+            onClick={() => step(false)}
+            className="absolute top-1/2 start-[-16px] -translate-y-1/2"
+          />
+          <Arrow
+            label={labels.next}
+            hidden={atEnd}
+            onPhone={arrowsOnPhone}
+            onClick={() => step(true)}
+            className="absolute top-1/2 end-[-16px] -translate-y-1/2 rotate-180"
           />
         </>
       ) : null}

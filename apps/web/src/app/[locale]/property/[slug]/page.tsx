@@ -7,7 +7,7 @@ import { confirmationWindowLabel } from '@/lib/operating-rules';
 
 import { isLocale, routing, type Locale } from '@/i18n/routing';
 import { MAX_BASKET_ROOMS } from '@/lib/basket-limits';
-import { readableDate } from '@/lib/readable-date';
+import { readableDate, readableMonth } from '@/lib/readable-date';
 import { AmenityIcon } from '@/components/icons';
 import { SaveButton } from '@/components/save-button';
 import { ShareButton } from '@/components/share-button';
@@ -747,64 +747,155 @@ export default async function PropertyPage({
                     pushed the cancellation policy, the location and everything under them a screen
                     and a half down the page.
 
-                    The same `CardSlider` again — the site has one — with the same two decisions the
-                    panel made and for the same reasons: no bleed, because this column has no page
-                    padding to cancel, and arrows BELOW, because a circle floating over a card of
-                    prose covers the words somebody is reading.
+                    ## The arrows moved to the SIDES, and the padding is what lets them
 
-                    `w-[85%]` on a phone rather than a full width: the sliver of the next card is
+                    Bashar asked for booking.com's own guest-review rail by screenshot
+                    (2026-09-15): bigger cards, and the pair of circles resting on the rail's two
+                    edges rather than sitting under it. The earlier note here said a floating arrow
+                    covers the prose it pages — it did, on a `p-5` card with the button at the
+                    edge, and the fix is geometric rather than a retreat. `side` shifts each button
+                    16px OUT, so a 40px circle reaches 24px in; `p-6` starts the words at 24px. The
+                    two numbers are one decision — read `arrows` in `card-slider.tsx`, which
+                    records what each edge was measured to do, before changing either.
+
+                    ## Bigger, and shaped like something somebody said
+
+                    `sm:w-[23rem]` and `p-6`, against `sm:w-80` and `p-5`. The card now opens with
+                    the guest — a monogram, their name, the month they stayed — carries the quote
+                    at the body size rather than the metadata size, and closes on the one fact that
+                    makes a review worth anything: it came from a stay that actually happened. That
+                    line sits at the FOOT of every card on an `mt-auto`, so it lands in the same
+                    place whether the quote is two lines or ten.
+
+                    `w-[86%]` on a phone rather than a full width: the sliver of the next card is
                     what says the rail moves, and it is the only such cue a thumb gets.
                   */}
-                  <div className="mt-3">
+                  <div className="mt-4">
                     <CardSlider
                       bleed={false}
                       arrowsOnPhone
-                      arrows="below"
+                      arrows="side"
                       labels={{
                         previous: t('reviewPrevious'),
                         next: t('reviewNext'),
                       }}
                     >
-                      {property.reviews.map((review) => (
-                        <li
-                          key={review.reference}
-                          className="w-[85%] shrink-0 snap-start rounded-card border border-line bg-card p-5 sm:w-80"
-                        >
-                          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                            <span className="text-sm font-semibold text-text">
-                              {review.author ?? ''}
-                            </span>
-                            {/*
-                          `dir="ltr"`: a ★ followed by a digit is a Latin run, and the star is
-                          bidi-neutral — without this it lands on the wrong side of the number.
-                        */}
-                            <span dir="ltr" className="text-sm font-bold text-gold-read">
-                              <span aria-hidden>★</span> {review.rating}
-                            </span>
-                            <span className="text-xs text-faint">
-                              {t('reviewsVerified')}
-                            </span>
-                            <span className="ms-auto text-xs text-faint">
-                              {review.createdAt.slice(0, 10)}
-                            </span>
-                          </div>
+                      {property.reviews.map((review) => {
+                        /*
+                          Spread rather than `slice(0, 1)`: a name beginning with anything outside
+                          the basic plane is a surrogate PAIR, and taking one code unit of it
+                          renders the replacement glyph. Arabic and Latin initials are unaffected;
+                          this is for the ones that are not.
+                        */
+                        const monogram = [...(review.author?.trim() ?? '')][0] ?? '';
 
-                          <p className="mt-2 text-sm leading-relaxed text-muted">
-                            {review.body}
-                          </p>
+                        return (
+                          <li
+                            key={review.reference}
+                            className="flex w-[86%] shrink-0 snap-start flex-col rounded-card border border-line bg-card p-6 sm:w-[23rem]"
+                          >
+                            <div className="flex items-center gap-3">
+                              {/*
+                                A monogram, not an avatar: the API sends a first name and no
+                                photograph, and a stock silhouette would be a picture of nobody.
+                                `aria-hidden` because the letter is the name's first character and
+                                a screen reader is about to read the name itself.
+                              */}
+                              {monogram ? (
+                                <span
+                                  aria-hidden
+                                  className="grid size-11 shrink-0 place-items-center rounded-full bg-gold/12 font-display text-lg font-bold text-gold-read"
+                                >
+                                  {monogram}
+                                </span>
+                              ) : null}
 
-                          {review.partnerReply ? (
-                            <div className="mt-3 rounded-lg border border-gold/30 bg-gold/5 px-4 py-3">
-                              <p className="text-xs font-semibold text-gold-read">
-                                {t('reviewsPartnerReply')}
-                              </p>
-                              <p className="mt-1 text-sm leading-relaxed text-muted">
-                                {review.partnerReply}
-                              </p>
+                              <div className="min-w-0">
+                                {review.author ? (
+                                  <p className="truncate text-[15px] font-bold text-text">
+                                    {review.author}
+                                  </p>
+                                ) : null}
+                                {/*
+                                  The month and the year, never the weekday: «الأحد» belongs to a
+                                  date somebody has to keep, and what a reader weighs on a review
+                                  is how long ago it was.
+                                */}
+                                <p className="mt-0.5 text-xs text-faint">
+                                  {readableMonth(review.createdAt.slice(0, 10), locale)}
+                                </p>
+                              </div>
+
+                              {/*
+                                `dir="ltr"`: a ★ followed by a digit is a Latin run, and the star is
+                                bidi-neutral — without this it lands on the wrong side of the
+                                number. It is the card's answer, so it is bold and 14px, never the
+                                faintest thing on it.
+                              */}
+                              <span
+                                dir="ltr"
+                                className="ms-auto shrink-0 rounded-lg bg-gold/10 px-2.5 py-1 text-sm font-bold text-gold-read"
+                              >
+                                <span aria-hidden>★</span> {review.rating}
+                              </span>
                             </div>
-                          ) : null}
-                        </li>
-                      ))}
+
+                            {/*
+                              `dir="auto"` because a review is written in the GUEST's language and
+                              read on a page in the READER's. An Arabic quotation inside an
+                              `ltr` paragraph put the opening mark on the left and the closing one
+                              on the right — measured on `/en`, where every seeded review is
+                              Arabic. `auto` takes the direction from the text's own first strong
+                              character, so the marks land where that language puts them and the
+                              block aligns to the side it is meant to be read from.
+                            */}
+                            <p
+                              dir="auto"
+                              className="mt-4 text-[15px] leading-7 text-text"
+                            >
+                              “{review.body}”
+                            </p>
+
+                            {review.partnerReply ? (
+                              /*
+                                A hairline and an indent, not a tinted box. A card inside a card is
+                                two objects where the page means «and the host answered» — the rule
+                                is a 1px start border, so the reply reads as quoted rather than as
+                                a second card sitting in the first.
+                              */
+                              <div className="mt-4 border-s border-gold/50 ps-3">
+                                <p className="text-xs font-bold text-gold-read">
+                                  {t('reviewsPartnerReply')}
+                                </p>
+                                <p
+                                  dir="auto"
+                                  className="mt-1 text-sm leading-relaxed text-muted"
+                                >
+                                  {review.partnerReply}
+                                </p>
+                              </div>
+                            ) : null}
+
+                            <p className="mt-auto flex items-center gap-1.5 pt-5 text-xs text-faint">
+                              <svg
+                                aria-hidden
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth={2.2}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="shrink-0 text-gold-read"
+                              >
+                                <path d="m4.5 12.5 5 5 10-11" />
+                              </svg>
+                              {t('reviewsVerified')}
+                            </p>
+                          </li>
+                        );
+                      })}
                     </CardSlider>
                   </div>
                 </>
@@ -1065,7 +1156,9 @@ function Quote({
 }) {
   return (
     <figure>
-      <blockquote className="line-clamp-3 text-sm leading-relaxed text-text">
+      {/* `dir="auto"` for the reason the section's cards carry it: the quotation marks belong to
+          the reviewer's language, not the page's. */}
+      <blockquote dir="auto" className="line-clamp-3 text-sm leading-relaxed text-text">
         “{body}”
       </blockquote>
       {author ? (
