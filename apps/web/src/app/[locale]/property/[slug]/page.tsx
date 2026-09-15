@@ -741,48 +741,72 @@ export default async function PropertyPage({
                     })}
                   </p>
 
-                  <ul className="mt-3 space-y-3">
-                    {property.reviews.map((review) => (
-                      <li
-                        key={review.reference}
-                        className="rounded-card border border-line bg-card p-5"
-                      >
-                        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                          <span className="text-sm font-semibold text-text">
-                            {review.author ?? ''}
-                          </span>
-                          {/*
+                  {/*
+                    A RAIL, as the booking panel's quotes are (Bashar, 2026-09-15: «do the same
+                    slider on the reviews section below»). It was a column of cards, so ten reviews
+                    pushed the cancellation policy, the location and everything under them a screen
+                    and a half down the page.
+
+                    The same `CardSlider` again — the site has one — with the same two decisions the
+                    panel made and for the same reasons: no bleed, because this column has no page
+                    padding to cancel, and arrows BELOW, because a circle floating over a card of
+                    prose covers the words somebody is reading.
+
+                    `w-[85%]` on a phone rather than a full width: the sliver of the next card is
+                    what says the rail moves, and it is the only such cue a thumb gets.
+                  */}
+                  <div className="mt-3">
+                    <CardSlider
+                      bleed={false}
+                      arrowsOnPhone
+                      arrows="below"
+                      labels={{
+                        previous: t('reviewPrevious'),
+                        next: t('reviewNext'),
+                      }}
+                    >
+                      {property.reviews.map((review) => (
+                        <li
+                          key={review.reference}
+                          className="w-[85%] shrink-0 snap-start rounded-card border border-line bg-card p-5 sm:w-80"
+                        >
+                          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                            <span className="text-sm font-semibold text-text">
+                              {review.author ?? ''}
+                            </span>
+                            {/*
                           `dir="ltr"`: a ★ followed by a digit is a Latin run, and the star is
                           bidi-neutral — without this it lands on the wrong side of the number.
                         */}
-                          <span dir="ltr" className="text-sm font-bold text-gold-read">
-                            <span aria-hidden>★</span> {review.rating}
-                          </span>
-                          <span className="text-xs text-faint">
-                            {t('reviewsVerified')}
-                          </span>
-                          <span className="ms-auto text-xs text-faint">
-                            {review.createdAt.slice(0, 10)}
-                          </span>
-                        </div>
-
-                        <p className="mt-2 text-sm leading-relaxed text-muted">
-                          {review.body}
-                        </p>
-
-                        {review.partnerReply ? (
-                          <div className="mt-3 rounded-lg border border-gold/30 bg-gold/5 px-4 py-3">
-                            <p className="text-xs font-semibold text-gold-read">
-                              {t('reviewsPartnerReply')}
-                            </p>
-                            <p className="mt-1 text-sm leading-relaxed text-muted">
-                              {review.partnerReply}
-                            </p>
+                            <span dir="ltr" className="text-sm font-bold text-gold-read">
+                              <span aria-hidden>★</span> {review.rating}
+                            </span>
+                            <span className="text-xs text-faint">
+                              {t('reviewsVerified')}
+                            </span>
+                            <span className="ms-auto text-xs text-faint">
+                              {review.createdAt.slice(0, 10)}
+                            </span>
                           </div>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
+
+                          <p className="mt-2 text-sm leading-relaxed text-muted">
+                            {review.body}
+                          </p>
+
+                          {review.partnerReply ? (
+                            <div className="mt-3 rounded-lg border border-gold/30 bg-gold/5 px-4 py-3">
+                              <p className="text-xs font-semibold text-gold-read">
+                                {t('reviewsPartnerReply')}
+                              </p>
+                              <p className="mt-1 text-sm leading-relaxed text-muted">
+                                {review.partnerReply}
+                              </p>
+                            </div>
+                          ) : null}
+                        </li>
+                      ))}
+                    </CardSlider>
+                  </div>
                 </>
               )}
             </section>
