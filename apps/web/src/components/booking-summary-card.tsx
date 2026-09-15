@@ -222,25 +222,40 @@ export function BookingSummaryCard({
         things rather than one booking. A rule between them separates just as well and lets the
         card read as a single object.
       */}
-      <ul className="mt-2 divide-y divide-line2">
+      {/*
+        `divide-line`, NOT `divide-line2`.
+
+        `--color-line2` is declared in the console and the portal and NOT in this app, so Tailwind
+        emitted no colour for it and the rule fell back to `currentColor` — a 1px band of INK
+        between every pair of rooms, measured at rgb(29,35,51) on white and near-white on the night
+        theme. It was not styled dark; it was not styled at all. Same defect as the room chips on
+        the property page (2026-09-11), same fix.
+      */}
+      <ul className="mt-2 divide-y divide-line">
         {lines.map((line) => (
           <li
             key={line.room.unitId}
             data-basket-line={line.room.unitId}
             className="grid gap-1.5 py-3 first:pt-1"
           >
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-              <h3 className="font-display text-[16px] leading-tight text-text">
+            {/*
+              The NAME and what it costs, on one line (Bashar, 2026-09-15: «design this better and
+              easier to read… make the unit names bold»).
+
+              They were three rows apart — name at the top, price down beside the occupancy — so
+              reading «what did I choose and what does it cost» meant zig-zagging. Paired, they are
+              the two things a guest checks and the only two in this block carrying weight.
+
+              Bold, and the strongest thing in its own block: the name identifies the line, and it
+              was previously lighter than the figure sitting next to it.
+            */}
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h3 className="font-display text-[16px] font-bold leading-tight text-text">
                 {line.room.name}
               </h3>
-              <button
-                type="button"
-                aria-label={`${copy.remove} — ${line.room.name}`}
-                onClick={() => remove(line.room.unitId)}
-                className="-my-2 ms-auto inline-flex min-h-10 cursor-pointer items-center text-[13px] text-muted underline underline-offset-2 transition-colors hover:text-bad lg:min-h-0"
-              >
-                {copy.remove}
-              </button>
+              <span className="ms-auto text-[15px] font-bold tabular-nums text-text">
+                {show(subtotalOf(line))}
+              </span>
             </div>
 
             {/*
@@ -268,14 +283,26 @@ export function BookingSummaryCard({
               />
             ) : null}
 
+            {/*
+              How many and who fits, with «إزالة» at the end of the same row.
+
+              The control moved off the name line when the price took that edge. It belongs beside
+              the quantity rather than beside the name: both are things a guest DOES to this line,
+              and the name row is now purely what-and-how-much.
+            */}
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-[13px]">
               <span className="text-muted">
                 {text(copy.roomsCountTexts, line.rooms)} ·{' '}
                 {text(copy.capacityTexts, line.room.maxGuests * line.rooms)}
               </span>
-              <span className="font-semibold tabular-nums text-text">
-                {show(subtotalOf(line))}
-              </span>
+              <button
+                type="button"
+                aria-label={`${copy.remove} — ${line.room.name}`}
+                onClick={() => remove(line.room.unitId)}
+                className="-my-2 inline-flex min-h-10 cursor-pointer items-center text-[13px] text-muted underline underline-offset-2 transition-colors hover:text-bad lg:min-h-0"
+              >
+                {copy.remove}
+              </button>
             </div>
 
             {/*
@@ -290,12 +317,24 @@ export function BookingSummaryCard({
               <p className="text-[14px] leading-relaxed text-faint">{copy.lineAll}</p>
             ) : null}
 
-            <p className="text-[14px] leading-relaxed text-faint">
+            {/*
+              Two tiers, because these are two kinds of fact.
+
+              The cancellation policy is a DECISION value — it is the thing a guest weighs before
+              paying — and it sat at `text-faint` in the same run as the facilities, which the
+              standing rule forbids: «important operational information is never the faintest text
+              on the screen». It reads at `text-muted` now. The facilities stay explanatory, quieter
+              and a tier smaller, on their own line so a long list cannot push the policy out of
+              sight.
+            */}
+            <p className="text-[14px] leading-relaxed text-muted">
               {copy.policy}: {line.room.policyText}
-              {line.room.amenities.length > 0
-                ? ` · ${line.room.amenities.map((amenity) => amenity.name).join(' · ')}`
-                : ''}
             </p>
+            {line.room.amenities.length > 0 ? (
+              <p className="text-[13px] leading-relaxed text-faint">
+                {line.room.amenities.map((amenity) => amenity.name).join(' · ')}
+              </p>
+            ) : null}
           </li>
         ))}
       </ul>
