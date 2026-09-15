@@ -17,22 +17,31 @@ export interface CurrencySeed {
   nameDe: string;
   symbol: string;
   decimals: number;
+  /** Whether the platform OFFERS it. See the note on `CURRENCIES`. */
+  isActive: boolean;
 }
 
 /**
  * §1.4: SYP is the internal accounting currency; USD is the pricing anchor.
  *
- * ## Three, and only three (Bashar, 2026-08-30)
+ * ## ONE currency is offered, and it is the dollar (Bashar, 2026-09-14)
  *
- * JOD and LBP were seeded and neither could ever price anything: `fx_rates` holds one pair,
- * USD→SYP, and `rateBetween` REFUSES rather than defaulting to 1 for a pair it cannot reach. So a
- * Jordanian visitor met «الأردن · JOD» on the geography screen and a booking that could not be
- * quoted — a currency offered by the platform and refused by it. Bashar had already said not to
- * invent rates for them; this removes the offer instead.
+ * «Remove all currencies from the system and keep only USD for everything.» So `USD` is the only
+ * row with `isActive`, which is what the public `/currencies` list answers with and what the
+ * platform prices, quotes, charges and displays in.
  *
- * They are not deleted from an existing database — `0017_currencies_syp_usd_eur.sql` retires them
- * with `deleted_at`, because a row is cheaper to keep than a foreign key is to unpick, and nothing
- * referenced either beyond Jordan's display currency.
+ * **SYP stays as a row, and is not a contradiction.** It is not something anyone chooses: every
+ * ledger leg is written with `amount_syp` and `fx_rate_to_syp` beside its own amount, because SAFRA
+ * BOOKS in Syrian pounds whatever it prices in. Retiring the row would orphan the accounting basis
+ * of every booking already recorded. It is inactive, so nothing offers it; the ledger addresses it
+ * by code regardless.
+ *
+ * EUR was offered until that date and priced nothing — zero units, and `fx_rates` holds one pair,
+ * USD→SYP, so a euro figure could only ever have been invented. It is dropped from this list and
+ * retired in `0077_usd_only.sql`; JOD and LBP went the same way on 2026-08-30, for the same reason.
+ *
+ * Nothing is DELETED from an existing database: a row is cheaper to keep than a foreign key is to
+ * unpick, and P-003 forbids the destructive version.
  */
 export const CURRENCIES: CurrencySeed[] = [
   {
@@ -42,6 +51,8 @@ export const CURRENCIES: CurrencySeed[] = [
     nameDe: 'Syrisches Pfund',
     symbol: 'ل.س',
     decimals: 2,
+    /* The books are kept in it; nobody picks it. */
+    isActive: false,
   },
   {
     code: 'USD',
@@ -50,14 +61,7 @@ export const CURRENCIES: CurrencySeed[] = [
     nameDe: 'US-Dollar',
     symbol: '$',
     decimals: 2,
-  },
-  {
-    code: 'EUR',
-    nameAr: 'يورو',
-    nameEn: 'Euro',
-    nameDe: 'Euro',
-    symbol: '€',
-    decimals: 2,
+    isActive: true,
   },
 ];
 

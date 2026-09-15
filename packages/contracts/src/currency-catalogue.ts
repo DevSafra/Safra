@@ -1,3 +1,5 @@
+import { DEFAULT_MONEY_CURRENCY } from './booking.js';
+
 /**
  * The ISO 4217 currencies a staff member may add, with the facts that come WITH the code.
  *
@@ -167,4 +169,22 @@ export function currencyDecimals(code: string): number {
  */
 export function symbolTrails(symbol: string): boolean {
   return /\p{Script=Arabic}/u.test(symbol);
+}
+
+/**
+ * The currencies a form may OFFER, which since 2026-09-14 is the dollar and nothing else.
+ *
+ * Bashar: «remove all currencies from the system and keep only USD for everything.» Every picker
+ * reads this rather than `CURRENCY_CATALOGUE`, which is an ISO REFERENCE — a table of facts about
+ * codes, not a list of things the platform does.
+ *
+ * `current` is the escape hatch, and it is load-bearing rather than defensive: 7 of SAFRA's own
+ * bank accounts and a number of partners' are recorded in Syrian pounds. A picker that could not
+ * express what a record already holds would silently redenominate it on the next save — a bank
+ * account is a fact about a bank, and editing the holder's name must not restate its currency.
+ */
+export function offerableCurrencies(current?: string): readonly CurrencyOption[] {
+  return CURRENCY_CATALOGUE.filter(
+    (one) => one.code === DEFAULT_MONEY_CURRENCY || one.code === current,
+  );
 }

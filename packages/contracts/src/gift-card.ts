@@ -190,17 +190,22 @@ export interface GiftCardRedeemResult {
 }
 
 /**
- * The currencies a gift card may be issued in (Bashar, 2026-08-26).
+ * The currencies a gift card may be issued in.
  *
- * SYP because it is what SAFRA settles in, USD because it is what the platform prices and reports
- * in, EUR because a share of customers hold one. `currencies` also carries JOD and LBP and they are
- * deliberately NOT here — a card is a bearer instrument SAFRA must honour for as long as it lives,
- * and every currency it can be denominated in is another exposure to carry.
+ * **The dollar, and nothing else** (Bashar, 2026-09-14: «remove all currencies from the system and
+ * keep only USD for everything»). This superseded 2026-08-26's SYP/USD/EUR, whose reasoning was
+ * that every currency a bearer instrument can be denominated in is another exposure to carry — the
+ * same argument, taken to one.
  *
- * Enforced in the SCHEMA, not only in the picker. A dropdown is a courtesy; the endpoint is the
- * control, and the standing rule is to assume the attribute is gone and ask what the server does.
+ * **Cards already issued in another currency are untouched.** 175 SYP cards are outstanding and
+ * SAFRA must honour them: this list guards `issue()` only, never `redeem()`, so an existing card
+ * spends exactly as it did. What changes is that no new one can be created.
+ *
+ * Enforced in the SCHEMA and again in the SERVICE, not only in the picker. A dropdown is a
+ * courtesy; the endpoint is the control, and the standing rule is to assume the attribute is gone
+ * and ask what the server does.
  */
-export const GIFT_CARD_CURRENCIES = ['SYP', 'USD', 'EUR'] as const;
+export const GIFT_CARD_CURRENCIES = ['USD'] as const;
 
 export type GiftCardCurrency = (typeof GIFT_CARD_CURRENCIES)[number];
 
@@ -219,20 +224,19 @@ export type GiftCardCurrency = (typeof GIFT_CARD_CURRENCIES)[number];
  * may spend before anybody reads the audit row. They are NOT a price list and not a policy — that
  * distinction is why they belong in settings rather than in a constant nobody can move.
  *
- * ## Why one number cannot serve
+ * ## One currency, so one number
  *
- * SYP and USD differ by four orders of magnitude — the same fact that makes «المبلغ 200.00»
- * unreadable without its currency. A flat 1,000 would cap a SYP card at about eight US cents. The
- * SYP default is the USD one at the configured rate, rounded, so the three mean roughly the same
- * thing until the business decides otherwise.
+ * It held three until 2026-09-14, and the reason was that SYP and USD differ by four orders of
+ * magnitude — the same fact that makes «المبلغ 200.00» unreadable without its currency, and why a
+ * flat 1,000 would have capped a SYP card at about eight US cents. With only the dollar issuable
+ * that problem is gone; the map stays a map because the ceiling is still looked up BY currency, and
+ * a card's currency is data rather than an assumption.
  *
  * The CEILING is not enforced here: a field schema cannot read a setting, so the check lives in
  * `GiftCardService` where the currency and the configured value are both in hand.
  */
 export const DEFAULT_MAX_ISSUED_GIFT_CARD: Record<GiftCardCurrency, number> = {
   USD: 1000,
-  EUR: 1000,
-  SYP: 15_000_000,
 };
 
 /** The settings key holding the ceiling for a currency — `giftcard.max_issue_usd`. */

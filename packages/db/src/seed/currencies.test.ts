@@ -3,15 +3,18 @@ import { describe, expect, it } from 'vitest';
 import { COUNTRIES, CURRENCIES } from './reference.js';
 
 /**
- * Three currencies, and every launch market priced in one that can be quoted.
+ * One currency offered, and every launch market priced in it.
  *
  * ## Why this is a test
  *
- * Standing instruction from Bashar (2026-08-30): «keep the currency only (usd, euro, syp)». JOD
- * and LBP had been seeded since the first migration and neither could ever price anything —
- * `fx_rates` holds one pair, USD→SYP, and `rateBetween` REFUSES rather than defaulting to 1 for a
- * pair it cannot reach. So «الأردن · JOD» sat on the geography screen above a market whose
- * bookings could not be quoted: a currency the platform offered and then declined to honour.
+ * Standing instruction from Bashar, 2026-09-14: «remove all currencies from the system and keep
+ * only USD for everything». That SUPERSEDES 2026-08-30's «keep the currency only (usd, euro,
+ * syp)», which itself removed JOD and LBP — neither could ever price anything, because `fx_rates`
+ * holds one pair, USD→SYP, and `rateBetween` REFUSES rather than defaulting to 1 for a pair it
+ * cannot reach. EUR was in exactly that position and is retired for exactly that reason.
+ *
+ * SYP keeps its ROW and loses its OFFER: it is the accounting currency, written onto every ledger
+ * leg, and removing it would orphan the basis of every booking already recorded.
  *
  * ## The second assertion is the one that decays
  *
@@ -22,8 +25,21 @@ import { COUNTRIES, CURRENCIES } from './reference.js';
 describe('the currencies the platform offers', () => {
   const codes = CURRENCIES.map((one) => one.code);
 
-  it('is exactly SYP, USD and EUR', () => {
-    expect([...codes].sort()).toEqual(['EUR', 'SYP', 'USD']);
+  it('is exactly SYP and USD', () => {
+    expect([...codes].sort()).toEqual(['SYP', 'USD']);
+  });
+
+  /**
+   * And only ONE of them is offered.
+   *
+   * The row for SYP is not a currency anybody can choose — it is the unit the books are kept in,
+   * carried on every ledger leg as `amount_syp`. Asserting the OFFER separately from the ROW is
+   * what keeps «keep only USD» true without pretending the accounting currency does not exist.
+   */
+  it('offers the dollar, and nothing else', () => {
+    expect(CURRENCIES.filter((one) => one.isActive).map((one) => one.code)).toEqual([
+      'USD',
+    ]);
   });
 
   it('prices every launch market in one of them', () => {
