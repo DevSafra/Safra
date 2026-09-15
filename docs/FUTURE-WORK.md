@@ -982,6 +982,49 @@ refunded» reads as a policy rather than as an error. It changes who is paid: no
 are attached to real payout records, which skews any figure read off the console there. That is
 dev-database hygiene from integration tests writing outside a rollback, not a product defect.
 
+### OPEN DECISION — do SAFRA's books move from SYP to USD? (2026-09-15)
+
+**This needs Bashar's answer; it is an accounting rule, not a defect I should decide.**
+
+The platform is single-currency as of 2026-09-14/15: the dollar is the only currency offered,
+quoted, charged and displayed, the customer site has no currency switcher and converts nothing, gift
+cards are issuable in USD alone, and the console's currencies panel is read-only information. No
+Syrian pound is visible on any screen in any of the three apps — swept and measured.
+
+**What remains is invisible and internal.** `ledger_entries.amount_syp` and `fx_rate_to_syp` are
+written on every posting, and `bookings.total_syp` is snapshotted on every booking. SYP is the unit
+the books are kept in, which is why its row still exists (the ledger resolves it by code) even
+though nothing offers it.
+
+|                                          | rows                                                             |
+| ---------------------------------------- | ---------------------------------------------------------------- |
+| ledger entries, USD-denominated          | 241,277                                                          |
+| ledger entries, SYP-denominated          | 502 (4.5bn SYP — mostly gift cards issued while SYP was offered) |
+| bookings carrying a `total_syp` snapshot | 41,814                                                           |
+
+**Why it was not simply done.** Re-denominating is mechanically defensible — `amount_syp` is
+DERIVED from `amount × fx_rate_to_syp`, so the source of truth is untouched and this is a
+recomputation rather than a rewrite of primary records. But two things need a decision rather than
+a guess:
+
+1. the 502 SYP-denominated entries have no USD amount of their own; expressing them in dollars
+   means choosing a rate, and the only one on record is 13,000 effective 2026-08-11;
+2. it changes SAFRA's reporting basis, which is a finance decision with tax and audit consequences.
+
+**What it would close.** The USD→SYP rate would stop existing, so would the console control that
+maintained it (already removed — see below), and `SafraPayoutService.revenueSummary` and the payout
+totals would report in dollars instead of pounds.
+
+**What was done without deciding.** The rate display and its editor were removed from the console
+on Bashar's instruction, so the rate is no longer maintainable from a screen. `POST /admin/fx-rates`
+is deliberately still live: the ledger reads that rate on every posting, and an endpoint kept
+without a screen is recoverable where a rate the platform cannot record at all is not.
+
+**Also removed, and worth knowing before it is missed.** With the currencies panel reduced to
+information, the add-currency form and the currency editor had no caller and were deleted. The
+console can no longer add, rename, activate or withdraw a currency. The endpoints behind them are
+untouched, so restoring the panel's controls is a revert rather than a rebuild.
+
 ### The booking basket — several room types on one booking, 2026-09-07
 
 «غرفة مزدوجة × 2، جناح تنفيذي × 1، غرفة عائلية × 1» is one family's trip and was three bookings.
