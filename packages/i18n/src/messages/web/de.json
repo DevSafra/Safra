@@ -14,11 +14,8 @@
     "openMenu": "Menü öffnen",
     "closeMenu": "Menü schließen",
     "language": "Sprache",
-    "currency": "Währung",
     "chooseLanguage": "Sprache wählen",
-    "chooseCurrency": "Anzeigewährung wählen",
     "closeDialog": "Schließen",
-    "currencyHelp": "Preise werden nur zur Anzeige umgerechnet; abgerechnet wird in der Währung der Unterkunft.",
     "breadcrumb": "Brotkrümelnavigation",
     "themeToLight": "Zum hellen Design wechseln",
     "themeToDark": "Zum dunklen Design wechseln"
@@ -267,7 +264,6 @@
     "retry": "Erneut versuchen",
     "skipToContent": "Zum Inhalt springen",
     "back": "Zurück",
-    "convertedFrom": "umgerechnet aus {amount}",
     "durationHours": "{count, plural, =0 {unter einer Stunde} one {1 Stunde} other {# Stunden}}",
     "durationMinutes": "{count, plural, =0 {unter einer Minute} one {1 Minute} other {# Minuten}}"
   },

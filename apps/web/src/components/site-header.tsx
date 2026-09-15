@@ -3,9 +3,8 @@ import { getTranslations } from 'next-intl/server';
 
 import type { Locale } from '@/i18n/routing';
 import { getSession } from '@/lib/session-server';
-import { getCurrencyCatalogue, getPublicSettings } from '@/lib/catalog';
+import { getPublicSettings } from '@/lib/catalog';
 import { announcementFor } from '@/lib/settings';
-import { DISPLAY_CURRENCIES, displayCurrency } from '@/lib/currency';
 import { HeaderMenus } from '@/components/header-menus';
 import { HeaderNav } from '@/components/header-nav';
 import { MenuContents } from '@/components/menu-contents';
@@ -128,34 +127,10 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
    * header is the sole dynamic part of them.
    */
   /*
-    Three reads in parallel, and two of them are free: `getCurrencyCatalogue` is the same
-    five-minute cached read the footer already makes and Next deduplicates it within a request, and
-    `displayCurrency` reads a cookie — which this header is already dynamic for, because of the
-    session below.
+    The session alone now. The currency catalogue and the chosen-currency cookie were read here to
+    feed a picker that no longer exists — see `HeaderMenus`.
   */
-  const [session, { currencies }, currency] = await Promise.all([
-    getSession(),
-    getCurrencyCatalogue(),
-    displayCurrency(),
-  ]);
-
-  /*
-    The list is `DISPLAY_CURRENCIES`; the catalogue supplies only the SYMBOL. This is the footer's
-    own arrangement and the reason is a defect this popup had for one build: offering the catalogue
-    directly listed TRY, which is a currency listings are PRICED in and not one prices can be shown
-    in. `isDisplayCurrency` rejects it on the way back, so choosing it set nothing and silently
-    left the reader on the default — a control that looks like it works and does not.
-
-    Mapping over the constant fixes the order as well: USD, EUR, SYP, rather than whatever
-    alphabetical order the reference table happens to return.
-  */
-  const symbolOf = (code: string) =>
-    currencies.find((one) => one.code === code)?.symbol ?? code;
-
-  const displayCurrencies = DISPLAY_CURRENCIES.map((code) => ({
-    code,
-    symbol: symbolOf(code),
-  }));
+  const session = await getSession();
 
   const links = [
     { href: `/${locale}`, label: t('home') },
@@ -282,14 +257,9 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
         */}
           <HeaderMenus
             locale={locale}
-            currency={currency}
-            currencies={displayCurrencies}
             labels={{
               language: t('language'),
-              currency: t('currency'),
               chooseLanguage: t('chooseLanguage'),
-              chooseCurrency: t('chooseCurrency'),
-              currencyHelp: t('currencyHelp'),
               close: t('closeDialog'),
             }}
           />
@@ -352,9 +322,7 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
             registerLabel={auth('createAccount')}
             signInLabel={auth('signIn')}
             accountTitle={session?.user.email}
-            currency={currency}
-            currencies={displayCurrencies}
-            localeLabels={{ language: t('language'), currency: t('currency') }}
+            localeLabels={{ language: t('language') }}
           />
         </MobileMenu>
       </div>

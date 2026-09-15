@@ -4,10 +4,8 @@ import { getTranslations } from 'next-intl/server';
 import type { Locale } from '@/i18n/routing';
 import type { SearchResultItem } from '@/lib/api';
 import { OrnamentField } from '@/components/ornament';
-import { localisedName, localisedText } from '@/lib/localise';
+import { formatMoney, localisedName, localisedText } from '@/lib/localise';
 import { imageUrl } from '@/lib/property';
-import { getCurrencyCatalogue } from '@/lib/catalog';
-import { convertForDisplay, displayCurrency } from '@/lib/currency';
 import { dynamicMessage } from '@/lib/dynamic-message';
 import { StarRating } from '@safra/ui';
 
@@ -70,31 +68,17 @@ export async function PropertyCard({
   const t = await getTranslations('property');
   const tt = await getTranslations('propertyTypes');
   const ts = await getTranslations('starRating');
-  const common = await getTranslations('common');
 
   /*
-    Both reads are cached and request-deduplicated, so a page of twenty cards makes one of each
-    rather than twenty. `displayCurrency` reads a cookie, which these pages already are dynamic for.
-  */
-  const [{ rates }, target] = await Promise.all([
-    getCurrencyCatalogue(),
-    displayCurrency(),
-  ]);
+    No conversion: the platform prices, quotes and charges in ONE currency (Bashar, 2026-09-14).
 
-  const nightly = convertForDisplay(
-    item.nightlyFrom,
-    item.currencyCode,
-    locale,
-    target,
-    rates,
-  );
-  const total = convertForDisplay(
-    item.stayTotal,
-    item.currencyCode,
-    locale,
-    target,
-    rates,
-  );
+    This used to read a cookie and a rate table to show a browse price in whatever the visitor had
+    picked, with «محوّل من …» underneath saying what they would actually be charged. With a single
+    currency there is nothing to convert and nothing to disclaim — the figure on the card is the
+    figure at checkout, which is what that disclaimer existed to admit it was not.
+  */
+  const nightly = formatMoney(item.nightlyFrom, item.currencyCode, locale);
+  const total = formatMoney(item.stayTotal, item.currencyCode, locale);
 
   /*
     `localisedName`, not a locale ternary. The old `locale === 'ar' ? nameAr : nameEn || nameAr`
@@ -239,7 +223,7 @@ export async function PropertyCard({
         <div className="mt-auto pt-5">
           <div className="border-t-2 border-dotted border-line pt-4">
             <p className="text-base text-text">
-              <span className="text-[18px] font-bold text-gold-read">{nightly.text}</span>{' '}
+              <span className="text-[18px] font-bold text-gold-read">{nightly}</span>{' '}
               <span className="text-[14px] text-muted">{t('perNight')}</span>
             </p>
             {/*
@@ -249,13 +233,7 @@ export async function PropertyCard({
         */}
             {item.nights > 1 ? (
               <p className="mt-0.5 text-xs text-muted">
-                {total.text} {t('totalFor', { nights: item.nights })}
-              </p>
-            ) : null}
-            {/* Said once per card, under the total — the figure a booking is actually made against. */}
-            {total.converted ? (
-              <p className="mt-0.5 text-[13px] text-muted">
-                {common('convertedFrom', { amount: total.original })}
+                {total} {t('totalFor', { nights: item.nights })}
               </p>
             ) : null}
           </div>

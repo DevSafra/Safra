@@ -11,10 +11,14 @@ import { LOCALE_LABELS, type Locale, routing } from '@/i18n/routing';
 import { swapLocale } from '@/lib/locale-path';
 
 /**
- * The language and currency controls in the header, each opening a popup.
+ * The LANGUAGE control in the header, opening a popup.
+ *
+ * There was a currency control beside it until 2026-09-14, when Bashar removed every currency but
+ * the dollar: «keep only USD for everything… remove the change currency from the navbar and
+ * footer». A picker offering one option is a control that cannot do anything.
  *
  * Bashar, 2026-09-02: «add on it the current language but as a flag, on changing it, a popup window
- * should appear. The same thing with the currency. (same as booking.com)»
+ * should appear. (same as booking.com)»
  *
  * ## The popup is `Modal` from `@safra/ui`
  *
@@ -25,13 +29,12 @@ import { swapLocale } from '@/lib/locale-path';
  * the whole point of «one popup, designed, used everywhere»: the CONTAINER is shared even when the
  * contents are not.
  *
- * ## Why the two behave differently inside
+ * ## Language is NAVIGATION
  *
- * They look like a pair and they are not. **Language is navigation** — three real anchors, so a
- * crawler can follow them and index the alternate-language version of a city page, which is what
- * §5.4 needs and what the footer's picker was built for. **Currency is a preference** — a form
- * POSTing to `/[locale]/currency`, because a GET that writes would let a prefetch or a pasted link
- * change somebody's currency, and Next prefetches every link in the viewport.
+ * Three real anchors, so a crawler can follow them and index the alternate-language version of a
+ * city page — what §5.4 needs, and what the footer's picker was built for. The currency control
+ * that used to sit beside it was a preference instead, and POSTed for that reason; with one
+ * currency there is no preference left to express.
  *
  * ## The path comes from the BROWSER
  *
@@ -43,20 +46,12 @@ import { swapLocale } from '@/lib/locale-path';
  */
 export function HeaderMenus({
   locale,
-  currency,
-  currencies,
   labels,
 }: {
   locale: Locale;
-  currency: string;
-  /** Code and symbol, from the cached catalogue the footer already reads. */
-  currencies: readonly { code: string; symbol: string }[];
   labels: {
     language: string;
-    currency: string;
     chooseLanguage: string;
-    chooseCurrency: string;
-    currencyHelp: string;
     close: string;
   };
 }) {
@@ -65,12 +60,6 @@ export function HeaderMenus({
       <Suspense fallback={<LanguageTrigger locale={locale} label={labels.language} />}>
         <LanguageMenu locale={locale} labels={labels} />
       </Suspense>
-      <CurrencyMenu
-        locale={locale}
-        currency={currency}
-        currencies={currencies}
-        labels={labels}
-      />
     </div>
   );
 }
@@ -187,126 +176,6 @@ function LanguageMenu({
               );
             })}
           </ul>
-
-          <CloseButton label={labels.close} onClick={() => setOpen(false)} />
-        </Modal>
-      ) : null}
-    </>
-  );
-}
-
-/* ── Currency ────────────────────────────────────────────────────────────── */
-
-function CurrencyMenu({
-  locale,
-  currency,
-  currencies,
-  labels,
-}: {
-  locale: Locale;
-  currency: string;
-  currencies: readonly { code: string; symbol: string }[];
-  labels: {
-    currency: string;
-    chooseCurrency: string;
-    currencyHelp: string;
-    close: string;
-  };
-}) {
-  const [open, setOpen] = useState(false);
-  const pathname = usePathname();
-  const query = useSearchParams().toString();
-
-  const symbolOf = (code: string) =>
-    currencies.find((one) => one.code === code)?.symbol ?? code;
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        data-menu="currency"
-        aria-label={`${labels.currency}: ${currency}`}
-        className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm text-text/85 transition-colors duration-200 ease-out-strong hover:bg-gold/10 hover:text-text sm:min-h-11"
-      >
-        <span aria-hidden className="text-[16px] leading-none">
-          {symbolOf(currency)}
-        </span>
-        <span className="hidden text-xs font-semibold tracking-wide sm:inline">
-          {currency}
-        </span>
-      </button>
-
-      {open ? (
-        <Modal
-          title={labels.chooseCurrency}
-          onClose={() => setOpen(false)}
-          width="max-w-sm"
-        >
-          {/*
-            A POST that redirects back, which is the shape `/[locale]/currency` enforces — a GET
-            that writes would let a prefetch or a pasted link change somebody's preference.
-
-            `next` carries the reader's current path AND query, so changing currency on
-            `/ar/search?citySlug=damascus` returns them to that search rather than to the home
-            page. The route rebuilds the destination and refuses anything that is not a single
-            leading slash, so this value cannot send them off-origin.
-          */}
-          <form
-            action={`/${locale}/currency`}
-            method="post"
-            className="flex flex-col gap-1"
-          >
-            <input
-              type="hidden"
-              name="next"
-              value={`${pathname}${query ? `?${query}` : ''}`}
-            />
-
-            {currencies.map(({ code, symbol }) => {
-              const current = code === currency;
-
-              return (
-                <button
-                  key={code}
-                  type="submit"
-                  name="currency"
-                  value={code}
-                  aria-current={current ? 'true' : undefined}
-                  className={`flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-start text-sm transition-colors duration-200 ease-out-strong ${
-                    current
-                      ? 'bg-gold/10 font-semibold text-text'
-                      : 'text-muted hover:bg-field hover:text-text'
-                  }`}
-                >
-                  {/*
-                    No box around the symbol (Bashar, 2026-09-03). It was a bordered chip, which
-                    read as a control inside a row that is already a button — two nested things to
-                    press, and the row's own selected state had to fight it. The fixed width stays:
-                    it is what keeps «$», «€» and «ل.س» on one column so the codes beside them line
-                    up.
-                  */}
-                  <span
-                    aria-hidden
-                    className="grid size-7 shrink-0 place-items-center text-[14px]"
-                  >
-                    {symbol}
-                  </span>
-                  <span className="flex-1 tracking-wide">{code}</span>
-                  {current ? <CheckIcon /> : null}
-                </button>
-              );
-            })}
-          </form>
-
-          {/*
-            Said here rather than nowhere: a converted figure is an estimate from one rate a staff
-            member typed, and the booking is charged in the listing's own currency. The card prints
-            the original underneath for the same reason.
-          */}
-          <p className="mt-3 text-[14px] leading-relaxed text-faint">
-            {labels.currencyHelp}
-          </p>
 
           <CloseButton label={labels.close} onClick={() => setOpen(false)} />
         </Modal>

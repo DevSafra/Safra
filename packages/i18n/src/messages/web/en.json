@@ -14,11 +14,8 @@
     "openMenu": "Open the menu",
     "closeMenu": "Close the menu",
     "language": "Language",
-    "currency": "Currency",
     "chooseLanguage": "Choose a language",
-    "chooseCurrency": "Choose a display currency",
     "closeDialog": "Close",
-    "currencyHelp": "Prices are converted for display only; you are charged in the listing's own currency.",
     "breadcrumb": "Breadcrumb",
     "themeToLight": "Switch to light mode",
     "themeToDark": "Switch to dark mode"
@@ -267,7 +264,6 @@
     "retry": "Try again",
     "skipToContent": "Skip to content",
     "back": "Back",
-    "convertedFrom": "converted from {amount}",
     "durationHours": "{count, plural, =0 {under an hour} one {1 hour} other {# hours}}",
     "durationMinutes": "{count, plural, =0 {under a minute} one {1 minute} other {# minutes}}"
   },

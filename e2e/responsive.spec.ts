@@ -630,14 +630,16 @@ test.describe('the phone menu', () => {
   });
 
   /**
-   * The two controls the bar gives up, and the question a trigger cannot answer.
+   * The phone menu shows the current LANGUAGE, marked (Bashar, 2026-09-03: «I do not see the
+   * current language… inside it»), which is the whole reason it is an open list rather than
+   * another button.
    *
-   * Bashar asked for these after the first build left them out (2026-09-03: «I do not see the
-   * current language and currency inside it»), so what is asserted is not merely that they are
-   * present — it is that the CURRENT one is marked, which is the whole reason they are open lists
-   * rather than two more buttons.
+   * A currency list sat beside it until 2026-09-14, when the platform reduced to one currency. Its
+   * absence is asserted here rather than merely uncovered by deleting the old assertions: a picker
+   * left behind in the phone menu is exactly the kind of thing that survives a change made on the
+   * desktop bar, because nobody opens the drawer to check.
    */
-  test('shows the current language and currency, and can change them', async ({
+  test('shows the current language, marked, and offers no currency to change', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 860 });
@@ -650,23 +652,19 @@ test.describe('the phone menu', () => {
       'aria-current',
       'true',
     );
-    await expect(menu.getByRole('button', { name: /USD/ })).toHaveAttribute(
-      'aria-current',
-      'true',
-    );
 
-    /*
-      And it APPLIES. This is a regression test for a silent one: the menu closed itself on every
-      click inside it, including the currency chips, which unmounted their own POST form in the
-      same tick. No request was made, no error appeared, and the menu closed looking exactly as if
-      it had worked — the failure mode a «does the control exist» assertion cannot see.
-    */
-    await menu.getByRole('button', { name: /EUR/ }).click();
-    await expect.poll(() => new URL(page.url()).pathname).toBe('/ar/city/damascus');
+    /* Changing language still works from here — the half that remains. */
+    await menu.getByRole('link', { name: 'English' }).click();
+    await expect.poll(() => new URL(page.url()).pathname).toBe('/en/city/damascus');
 
+    /* And there is nothing left to change a currency with. */
     await page.locator('header [data-menu="mobile"]').click();
-    await expect(page.getByRole('dialog').getByRole('button', { name: /EUR/ })) //
-      .toHaveAttribute('aria-current', 'true');
+    await expect(
+      page.getByRole('dialog').locator('form[action*="/currency"]'),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole('dialog').getByRole('button', { name: /USD|EUR|SYP/ }),
+    ).toHaveCount(0);
   });
 
   test('leaves nothing on the document when it closes', async ({ page }) => {

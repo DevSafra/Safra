@@ -540,35 +540,32 @@ test.describe('a Latin-valued field on an Arabic page', () => {
 
   /**
    * The currency control, end to end — and the line that keeps it honest.  /**
-   * The currency control, end to end — and the line that keeps it honest.
+   * ONE currency, on the browse surface and at the checkout alike.
    *
-   * A converted price is an ESTIMATE from one rate a staff member typed. The listing's own amount
-   * is printed beneath it, and checkout is never converted, because that is the figure somebody is
-   * actually charged. Both halves are asserted here; either alone would pass on a broken build.
+   * This used to drive the footer's currency picker: choose Syrian pounds, watch a search card
+   * switch to «ل.س» with the dollar figure kept underneath as «محوَّل من …», then confirm the
+   * CHECKOUT still charged dollars. The picker existed because a converted price is an estimate
+   * and a contractual one is not, and the disclaimer existed to admit the difference.
    *
-   * The dollar is «$», which is what `CURRENCY_CATALOGUE` says it is. This pinned `Intl`'s ar-SY
-   * spelling until 2026-09-03 — asserted because that is what the screen happened to render, never
-   * because the platform had decided it. See the note in `formatMoney`.
+   * Bashar removed every currency but the dollar on 2026-09-14, so there is no estimate left to
+   * distinguish from a quote: the figure on the card is the figure at the checkout. What is
+   * asserted now is that single fact, plus the absence of the machinery — no picker, and no other
+   * currency's symbol anywhere on either screen.
    */
-  test('converts browse prices and never the checkout total', async ({ page }) => {
+  test('prices in dollars on the card and at the checkout, with nothing to switch', async ({
+    page,
+  }) => {
     await page.goto('/ar/city/damascus');
 
     const card = page.locator('article').first();
 
     await expect(card).toContainText('$');
+    await expect(card, 'no other currency reaches a card').not.toContainText('ل.س');
+    await expect(card, 'and no «converted from» disclaimer').not.toContainText('محوَّل');
 
-    /*
-      Driven through the real control — a `<details>` and a form POST. A cookie set directly would
-      skip the one thing worth testing, which is that choosing a currency writes it and comes back
-      to the same page.
-    */
-    await page.locator('footer [data-menu="currency"]').click();
-    await page.locator('footer button[name="currency"][value="SYP"]').click();
-
-    await expect.poll(() => new URL(page.url()).pathname).toBe('/ar/city/damascus');
-    await expect(card).toContainText('ل.س');
-    /* The original, so an estimate is never mistaken for a quote. */
-    await expect(card).toContainText('$');
+    /* The control itself is gone, in the footer and in the bar. */
+    await expect(page.locator('[data-menu="currency"]')).toHaveCount(0);
+    await expect(page.locator('form[action*="/currency"]')).toHaveCount(0);
 
     /* Contractual: the amount a card is charged, in the listing's own currency, always. */
     await page.goto(CHECKOUT);

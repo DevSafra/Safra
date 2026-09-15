@@ -3,8 +3,7 @@ import { getTranslations } from 'next-intl/server';
 
 import type { Locale } from '@/i18n/routing';
 import { HeaderMenus } from '@/components/header-menus';
-import { getCities, getCurrencyCatalogue } from '@/lib/catalog';
-import { DISPLAY_CURRENCIES, displayCurrency } from '@/lib/currency';
+import { getCities } from '@/lib/catalog';
 import { localisedName } from '@/lib/localise';
 import { CUSTOMER_FACING_METHODS, type CustomerFacingMethod } from '@safra/contracts';
 import { ORNAMENT_BRAND } from '@safra/ui';
@@ -62,7 +61,7 @@ import { ORNAMENT_BRAND } from '@safra/ui';
  *
  * ## Two fetches, both cached
  *
- * `getCurrencyCatalogue` and `getCities` are the shared five-minute cached reads the price and city
+ * `getCities` is the shared five-minute cached read the city
  * surfaces already make, and they run concurrently. A footer on every page must not add a round
  * trip of its own; these add none.
  */
@@ -97,25 +96,11 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
   const auth = await getTranslations('auth');
   const payment = await getTranslations('paymentMethods');
 
-  const [{ currencies }, cities, chosen] = await Promise.all([
-    getCurrencyCatalogue(),
-    getCities(),
-    displayCurrency(),
-  ]);
-
   /*
-    `DISPLAY_CURRENCIES` for the list, the catalogue for the SYMBOL — the header's own arrangement,
-    and the reason is a defect this popup had for one build: offering the catalogue directly listed
-    TRY, a currency listings are PRICED in and not one prices can be SHOWN in, so choosing it set
-    nothing and left the reader on the default.
+    The cities alone now. The currency catalogue and the chosen-currency cookie fed a picker that
+    no longer exists — the platform prices in one currency (Bashar, 2026-09-14).
   */
-  const symbolOf = (code: string) =>
-    currencies.find((entry) => entry.code === code)?.symbol ?? code;
-
-  const displayCurrencies = DISPLAY_CURRENCIES.map((code) => ({
-    code,
-    symbol: symbolOf(code),
-  }));
+  const cities = await getCities();
 
   const destinations = {
     title: t('links'),
@@ -355,14 +340,9 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
             <div className="mt-6">
               <HeaderMenus
                 locale={locale}
-                currency={chosen}
-                currencies={displayCurrencies}
                 labels={{
                   language: nav('language'),
-                  currency: nav('currency'),
                   chooseLanguage: nav('chooseLanguage'),
-                  chooseCurrency: nav('chooseCurrency'),
-                  currencyHelp: nav('currencyHelp'),
                   close: nav('closeDialog'),
                 }}
               />

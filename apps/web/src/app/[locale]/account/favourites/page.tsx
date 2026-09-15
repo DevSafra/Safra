@@ -6,10 +6,8 @@ import { AccountShell } from '@/components/account-shell';
 import { SaveButton } from '@/components/save-button';
 import { getAccountSummary, getMyFavourites } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
-import { localisedName } from '@/lib/localise';
+import { formatMoney, localisedName } from '@/lib/localise';
 import { StarRating } from '@safra/ui';
-import { getCurrencyCatalogue } from '@/lib/catalog';
-import { convertForDisplay, displayCurrency } from '@/lib/currency';
 
 /**
  * المفضلة — the listings this customer has saved (handoff §6).
@@ -46,14 +44,6 @@ export default async function AccountFavouritesPage({
 
   const ts = await getTranslations('starRating');
 
-  /*
-    A saved listing is a BROWSE surface — somebody comparing what they shortlisted — so its price
-    converts like a search card's. Cached and request-deduplicated, so this adds no round trip.
-  */
-  const [{ rates }, target] = await Promise.all([
-    getCurrencyCatalogue(),
-    displayCurrency(),
-  ]);
   const property = await getTranslations('property');
 
   const [summaryRead, favouritesRead] = await Promise.all([
@@ -139,15 +129,7 @@ export default async function AccountFavouritesPage({
                   <p className="text-sm text-gold-read">
                     {t('favouriteFrom')}{' '}
                     <span dir="ltr">
-                      {
-                        convertForDisplay(
-                          item.fromPrice,
-                          item.currencyCode,
-                          locale,
-                          target,
-                          rates,
-                        ).text
-                      }
+                      {formatMoney(item.fromPrice, item.currencyCode, locale)}
                     </span>
                   </p>
                 ) : null}

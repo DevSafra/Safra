@@ -21,12 +21,10 @@ import {
   subtractMoney,
   countedTexts,
 } from '@/lib/customer-fee';
-import { localisedName, localisedText } from '@/lib/localise';
+import { formatMoney, localisedName, localisedText } from '@/lib/localise';
 import { getProperty, imageUrl, type PropertyDetail } from '@/lib/property';
 import { dynamicMessage } from '@/lib/dynamic-message';
 import { StarRating } from '@safra/ui';
-import { getCurrencyCatalogue } from '@/lib/catalog';
-import { convertForDisplay, displayCurrency } from '@/lib/currency';
 import { DEFAULT_MONEY_CURRENCY, preferredCurrency } from '@safra/contracts';
 
 /**
@@ -202,10 +200,6 @@ export default async function PropertyPage({
     The visitor's chosen currency, and the rates that reach it. Both reads are cached for five
     minutes and deduplicated per request, so this costs nothing the page was not already paying.
   */
-  const [{ rates }, target] = await Promise.all([
-    getCurrencyCatalogue(),
-    displayCurrency(),
-  ]);
 
   /*
     The fee is IN the figure, as it is in every card (Bashar, 2026-09-03).
@@ -215,14 +209,12 @@ export default async function PropertyPage({
     per-night «from» price carries the whole of it — which is exact for the one-night stay the
     figure is a floor for, and never understates a longer one.
   */
-  const nightly = convertForDisplay(
+  const nightly = formatMoney(
     cheapest
       ? priceWithCustomerFee(cheapest.basePrice, cheapest.currencyCode, property.fees)
       : '0',
     cheapest?.currencyCode ?? DEFAULT_MONEY_CURRENCY,
     locale,
-    target,
-    rates,
   );
 
   /*
@@ -330,8 +322,7 @@ export default async function PropertyPage({
     */
     const tooShort = unit.minNights > nights;
 
-    const shown = (amount: string) =>
-      convertForDisplay(amount, unit.currencyCode, locale, target, rates).text;
+    const shown = (amount: string) => formatMoney(amount, unit.currencyCode, locale);
 
     /* The room alone, the fee alone, and their sum — three figures that reconcile on screen. */
     const roomOnly = multiplyMoney(unit.basePrice, unit.currencyCode, nights);
@@ -863,7 +854,7 @@ export default async function PropertyPage({
                       renders — not computed again here. Two derivations of one figure is how a
                       card and the row it summarises come to disagree.
                     */
-                    fromPrice={rooms[0]?.totalText ?? nightly.text}
+                    fromPrice={rooms[0]?.totalText ?? nightly}
                     stay={{
                       checkIn: stayWindow.checkIn,
                       checkOut: stayWindow.checkOut,
@@ -889,8 +880,6 @@ export default async function PropertyPage({
                       currencyCode: preferredCurrency(
                         rooms.map((room) => room.currencyCode),
                       ),
-                      target,
-                      rates,
                       fees: property.fees,
                     }}
                     copy={{

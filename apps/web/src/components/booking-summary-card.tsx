@@ -6,9 +6,8 @@ import { useBookingSelection, type BasketLine } from '@/components/booking-selec
 import { MAX_BASKET_ROOMS } from '@/lib/basket-limits';
 import { Stepper } from '@/components/field-popover';
 import { rangeArrow } from '@/lib/arrows';
-import { convertMoney, type FxRate } from '@/lib/convert-money';
 import { priceWithCustomerFee } from '@/lib/customer-fee';
-import { addMoney } from '@/lib/localise';
+import { addMoney, formatMoney } from '@/lib/localise';
 import type { Locale } from '@/i18n/routing';
 
 /**
@@ -64,8 +63,6 @@ export function BookingSummaryCard({
    */
   readonly money: {
     readonly currencyCode: string;
-    readonly target: string;
-    readonly rates: readonly FxRate[];
     readonly fees: {
       readonly customerFeeMode: string;
       readonly customerFeeValue: number;
@@ -113,8 +110,12 @@ export function BookingSummaryCard({
   const { lines, rooms, capacity, setRooms, remove, clear, hasRoom } =
     useBookingSelection();
 
-  const show = (amount: string) =>
-    convertMoney(amount, money.currencyCode, locale, money.target, money.rates).text;
+  /*
+    One currency, so nothing converts (Bashar, 2026-09-14). This used to run every figure in the
+    basket through the visitor's chosen currency and a rate table; the amounts here are the ones
+    checkout charges, and now they are also the ones it shows.
+  */
+  const show = (amount: string) => formatMoney(amount, money.currencyCode, locale);
 
   if (lines.length === 0) {
     return (

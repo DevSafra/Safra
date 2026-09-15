@@ -9,7 +9,9 @@ import { LOCALE_LABELS, type Locale, routing } from '@/i18n/routing';
 import { swapLocale } from '@/lib/locale-path';
 
 /**
- * Language and currency inside the phone menu — open, not behind a second press.
+ * The LANGUAGE list inside the phone menu — open, not behind a second press.
+ *
+ * A currency list sat beside it until 2026-09-14, when Bashar reduced the platform to one currency.
  *
  * ## Why not `HeaderMenus`, which already does this
  *
@@ -24,13 +26,11 @@ import { swapLocale } from '@/lib/locale-path';
  * alternatives; three chips show the current value AND what else there is, in the same space, and
  * change it in one press instead of two.
  *
- * ## The two halves behave differently, deliberately
+ * ## Language is navigation
  *
- * **Language is navigation** — real anchors carrying `hrefLang`, so a press is an ordinary
- * navigation that keeps the reader's page. **Currency is a preference** — a form that POSTs,
- * because a `<Link>` that wrote a cookie would fire on Next's prefetch, and Next prefetches every
- * link in the viewport. Somebody merely opening this menu would have their currency changed for
- * them. The same reasoning made the footer's picker a POST.
+ * Real anchors carrying `hrefLang`, so a press is an ordinary navigation that keeps the reader's
+ * page. The currency half was a POSTing form instead — a `<Link>` writing a cookie would have
+ * fired on Next's prefetch — and it went with the currencies.
  *
  * ## The path comes from the BROWSER
  *
@@ -41,37 +41,24 @@ import { swapLocale } from '@/lib/locale-path';
  */
 export function MenuLocale({
   locale,
-  currency,
-  currencies,
   labels,
 }: {
   readonly locale: Locale;
-  readonly currency: string;
-  readonly currencies: readonly { code: string; symbol: string }[];
-  readonly labels: { language: string; currency: string };
+  readonly labels: { language: string };
 }) {
   return (
     <Suspense fallback={null}>
-      <Controls
-        locale={locale}
-        currency={currency}
-        currencies={currencies}
-        labels={labels}
-      />
+      <Controls locale={locale} labels={labels} />
     </Suspense>
   );
 }
 
 function Controls({
   locale,
-  currency,
-  currencies,
   labels,
 }: {
   readonly locale: Locale;
-  readonly currency: string;
-  readonly currencies: readonly { code: string; symbol: string }[];
-  readonly labels: { language: string; currency: string };
+  readonly labels: { language: string };
 }) {
   const pathname = usePathname();
   const query = useSearchParams().toString();
@@ -95,36 +82,6 @@ function Controls({
             </Link>
           ))}
         </div>
-      </section>
-
-      <section>
-        <Heading>{labels.currency}</Heading>
-        {/*
-          `next` carries the reader's path AND query, so changing currency on a search returns them
-          to that search rather than to the home page. The route rebuilds the destination and
-          refuses anything that is not a single leading slash, so this value cannot send them
-          off-origin.
-        */}
-        <form
-          action={`/${locale}/currency`}
-          method="post"
-          className="mt-2 flex flex-wrap gap-1.5"
-        >
-          <input type="hidden" name="next" value={`${pathname}${suffix}`} />
-          {currencies.map(({ code, symbol }) => (
-            <button
-              key={code}
-              type="submit"
-              name="currency"
-              value={code}
-              aria-current={code === currency ? 'true' : undefined}
-              className={`${chip(code === currency)} cursor-pointer`}
-            >
-              <span aria-hidden>{symbol}</span>
-              {code}
-            </button>
-          ))}
-        </form>
       </section>
     </div>
   );

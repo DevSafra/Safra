@@ -22,10 +22,10 @@ import { MenuLocale } from '@/components/menu-locale';
  * take the SAME components and the same catalogue keys: `HeaderNav` renders the destinations here
  * exactly as it does up there, current-page marking included.
  *
- * The language and currency controls are the one thing NOT taken from the bar as-is: the bar's are
+ * The language control is the one thing NOT taken from the bar as-is: the bar's is
  * popup triggers, and a popup opened from inside a popup is two focus traps and an ambiguous
  * Escape. `MenuLocale` renders the same choices as open lists instead, which also answers the
- * question a trigger hides — which language and which currency am I on right now.
+ * question a trigger hides — which language am I reading right now.
  */
 export function MenuContents({
   locale,
@@ -37,8 +37,6 @@ export function MenuContents({
   registerLabel,
   signInLabel,
   accountTitle,
-  currency,
-  currencies,
   localeLabels,
 }: {
   readonly locale: Locale;
@@ -51,9 +49,7 @@ export function MenuContents({
   readonly registerLabel: string;
   readonly signInLabel: string;
   readonly accountTitle?: string | undefined;
-  readonly currency: string;
-  readonly currencies: readonly { code: string; symbol: string }[];
-  readonly localeLabels: { language: string; currency: string };
+  readonly localeLabels: { language: string };
 }) {
   return (
     <>
@@ -88,16 +84,11 @@ export function MenuContents({
       </Link>
 
       {/*
-        Language and currency, shown OPEN with the current one filled in (Bashar, 2026-09-03: «I do
-        not see the current language and currency inside it»). See `MenuLocale` for why they are
-        lists here and a popup on the bar.
+        The language, shown OPEN with the current one filled in (Bashar, 2026-09-03: «I do not see
+        the current language… inside it»). See `MenuLocale` for why it is a list here and a popup on
+        the bar. The currency list beside it went when the platform reduced to one currency.
       */}
-      <MenuLocale
-        locale={locale}
-        currency={currency}
-        currencies={currencies}
-        labels={localeLabels}
-      />
+      <MenuLocale locale={locale} labels={localeLabels} />
 
       {/* A rule, because what follows is about the READER rather than about the site. */}
       <div className="mt-2 grid gap-2 border-t border-line pt-4">
