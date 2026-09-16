@@ -33,6 +33,26 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * arrow KEY means a physical direction: these are not keys, they are labels for «earlier in the
  * list» and «later in the list», and later is to the left when the list runs right to left.
  */
+/**
+ * How long the rail must be still before its arrows answer for where it IS again.
+ *
+ * Long enough to outlast the gap between two frames of a smooth scroll and the snap correction
+ * that can follow one; short enough that a reader who flicks the rail with a thumb and stops does
+ * not see the arrows lag behind their own hand.
+ */
+const SETTLE_MS = 160;
+
+/**
+ * How near an edge counts as being at it.
+ *
+ * TWO pixels, not one. `scrollWidth` and `clientWidth` are integers while `scrollLeft` is a float,
+ * so the arithmetic maximum can sit up to a pixel beyond any position the rail can actually reach —
+ * and on a display with a fractional device pixel ratio, up to two. A one-pixel test can therefore
+ * be unsatisfiable at the very end of the rail, which is the one place it is asked, and the arrow
+ * would come back to life the moment the prediction above was released.
+ */
+const EDGE_SLACK = 2;
+
 export function CardSlider({
   children,
   labels,
@@ -144,6 +164,21 @@ export function CardSlider({
     figure is wrong exactly at the end, which is the one place it is being asked.
   */
   const pending = useRef<number | null>(null);
+  /*
+    The prediction is released when the rail STOPS, not when it arrives.
+
+    It used to be released by comparing the live position against the target, and that is the flicker
+    Bashar saw on the last quote (2026-09-16): «the button gets deactivated, activated and then
+    deactivated very fast». A position test has to be exact to within a pixel, and a scroll position
+    is a float that a snap correction, a fractional device pixel ratio or another engine's smooth
+    scroller can leave a hair away from the number this code chose — at which point the prediction
+    is dropped mid-animation, the arrow answers for where the rail IS rather than where it is going,
+    and it lights up for one frame before the scroll finishes and puts it out again.
+
+    Waiting for silence needs no such luck. Every scroll event pushes this timer out, so it fires
+    once the rail has been still for `SETTLE_MS`, whatever route it took to get there.
+  */
+  const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const tracksActive = footers !== undefined;
 
@@ -153,12 +188,6 @@ export function CardSlider({
 
     const furthest = el.scrollWidth - el.clientWidth;
     const live = Math.abs(el.scrollLeft);
-
-    /* Arrived — or close enough that a zoomed float will never land exactly. */
-    if (pending.current !== null && Math.abs(live - pending.current) <= 1) {
-      pending.current = null;
-    }
-
     const position = pending.current ?? live;
 
     /*
@@ -179,8 +208,8 @@ export function CardSlider({
     */
     const padding = Number.parseFloat(getComputedStyle(el).paddingInlineStart) || 0;
 
-    setAtStart(position <= padding + 1);
-    setAtEnd(position >= furthest - 1);
+    setAtStart(position <= padding + EDGE_SLACK);
+    setAtEnd(position >= furthest - EDGE_SLACK);
 
     /*
       The slide nearest the rail's START edge, found by comparing rectangles rather than by
@@ -210,6 +239,26 @@ export function CardSlider({
     setActive(nearest);
   }, [tracksActive]);
 
+  /** Drop the prediction and re-answer from where the rail actually is. */
+  const release = useCallback(() => {
+    if (settle.current !== null) {
+      clearTimeout(settle.current);
+      settle.current = null;
+    }
+
+    pending.current = null;
+    measure();
+  }, [measure]);
+
+  /** Push the release out; a rail still moving is a rail still going where it was sent. */
+  const postpone = useCallback(() => {
+    if (pending.current === null) return;
+
+    if (settle.current !== null) clearTimeout(settle.current);
+
+    settle.current = setTimeout(release, SETTLE_MS);
+  }, [release]);
+
   useEffect(() => {
     setMounted(true);
     measure();
@@ -225,7 +274,12 @@ export function CardSlider({
     const observer = new ResizeObserver(measure);
     observer.observe(el);
 
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+
+      /* A timer that fires into an unmounted component sets state on nothing. */
+      if (settle.current !== null) clearTimeout(settle.current);
+    };
   }, [measure]);
 
   const step = useCallback(
@@ -281,6 +335,12 @@ export function CardSlider({
       /* Answer for the destination NOW; the scroll can take its few hundred milliseconds. */
       pending.current = target;
       measure();
+      /*
+        Armed here as well as on every scroll event, because a press that cannot move the rail —
+        already at the end, or a target the engine rounds to where it already is — produces no
+        scroll events at all, and the prediction would otherwise be held for ever.
+      */
+      postpone();
 
       el.scrollTo({
         left: rtl ? -target : target,
@@ -289,26 +349,25 @@ export function CardSlider({
           : 'smooth',
       });
     },
-    [measure],
+    [measure, postpone],
   );
 
   return (
     <div className="relative">
       <ul
         ref={rail}
-        onScroll={measure}
+        onScroll={() => {
+          measure();
+          postpone();
+        }}
         /*
           A thumb, a drag or a trackpad takes the rail somewhere the last press did not promise, so
           the prediction above is abandoned the moment somebody touches it — otherwise a scroll
           interrupted halfway would leave the arrows describing a destination nobody is travelling
           to any more.
         */
-        onPointerDown={() => {
-          pending.current = null;
-        }}
-        onWheel={() => {
-          pending.current = null;
-        }}
+        onPointerDown={release}
+        onWheel={release}
         className={`slider-rail flex snap-x snap-mandatory overflow-x-auto pb-1 ${
           bleed ? '-mx-4 gap-3 px-4 sm:gap-4' : 'gap-3'
         }`}
@@ -492,7 +551,7 @@ function Arrow({
     way to say «nothing that way» because the keyboard and a screen reader both get told.
   */
   const skin = bare
-    ? `text-muted transition-[opacity,color,scale] ease-out-strong hover:text-gold-read active:scale-95 ${
+    ? `group text-muted transition-[opacity,color] ease-out-strong hover:text-gold-read ${
         hidden ? 'opacity-30 duration-140' : 'opacity-100 duration-200'
       }`
     : `border border-line bg-card text-text shadow-[var(--shadow-lift)] transition-[opacity,box-shadow,background-color] ease-out-strong hover:bg-field hover:shadow-[var(--shadow-lift-hover)] ${
@@ -500,6 +559,32 @@ function Arrow({
           ? 'pointer-events-none opacity-0 duration-140 lg:scale-90'
           : 'opacity-100 duration-200 lg:scale-100'
       }`;
+
+  /*
+    ## The press lives on the GLYPH, and its resting size when spent is the pressed one
+
+    Both halves of that are a fix for what Bashar saw (2026-09-16): «the button gets deactivated,
+    activated and then deactivated very fast», on the press that reaches the last quote.
+
+    It was `active:scale-95` on the button. A DISABLED element stops matching `:active`, so the
+    moment that press retired the control the scale sprang back — measured: 0.95 → 1 over 180ms,
+    beginning at full opacity, while the fade had barely started. A control growing at the instant
+    it is pressed reads as coming back to life, which is the one thing it is not doing.
+
+    So the pressed size is also the SPENT size: pressing takes the chevron to 90%, and an arrow
+    with nothing left to reach rests there and fades. Nothing travels backwards, and the class flip
+    at that moment changes no computed value, so there is no transition to see.
+
+    On the glyph rather than the button because the button is the TARGET. `globals.css` holds a
+    control to 40px below `lg`, and a scale on the button is how the disc above came to need a
+    `lg:` guard to stay a fingertip wide. A chevron may shrink to any size it likes; the box a
+    thumb is aiming at may not.
+  */
+  const glyph = bare
+    ? `transition-transform duration-140 ease-out-strong ${
+        hidden ? 'scale-90' : 'scale-100 group-active:scale-90'
+      }`
+    : '';
 
   return (
     <button
@@ -528,7 +613,7 @@ function Arrow({
         strokeWidth={bare ? 2.1 : 1.8}
         strokeLinecap="round"
         strokeLinejoin="round"
-        className="rtl:rotate-180"
+        className={`rtl:rotate-180 ${glyph}`}
       >
         <path d="m14.5 5.5-7 6.5 7 6.5" />
       </svg>
