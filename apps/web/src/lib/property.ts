@@ -71,6 +71,16 @@ const propertyDetailSchema = z.object({
       maxGuests: z.number(),
       bedrooms: z.number(),
       beds: z.number(),
+      /*
+        What KIND — «سرير فردي» or «سرير مزدوج». Required, with no default and no null.
+
+        There is no fallback rendering to fall back TO: the platform has no phrasing for an untyped
+        bed any more (Bashar, 2026-09-16), so a payload without a kind is a payload this page
+        cannot honestly draw. Failing the parse is the right answer to that — `units.bed_type` is
+        `NOT NULL`, so the only way to see it is an API that has stopped keeping its side of the
+        contract, and printing «سرير واحد» over the top of that would hide it.
+      */
+      bedType: z.enum(['single', 'double']),
       bathrooms: z.number(),
       basePrice: z.string(),
       currencyCode: z.string(),

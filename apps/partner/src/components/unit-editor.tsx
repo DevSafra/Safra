@@ -211,6 +211,7 @@ function UnitRow({
     maxGuests: String(unit.maxGuests),
     bedrooms: String(unit.bedrooms),
     beds: String(unit.beds),
+    bedType: unit.bedType,
     bathrooms: String(unit.bathrooms),
     basePrice: unit.basePrice,
     minNights: String(unit.minNights),
@@ -264,6 +265,9 @@ function UnitRow({
     if ([...amenityCodes].sort().join(',') !== before) {
       patch['amenityCodes'] = amenityCodes;
     }
+
+    /* Two-way: the other kind, or nothing to send. There is no unpicking — see the contract. */
+    if (form.bedType !== unit.bedType) patch['bedType'] = form.bedType;
 
     const numbers: [keyof typeof form, string, number][] = [
       ['maxGuests', 'maxGuests', unit.maxGuests],
@@ -399,6 +403,24 @@ function UnitRow({
         />
       </div>
 
+      {/*
+        What kind of bed, beside how many (Bashar, 2026-09-16). Its own row rather than a fifth
+        column: the four above are all counts a partner types, and this is the one thing on the row
+        they CHOOSE — squeezed in beside them at a quarter width it read as another number field
+        and its longest option would not fit.
+      */}
+      <Choice
+        label={t.editProperty.unitBedType}
+        value={form.bedType}
+        onChange={set('bedType')}
+        id={`unit-bed-type-${unit.id}`}
+        /* Two options and no empty one: a bed is one kind or the other, never neither. */
+        options={[
+          { value: 'single', label: t.editProperty.unitBedTypeSingle },
+          { value: 'double', label: t.editProperty.unitBedTypeDouble },
+        ]}
+      />
+
       <div className="grid gap-3 sm:grid-cols-3">
         <Number_
           label={`${t.editProperty.unitPrice} (${unit.currencyCode})`}
@@ -500,6 +522,48 @@ function Field({
         onChange={(event) => onChange(event.target.value)}
         className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text lg:min-h-0"
       />
+    </label>
+  );
+}
+
+/**
+ * One choice from a short, closed list.
+ *
+ * A native `<select>` rather than a set of radios or a custom menu: three options, one of which is
+ * «not said», on a form that is already a column of labelled fields. The browser's own control is
+ * the one that works with a thumb, a keyboard and a screen reader without any of it being written
+ * here, and `globals.css` already holds it to the 40px touch floor below `lg`.
+ *
+ * No `dir` override, per the standing rule — the words are Arabic and follow the page.
+ */
+function Choice({
+  id,
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  readonly id: string;
+  readonly label: string;
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+  readonly options: readonly { readonly value: string; readonly label: string }[];
+}) {
+  return (
+    <label className="grid gap-1 sm:max-w-64">
+      <span className="text-[13px] text-muted">{label}</span>
+      <select
+        id={id}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="min-h-10 cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text lg:min-h-0"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
     </label>
   );
 }

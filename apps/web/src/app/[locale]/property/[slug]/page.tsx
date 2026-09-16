@@ -42,6 +42,22 @@ import { DEFAULT_MONEY_CURRENCY, preferredCurrency } from '@safra/contracts';
  */
 export const revalidate = 60;
 
+/**
+ * Which bed message a unit's kind asks for.
+ *
+ * A map rather than a ternary because it is a LOOKUP TABLE of catalogue keys, and a third kind
+ * should be one line here and three strings in the catalogues — not a condition somebody has to
+ * find and re-nest.
+ *
+ * There is no row for «not said», and no key in the catalogue that would serve one. Every unit
+ * carries a kind (Bashar, 2026-09-16), and the way to keep that true is to leave the platform no
+ * sentence it could print if it stopped being true.
+ */
+const BED_SEGMENT = {
+  single: 'unitBedsSingle',
+  double: 'unitBedsDouble',
+} as const;
+
 /** The first value of a repeatable query parameter, or nothing. */
 function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -353,9 +369,21 @@ export default async function PropertyPage({
       soldOut: free.length === 0,
       /* What is FREE, not what exists — and silent when there is only ever one. */
       leftText: free.length > 1 ? t('unitsLeft', { count: free.length }) : null,
+      /*
+        «حتى ضيفين · غرفة نوم · سرير مزدوج · حمّام واحد».
+
+        The bed segment is FORMATTED first and handed to the sentence as a value, rather than the
+        sentence pluralising a number it was given. That is the only arrangement that survives
+        translation: «سريران مزدوجان» is one message whose adjective agrees with its own count, and
+        an English «2 double beds» is another — a sentence that stitched «2 beds» to a separate
+        «double» would freeze an order Arabic does not use and lose the agreement entirely.
+
+        Every unit has a kind, so there is no count-alone branch to fall into — «3 أسرّة مزدوجة»
+        rather than «3 أسرّة», on a room with three of them.
+      */
       occupancyText: `${t('guestsUpTo', { count: unit.maxGuests })} · ${t('unitLayout', {
         bedrooms: unit.bedrooms,
-        beds: unit.beds,
+        beds: t(BED_SEGMENT[unit.bedType], { count: unit.beds }),
         bathrooms: unit.bathrooms,
       })}`,
       termsText: `${t('unitAvailable')} · ${t('unitNightsMin', { count: unit.minNights })}${

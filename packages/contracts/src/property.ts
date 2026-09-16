@@ -329,12 +329,59 @@ export const propertyUpdateSchema = propertyBaseSchema
   });
 export type PropertyUpdateInput = z.infer<typeof propertyUpdateSchema>;
 
+/**
+ * What KIND of bed a unit has — «سرير فردي» or «سرير مزدوج» (Bashar, 2026-09-16).
+ *
+ * The listing used to say how MANY beds and never what they were, so «سرير واحد» left a guest
+ * booking a room for two on a hope. A count and a kind answer different questions and a traveller
+ * needs both.
+ *
+ * ## Why one kind for the unit rather than an inventory of beds
+ *
+ * A room with one double and two singles cannot be said here, and that is a deliberate limit
+ * rather than an oversight: expressing it means a LIST of `{ kind, count }` rows, which is a
+ * second table, a second partner form and a second thing for a search filter to reason about.
+ * `units.beds` is one number today, and one kind beside it is the honest extension of that shape.
+ * When a partner needs to describe a mixed room, the model is what changes, not this enum.
+ *
+ * ## Why exactly two
+ *
+ * These are the two Bashar named. A third — twin, bunk, a sofa bed — is a migration and three
+ * strings, and every value added is a word a partner has to choose between and three translations
+ * somebody has to be right about. Two that are certainly correct beat five that are guesses.
+ *
+ * ## There is no «not said», anywhere
+ *
+ * It was nullable for half a day. Bashar, 2026-09-16: *«We should be not allowed on the entire
+ * system to define only "سرير" — every bed should be defined as سرير مزدوج or سرير فردي, also on
+ * multiple beds.»* So a kind is REQUIRED to create a unit and cannot be cleared on an update, the
+ * column is `NOT NULL`, and the listing has no phrasing left that prints a bed without its kind.
+ *
+ * «Also on multiple beds» is the same rule one step along: a three-bed room reads «3 أسرّة مزدوجة»,
+ * not «3 أسرّة». The kind is a property of the room's beds, so it survives the count.
+ */
+export const bedTypeSchema = z.enum(['single', 'double']);
+
+export type BedType = z.infer<typeof bedTypeSchema>;
+
+/** The same two as a LIST, for a form to render — derived, never written twice. */
+export const BED_TYPES = bedTypeSchema.options;
+
 export const unitCreateSchema = z
   .object({
     name: translatedText(160),
     maxGuests: z.number().int().min(1).max(50),
     bedrooms: z.number().int().min(0).max(30).default(1),
     beds: z.number().int().min(1).max(50).default(1),
+    /**
+     * REQUIRED, with no default — a unit cannot be created without saying what its beds are.
+     *
+     * No `.default('single')` here even though the column carries one: a default in the contract
+     * would let the partner's own form omit the question and answer it on their behalf, which is
+     * precisely «defining only سرير» wearing a different hat. The column's default exists for
+     * fixtures and for the rows that predate the field, not for anybody filling in this form.
+     */
+    bedType: bedTypeSchema,
     bathrooms: z.number().int().min(0).max(30).default(1),
     basePrice: z.number().min(0).max(1_000_000),
     currencyCode: z.string().trim().length(3),
@@ -380,6 +427,15 @@ export const unitUpdateSchema = z
     maxGuests: z.number().int().min(1).max(50).optional(),
     bedrooms: z.number().int().min(0).max(30).optional(),
     beds: z.number().int().min(1).max(50).optional(),
+    /**
+     * Two-way, not three: the other kind, or absent to leave it alone.
+     *
+     * `null` is deliberately NOT accepted. Every other clearable field on this form has an empty
+     * state that means something — a room with no label, a stay with no maximum — and a bed with
+     * no kind is the one state the platform refuses to hold. A partner corrects a mistake by
+     * picking the other kind, which is the only correction there is.
+     */
+    bedType: bedTypeSchema.optional(),
     bathrooms: z.number().int().min(0).max(30).optional(),
     basePrice: z.number().min(0).max(1_000_000).optional(),
     minNights: z.number().int().min(1).max(365).optional(),

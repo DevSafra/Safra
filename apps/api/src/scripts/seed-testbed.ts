@@ -111,6 +111,13 @@ interface UnitSpec {
   readonly roomTypeCode?: string;
   readonly bedrooms?: number;
   readonly beds?: number;
+  /**
+   * «سرير فردي» or «سرير مزدوج» — REQUIRED, because no bed on this platform is untyped.
+   *
+   * Written out per room rather than defaulted, so the testbed carries both kinds AND rooms with
+   * several beds of a kind: «3 أسرّة مزدوجة» is a line only a fixture like that can exercise.
+   */
+  readonly bedType: 'single' | 'double';
   readonly bathrooms?: number;
   readonly minNights?: number;
   /** What THIS room offers, as opposed to the building — see `PropertySpec.amenityCodes`. */
@@ -239,8 +246,20 @@ const PARTNERS: readonly PartnerSpec[] = [
         address: 'المالكي، دمشق',
         descriptionAr: 'فندق أربع نجوم في قلب المالكي، على بعد دقائق من وسط المدينة.',
         units: [
-          { nameAr: 'غرفة مزدوجة', nameEn: 'Double Room', price: 65, maxGuests: 2 },
-          { nameAr: 'جناح تنفيذي', nameEn: 'Executive Suite', price: 140, maxGuests: 4 },
+          {
+            nameAr: 'غرفة مزدوجة',
+            nameEn: 'Double Room',
+            price: 65,
+            maxGuests: 2,
+            bedType: 'double',
+          },
+          {
+            nameAr: 'جناح تنفيذي',
+            nameEn: 'Executive Suite',
+            price: 140,
+            maxGuests: 4,
+            bedType: 'double',
+          },
         ],
       },
       {
@@ -280,6 +299,7 @@ const PARTNERS: readonly PartnerSpec[] = [
             nameAr: 'غرفة مزدوجة قياسية',
             nameEn: 'Standard Double Room',
             roomTypeCode: 'double_standard',
+            bedType: 'double',
             price: 72,
             maxGuests: 2,
             bedrooms: 1,
@@ -292,6 +312,7 @@ const PARTNERS: readonly PartnerSpec[] = [
             nameAr: 'غرفة مزدوجة قياسية',
             nameEn: 'Standard Double Room',
             roomTypeCode: 'double_standard',
+            bedType: 'double',
             price: 72,
             maxGuests: 2,
             bedrooms: 1,
@@ -304,6 +325,7 @@ const PARTNERS: readonly PartnerSpec[] = [
             nameAr: 'غرفة مزدوجة قياسية',
             nameEn: 'Standard Double Room',
             roomTypeCode: 'double_standard',
+            bedType: 'double',
             price: 72,
             maxGuests: 2,
             bedrooms: 1,
@@ -316,6 +338,7 @@ const PARTNERS: readonly PartnerSpec[] = [
             nameAr: 'غرفة مزدوجة قياسية',
             nameEn: 'Standard Double Room',
             roomTypeCode: 'double_standard',
+            bedType: 'double',
             price: 72,
             maxGuests: 2,
             bedrooms: 1,
@@ -328,6 +351,7 @@ const PARTNERS: readonly PartnerSpec[] = [
             nameAr: 'غرفة مزدوجة قياسية',
             nameEn: 'Standard Double Room',
             roomTypeCode: 'double_standard',
+            bedType: 'double',
             price: 72,
             maxGuests: 2,
             bedrooms: 1,
@@ -340,6 +364,7 @@ const PARTNERS: readonly PartnerSpec[] = [
             nameAr: 'غرفة مزدوجة قياسية',
             nameEn: 'Standard Double Room',
             roomTypeCode: 'double_standard',
+            bedType: 'double',
             price: 72,
             maxGuests: 2,
             bedrooms: 1,
@@ -352,6 +377,7 @@ const PARTNERS: readonly PartnerSpec[] = [
             nameAr: 'غرفة مزدوجة بإطلالة',
             nameEn: 'Double Room with View',
             roomTypeCode: 'double_view',
+            bedType: 'double',
             price: 98,
             maxGuests: 2,
             bedrooms: 1,
@@ -364,6 +390,7 @@ const PARTNERS: readonly PartnerSpec[] = [
             nameAr: 'غرفة مزدوجة بإطلالة',
             nameEn: 'Double Room with View',
             roomTypeCode: 'double_view',
+            bedType: 'double',
             price: 98,
             maxGuests: 2,
             bedrooms: 1,
@@ -376,6 +403,7 @@ const PARTNERS: readonly PartnerSpec[] = [
             nameAr: 'غرفة مزدوجة بإطلالة',
             nameEn: 'Double Room with View',
             roomTypeCode: 'double_view',
+            bedType: 'double',
             price: 98,
             maxGuests: 2,
             bedrooms: 1,
@@ -388,6 +416,7 @@ const PARTNERS: readonly PartnerSpec[] = [
             nameAr: 'غرفة مزدوجة بإطلالة',
             nameEn: 'Double Room with View',
             roomTypeCode: 'double_view',
+            bedType: 'double',
             price: 98,
             maxGuests: 2,
             bedrooms: 1,
@@ -400,6 +429,7 @@ const PARTNERS: readonly PartnerSpec[] = [
             nameAr: 'جناح تنفيذي',
             nameEn: 'Executive Suite',
             roomTypeCode: 'suite_executive',
+            bedType: 'double',
             price: 185,
             maxGuests: 4,
             bedrooms: 2,
@@ -412,6 +442,7 @@ const PARTNERS: readonly PartnerSpec[] = [
             nameAr: 'جناح تنفيذي',
             nameEn: 'Executive Suite',
             roomTypeCode: 'suite_executive',
+            bedType: 'double',
             price: 185,
             maxGuests: 4,
             bedrooms: 2,
@@ -424,6 +455,7 @@ const PARTNERS: readonly PartnerSpec[] = [
             nameAr: 'غرفة عائلية',
             nameEn: 'Family Room',
             roomTypeCode: 'family_room',
+            bedType: 'single',
             price: 150,
             maxGuests: 6,
             bedrooms: 2,
@@ -443,7 +475,15 @@ const PARTNERS: readonly PartnerSpec[] = [
         type: 'hotel',
         address: 'أبو رمانة، دمشق',
         descriptionAr: 'فرعنا الثاني، بإطلالة على جبل قاسيون.',
-        units: [{ nameAr: 'غرفة مفردة', nameEn: 'Single Room', price: 45, maxGuests: 1 }],
+        units: [
+          {
+            nameAr: 'غرفة مفردة',
+            nameEn: 'Single Room',
+            price: 45,
+            maxGuests: 1,
+            bedType: 'single',
+          },
+        ],
       },
       {
         /* The draft: what the تعديل form is actually tested against. */
@@ -457,7 +497,13 @@ const PARTNERS: readonly PartnerSpec[] = [
         descriptionAr: 'نزل صغير في المدينة القديمة، لم يُرسَل للمراجعة بعد.',
         status: 'draft',
         units: [
-          { nameAr: 'غرفة بإطلالة', nameEn: 'Room with a View', price: 60, maxGuests: 2 },
+          {
+            nameAr: 'غرفة بإطلالة',
+            nameEn: 'Room with a View',
+            price: 60,
+            maxGuests: 2,
+            bedType: 'double',
+          },
         ],
       },
       {
@@ -473,7 +519,13 @@ const PARTNERS: readonly PartnerSpec[] = [
         status: 'rejected',
         reviewNotes: 'العنوان في الوثائق لا يطابق العنوان المُدخل. صحّحه وأعد الإرسال.',
         units: [
-          { nameAr: 'جناح عائلي', nameEn: 'Family Suite', price: 80, maxGuests: 6 },
+          {
+            nameAr: 'جناح عائلي',
+            nameEn: 'Family Suite',
+            price: 80,
+            maxGuests: 6,
+            bedType: 'double',
+          },
         ],
       },
       {
@@ -491,6 +543,7 @@ const PARTNERS: readonly PartnerSpec[] = [
             nameEn: 'Two-Bedroom Apartment',
             price: 95,
             maxGuests: 5,
+            bedType: 'double',
           },
         ],
       },
@@ -520,8 +573,20 @@ const PARTNERS: readonly PartnerSpec[] = [
         headlineAr: 'استيقظ على صوت البحر، ونم على ضوء المرفأ.',
         descriptionAr: 'شاليهات على البحر مباشرة، مع مسبح مشترك.',
         units: [
-          { nameAr: 'شاليه عائلي', nameEn: 'Family Chalet', price: 110, maxGuests: 6 },
-          { nameAr: 'شاليه صغير', nameEn: 'Studio Chalet', price: 70, maxGuests: 2 },
+          {
+            nameAr: 'شاليه عائلي',
+            nameEn: 'Family Chalet',
+            price: 110,
+            maxGuests: 6,
+            bedType: 'double',
+          },
+          {
+            nameAr: 'شاليه صغير',
+            nameEn: 'Studio Chalet',
+            price: 70,
+            maxGuests: 2,
+            bedType: 'double',
+          },
         ],
       },
       {
@@ -534,7 +599,13 @@ const PARTNERS: readonly PartnerSpec[] = [
         address: 'الشاطئ الأزرق، اللاذقية',
         descriptionAr: 'منتجع متكامل مع مطعم ونادٍ رياضي.',
         units: [
-          { nameAr: 'جناح بحري', nameEn: 'Sea-View Suite', price: 165, maxGuests: 4 },
+          {
+            nameAr: 'جناح بحري',
+            nameEn: 'Sea-View Suite',
+            price: 165,
+            maxGuests: 4,
+            bedType: 'double',
+          },
         ],
       },
     ],
@@ -562,8 +633,20 @@ const PARTNERS: readonly PartnerSpec[] = [
         address: 'باب توما، دمشق القديمة',
         descriptionAr: 'بيت دمشقي من القرن التاسع عشر، بفناء وبحرة ونافورة.',
         units: [
-          { nameAr: 'غرفة القبو', nameEn: 'Vaulted Room', price: 85, maxGuests: 2 },
-          { nameAr: 'الليوان', nameEn: 'The Liwan', price: 120, maxGuests: 4 },
+          {
+            nameAr: 'غرفة القبو',
+            nameEn: 'Vaulted Room',
+            price: 85,
+            maxGuests: 2,
+            bedType: 'double',
+          },
+          {
+            nameAr: 'الليوان',
+            nameEn: 'The Liwan',
+            price: 120,
+            maxGuests: 4,
+            bedType: 'double',
+          },
         ],
       },
     ],
@@ -1659,6 +1742,7 @@ async function build(db: Seeder): Promise<void> {
             ...(unit.roomTypeCode ? { roomTypeCode: unit.roomTypeCode } : {}),
             ...(unit.bedrooms === undefined ? {} : { bedrooms: unit.bedrooms }),
             ...(unit.beds === undefined ? {} : { beds: unit.beds }),
+            bedType: unit.bedType,
             ...(unit.bathrooms === undefined ? {} : { bathrooms: unit.bathrooms }),
             ...(unit.minNights === undefined ? {} : { minNights: unit.minNights }),
           })

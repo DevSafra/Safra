@@ -262,6 +262,7 @@ export class PropertiesService {
       max_guests: number;
       bedrooms: number;
       beds: number;
+      bed_type: 'single' | 'double';
       bathrooms: number;
       base_price: string;
       currency_code: string;
@@ -271,7 +272,7 @@ export class PropertiesService {
       amenity_codes: string[];
     }>(sql`
       SELECT un.id, un.name_ar, un.unit_label, un.room_type_code,
-             un.max_guests, un.bedrooms, un.beds,
+             un.max_guests, un.bedrooms, un.beds, un.bed_type,
              un.bathrooms, un.base_price::text, cur.code AS currency_code,
              un.min_nights, un.max_nights, un.is_active,
              /*
@@ -348,6 +349,7 @@ export class PropertiesService {
         maxGuests: unit.max_guests,
         bedrooms: unit.bedrooms,
         beds: unit.beds,
+        bedType: unit.bed_type,
         bathrooms: unit.bathrooms,
         basePrice: unit.base_price,
         currencyCode: unit.currency_code,
@@ -1004,6 +1006,7 @@ export class PropertiesService {
             maxGuests: input.maxGuests,
             bedrooms: input.bedrooms,
             beds: input.beds,
+            bedType: input.bedType,
             bathrooms: input.bathrooms,
             basePrice: input.basePrice.toFixed(2),
             currencyId: currency.id,
@@ -1108,6 +1111,7 @@ export class PropertiesService {
     if (input.maxGuests !== undefined) patch['maxGuests'] = input.maxGuests;
     if (input.bedrooms !== undefined) patch['bedrooms'] = input.bedrooms;
     if (input.beds !== undefined) patch['beds'] = input.beds;
+    if (input.bedType !== undefined) patch['bedType'] = input.bedType;
     if (input.bathrooms !== undefined) patch['bathrooms'] = input.bathrooms;
     // Price is stored as a fixed-scale string; never a float (rule 1).
     if (input.basePrice !== undefined) patch['basePrice'] = input.basePrice.toFixed(2);

@@ -4243,6 +4243,8 @@ export const ar = {
       /* Written by a unit update since a partner could declare amenities (2026-09-05). */
       amenityCodes: 'الخدمات والمرافق',
       maxGuests: 'عدد الضيوف',
+      /* نوع السرير في الوحدة — «فردي» أو «مزدوج». لا حالة ثالثة: كل سرير في المنصّة له نوع. */
+      bedType: 'نوع السرير',
       /* The payout-account lifecycle — masked in the trail exactly as it is on screen. */
       partnerId: 'الشريك',
       /* The star classification, in a before/after payload on the audit screen. */
@@ -4595,6 +4597,18 @@ export const ar = {
       changes. Keep it small: a code that means one thing everywhere belongs below, not here.
     */
     payloadValueByKey: {
+      /*
+        نوع السرير، مربوطًا بحقله لا بالقيمة وحدها: «single» كلمة عامة قد تعني في حقل آخر شيئًا
+        مختلفًا تمامًا، وربطها بـ `bedType` يجعل الجواب صحيحًا هنا دون أن يفرض نفسه على غيره.
+
+        الكلمتان نفسهما اللتان يقرأهما الضيف على صفحة العقار ويختارهما الشريك في لوحته — حالة
+        واحدة وكلمة واحدة، فمن يرى «سرير مزدوج» على الصفحة لا يقرأ «double» في سجل التدقيق.
+      */
+      bedType: {
+        single: 'سرير فردي',
+        double: 'سرير مزدوج',
+      },
+
       /*
         Which COPY of a contract — the generated original, either side's signed scan, or the one
         sheet both parties signed. The console's own download buttons use these words.

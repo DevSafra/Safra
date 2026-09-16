@@ -562,3 +562,12 @@ export const jobRunStatus = pgEnum('job_run_status', [
   'skipped',
   'failed',
 ]);
+
+/**
+ * «سرير فردي» or «سرير مزدوج» (Bashar, 2026-09-16).
+ *
+ * The same two literals as `bedTypeSchema` in `@safra/contracts`, which is where the reasoning
+ * lives. They are written twice because this package depends on nothing and that is worth keeping;
+ * a third kind is added in both, and the database refuses anything the two disagree about.
+ */
+export const bedType = pgEnum('bed_type', ['single', 'double']);

@@ -15,7 +15,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import { foreignId, money, notDeleted, primaryId, timestamps } from './_shared.js';
-import { dayStatus, imageStatus, propertyStatus } from './enums.js';
+import { bedType, dayStatus, imageStatus, propertyStatus } from './enums.js';
 import { cities, currencies } from './geo.js';
 import { partners } from './partner.js';
 import { users } from './identity.js';
@@ -323,6 +323,16 @@ export const units = pgTable(
     maxGuests: smallint('max_guests').notNull(),
     bedrooms: smallint('bedrooms').notNull().default(1),
     beds: smallint('beds').notNull().default(1),
+    /**
+     * What kind of bed — see `bedTypeSchema` in `@safra/contracts`.
+     *
+     * `NOT NULL`: no room on this platform has an untyped bed (Bashar, 2026-09-16). The DEFAULT is
+     * for rows nobody fills in by hand — the load generator, forty integration fixtures whose
+     * subject is bookings rather than beds — and never for a partner: `unitCreateSchema` makes the
+     * kind required, so the one path a person uses has to answer the question rather than inherit
+     * an answer.
+     */
+    bedType: bedType('bed_type').notNull().default('single'),
     bathrooms: smallint('bathrooms').notNull().default(1),
     /** Fallback nightly price; availabilityDays.price overrides per date. */
     basePrice: money('base_price').notNull(),

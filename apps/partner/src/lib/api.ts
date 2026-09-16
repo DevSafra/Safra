@@ -710,6 +710,8 @@ const partnerPropertySchema = z.object({
       maxGuests: z.number(),
       bedrooms: z.number(),
       beds: z.number(),
+      /* Always one of the two — see `bedTypeSchema` in `@safra/contracts`. */
+      bedType: z.enum(['single', 'double']),
       bathrooms: z.number(),
       basePrice: z.string(),
       currencyCode: z.string(),

@@ -299,7 +299,7 @@ export class PropertyDetailService {
     const rows = await this.db.execute<Record<string, unknown>>(sql`
       SELECT
         u.id, u.name_ar, u.name_en, u.name_de,
-        u.max_guests, u.bedrooms, u.beds, u.bathrooms,
+        u.max_guests, u.bedrooms, u.beds, u.bed_type, u.bathrooms,
         u.base_price, u.min_nights, u.max_nights, u.room_type_code,
         ${available} AS available,
         cur.code AS currency_code,
@@ -330,6 +330,8 @@ export class PropertyDetailService {
       maxGuests: Number(r['max_guests']),
       bedrooms: Number(r['bedrooms']),
       beds: Number(r['beds']),
+      /* Always present — the column is NOT NULL, because no bed here is untyped. */
+      bedType: r['bed_type'] as 'single' | 'double',
       bathrooms: Number(r['bathrooms']),
       basePrice: r['base_price'],
       currencyCode: r['currency_code'],

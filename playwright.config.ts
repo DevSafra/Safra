@@ -60,6 +60,7 @@ const NEEDS_PARTNER_SESSION = new RegExp(
     'partner-responsive',
     'partner-settings',
     'amenities-end-to-end',
+    'bed-type-end-to-end',
     'property-amenities-chain',
     'multi-unit-downstream',
     'booking-confirmation-journey',

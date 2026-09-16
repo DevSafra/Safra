@@ -2,7 +2,13 @@ import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createRollbackDatabase, type Database } from '@safra/db';
-import { ERROR, PERMISSIONS as P, propertyCreateSchema } from '@safra/contracts';
+import {
+  ERROR,
+  PERMISSIONS as P,
+  propertyCreateSchema,
+  unitCreateSchema,
+  unitUpdateSchema,
+} from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { PropertiesService } from './properties.service.js';
@@ -806,6 +812,7 @@ describeIfDb('PropertiesService.readOwn', () => {
         maxGuests: 2,
         bedrooms: 1,
         beds: 1,
+        bedType: 'single',
         bathrooms: 1,
         basePrice: 100,
         currencyCode: 'USD',
@@ -835,6 +842,7 @@ describeIfDb('PropertiesService.readOwn', () => {
         maxGuests: 2,
         bedrooms: 1,
         beds: 1,
+        bedType: 'single',
         bathrooms: 1,
         basePrice: 90,
         currencyCode: 'USD',
@@ -884,6 +892,7 @@ describeIfDb('PropertiesService.readOwn', () => {
         maxGuests: 4,
         bedrooms: 2,
         beds: 2,
+        bedType: 'single',
         bathrooms: 1,
         basePrice: 250,
         currencyCode: 'USD',
@@ -906,6 +915,123 @@ describeIfDb('PropertiesService.readOwn', () => {
       expect(rows.rows[0]?.unit_label).toBe('الشاليه');
     });
 
+    /**
+     * The bed KIND: stored as given, changed to the other one, untouched by an unrelated edit.
+     *
+     * One test rather than three because the states are only meaningful against each other. The
+     * bug it guards is `if (input.bedType)` — truthiness instead of presence — which stores a kind
+     * and then quietly refuses every later change that is falsy, and which passes any test that
+     * only ever sets one value.
+     */
+    it('stores a bed kind, changes it, and leaves it alone on an omission', async () => {
+      const created = await service.addUnit(partner(otherPartnerId), otherReference, {
+        name: { ar: 'وحدة لنوع السرير' },
+        maxGuests: 2,
+        bedrooms: 1,
+        beds: 1,
+        bedType: 'double',
+        bathrooms: 1,
+        basePrice: 100,
+        currencyCode: 'USD',
+        minNights: 1,
+        quantity: 1,
+        amenityCodes: [],
+      });
+
+      const kind = async () => {
+        const rows = await db.execute<{ bed_type: string | null }>(sql`
+          SELECT bed_type FROM units WHERE id = ${created.unitId}
+        `);
+
+        return rows.rows[0]?.bed_type ?? null;
+      };
+
+      expect(await kind(), 'what the partner asked for at creation').toBe('double');
+
+      await service.updateUnit(partner(otherPartnerId), created.unitId, {
+        bedType: 'single',
+      });
+
+      expect(await kind(), 'changed to the other kind').toBe('single');
+
+      /* An edit that says nothing about beds must not touch them. */
+      await service.updateUnit(partner(otherPartnerId), created.unitId, { beds: 2 });
+
+      expect(await kind(), 'untouched by an unrelated edit').toBe('single');
+    });
+
+    /**
+     * No bed on this platform is untyped, and the refusal is at the BOUNDARY.
+     *
+     * Bashar, 2026-09-16: «We should be not allowed on the entire system to define only "سرير"».
+     * Three things have to hold for that to be true, and each is asserted here because each fails
+     * on its own: a create with no kind is rejected, an update cannot clear one back to nothing,
+     * and the column itself refuses a null so no other writer can produce the state either.
+     *
+     * The contract is checked directly rather than through the service, because it is the schema
+     * the partner's route parses with — `unitCreateSchema` is the thing standing between a form
+     * and the database, and a service test would be asking the question one layer past where it
+     * is answered.
+     */
+    it('refuses a unit with no bed kind, at every layer that could allow one', async () => {
+      const complete = {
+        name: { ar: 'وحدة بلا نوع سرير' },
+        maxGuests: 6,
+        bedrooms: 2,
+        beds: 4,
+        bedType: 'double',
+        bathrooms: 2,
+        basePrice: 300,
+        currencyCode: 'USD',
+        minNights: 1,
+        quantity: 1,
+        amenityCodes: [],
+      };
+
+      expect(
+        unitCreateSchema.safeParse(complete).success,
+        'the control: the same input WITH a kind is accepted',
+      ).toBe(true);
+
+      const { bedType: _omitted, ...withoutKind } = complete;
+
+      expect(
+        unitCreateSchema.safeParse(withoutKind).success,
+        'a unit cannot be created without saying what its beds are',
+      ).toBe(false);
+
+      expect(
+        unitUpdateSchema.safeParse({ bedType: 'single' }).success,
+        'the control: changing the kind is allowed',
+      ).toBe(true);
+
+      expect(
+        unitUpdateSchema.safeParse({ bedType: null }).success,
+        'and a kind cannot be cleared back to nothing',
+      ).toBe(false);
+
+      const column = await db.execute<{
+        is_nullable: string;
+        column_default: string | null;
+      }>(sql`
+        SELECT is_nullable, column_default
+        FROM information_schema.columns
+        WHERE table_name = 'units' AND column_name = 'bed_type'
+      `);
+
+      expect(
+        column.rows[0]?.is_nullable,
+        'the column refuses the state too, so no other writer can reach it',
+      ).toBe('NO');
+
+      /*
+        The default is deliberate and is asserted so it cannot quietly disappear: forty integration
+        fixtures and the load generator insert units without an opinion about beds, and a NOT NULL
+        column with no default would fail every one of them on a field their subject is not about.
+      */
+      expect(column.rows[0]?.column_default).toContain('single');
+    });
+
     /** An edit REPLACES the set — the API's own comment says so, and a diff would drift. */
     it('replaces the set on an update rather than merging it', async () => {
       const offered = await service.offerableAmenities(partner());
@@ -920,6 +1046,7 @@ describeIfDb('PropertiesService.readOwn', () => {
         maxGuests: 2,
         bedrooms: 1,
         beds: 1,
+        bedType: 'single',
         bathrooms: 1,
         basePrice: 100,
         currencyCode: 'USD',
@@ -958,6 +1085,7 @@ describeIfDb('PropertiesService.readOwn', () => {
               maxGuests: 2,
               bedrooms: 1,
               beds: 1,
+              bedType: 'single',
               bathrooms: 1,
               basePrice: 100,
               currencyCode: 'USD',
@@ -979,6 +1107,7 @@ describeIfDb('PropertiesService.readOwn', () => {
               maxGuests: 2,
               bedrooms: 1,
               beds: 1,
+              bedType: 'single',
               bathrooms: 1,
               basePrice: 100,
               currencyCode: 'USD',
@@ -1054,6 +1183,7 @@ describeIfDb('PropertiesService.readOwn', () => {
               maxGuests: 2,
               bedrooms: 1,
               beds: 1,
+              bedType: 'single',
               bathrooms: 1,
               basePrice: 100,
               currencyCode: 'USD',
@@ -1073,6 +1203,7 @@ describeIfDb('PropertiesService.readOwn', () => {
         maxGuests: 2,
         bedrooms: 1,
         beds: 1,
+        bedType: 'single',
         bathrooms: 1,
         basePrice: 100,
         currencyCode: 'USD',

@@ -430,9 +430,12 @@ async function main(): Promise<void> {
     await step('units', () =>
       exec(
         `INSERT INTO units (property_id, name_ar, name_en, name_de, max_guests, bedrooms, beds,
-                            bathrooms, base_price, currency_id, min_nights, is_active)
+                            bed_type, bathrooms, base_price, currency_id, min_nights, is_active)
          SELECT p.id, 'وحدة ' || k, 'Unit ' || k, 'Einheit ' || k,
-                2 + (k % 6), 1 + (k % 3), 1 + (k % 4), 1 + (k % 2),
+                2 + (k % 6), 1 + (k % 3), 1 + (k % 4),
+                /* Both kinds, so a query that groups or filters by one meets a real mix. */
+                (CASE WHEN k % 3 = 0 THEN 'single' ELSE 'double' END)::bed_type,
+                1 + (k % 2),
                 round((40 + (k % 200))::numeric, 2), cur.id, 1 + (k % 3), true
          FROM properties p
          CROSS JOIN generate_series(1, $1) AS k

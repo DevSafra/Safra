@@ -59,6 +59,13 @@ export function AddUnit({
   const [form, setForm] = useState({
     name: '',
     maxGuests: '2',
+    /*
+      A kind is required to create a unit, so the form has to ASK — there is no «not said» to fall
+      back on (Bashar, 2026-09-16). It opens on «مزدوج» because that is what a room for two, which
+      is what this form opens on, almost always has; a partner adding a single room changes one
+      control, and nobody can submit a bed with no kind at all.
+    */
+    bedType: 'double',
     basePrice: '',
     quantity: '1',
   });
@@ -89,6 +96,7 @@ export function AddUnit({
             /* Arabic only, as the creation form sends it — the API fills en/de from ar. */
             name: { ar: form.name.trim() },
             maxGuests: Number(form.maxGuests),
+            bedType: form.bedType,
             basePrice: Number(form.basePrice),
             /*
               How many identical rooms. The API creates a row per room and groups them under one
@@ -126,7 +134,13 @@ export function AddUnit({
             ? plural(t.editProperty.unitQuantityAdded, { count: created })
             : t.editProperty.unitAdded,
       });
-      setForm({ name: '', maxGuests: '2', basePrice: '', quantity: '1' });
+      setForm({
+        name: '',
+        maxGuests: '2',
+        bedType: 'double',
+        basePrice: '',
+        quantity: '1',
+      });
       setAmenityCodes([]);
       setBusy(false);
       /* The new unit arrives as a row of its own, which is the confirmation that it landed. */
@@ -195,7 +209,7 @@ export function AddUnit({
         />
       </label>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="grid gap-1">
           <span className="text-[13px] text-muted">{t.editProperty.unitGuestsField}</span>
           <input
@@ -207,6 +221,22 @@ export function AddUnit({
             required
             className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text lg:min-h-0"
           />
+        </label>
+
+        {/*
+          The kind, beside the capacity rather than below it: «room for two» and «double bed» are
+          one thought a partner has about the room, and the two answers belong on one line.
+        */}
+        <label className="grid gap-1">
+          <span className="text-[13px] text-muted">{t.editProperty.unitBedType}</span>
+          <select
+            value={form.bedType}
+            onChange={(event) => set('bedType')(event.target.value)}
+            className="min-h-10 cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text lg:min-h-0"
+          >
+            <option value="single">{t.editProperty.unitBedTypeSingle}</option>
+            <option value="double">{t.editProperty.unitBedTypeDouble}</option>
+          </select>
         </label>
 
         <label className="grid gap-1">
