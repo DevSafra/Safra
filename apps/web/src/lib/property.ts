@@ -30,6 +30,20 @@ const propertyDetailSchema = z.object({
   latitude: z.string().nullable(),
   longitude: z.string().nullable(),
   exactLocationAfterBooking: z.boolean(),
+  /*
+    The location map, or null when there is none to draw — no MapTiler plan configured,
+    or a listing whose partner never recorded coordinates.
+
+    `.nullable()`, never `.default()`: a default would invent a plausible object for a
+    field the API did not send, and the page would then request an image that cannot
+    exist. Null is the API's own answer and the page draws no figure for it.
+  */
+  map: z
+    .object({
+      card: z.object({ url: z.string().url(), width: z.number(), height: z.number() }),
+      full: z.object({ url: z.string().url(), width: z.number(), height: z.number() }),
+    })
+    .nullable(),
   city: z.object({
     slug: z.string(),
     nameAr: z.string(),

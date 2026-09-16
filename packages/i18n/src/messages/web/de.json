@@ -169,6 +169,17 @@
     "refundFloor": "Die Mindestrückerstattung in SAFRA-Richtlinien beträgt {percent} %, außer in von der Verwaltung genehmigten Sonderfällen.",
     "location": "Lage",
     "exactLocationAfterBooking": "Die genaue Lage wird nach der Buchungsbestätigung angezeigt.",
+    "map": {
+      "show": "Auf der Karte zeigen",
+      "alt": "Karte der Umgebung der Unterkunft",
+      "title": "Lage der Unterkunft",
+      "open": "Karte anzeigen",
+      "previous": "Vorherige Karte",
+      "next": "Nächste Karte",
+      "close": "Karte schließen",
+      "zoomIn": "Vergrößern",
+      "zoomOut": "Verkleinern"
+    },
     "bookNow": "Jetzt buchen",
     "askSafra": "SAFRA zu dieser Unterkunft fragen",
     "notInstantNotice": "Sie kontaktieren den Partner nicht direkt; SAFRA bestätigt Ihre Buchung innerhalb von {window} nach Zahlung.",

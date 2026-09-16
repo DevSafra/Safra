@@ -12,6 +12,7 @@ import { AmenityIcon } from '@/components/icons';
 import { SaveButton } from '@/components/save-button';
 import { ShareButton } from '@/components/share-button';
 import { PropertyGallery } from '@/components/property-gallery';
+import { PropertyMap } from '@/components/property-map';
 import { BookingSelectionProvider } from '@/components/booking-selection';
 import { CardSlider } from '@/components/card-slider';
 import { BookingSummaryCard } from '@/components/booking-summary-card';
@@ -739,13 +740,44 @@ export default async function PropertyPage({
             {/* ── Location, deliberately approximate (§5.6, P-001) ──────────── */}
             <section id="location" className="scroll-mt-28">
               <h2 className="font-display text-xl text-text">{t('location')}</h2>
-              <div className="mt-3 rounded-card border border-line bg-card p-5">
-                <p className="text-sm text-muted">
-                  {property.addressApproximate}, {cityName}
-                </p>
-                <p className="mt-2 text-xs text-faint">
-                  {t('exactLocationAfterBooking')}
-                </p>
+              {/*
+                `overflow-hidden` so the map meets the card's rounded corners. The map is a
+                flush surface at the foot of this ONE card rather than a second bordered box
+                under it: two stacked cards for one idea reads as two ideas, and the address
+                and the picture are the same answer to «where is this».
+              */}
+              <div className="mt-3 overflow-hidden rounded-card border border-line bg-card">
+                <div className="p-5">
+                  <p className="text-sm text-muted">
+                    {property.addressApproximate}, {cityName}
+                  </p>
+                  <p className="mt-2 text-xs text-faint">
+                    {t('exactLocationAfterBooking')}
+                  </p>
+                </div>
+
+                {/*
+                  Absent whenever there is nothing honest to draw — no MapTiler plan, or a
+                  listing with no coordinates. The card above is then exactly what shipped
+                  before the map existed.
+                */}
+                {property.map ? (
+                  <PropertyMap
+                    card={property.map.card}
+                    full={property.map.full}
+                    showLabel={t('map.show')}
+                    alt={t('map.alt')}
+                    labels={{
+                      title: t('map.title'),
+                      open: t('map.open'),
+                      previous: t('map.previous'),
+                      next: t('map.next'),
+                      close: t('map.close'),
+                      zoomIn: t('map.zoomIn'),
+                      zoomOut: t('map.zoomOut'),
+                    }}
+                  />
+                ) : null}
               </div>
             </section>
 

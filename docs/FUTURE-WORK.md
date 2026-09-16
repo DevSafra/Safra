@@ -1414,12 +1414,12 @@ unblocks four items and is the highest-leverage action available.**
 
 ### 🤝 Vendor dependencies
 
-| Item                                            | Note                                                             |
-| ----------------------------------------------- | ---------------------------------------------------------------- |
-| **S-9** Independent penetration test            | Book early; testers have lead times. Needs a staging environment |
-| **S-8** Malware scanning for uploaded documents | ClamAV sidecar or storage hook; needs hosting                    |
-| **S-2** Partner notifications                   | Blocked on the WhatsApp BSP decision (item 192)                  |
-| Maps billing account                            | Item 195; MapLibre + MapTiler recommended                        |
+| Item                                                    | Note                                                                                                                                                                                          |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **S-9** Independent penetration test                    | Book early; testers have lead times. Needs a staging environment                                                                                                                              |
+| **S-8** Malware scanning for uploaded documents         | ClamAV sidecar or storage hook; needs hosting                                                                                                                                                 |
+| **S-2** Partner notifications                           | Blocked on the WhatsApp BSP decision (item 192)                                                                                                                                               |
+| **Maps billing account — now BLOCKING a built feature** | Item 195. MapTiler **Flex ($30/mo) or above**: the free tier has no Static Maps API and is non-commercial only. The property page's map card is built and dormant until `MAPTILER_KEY` is set |
 
 ### 📦 Deferred product scope — deliberately not started
 
@@ -2743,10 +2743,26 @@ column empty beside a full-height cover, which reads as an image that failed to 
 
 **Not done, and each is a real piece:**
 
-- **The map card.** Bashar chose MapLibre + MapTiler on 2026-09-02; it needs `MAPTILER_KEY` in the
-  environment, which only he can obtain. The component will render an honest fallback until it is
-  there. Note the constraint already recorded: coordinates are fuzzed to ~100m and the address is
-  truncated until a booking exists, so the map must show an AREA, not a door.
+- ~~**The map card.**~~ **Built 2026-09-16**, against Bashar's booking.com screenshot: a static map
+  flush at the foot of the location card, an area disc, and «اعرض على الخريطة» opening a larger
+  rendering in `ImageSliderFrame`. **It shows nothing until `MAPTILER_KEY` is in the environment,
+  which is still only Bashar's to obtain** — and the plan has to be **Flex ($30/month) or above**,
+  because MapTiler's free tier excludes the Static Maps API _and_ is licensed for non-commercial use
+  only. With no key the payload's `map` is `null` and the location card renders exactly as it did
+  before, which is the chosen failure mode: a broken tile box on a public listing is worse than no
+  map.
+
+  Not MapLibre in the end. The 2026-09-02 note said MapLibre + MapTiler; the card is ONE `<img>`
+  instead, because an interactive map would have to re-implement the restriction the rounding
+  already enforces — panning toward the door is the one thing this feature must not allow — and it
+  would put ~200 KB of library on a page that already carries fourteen photographs. Revisit only if
+  a genuine pan/zoom requirement appears.
+
+  The disc is burned into the image by the API (`areaPolygon`), not laid over it in CSS. A CSS
+  overlay was the first attempt and the browser showed why it was wrong: `ImageSliderFrame` owns its
+  `<img>`, so the mark appeared on the card and vanished in the enlargement — pressing the button
+  lost the only thing it exists to show.
+
 - **The score-and-review card** in the sidebar — «9.0 ممتاز», the review count, one guest quote.
 - **The amenity chips as bordered icon boxes**, which is how the reference draws them; they are a
   plain grid today.

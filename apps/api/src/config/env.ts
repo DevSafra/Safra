@@ -147,6 +147,22 @@ export const envSchema = z.object({
   API_URL_SELF: z.string().url().default('http://localhost:4000'),
 
   /**
+   * MapTiler key for the property page's location map (O-web-12).
+   *
+   * OPTIONAL, and the whole feature is keyed on its presence: with no key the detail
+   * payload carries `map: null` and the page renders the location card exactly as it
+   * did before. That is deliberate — a broken tile box on a public listing is worse
+   * than no map, and it means a deployment that has not bought a plan degrades to the
+   * previous design rather than to a defect.
+   *
+   * It is a SECRET: MapTiler bills per request against it, so it never reaches the
+   * browser. `PropertyMapService` renders the image server-side and the page points at
+   * our own origin. See that service for why the endpoint takes a slug and not a
+   * coordinate pair.
+   */
+  MAPTILER_KEY: z.string().min(1).optional(),
+
+  /**
    * Object storage. All optional: when unset the API falls back to local disk,
    * which keeps a fresh checkout runnable without cloud credentials.
    */

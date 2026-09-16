@@ -97,7 +97,14 @@ describeIfDb('ReviewService', () => {
     is not what these tests are about — but stubbing it would mean the public read here diverged
     from the one the endpoint performs, which is the only reason to go through this service at all.
   */
-  const publicPage = new PropertyDetailService(db, new SettingsService(db));
+  /*
+    No `MAPTILER_KEY`, so the payload's `map` is null throughout these tests. That is the
+    right shape here: they assert what a review does to a listing's public page, and a map
+    is not part of that question.
+  */
+  const publicPage = new PropertyDetailService(db, new SettingsService(db), {
+    API_URL_SELF: 'http://localhost:4000',
+  } as unknown as Env);
 
   let partnerId = '';
   let propertyId = '';
