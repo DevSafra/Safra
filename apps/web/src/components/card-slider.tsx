@@ -36,12 +36,31 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 export function CardSlider({
   children,
   labels,
+  footers,
   bleed = true,
   arrowsOnPhone = false,
   arrows = 'float',
 }: {
   children: React.ReactNode;
   labels: { previous: string; next: string };
+  /**
+   * One node per slide, of which the slider shows the one belonging to the slide in view.
+   *
+   * It exists because the booking panel's attribution has to sit BELOW the arrows (Bashar,
+   * 2026-09-16: «the buttons should be under the comment and above the name»), and a name that
+   * belongs to a particular review cannot be written once under a rail that pages through six.
+   * So the caller hands over the rendered nodes — elements, not a function, because a server
+   * component cannot pass a callback across the client boundary — and the slider picks.
+   *
+   * It is NODES rather than strings so every word and every class stays in the caller's file;
+   * a caption styled inside a shared slider is a string living where the next language never
+   * looks. The panel passes `<figcaption>`s and wraps the slider in a `<figure>`, so the pair is
+   * still a quotation with an attribution rather than two unrelated lines.
+   *
+   * The index is tracked only when this is given — it costs a rect per slide per scroll event,
+   * which is nothing for six and not nothing for a home page of twenty destinations.
+   */
+  readonly footers?: readonly React.ReactNode[];
   /**
    * Whether the rail runs to the container's edge, as the home page's rows do.
    *
@@ -66,10 +85,18 @@ export function CardSlider({
    * the first and last card. That works because those cards are PHOTOGRAPHS — a circle resting on
    * an image hides nothing anybody was reading.
    *
-   * `below` is for a rail of TEXT with no room beside it. Measured on the booking panel's reviews
-   * (2026-09-15): the floating arrow landed squarely on the second line of a quote and covered two
-   * words. A control that hides the content it pages through is worse than one that costs a row of
-   * height, so in the panel the pair sits under the rail instead.
+   * `below` is a row of BARE chevrons under the rail — no disc, no border, no shadow — followed by
+   * `footers`. It is what the booking panel came back to (Bashar, 2026-09-16: «remove the rounded
+   * circle around them and keep only the arrows… the buttons should be under the comment and above
+   * the name, so we will not have the comment in the center»). Flanking the quote had squeezed a
+   * 320px panel's text into 230px; under it, the quote is full width again and the pager reads as
+   * a pager rather than as two objects pinning the words in place.
+   *
+   * The two end states differ from the disc's on purpose. A disc that has nothing left to reach is
+   * HIDDEN — a circle disappearing from the edge of a photograph leaves a clean edge. A bare
+   * chevron that disappears leaves a hole in a row of two glyphs and reads as a rendering fault,
+   * so this one is `disabled` and dimmed instead: still a pair, still legible as «two directions,
+   * one of them unavailable», and the keyboard skips it because the attribute is real.
    *
    * `side` is booking.com's own arrangement for its guest-review rail, and Bashar asked for it by
    * screenshot (2026-09-15). It is the answer to the same problem `below` solves, not a relapse
@@ -96,13 +123,43 @@ export function CardSlider({
   const [mounted, setMounted] = useState(false);
   const [atStart, setAtStart] = useState(true);
   const [atEnd, setAtEnd] = useState(true);
+  /*
+    Which slide the rail is showing. Zero on the server and on the first client render, which is
+    the slide a reader sees before touching anything — so the caption under the arrows is right
+    from the first paint rather than arriving with the JavaScript.
+  */
+  const [active, setActive] = useState(0);
+  /*
+    Where a pressed arrow is taking the rail, until it arrives.
+
+    A smooth scroll takes a few hundred milliseconds, and `measure()` runs off the scroll events it
+    produces — so «there is nothing after this» used to become true only once the animation had
+    finished, and the arrow sat there live and pressable over a rail with nowhere left to go
+    (Bashar, 2026-09-16: «make it immediately disabled when there is no item next»). Reading this
+    first answers for the DESTINATION rather than the position, from the moment of the press.
+
+    It has to be a destination rather than a distance, which is why `step` computes the snap offset
+    it is scrolling TO: a rail that moves 0.85 of its width and then snaps to a card boundary ends
+    up somewhere the press did not name, and «is that the end» answered against the un-snapped
+    figure is wrong exactly at the end, which is the one place it is being asked.
+  */
+  const pending = useRef<number | null>(null);
+
+  const tracksActive = footers !== undefined;
 
   const measure = useCallback(() => {
     const el = rail.current;
     if (!el) return;
 
     const furthest = el.scrollWidth - el.clientWidth;
-    const position = Math.abs(el.scrollLeft);
+    const live = Math.abs(el.scrollLeft);
+
+    /* Arrived — or close enough that a zoomed float will never land exactly. */
+    if (pending.current !== null && Math.abs(live - pending.current) <= 1) {
+      pending.current = null;
+    }
+
+    const position = pending.current ?? live;
 
     /*
       ## The start tolerance is the rail's own padding, and that is a measured fix
@@ -124,7 +181,34 @@ export function CardSlider({
 
     setAtStart(position <= padding + 1);
     setAtEnd(position >= furthest - 1);
-  }, []);
+
+    /*
+      The slide nearest the rail's START edge, found by comparing rectangles rather than by
+      dividing the scroll by a slide width. A rail whose slides are one width each could be
+      divided; this one cannot promise that — the reviews section's cards are narrower than the
+      rail and the home page's are narrower still — and a formula that is right for one caller and
+      quietly wrong for another is the shape this component keeps being asked to avoid.
+    */
+    if (!tracksActive) return;
+
+    const rtl = getComputedStyle(el).direction === 'rtl';
+    const edge = rtl ? el.getBoundingClientRect().right : el.getBoundingClientRect().left;
+
+    let nearest = 0;
+    let shortest = Number.POSITIVE_INFINITY;
+
+    [...el.children].forEach((child, index) => {
+      const box = child.getBoundingClientRect();
+      const distance = Math.abs((rtl ? box.right : box.left) - edge);
+
+      if (distance < shortest) {
+        shortest = distance;
+        nearest = index;
+      }
+    });
+
+    setActive(nearest);
+  }, [tracksActive]);
 
   useEffect(() => {
     setMounted(true);
@@ -144,32 +228,87 @@ export function CardSlider({
     return () => observer.disconnect();
   }, [measure]);
 
-  const step = useCallback((towardsEnd: boolean) => {
-    const el = rail.current;
-    if (!el) return;
+  const step = useCallback(
+    (towardsEnd: boolean) => {
+      const el = rail.current;
+      if (!el) return;
 
-    const rtl = getComputedStyle(el).direction === 'rtl';
-    /*
-      One viewport of cards, less a sliver, so the card that was half-visible at the edge is fully
-      visible after the press rather than being scrolled past. booking.com's arrows move by a page
-      for the same reason.
-    */
-    const page = el.clientWidth * 0.85;
-    const delta = (towardsEnd ? 1 : -1) * (rtl ? -1 : 1) * page;
+      const rtl = getComputedStyle(el).direction === 'rtl';
+      const furthest = el.scrollWidth - el.clientWidth;
+      const position = Math.abs(el.scrollLeft);
 
-    el.scrollBy({
-      left: delta,
-      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
-        ? 'auto'
-        : 'smooth',
-    });
-  }, []);
+      /*
+        One viewport of cards, less a sliver, so the card that was half-visible at the edge is fully
+        visible after the press rather than being scrolled past. booking.com's arrows move by a page
+        for the same reason.
+      */
+      const page = el.clientWidth * 0.85;
+      const desired = Math.min(
+        Math.max(position + (towardsEnd ? page : -page), 0),
+        furthest,
+      );
+
+      /*
+        Every position at which a slide would park flush against the rail's start — the snap points
+        the browser itself would choose between. Read from rectangles rather than from
+        `offsetLeft`, because the start edge is the RIGHT one in Arabic and `offsetLeft` does not
+        know that. Clamped, so the tail slides that can never park flush all collapse onto the true
+        maximum instead of naming a position the rail cannot reach.
+      */
+      const box = el.getBoundingClientRect();
+      const stops = [...el.children].map((child) => {
+        const slide = child.getBoundingClientRect();
+        const shift = rtl ? box.right - slide.right : slide.left - box.left;
+
+        return Math.min(Math.max(position + shift, 0), furthest);
+      });
+
+      /*
+        The stop nearest where a page-scroll would have landed — and never the one the rail is
+        already on, so a press always moves. If nothing lies ahead there is nothing to do, and the
+        arrow that was pressed is about to be the one that goes quiet.
+      */
+      const ahead = stops.filter((stop) =>
+        towardsEnd ? stop > position + 1 : stop < position - 1,
+      );
+
+      const target = ahead.length
+        ? ahead.reduce((best, stop) =>
+            Math.abs(stop - desired) < Math.abs(best - desired) ? stop : best,
+          )
+        : desired;
+
+      /* Answer for the destination NOW; the scroll can take its few hundred milliseconds. */
+      pending.current = target;
+      measure();
+
+      el.scrollTo({
+        left: rtl ? -target : target,
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          ? 'auto'
+          : 'smooth',
+      });
+    },
+    [measure],
+  );
 
   return (
     <div className="relative">
       <ul
         ref={rail}
         onScroll={measure}
+        /*
+          A thumb, a drag or a trackpad takes the rail somewhere the last press did not promise, so
+          the prediction above is abandoned the moment somebody touches it — otherwise a scroll
+          interrupted halfway would leave the arrows describing a destination nobody is travelling
+          to any more.
+        */
+        onPointerDown={() => {
+          pending.current = null;
+        }}
+        onWheel={() => {
+          pending.current = null;
+        }}
         className={`slider-rail flex snap-x snap-mandatory overflow-x-auto pb-1 ${
           bleed ? '-mx-4 gap-3 px-4 sm:gap-4' : 'gap-3'
         }`}
@@ -229,24 +368,22 @@ export function CardSlider({
       ) : null}
 
       {/*
-        Under the rail, at the reading START, and only the arrows that can still do something.
+        Under the rail, at the reading START, both of them, always.
 
-        Start rather than end, which was measured rather than preferred: at the first slide only
-        «next» is drawn, and against `justify-end` it sat alone in the far corner with the width of
-        the hidden «previous» between it and the edge — a control adrift in empty card. Under the
-        first word of the quote it reads as belonging to the text it pages.
-
-        Hidden at the ends rather than disabled, which keeps one rule for both placements: an arrow
-        with nothing left to reach is not a control that failed. It still RESERVES its space, so the
-        pair does not shuffle sideways as a reader moves through the rail.
+        `-ms-[11px]` is optical alignment and it is arithmetic rather than taste: the chevron is
+        18px inside a 40px target, so its glyph sits 11px in from the invisible box's edge. Without
+        the pull the first arrow hangs a finger's width past the quote above it — the box lines up
+        and the thing a person can SEE does not. The target keeps its 40px because below `lg` the
+        input is a thumb.
       */}
       {mounted && arrows === 'below' ? (
-        <div className="mt-1 flex justify-start gap-1.5">
+        <div className="-ms-[11px] mt-2 flex items-center">
           <Arrow
             label={labels.previous}
             hidden={atStart}
             onPhone={arrowsOnPhone}
             onClick={() => step(false)}
+            bare
             className=""
           />
           <Arrow
@@ -254,10 +391,18 @@ export function CardSlider({
             hidden={atEnd}
             onPhone={arrowsOnPhone}
             onClick={() => step(true)}
+            bare
             className="rotate-180"
           />
         </div>
       ) : null}
+
+      {/*
+        The slide's own footer, under the arrows — the panel's attribution. Rendered whether or not
+        the script has arrived: a quotation with no name under it is worse for the half-second
+        before hydration than a name that a pre-hydration thumb-scroll could leave one slide stale.
+      */}
+      {footers ? footers[active] : null}
     </div>
   );
 }
@@ -321,6 +466,7 @@ function Arrow({
   hidden,
   onClick,
   onPhone,
+  bare = false,
   className,
 }: {
   label: string;
@@ -328,35 +474,58 @@ function Arrow({
   onClick: () => void;
   /** Whether this arrow is drawn below `sm` — see `arrowsOnPhone`. */
   onPhone: boolean;
+  /**
+   * A chevron with nothing under it, for a row sitting on a plain surface.
+   *
+   * The disc is not decoration where it is kept: over a photograph or over the edge of a card it
+   * is the only thing giving a white chevron a background to be legible against. Under a quote
+   * there is already a background, and the circle was one painted shape too many — so this variant
+   * drops the border, the fill and the shadow and answers the pointer with COLOUR, and the press
+   * with the 95% scale that a surface change can no longer carry.
+   */
+  bare?: boolean;
   className: string;
 }) {
+  /*
+    A bare arrow at the end of the rail stays and dims; a disc leaves. See the `below` note on
+    `arrows` — a two-glyph row with one glyph missing reads as broken, and `disabled` is the honest
+    way to say «nothing that way» because the keyboard and a screen reader both get told.
+  */
+  const skin = bare
+    ? `text-muted transition-[opacity,color,scale] ease-out-strong hover:text-gold-read active:scale-95 ${
+        hidden ? 'opacity-30 duration-140' : 'opacity-100 duration-200'
+      }`
+    : `border border-line bg-card text-text shadow-[var(--shadow-lift)] transition-[opacity,box-shadow,background-color] ease-out-strong hover:bg-field hover:shadow-[var(--shadow-lift-hover)] ${
+        hidden
+          ? 'pointer-events-none opacity-0 duration-140 lg:scale-90'
+          : 'opacity-100 duration-200 lg:scale-100'
+      }`;
+
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={label}
-      tabIndex={hidden ? -1 : 0}
-      aria-hidden={hidden}
-      className={`z-10 size-10 shrink-0 cursor-pointer place-items-center rounded-full border border-line bg-card text-text shadow-[var(--shadow-lift)] transition-[opacity,box-shadow,background-color] ease-out-strong hover:bg-field hover:shadow-[var(--shadow-lift-hover)] ${
-        onPhone ? 'grid' : 'hidden sm:grid'
-      } ${
-        hidden
-          ? 'pointer-events-none opacity-0 duration-140 lg:scale-90'
-          : 'opacity-100 duration-200 lg:scale-100'
-      } ${className}`}
+      disabled={bare && hidden}
+      tabIndex={!bare && hidden ? -1 : 0}
+      aria-hidden={!bare && hidden}
+      className={`z-10 size-10 shrink-0 place-items-center rounded-full ${
+        bare && hidden ? 'cursor-default' : 'cursor-pointer'
+      } ${onPhone ? 'grid' : 'hidden sm:grid'} ${skin} ${className}`}
     >
       {/*
         Drawn, at the stroke every other icon on this site uses, and mirrored under RTL so it points
-        at the direction of travel rather than at a fixed side of the screen.
+        at the direction of travel rather than at a fixed side of the screen. The bare one is drawn
+        heavier: a chevron with no disc under it has to hold the eye on its own.
       */}
       <svg
         aria-hidden
-        width="1.05em"
-        height="1.05em"
+        width={bare ? '1.25em' : '1.05em'}
+        height={bare ? '1.25em' : '1.05em'}
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
-        strokeWidth={1.8}
+        strokeWidth={bare ? 2.1 : 1.8}
         strokeLinecap="round"
         strokeLinejoin="round"
         className="rtl:rotate-180"

@@ -939,15 +939,32 @@ export default async function PropertyPage({
                       finding — so the rail appears only when there is a second review to reach.
                     */}
                     {quotable.length > 1 ? (
+                      /*
+                        Quote, then the pager, then the name (Bashar, 2026-09-16).
+
+                        The arrows are back UNDER the rail and the quote is full width again. They
+                        flanked it for a day; in a 320px panel that cost the text 48px of its 278,
+                        and his word for the result was that it put the comment in the centre.
+                      */
                       <div className="mt-2">
                         <CardSlider
                           bleed={false}
                           arrowsOnPhone
-                          arrows="side"
+                          arrows="below"
                           labels={{
                             previous: t('reviewPrevious'),
                             next: t('reviewNext'),
                           }}
+                          footers={quotable.map((review) =>
+                            review.author ? (
+                              <QuoteAuthor
+                                key={review.reference}
+                                as="p"
+                                author={review.author}
+                                className="mt-1"
+                              />
+                            ) : null,
+                          )}
                         >
                           {quotable.map((review) => (
                             <li
@@ -955,18 +972,10 @@ export default async function PropertyPage({
                               /*
                                 `w-full shrink-0`, so each review is exactly one rail-width and the
                                 arrows page one review at a time. `snap-start` parks it flush.
-
-                                `px-6` is the toll for `side`, and it is the whole of the contract
-                                that placement states: the arrow reaches 24px into the rail, so the
-                                words start at 24px and the circle rests on the indent instead of
-                                on the quote. The panel is 320px wide, which is why the quote is
-                                INSET rather than the arrows pushed further out — 20px of card
-                                padding is all there is beside it, and a button hanging past that
-                                would hang past the page at any width where the article is flush.
                               */
-                              className="w-full shrink-0 snap-start px-6"
+                              className="w-full shrink-0 snap-start"
                             >
-                              <Quote body={review.body} author={review.author} />
+                              <QuoteBody body={review.body} />
                             </li>
                           ))}
                         </CardSlider>
@@ -1147,16 +1156,52 @@ function Quote({
 }) {
   return (
     <figure>
-      {/* `dir="auto"` for the reason the section's cards carry it: the quotation marks belong to
-          the reviewer's language, not the page's. */}
-      <blockquote dir="auto" className="line-clamp-3 text-sm leading-relaxed text-text">
-        “{body}”
-      </blockquote>
-      {author ? (
-        <figcaption className="mt-2 text-xs text-faint">{author}</figcaption>
-      ) : null}
+      <QuoteBody body={body} />
+      {author ? <QuoteAuthor as="figcaption" author={author} className="mt-2" /> : null}
     </figure>
   );
+}
+
+/**
+ * The quotation itself, separated from its attribution.
+ *
+ * The rail needs the two apart, because the arrows now sit BETWEEN them (Bashar, 2026-09-16), and
+ * an arrow row cannot be threaded through the middle of a slide. So the slides carry this, and the
+ * name travels as the slider's `footers` — one `<figure>` around the whole rail keeps them a
+ * quotation and its attribution rather than two lines that happen to be near each other.
+ *
+ * `dir="auto"` for the reason the section's cards carry it: the quotation marks belong to the
+ * reviewer's language, not the page's.
+ */
+function QuoteBody({ body }: { readonly body: string }) {
+  return (
+    <blockquote dir="auto" className="line-clamp-3 text-sm leading-relaxed text-text">
+      “{body}”
+    </blockquote>
+  );
+}
+
+/**
+ * Who said it — written once, so the single-quote card and the rail's footer cannot drift.
+ *
+ * The ELEMENT differs because the association does. On a listing with one quotable review the name
+ * is a `<figcaption>` inside `Quote`'s own figure, which is how a screen reader is told that this
+ * name belongs to those words. In the rail it cannot be: the slider owns the markup between the
+ * quotation and the footer, so a `figcaption` there would be a grandchild of the figure rather
+ * than its child — invalid, and unassociated by exactly the machinery it was reached for. A
+ * paragraph directly under the quotation is the honest fallback, and `as` makes the choice visible
+ * at the call site instead of hiding a wrong element inside a shared component.
+ */
+function QuoteAuthor({
+  author,
+  as: Tag,
+  className = '',
+}: {
+  readonly author: string;
+  readonly as: 'figcaption' | 'p';
+  readonly className?: string;
+}) {
+  return <Tag className={`text-xs text-faint ${className}`}>{author}</Tag>;
 }
 
 function Gallery({
