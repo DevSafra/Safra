@@ -63,6 +63,42 @@ export interface CspOptions {
    * thing in the header that must not be enabled by an accident, so it fails closed.
    */
   readonly allowEval?: boolean;
+  /**
+   * Extra origins the page may FETCH from, beyond its own.
+   *
+   * Added for the property page's self-hosted basemap: MapLibre pulls tiles, glyphs and
+   * a sprite with `fetch`, so an origin that is fine in `img-src` is still refused
+   * without being named here. Omitted by every other surface, which fetches only itself.
+   *
+   * The failure it prevents is a quiet one — the map renders an empty grey canvas and the
+   * refusals appear only in the browser console, nowhere in our logs.
+   */
+  readonly connectSrc?: string;
+  /**
+   * Whether the page may start a worker from a `blob:` URL.
+   *
+   * MapLibre compiles its tile workers at run time and starts them from blobs. With
+   * `default-src 'self'` and no `worker-src`, the browser refuses, and the map fails in a
+   * way that reads as a broken build rather than a policy.
+   *
+   * Off everywhere else: `blob:` workers are a real capability, and a surface that does
+   * not draw a map has no business being able to start one.
+   */
+  readonly blobWorkers?: boolean;
+  /**
+   * Whether the page may compile WebAssembly.
+   *
+   * `'wasm-unsafe-eval'`, NOT `'unsafe-eval'`. The two are often confused and the
+   * difference is the whole point: this permits `WebAssembly.instantiate` and nothing
+   * else, while `'unsafe-eval'` would also hand an injected script `eval()` and
+   * `new Function()`. Turning this on does not weaken the defence against injected script.
+   *
+   * Needed because MapLibre's RTL text plugin — the thing that joins Arabic letters and
+   * lays them right to left — is compiled WebAssembly. Without it the plugin throws
+   * inside the worker, the map keeps rendering, and Arabic labels come out reversed
+   * letter by letter: correct glyphs in the wrong order, which reads as a broken font.
+   */
+  readonly wasm?: boolean;
 }
 
 /**
@@ -120,11 +156,12 @@ export function mediaOrigins(bases: readonly (string | undefined)[]): readonly s
 
 /** Builds the policy string. */
 export function buildCsp(options: CspOptions): string {
-  const { nonce, imgSrc, upgradeInsecure, allowEval } = options;
+  const { nonce, imgSrc, upgradeInsecure, allowEval, connectSrc, blobWorkers, wasm } =
+    options;
 
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${allowEval ? " 'unsafe-eval'" : ''}`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${wasm ? " 'wasm-unsafe-eval'" : ''}${allowEval ? " 'unsafe-eval'" : ''}`,
     /**
      * `unsafe-inline` for STYLES only. Next injects critical CSS inline and offers no
      * hash-stable or nonce-able equivalent for it. The exposure is a styling attack
@@ -133,7 +170,8 @@ export function buildCsp(options: CspOptions): string {
     "style-src 'self' 'unsafe-inline'",
     `img-src ${imgSrc}`,
     "font-src 'self'",
-    "connect-src 'self'",
+    `connect-src 'self'${connectSrc ? ` ${connectSrc}` : ''}`,
+    ...(blobWorkers ? ["worker-src 'self' blob:"] : []),
     "frame-ancestors 'none'",
     "form-action 'self'",
     "base-uri 'none'",

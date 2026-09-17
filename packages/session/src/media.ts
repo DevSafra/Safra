@@ -58,3 +58,33 @@ export function mediaUrl(
 
   return `${base}/${image.fileKey}-${chosen}.${format}`;
 }
+
+/**
+ * Where a browser fetches the self-hosted basemap: tiles, glyphs and sprites.
+ *
+ * Derived from the media base by default, because `pnpm basemap:bootstrap` uploads to the
+ * `basemap/` prefix of the same bucket that already holds listing photography. Deriving it
+ * means a deployment that has run the bootstrap needs NO new environment variable, and one
+ * that has not gets `undefined` and a location card with no map — which is the honest
+ * outcome rather than a grey box asking a bucket for a file nobody put there.
+ *
+ * `NEXT_PUBLIC_BASEMAP_URL` overrides it, for a deployment that wants the 154 MB tileset on
+ * a different CDN from its photography.
+ *
+ * Shared with the CSP for the reason this whole file exists: the middleware must name the
+ * exact origin the component will fetch from. Two derivations of the same URL would agree
+ * until somebody changed one, and the symptom would be a map that draws nothing while
+ * every request 200s in the bucket's own log — the refusal happens in the browser.
+ */
+export function basemapBase(env: {
+  NEXT_PUBLIC_BASEMAP_URL?: string | undefined;
+  NEXT_PUBLIC_MEDIA_URL?: string | undefined;
+}): string | undefined {
+  const explicit = env.NEXT_PUBLIC_BASEMAP_URL;
+
+  if (explicit) return explicit.replace(/\/+$/, '');
+
+  const media = env.NEXT_PUBLIC_MEDIA_URL;
+
+  return media ? `${media.replace(/\/+$/, '')}/basemap` : undefined;
+}

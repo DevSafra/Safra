@@ -79,6 +79,14 @@ function readOnlyPolicy(bucket: string): string {
           `arn:aws:s3:::${bucket}/properties/*`,
           `arn:aws:s3:::${bucket}/ads/*`,
           `arn:aws:s3:::${bucket}/cities/*`,
+          /*
+            `basemap/*` joined on 2026-09-17: the map tiles, glyphs and sprites the property
+            page's location map renders from. They are a PUBLISHED BASEMAP, not customer
+            content — an extract of OpenStreetMap under ODbL, identical for every visitor and
+            carrying nothing about any listing. The map draws the same streets whether or not
+            a property exists on them.
+          */
+          `arn:aws:s3:::${bucket}/basemap/*`,
         ],
       },
     ],
@@ -133,8 +141,8 @@ async function main(): Promise<void> {
   );
 
   console.log(
-    `Anonymous read enabled for ${bucket}/properties/*, ${bucket}/ads/* and ` +
-      `${bucket}/cities/*. Identity documents and dispute evidence stay private.`,
+    `Anonymous read enabled for ${bucket}: properties/*, ads/*, cities/*, basemap/*. ` +
+      `Identity documents and dispute evidence stay private.`,
   );
 }
 

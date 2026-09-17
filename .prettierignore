@@ -15,3 +15,10 @@ packages/db/migrations
 .agents
 .impeccable
 skills-lock.json
+
+# The RTL text plugin, copied out of node_modules at build time (2026-09-17).
+#
+# `apps/web/.gitignore` excludes it and no human edits it — it is somebody else's compiled
+# output plus their licence file. Prettier does not read `.gitignore`, so without this the
+# whole of `pnpm verify` fails on a vendored LICENSE.md the moment anybody runs a build.
+apps/web/public/map

@@ -11,6 +11,7 @@ export * from './fx.js';
 export * from './currency-catalogue.js';
 export * from './timezone-catalogue.js';
 export * from './geo.js';
+export * from './location.js';
 export * from './gift-card.js';
 export * from './catalogue.js';
 export * from './customer-fee.js';

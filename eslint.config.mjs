@@ -35,6 +35,11 @@ export default tseslint.config(
       // `node --check` catches a syntax error, so what is lost is the type-aware rules on a file
       // whose whole job is to spawn a process and count its results.
       'scripts/**',
+      // The same, for an app's own build scripts — `scripts/**` matches only the root one.
+      'apps/*/scripts/**',
+      // The RTL text plugin, copied out of node_modules at build time (2026-09-17). Somebody
+      // else's compiled WebAssembly loader; git-ignored, in no tsconfig project, not ours to lint.
+      'apps/web/public/map/**',
       // k6 load scripts (`docs/load-testing.md`). They execute inside k6's own JavaScript
       // runtime, not Node: they import `k6/http`, which resolves nowhere on this machine, and
       // rely on the `__ENV` / `__VU` / `__ITER` globals k6 injects. Type-aware linting needs a

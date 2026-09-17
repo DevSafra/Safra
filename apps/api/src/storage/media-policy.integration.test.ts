@@ -42,7 +42,7 @@ describeIfStore('what the media bucket serves anonymously', () => {
     got PAST the policy. A private prefix answers 403 whether the key exists or not, which is what
     makes these two states distinguishable without seeding a file.
   */
-  it.each(['properties', 'ads', 'cities'])(
+  it.each(['properties', 'ads', 'cities', 'basemap'])(
     'lets a stranger reach %s/',
     async (prefix) => {
       expect(await status(`${prefix}/${PROBE}`)).toBe(404);

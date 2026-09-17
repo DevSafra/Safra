@@ -31,13 +31,14 @@
     "load:generate": "pnpm --filter @safra/db load:generate",
     "db:testbed": "pnpm --filter @safra/api db:testbed",
     "partner:code": "sh -c 'set -a; . ./.env; set +a; pnpm --filter @safra/api partner:code'",
-    "media:bootstrap": "pnpm --filter @safra/api media:bootstrap",
+    "media:bootstrap": "sh -c 'set -a; . ./.env; set +a; pnpm --filter @safra/api media:bootstrap'",
     "load:reset": "pnpm --filter @safra/db load:reset",
     "load:invariants": "pnpm --filter @safra/db load:invariants",
     "load:accounts": "pnpm --filter @safra/api load:accounts",
     "load:token": "pnpm --filter @safra/api load:token",
     "worker": "sh -c 'set -a; . ./.env; set +a; pnpm --filter @safra/api start:worker'",
-    "e2e:run": "sh -c 'set -a; [ -f ./.env ] && . ./.env; set +a; node scripts/e2e-run.mjs \"$@\"' --"
+    "e2e:run": "sh -c 'set -a; [ -f ./.env ] && . ./.env; set +a; node scripts/e2e-run.mjs \"$@\"' --",
+    "basemap:bootstrap": "sh -c 'set -a; . ./.env; set +a; pnpm --filter @safra/api basemap:bootstrap \"$@\"' --"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -66,6 +67,11 @@
       "qs": ">=6.16.0",
       "nodemailer": ">=9.1.1 <10",
       "multer": ">=2.3.0"
+    },
+    "auditConfig": {
+      "ignoreGhsas": [
+        "GHSA-jrc7-96c5-q579"
+      ]
     }
   }
 }

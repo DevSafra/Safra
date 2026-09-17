@@ -547,10 +547,10 @@ export default async function PropertyPage({
               the line: «where is it» is the second question anybody asks and it was buried in a
               section two screens down.
 
-              It jumps to that section rather than opening a map, because there is no map yet:
-              `MAPTILER_KEY` is not in the environment. The link is honest about where it goes, and
-              the section it lands on is the one that also says the exact address arrives after
-              booking (§5.6, P-001) — which is the part a pin would otherwise imply away.
+              It jumps to that SECTION rather than opening the map directly, and still should:
+              the section is where the map lives now, and it is also the one that says the exact
+              address arrives after booking (§5.6, P-001) — which is the part a pin would otherwise
+              imply away. Landing there also puts «الموقع» in view, which is what mounts the map.
             */}
               <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
                 <PinIcon />
@@ -757,25 +757,16 @@ export default async function PropertyPage({
                 </div>
 
                 {/*
-                  Absent whenever there is nothing honest to draw — no MapTiler plan, or a
-                  listing with no coordinates. The card above is then exactly what shipped
-                  before the map existed.
+                  Absent for a listing whose partner never recorded coordinates, and on any
+                  deployment with no basemap configured. The card above is then exactly what
+                  shipped before the map existed — nothing about it looks broken.
                 */}
-                {property.map ? (
+                {property.latitude && property.longitude ? (
                   <PropertyMap
-                    card={property.map.card}
-                    full={property.map.full}
-                    showLabel={t('map.show')}
-                    alt={t('map.alt')}
-                    labels={{
-                      title: t('map.title'),
-                      open: t('map.open'),
-                      previous: t('map.previous'),
-                      next: t('map.next'),
-                      close: t('map.close'),
-                      zoomIn: t('map.zoomIn'),
-                      zoomOut: t('map.zoomOut'),
-                    }}
+                    latitude={property.latitude}
+                    longitude={property.longitude}
+                    locale={locale}
+                    labels={{ explore: t('map.show'), region: t('map.region') }}
                   />
                 ) : null}
               </div>

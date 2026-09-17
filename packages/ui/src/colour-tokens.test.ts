@@ -85,6 +85,19 @@ const COLOUR_PREFIXES = [
  * because a pattern loose enough to cover them is loose enough to cover `ink`.
  */
 const NOT_A_COLOUR = new Set([
+  /*
+    MapLibre PAINT KEYS, not Tailwind classes — `fill-color`, `fill-opacity` in the
+    property page's map layers. `classAttributes` strips comments and brackets but reads
+    the whole file rather than only `className`, so any `fill-…` string in the source
+    reaches this sweep.
+
+    Safe to exclude because Tailwind v4 has no `*-color` or `*-opacity` utility at all:
+    `bg-color` and `text-opacity` are not classes that could be written by mistake and
+    silently work. A real dangling colour still reads `bg-brandd` or `text-gols`, and is
+    still caught.
+  */
+  'color',
+  'opacity',
   // shared
   'transparent',
   'current',

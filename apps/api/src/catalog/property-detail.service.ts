@@ -6,7 +6,6 @@ import type { Database } from '@safra/db';
 import { DATABASE } from '../database/database.module.js';
 import { imageIsPublished } from '../storage/image-visibility.js';
 import { SettingsService } from '../settings/settings.service.js';
-import { ENV, type Env } from '../config/env.js';
 import { ERROR } from '@safra/contracts';
 import { notFound } from '../common/errors/app-error.js';
 import { fuzzCoordinate } from './public-location.js';
@@ -17,57 +16,12 @@ import { fuzzCoordinate } from './public-location.js';
  */
 const CALENDAR_DAYS = 60;
 
-/**
- * The public map's pixel size, and the path the browser fetches it from.
- *
- * Two variants because the card and the enlarged view are different pictures, not one
- * picture at two CSS sizes: shipping the lightbox's image into a 280px-tall card would
- * cost the reader several hundred kilobytes to look at a thumbnail, which §3's payload
- * budget forbids. The sizes are the CSS ones; `@2x` doubles the pixels.
- */
-const MAP_VARIANTS = {
-  card: { width: 800, height: 320 },
-  full: { width: 1000, height: 700 },
-} as const;
-
 @Injectable()
 export class PropertyDetailService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly settings: SettingsService,
-    @Inject(ENV) private readonly env: Env,
   ) {}
-
-  /**
-   * What the page needs to draw the location map, or `null` when it must draw none.
-   *
-   * `null` in three cases, all of them ordinary rather than exceptional: no MapTiler
-   * plan configured, or a listing whose partner never recorded coordinates. The page
-   * renders the location card without a picture and nothing looks broken — see
-   * `MAPTILER_KEY` in `config/env.ts` for why that is the chosen failure mode.
-   *
-   * The URLs address the property by SLUG and carry no coordinates. A caller cannot
-   * ask this service to render an arbitrary point on earth at our expense, and the
-   * set of reachable images is exactly the set of published listings.
-   */
-  private mapFor(
-    slug: string,
-    latitude: string | null,
-    longitude: string | null,
-  ): {
-    card: { url: string; width: number; height: number };
-    full: { url: string; width: number; height: number };
-  } | null {
-    if (!this.env.MAPTILER_KEY) return null;
-    if (latitude === null || longitude === null) return null;
-
-    const base = `${this.env.API_URL_SELF}/api/v1/properties/${encodeURIComponent(slug)}/map`;
-
-    return {
-      card: { url: `${base}/card.webp`, ...MAP_VARIANTS.card },
-      full: { url: `${base}/full.webp`, ...MAP_VARIANTS.full },
-    };
-  }
 
   /**
    * Full public detail for one property (§5.6).
@@ -158,15 +112,6 @@ export class PropertyDetailService {
       latitude: fuzzCoordinate(row['latitude']),
       longitude: fuzzCoordinate(row['longitude']),
       exactLocationAfterBooking: true,
-      /*
-        Drawn from the SAME rounded pair the two lines above publish, via one helper, so
-        the picture cannot be more precise than the text beside it.
-      */
-      map: this.mapFor(
-        slug,
-        fuzzCoordinate(row['latitude']),
-        fuzzCoordinate(row['longitude']),
-      ),
       city: {
         slug: row['city_slug'],
         nameAr: row['city_name_ar'],

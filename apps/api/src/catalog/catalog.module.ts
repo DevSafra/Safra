@@ -1,22 +1,8 @@
-import {
-  Controller,
-  Get,
-  Module,
-  Param,
-  Query,
-  Res,
-  StreamableFile,
-} from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
-import type { Response } from 'express';
-
-import { ERROR } from '@safra/contracts';
+import { Controller, Get, Module, Param, Query } from '@nestjs/common';
 
 import { Public } from '../rbac/decorators.js';
-import { notFound } from '../common/errors/app-error.js';
 import { CatalogService } from './catalog.service.js';
 import { PropertyDetailService } from './property-detail.service.js';
-import { isMapVariant, PropertyMapService } from './property-map.service.js';
 
 /**
  * Public catalogue. @Public() because §5.1 requires a visitor to browse and search
@@ -27,7 +13,6 @@ class CatalogController {
   constructor(
     private readonly catalog: CatalogService,
     private readonly properties: PropertyDetailService,
-    private readonly maps: PropertyMapService,
   ) {}
 
   @Public()
@@ -64,47 +49,6 @@ class CatalogController {
         : undefined;
 
     return this.properties.bySlug(slug, stay);
-  }
-
-  /**
-   * The location map for one published listing (O-web-12).
-   *
-   * `@Public()` because the property page it sits on is public. The variant is matched
-   * against a closed set before it reaches the service — an unknown one 404s rather
-   * than being coerced into a default, so a caller cannot invent sizes we then pay to
-   * render. `map/:variant.webp` is spelled as a two-segment path because Nest treats a
-   * dot in a parameter as part of the value, which would hand the service `card.webp`.
-   *
-   * The throttle is per IP and deliberately generous: a reader opening ten listings
-   * fetches ten maps, and every one of those is a cache hit after the first visitor.
-   * It is there to bound a script, not a person.
-   */
-  @Public()
-  @Throttle({ default: { limit: 120, ttl: 60_000 } })
-  @Get('properties/:slug/map/:variant.webp')
-  async propertyMap(
-    @Param('slug') slug: string,
-    @Param('variant') variant: string,
-    @Res({ passthrough: true }) response: Response,
-  ): Promise<StreamableFile> {
-    if (!isMapVariant(variant)) throw notFound(ERROR.PROPERTY_NOT_FOUND);
-
-    const bytes = await this.maps.image(slug, variant);
-
-    /*
-      Set HERE, on the success path, and deliberately not with `@Header`.
-
-      The decorator writes the header before the handler runs, so it survived onto the
-      404 — and a 404 cached `public, max-age=604800` is a week of shared caches
-      insisting a map does not exist. Every reason this endpoint 404s is TEMPORARY: a
-      plan not yet bought, coordinates not yet recorded, a listing not yet published.
-      Caching those would mean the feature stayed broken for a week after the thing that
-      was missing arrived, on exactly the machines that had looked early.
-    */
-    response.setHeader('Content-Type', 'image/webp');
-    response.setHeader('Cache-Control', 'public, max-age=604800');
-
-    return new StreamableFile(bytes);
   }
 
   /** The business kinds «انضم كشريك» offers. See the service for why these are rows. */
@@ -172,7 +116,7 @@ class CatalogController {
 
 @Module({
   controllers: [CatalogController],
-  providers: [CatalogService, PropertyDetailService, PropertyMapService],
+  providers: [CatalogService, PropertyDetailService],
   exports: [CatalogService, PropertyDetailService],
 })
 export class CatalogModule {}

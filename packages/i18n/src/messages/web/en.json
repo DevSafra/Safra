@@ -171,14 +171,7 @@
     "exactLocationAfterBooking": "The exact location is shown once your booking is confirmed.",
     "map": {
       "show": "Show on map",
-      "alt": "Map of the area around the property",
-      "title": "Property location",
-      "open": "Show the map",
-      "previous": "Previous map",
-      "next": "Next map",
-      "close": "Close the map",
-      "zoomIn": "Zoom in",
-      "zoomOut": "Zoom out"
+      "region": "Map of the area around the property"
     },
     "bookNow": "Book now",
     "askSafra": "Ask SAFRA about this property",

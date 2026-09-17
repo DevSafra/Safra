@@ -7,17 +7,24 @@
     "build": "NODE_ENV=production next build",
     "start": "next start --port 3000",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "map:assets": "node scripts/copy-map-assets.mjs",
+    "prebuild": "node scripts/copy-map-assets.mjs",
+    "predev": "node scripts/copy-map-assets.mjs"
   },
   "dependencies": {
+    "@mapbox/mapbox-gl-rtl-text": "^0.4.0",
+    "@protomaps/basemaps": "^5.7.2",
     "@safra/contracts": "workspace:*",
     "@safra/i18n": "workspace:*",
     "@safra/session": "workspace:*",
     "@safra/ui": "workspace:*",
     "libphonenumber-js": "^1.13.11",
+    "maplibre-gl": "^5.24.0",
     "next": "^15.5.25",
     "next-intl": "^4.3.0",
     "playwright-core": "^1.62.1",
+    "pmtiles": "^4.5.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "zod": "^4.1.0"

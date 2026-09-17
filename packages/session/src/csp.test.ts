@@ -83,6 +83,42 @@ describe('buildCsp', () => {
       );
     });
 
+    /*
+      The three directives the property page's self-hosted map needs, each OFF unless a
+      surface asks. A map is one page of one app; the console and the partner portal have
+      no business fetching foreign origins, starting blob workers or compiling WebAssembly.
+    */
+    describe('the map directives', () => {
+      it('keeps connect-src to self until an origin is named', () => {
+        expect(policy()).toContain("connect-src 'self'");
+        expect(policy()).not.toContain("connect-src 'self' http");
+      });
+
+      it('adds a named origin to connect-src when one is given', () => {
+        expect(policy({ connectSrc: 'https://media.safra.com' })).toContain(
+          "connect-src 'self' https://media.safra.com",
+        );
+      });
+
+      it('emits no worker-src unless blob workers are asked for', () => {
+        expect(policy()).not.toContain('worker-src');
+        expect(policy({ blobWorkers: true })).toContain("worker-src 'self' blob:");
+      });
+
+      it('allows WebAssembly WITHOUT allowing eval', () => {
+        /*
+          The distinction this test exists for. `'wasm-unsafe-eval'` compiles WebAssembly
+          and nothing else; `'unsafe-eval'` would also hand an injected script `eval()`.
+          A change that reached for the wrong one would look identical to the map.
+        */
+        const withWasm = policy({ wasm: true });
+
+        expect(withWasm).toContain("'wasm-unsafe-eval'");
+        expect(withWasm).not.toContain("'unsafe-eval'");
+        expect(policy()).not.toContain('wasm-unsafe-eval');
+      });
+    });
+
     it('forbids framing, foreign form targets, and plugins', () => {
       const p = policy();
 

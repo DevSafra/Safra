@@ -1414,12 +1414,12 @@ unblocks four items and is the highest-leverage action available.**
 
 ### 🤝 Vendor dependencies
 
-| Item                                                    | Note                                                                                                                                                                                          |
-| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **S-9** Independent penetration test                    | Book early; testers have lead times. Needs a staging environment                                                                                                                              |
-| **S-8** Malware scanning for uploaded documents         | ClamAV sidecar or storage hook; needs hosting                                                                                                                                                 |
-| **S-2** Partner notifications                           | Blocked on the WhatsApp BSP decision (item 192)                                                                                                                                               |
-| **Maps billing account — now BLOCKING a built feature** | Item 195. MapTiler **Flex ($30/mo) or above**: the free tier has no Static Maps API and is non-commercial only. The property page's map card is built and dormant until `MAPTILER_KEY` is set |
+| Item                                            | Note                                                                                                                              |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **S-9** Independent penetration test            | Book early; testers have lead times. Needs a staging environment                                                                  |
+| **S-8** Malware scanning for uploaded documents | ClamAV sidecar or storage hook; needs hosting                                                                                     |
+| **S-2** Partner notifications                   | Blocked on the WhatsApp BSP decision (item 192)                                                                                   |
+| ~~Maps billing account~~ **CLOSED 2026-09-17**  | No vendor. The basemap is self-hosted from a Protomaps extract in our own bucket — see O-web-12. Nothing to buy, nothing to renew |
 
 ### 📦 Deferred product scope — deliberately not started
 
@@ -2743,25 +2743,59 @@ column empty beside a full-height cover, which reads as an image that failed to 
 
 **Not done, and each is a real piece:**
 
-- ~~**The map card.**~~ **Built 2026-09-16**, against Bashar's booking.com screenshot: a static map
-  flush at the foot of the location card, an area disc, and «اعرض على الخريطة» opening a larger
-  rendering in `ImageSliderFrame`. **It shows nothing until `MAPTILER_KEY` is in the environment,
-  which is still only Bashar's to obtain** — and the plan has to be **Flex ($30/month) or above**,
-  because MapTiler's free tier excludes the Static Maps API _and_ is licensed for non-commercial use
-  only. With no key the payload's `map` is `null` and the location card renders exactly as it did
-  before, which is the chosen failure mode: a broken tile box on a public listing is worse than no
-  map.
+- ~~**The map card.**~~ **Built 2026-09-16, rebuilt free 2026-09-17.** An INTERACTIVE MapLibre
+  map over a self-hosted Protomaps basemap. **No vendor, no API key, no subscription.**
 
-  Not MapLibre in the end. The 2026-09-02 note said MapLibre + MapTiler; the card is ONE `<img>`
-  instead, because an interactive map would have to re-implement the restriction the rounding
-  already enforces — panning toward the door is the one thing this feature must not allow — and it
-  would put ~200 KB of library on a page that already carries fourteen photographs. Revisit only if
-  a genuine pan/zoom requirement appears.
+  Bashar asked (2026-09-17) whether a free, commercially-clean alternative existed before
+  committing to MapTiler's $30/month. It does, and the licensing was verified from primary
+  sources rather than assumed:
 
-  The disc is burned into the image by the API (`areaPolygon`), not laid over it in CSS. A CSS
-  overlay was the first attempt and the browser showed why it was wrong: `ImageSliderFrame` owns its
-  `<img>`, so the mark appeared on the card and vanished in the enlargement — pressing the button
-  lost the only thing it exists to show.
+  | Option                                               | Verdict                                                                                                                                                     |
+  | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `tile.openstreetmap.org`, `vector.openstreetmap.org` | Rejected. Permitted but «access may be withdrawn at any point», and **building tile archives is prohibited** — which also rules out pre-rendering from them |
+  | Stadia Maps free tier                                | Rejected. «Commercial use not allowed», stated on their pricing page. Starter is $20/mo and includes static maps                                            |
+  | OpenFreeMap public instance                          | Viable — «Is commercial usage allowed? Yes», MIT, no key. Rejected only because every visitor's IP would reach it and Cloudflare                            |
+  | **Protomaps, self-hosted**                           | **Chosen.** ODbL Produced Work; `pmtiles`, `maplibre-gl` and `@protomaps/basemaps` are all BSD; Noto Sans is OFL                                            |
+
+  **Cost, measured.** A Syria extract (`--bbox=35.5,32.2,42.5,37.4 --maxzoom=14`) is 154 MB
+  against a 128 GB planet — 86 MB at z13, 330 MB at z15. Roughly **$0.004/month** of S3,
+  plus ~18 MB of glyphs and 120 KB of sprites. `pnpm basemap:bootstrap <file.pmtiles>`
+  uploads all of it; `NEXT_PUBLIC_BASEMAP_URL` points the app at it.
+
+  **Privacy is structural, not a setting.** The browser only ever receives coordinates
+  rounded to three decimals, so panning and zooming cannot reveal a precision that was
+  never transmitted — which is why an interactive map is safe here and would not be on a
+  site that shipped exact coordinates behind a locked viewport. A disc rather than a pin,
+  and `PUBLIC_MAP_MAX_ZOOM` caps at 16 so the picture does not imply more than the number
+  behind it. Self-hosting also means **no third party learns which listing a visitor is
+  looking at** — verified in a browser: every request goes to our own origins.
+
+  **Weight.** 265 KB gzipped for MapLibre plus 36 KB for the RTL text plugin, and none of
+  it loads until «الموقع» scrolls into view — proven with the section 537 px below the
+  fold: 0 map requests before, 12 after. The map mounts inert and only takes the wheel when
+  the reader presses «اعرض على الخريطة».
+
+  **Three traps, all silent, all found in a browser and none by any test:**
+
+  - **`maplibre-gl@6` does not work with `pmtiles@4`.** No error: the style loads, WebGL is
+    healthy, and the source never leaves `isSourceLoaded: false`. v6 now throws before it
+    even creates a canvas. Pinned to v5 — see the CVE note below.
+  - **The RTL text plugin loaded lazily produces a map with NO LABELS.** The style's label
+    expressions gate on `is-supported-script`, which answers false for Arabic until the
+    plugin is in memory. It must be loaded eagerly AND awaited before the map is created,
+    or the first tiles parse without it and Arabic comes out reversed letter by letter.
+  - **That plugin is WebAssembly, which the CSP blocked.** Fixed with `'wasm-unsafe-eval'`,
+    which permits WebAssembly and nothing else — NOT `'unsafe-eval'`, which would also hand
+    an injected script `eval()`. `csp.test.ts` asserts the difference.
+
+  **One accepted risk, with a name.** `maplibre-gl@5` carries GHSA-jrc7-96c5-q579, a
+  CRITICAL XSS sanitiser bypass patched only in 6.4.1 — a version the PMTiles ecosystem
+  cannot use yet. `package.json` ignores it, on the grounds that the advisory's attack
+  vector is attribution and popup HTML: ours is a compile-time constant, we render no
+  popups or markers, and we load no third-party style. The advisory's own workaround holds
+  by construction. **`map-sanitiser-reach.test.ts` holds that excuse to account** and fails
+  the moment any of those three stops being true. Revisit when `pmtiles` supports MapLibre
+  6.4.1+; the exemption comes out of `package.json` the same day.
 
 - **The score-and-review card** in the sidebar — «9.0 ممتاز», the review count, one guest quote.
 - **The amenity chips as bordered icon boxes**, which is how the reference draws them; they are a

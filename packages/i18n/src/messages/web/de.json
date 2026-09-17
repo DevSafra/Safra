@@ -171,14 +171,7 @@
     "exactLocationAfterBooking": "Die genaue Lage wird nach der Buchungsbestätigung angezeigt.",
     "map": {
       "show": "Auf der Karte zeigen",
-      "alt": "Karte der Umgebung der Unterkunft",
-      "title": "Lage der Unterkunft",
-      "open": "Karte anzeigen",
-      "previous": "Vorherige Karte",
-      "next": "Nächste Karte",
-      "close": "Karte schließen",
-      "zoomIn": "Vergrößern",
-      "zoomOut": "Verkleinern"
+      "region": "Karte der Umgebung der Unterkunft"
     },
     "bookNow": "Jetzt buchen",
     "askSafra": "SAFRA zu dieser Unterkunft fragen",

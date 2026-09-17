@@ -5,6 +5,7 @@ import { routing } from './i18n/routing';
 import {
   CUSTOMER_SESSION_COOKIE,
   SESSION_MAX_AGE_SECONDS,
+  basemapBase,
   buildCsp,
   callAuth,
   createNonce,
@@ -41,6 +42,12 @@ export default async function middleware(request: NextRequest) {
    * learns the nonce and stamps it onto the scripts it generates. Omitting it serves a
    * policy the browser enforces against scripts that carry no nonce.
    */
+  /* One derivation, shared with `PropertyMap`, so the policy names what the map fetches. */
+  const basemap = basemapBase({
+    NEXT_PUBLIC_BASEMAP_URL: process.env['NEXT_PUBLIC_BASEMAP_URL'],
+    NEXT_PUBLIC_MEDIA_URL: process.env['NEXT_PUBLIC_MEDIA_URL'],
+  });
+
   const csp = buildCsp({
     nonce: createNonce(),
     // https: because property photography comes from object storage or a CDN whose
@@ -57,8 +64,22 @@ export default async function middleware(request: NextRequest) {
       ...mediaOrigins([
         process.env['NEXT_PUBLIC_MEDIA_URL'],
         process.env['API_URL'] ?? 'http://localhost:4000',
+        /* The basemap's sprite sheet is an image; its tiles and glyphs are fetches. */
+        basemap,
       ]),
     ].join(' '),
+    /*
+      The self-hosted basemap, which MapLibre reaches with `fetch` rather than `<img>`.
+
+      Named rather than wildcarded, for the reason `img-src` is: `connect-src` is where an
+      injected script would send what it stole, so the list stays as short as the product
+      needs. One origin — ours — and nothing else.
+    */
+    connectSrc: mediaOrigins([basemap]).join(' '),
+    /* MapLibre starts its tile workers from `blob:` URLs; see `blobWorkers`. */
+    blobWorkers: Boolean(basemap),
+    /* Its Arabic text plugin is WebAssembly; see `wasm` for why this is not `unsafe-eval`. */
+    wasm: Boolean(basemap),
     /*
       TLS, not the BUILD MODE.
 
