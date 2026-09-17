@@ -766,7 +766,43 @@ export default async function PropertyPage({
                     latitude={property.latitude}
                     longitude={property.longitude}
                     locale={locale}
-                    labels={{ explore: t('map.show'), region: t('map.region') }}
+                    labels={{
+                      explore: t('map.show'),
+                      region: t('map.region'),
+                      close: t('map.close'),
+                      dialog: t('map.dialog'),
+                    }}
+                    /*
+                      Every figure comes from what this page already computed — `nightly`
+                      carries the customer fee, `rating` is the maintained aggregate, and
+                      the star rating is the CLASSIFICATION rather than the review score.
+                      Recomputing any of them here would be a second answer to a question
+                      the page has already answered.
+                    */
+                    card={{
+                      name,
+                      rating: property.rating,
+                      reviewsLabel:
+                        property.reviewsCount > 0
+                          ? t('reviews', { count: property.reviewsCount })
+                          : null,
+                      starRating: property.starRating,
+                      starsLabel: property.starRating
+                        ? ts('stars', { count: property.starRating })
+                        : null,
+                      nightly,
+                      perNight: t('perNight'),
+                      fromLabel: t('summaryFromLabel'),
+                      address: `${property.addressApproximate}, ${cityName}`,
+                      image: property.images[0]
+                        ? {
+                            src: imageUrl(property.images[0], 400),
+                            alt: localisedText(property.images[0].alt, locale) ?? name,
+                          }
+                        : null,
+                      viewHref: '#booking',
+                      viewLabel: t('map.view'),
+                    }}
                   />
                 ) : null}
               </div>

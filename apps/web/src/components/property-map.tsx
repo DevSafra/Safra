@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type * as MapLibre from 'maplibre-gl';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 
 import { areaCircle, PUBLIC_MAP_MAX_ZOOM, PUBLIC_MAP_ZOOM } from '@safra/contracts';
 import { basemapBase } from '@safra/session';
+
+import { PropertyMapCard, type PropertyMapCardData } from './property-map-card';
 
 /*
   MapLibre's own stylesheet, ~10 KB gzipped. Imported statically rather than with the
@@ -28,10 +30,14 @@ const BASEMAP = basemapBase({
 });
 
 export interface PropertyMapLabels {
-  /** The button that hands the map over to the reader. */
+  /** The button that opens the full-screen map. */
   readonly explore: string;
-  /** Names the region for a screen reader. */
+  /** Names the inline map for a screen reader. */
   readonly region: string;
+  /** The control that leaves the full-screen map. */
+  readonly close: string;
+  /** The full-screen map's accessible name. */
+  readonly dialog: string;
 }
 
 /**
@@ -56,65 +62,70 @@ export interface PropertyMapLabels {
  *   handful of roofs and invites «it must be one of those», a confidence the data does
  *   not support. Stopping at 16 keeps the picture as vague as the number behind it.
  *
- * ## Why the library is not in the page bundle
+ * ## Two maps, and why they are not one
  *
- * MapLibre and its RTL text plugin are around 200 KB gzipped, which is not a price a
- * reader should pay for a listing they scroll half of. Everything is behind a dynamic
- * `import()` fired by an `IntersectionObserver`, so the map costs exactly nothing until
- * «الموقع» comes into view, and nothing at all to somebody who never reaches it.
+ * The card carries an INERT thumbnail; «اعرض على الخريطة» opens a full-screen one that
+ * pans and zooms, the arrangement Bashar asked for by screenshot (2026-09-17). They are
+ * separate MapLibre instances rather than one canvas moved between containers: moving a
+ * React-owned node between trees to keep a WebGL context alive is the kind of cleverness
+ * that survives until the next render. The second instance is nearly free — the tiles,
+ * glyphs and sprite it needs are already in the browser's cache from the first.
+ *
+ * The thumbnail never becomes interactive. A live map inside a scrolling page steals the
+ * wheel on a laptop and the finger on a phone, and a reader trying to scroll past a
+ * listing should not have to escape a map to do it.
  *
  * ## MapLibre is pinned to v5, deliberately
  *
- * `maplibre-gl@6` does not work with `pmtiles@4`'s protocol handler. The failure has no
- * error attached to it: the style loads, the canvas gets a drawing surface, WebGL reports
- * itself healthy, and the source simply never leaves `isSourceLoaded: false`, so `load`
- * never fires and the map stays blank. Nothing appears in the console and nothing appears
- * in our logs.
+ * `maplibre-gl@6` does not work with `pmtiles@4`'s protocol handler, and the failure has
+ * no error attached to it: the style loads, the canvas gets a drawing surface, WebGL
+ * reports itself healthy, and the source simply never leaves `isSourceLoaded: false`, so
+ * `load` never fires and the map stays blank. v6.10 now throws before it creates a canvas.
  *
- * Verified by swapping only the major — v6.10.0 blank, v5.24.0 draws. Anybody raising this
- * to 6 needs to check that a tile actually renders, not that the build passes.
+ * Verified by swapping only the major — v6 blank, v5.24.0 draws. Anybody raising this to 6
+ * needs to check that a tile actually renders, not that the build passes. It is also why
+ * `package.json` carries an audit exemption; `map-sanitiser-reach.test.ts` holds that
+ * exemption to account.
  *
- * ## Why the reader has to ask before it moves
+ * ## Why the library is not in the page bundle
  *
- * It mounts inert — no drag, no scroll-zoom — and becomes interactive on «اعرض على
- * الخريطة». A live map inside a scrolling page steals the wheel on a laptop and the
- * finger on a phone, and a reader trying to get past a listing should not have to escape
- * a map to do it.
+ * MapLibre and its RTL text plugin are around 300 KB gzipped, which is not a price a
+ * reader should pay for a listing they scroll half of. Everything is behind a dynamic
+ * `import()` fired by an `IntersectionObserver`, so the map costs exactly nothing until
+ * «الموقع» comes into view, and nothing at all to somebody who never reaches it.
  */
 export function PropertyMap({
   latitude,
   longitude,
   locale,
   labels,
+  card,
 }: {
   readonly latitude: string;
   readonly longitude: string;
   readonly locale: string;
   readonly labels: PropertyMapLabels;
+  /** The listing, for the panel beside the full-screen map. */
+  readonly card: PropertyMapCardData;
 }) {
-  const container = useRef<HTMLDivElement | null>(null);
-  const map = useRef<MapLibreMap | null>(null);
-  /** The loaded module, kept so `enable` can add a control without importing again. */
-  const lib = useRef<typeof MapLibre | null>(null);
-  const [near, setNear] = useState(false);
-  /*
-    Read from the document rather than passed down from the server.
+  const thumbnail = useRef<HTMLDivElement | null>(null);
+  const full = useRef<HTMLDivElement | null>(null);
+  const overlay = useRef<HTMLDivElement | null>(null);
+  /** Where focus was before the overlay opened, so it can be put back. */
+  const opener = useRef<HTMLElement | null>(null);
 
-    The theme toggle is client-side — it sets `data-theme` and a cookie without a
-    navigation — so a prop rendered on the server is correct exactly until somebody uses
-    the toggle, and then it is a light map on a dark page until the next reload.
+  const [near, setNear] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [failed, setFailed] = useState(false);
+  /** Set once the thumbnail has drawn, so the placeholder can step out from under it. */
+  const [drawn, setDrawn] = useState(false);
+  /*
+    Read from the document rather than passed down from the server. The theme toggle is
+    client-side — it sets `data-theme` and a cookie without a navigation — so a prop
+    rendered on the server is correct exactly until somebody uses the toggle, and then it
+    is a light map on a dark page until the next reload.
   */
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const [interactive, setInteractive] = useState(false);
-  /*
-    The same fact as `interactive`, as a ref, because the map effect must READ it without
-    DEPENDING on it: a theme switch rebuilds the map, and a rebuilt map that came up inert
-    under a hidden button would leave the reader with no way to ask again.
-  */
-  const asked = useRef(false);
-  const [failed, setFailed] = useState(false);
-  /** Set once the map has drawn, so the placeholder can step out from under it. */
-  const [drawn, setDrawn] = useState(false);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -134,7 +145,7 @@ export function PropertyMap({
     still paid nothing.
   */
   useEffect(() => {
-    const element = container.current;
+    const element = thumbnail.current;
     if (!element || near) return;
 
     const observer = new IntersectionObserver(
@@ -152,141 +163,174 @@ export function PropertyMap({
     return () => observer.disconnect();
   }, [near]);
 
-  useEffect(() => {
-    if (!near || !container.current || !BASEMAP) return;
+  /**
+   * Builds one map into a container.
+   *
+   * Shared by the thumbnail and the full-screen view so there is ONE description of the
+   * style, the centre and the area disc. Two copies would agree right up until somebody
+   * changed the disc in one of them.
+   */
+  const mount = useCallback(
+    async (
+      container: HTMLDivElement,
+      options: { interactive: boolean },
+    ): Promise<{
+      instance: MapLibreMap;
+      library: typeof MapLibre;
+      dispose: () => void;
+    } | null> => {
+      if (!BASEMAP) return null;
 
-    let cancelled = false;
+      const [maplibre, pmtiles, basemaps] = await Promise.all([
+        import('maplibre-gl'),
+        import('pmtiles'),
+        import('@protomaps/basemaps'),
+      ]);
 
-    const start = async () => {
-      try {
-        const [maplibre, pmtiles, basemaps] = await Promise.all([
-          import('maplibre-gl'),
-          import('pmtiles'),
-          import('@protomaps/basemaps'),
-        ]);
-
-        if (cancelled || !container.current) return;
-
-        lib.current = maplibre;
-
+      if (maplibre.getRTLTextPluginStatus() === 'unavailable') {
         /*
-          Arabic needs the RTL plugin, and it must load EAGERLY — the second argument is
-          `lazy`, and passing `true` produces a map with no labels at all.
+          Eager AND awaited, and both halves matter.
 
           The style's label expressions gate on `is-supported-script`, which answers false
-          for Arabic until the plugin is in memory. Lazy loading defers the plugin until
-          RTL text is first encountered, so the check fails, every Arabic label is
-          suppressed, no Arabic glyph range is ever requested, and the map draws streets,
-          parks and water without one name on them. Nothing errors; it just looks like a
-          basemap that forgot its labels.
+          for Arabic until the plugin is in memory — so loading it LAZILY produces a map
+          with no labels at all and nothing in the console. And starting the download
+          without WAITING lets the first tiles parse before it lands; those tiles keep the
+          layout they were parsed with, and «محطة قطار الحجاز» comes out as «زاجحلا راطق
+          ةطحم», letter for letter backwards.
 
-          Served from our own origin rather than unpkg, so the map contacts nobody.
+          The plugin is WebAssembly, so the CSP needs `'wasm-unsafe-eval'` — see `wasm` in
+          `@safra/session`'s `buildCsp`, which is deliberately NOT `'unsafe-eval'`.
         */
-        if (maplibre.getRTLTextPluginStatus() === 'unavailable') {
-          /*
-            AWAITED, and that is the second half of the same bug. Starting the download
-            without waiting lets the map be created and the first tiles be parsed while the
-            plugin is still in flight, and those tiles keep the layout they were parsed
-            with: «محطة قطار الحجاز» came out as «زاجحلا راطق ةطحم», letter for letter
-            backwards. Correct glyphs, correct font, wrong order — which reads as a broken
-            font rather than a missing plugin.
-          */
-          await maplibre.setRTLTextPlugin('/map/mapbox-gl-rtl-text.js', false);
-          if (cancelled || !container.current) return;
+        await maplibre.setRTLTextPlugin('/map/mapbox-gl-rtl-text.js', false);
+      }
+
+      const protocol = new pmtiles.Protocol();
+      maplibre.addProtocol('pmtiles', protocol.tile);
+
+      const flavour = basemaps.namedFlavor(theme === 'dark' ? 'dark' : 'light');
+
+      const instance = new maplibre.Map({
+        container,
+        /*
+          The whole style is assembled here from files we host. No key, no vendor
+          call-out, and nothing in this object points at a third party.
+        */
+        style: {
+          version: 8,
+          glyphs: `${BASEMAP}/fonts/{fontstack}/{range}.pbf`,
+          sprite: `${BASEMAP}/sprites/${theme === 'dark' ? 'dark' : 'light'}`,
+          sources: {
+            protomaps: {
+              type: 'vector',
+              /*
+                The tile TEMPLATE rather than `url:`, which saves MapLibre a TileJSON
+                round trip through the protocol before it can draw anything. The zoom
+                range restates what the archive's own header says; `pmtiles extract` built
+                it with `--maxzoom=14`, and the map overzooms from there.
+              */
+              tiles: [`pmtiles://${BASEMAP}/tiles.pmtiles/{z}/{x}/{y}`],
+              minzoom: 0,
+              maxzoom: 14,
+              /* ODbL: this must stay visible, so it is a permanent control below. */
+              attribution: '© OpenStreetMap contributors',
+            },
+          },
+          layers: basemaps.layers('protomaps', flavour, {
+            lang: locale,
+          }) as MapLibre.LayerSpecification[],
+        },
+        center: [Number(longitude), Number(latitude)],
+        zoom: PUBLIC_MAP_ZOOM,
+        maxZoom: PUBLIC_MAP_MAX_ZOOM,
+        attributionControl: false,
+        interactive: options.interactive,
+      });
+
+      instance.addControl(
+        new maplibre.AttributionControl({ compact: false }),
+        'bottom-right',
+      );
+
+      /*
+        A missing glyph range must not blank the card — a word renders as boxes and the
+        rest of the map is still useful. A style or source that cannot load means there is
+        no map at all, and the card is better off without an empty canvas.
+      */
+      instance.on('error', (event: { error?: unknown }) => {
+        const message = event.error instanceof Error ? event.error.message : '';
+        if (/style|source|sprite/i.test(message)) setFailed(true);
+      });
+
+      instance.on('load', () => {
+        instance.addSource('listing-area', {
+          type: 'geojson',
+          data: areaCircle(Number(latitude), Number(longitude)),
+        });
+
+        instance.addLayer({
+          id: 'listing-area-fill',
+          type: 'fill',
+          source: 'listing-area',
+          paint: { 'fill-color': '#a87a1f', 'fill-opacity': 0.22 },
+        });
+
+        instance.addLayer({
+          id: 'listing-area-edge',
+          type: 'line',
+          source: 'listing-area',
+          paint: { 'line-color': '#a87a1f', 'line-width': 2, 'line-opacity': 0.9 },
+        });
+      });
+
+      /*
+        MapLibre measures its container ONCE, at construction, and then only listens for
+        window resizes. That is not enough here: the full-screen map is built into a
+        container React has just mounted, and it came up as a 1440x300 canvas — MapLibre's
+        fallback size for a container it could not measure — leaving the middle of the
+        screen showing the backdrop rather than the map. Dragging there hit the dialog and
+        moved nothing, which is how this was found.
+
+        A `ResizeObserver` fixes the mount case and every later one for free: the panel
+        turning from a bottom sheet into a side column changes the map's box too.
+      */
+      const resizer = new ResizeObserver(() => instance.resize());
+      resizer.observe(container);
+
+      return {
+        instance,
+        library: maplibre,
+        dispose: () => {
+          resizer.disconnect();
+          instance.remove();
+        },
+      };
+    },
+    [latitude, longitude, locale, theme],
+  );
+
+  /* The thumbnail: inert, and only once the section is nearly in view. */
+  useEffect(() => {
+    if (!near || !thumbnail.current || !BASEMAP) return;
+
+    let cancelled = false;
+    let dispose: (() => void) | null = null;
+
+    void (async () => {
+      try {
+        const container = thumbnail.current;
+        const built = container ? await mount(container, { interactive: false }) : null;
+
+        if (!built) return;
+
+        if (cancelled) {
+          built.dispose();
+
+          return;
         }
 
-        const protocol = new pmtiles.Protocol();
-        maplibre.addProtocol('pmtiles', protocol.tile);
-
-        const flavour = basemaps.namedFlavor(theme === 'dark' ? 'dark' : 'light');
-        const centre: [number, number] = [Number(longitude), Number(latitude)];
-
-        const instance = new maplibre.Map({
-          container: container.current,
-          /*
-            The whole style is assembled here from files we host. No key, no vendor
-            call-out, and nothing in this object points at a third party.
-          */
-          style: {
-            version: 8,
-            glyphs: `${BASEMAP}/fonts/{fontstack}/{range}.pbf`,
-            sprite: `${BASEMAP}/sprites/${theme === 'dark' ? 'dark' : 'light'}`,
-            sources: {
-              protomaps: {
-                type: 'vector',
-                /*
-                  The tile TEMPLATE rather than `url:`, which saves MapLibre a TileJSON
-                  round trip through the protocol before it can draw anything. The zoom
-                  range restates what the archive's own header says; `pmtiles extract`
-                  built it with `--maxzoom=14`, and the map overzooms from there.
-                */
-                tiles: [`pmtiles://${BASEMAP}/tiles.pmtiles/{z}/{x}/{y}`],
-                minzoom: 0,
-                maxzoom: 14,
-                /* ODbL: this must stay visible, so it is a permanent control below. */
-                attribution: '© OpenStreetMap contributors',
-              },
-            },
-            /*
-              Cast because `@protomaps/basemaps` is built against MapLibre v5's types and
-              the two `LayerSpecification` shapes are structurally identical but nominally
-              distinct. A runtime check follows: the map is driven in a browser, and a
-              style the renderer rejects shows up as a blank canvas immediately.
-            */
-            layers: basemaps.layers('protomaps', flavour, {
-              lang: locale,
-            }) as MapLibre.LayerSpecification[],
-          },
-          center: centre,
-          zoom: PUBLIC_MAP_ZOOM,
-          maxZoom: PUBLIC_MAP_MAX_ZOOM,
-          attributionControl: false,
-          /* Inert until asked. Each of these is re-enabled together in the handler below. */
-          interactive: false,
-        });
-
-        map.current = instance;
-
-        instance.addControl(
-          new maplibre.AttributionControl({ compact: false }),
-          'bottom-right',
-        );
-
-        /*
-          A missing glyph range must not blank the card — a word renders as boxes and the
-          rest of the map is still useful. A style or source that cannot load means there
-          is no map at all, and the card is better off without the empty canvas.
-        */
-        instance.on('error', (event: { error?: unknown }) => {
-          const message = event.error instanceof Error ? event.error.message : '';
-          if (/style|source|sprite/i.test(message)) setFailed(true);
-        });
-
-        instance.on('load', () => {
-          if (cancelled) return;
-
-          instance.addSource('listing-area', {
-            type: 'geojson',
-            data: areaCircle(Number(latitude), Number(longitude)),
-          });
-
-          instance.addLayer({
-            id: 'listing-area-fill',
-            type: 'fill',
-            source: 'listing-area',
-            paint: { 'fill-color': '#a87a1f', 'fill-opacity': 0.22 },
-          });
-
-          instance.addLayer({
-            id: 'listing-area-edge',
-            type: 'line',
-            source: 'listing-area',
-            paint: { 'line-color': '#a87a1f', 'line-width': 2, 'line-opacity': 0.9 },
-          });
-
-          setDrawn(true);
-
-          if (asked.current) giveControl(instance, maplibre);
+        dispose = built.dispose;
+        built.instance.on('load', () => {
+          if (!cancelled) setDrawn(true);
         });
       } catch {
         /*
@@ -295,42 +339,116 @@ export function PropertyMap({
         */
         if (!cancelled) setFailed(true);
       }
-    };
-
-    void start();
+    })();
 
     return () => {
       cancelled = true;
-      map.current?.remove();
-      map.current = null;
+      dispose?.();
     };
-  }, [near, latitude, longitude, theme, locale]);
+  }, [near, mount]);
 
-  /**
-   * Hands the map over: drag, wheel, pinch and keyboard together.
-   *
-   * Each handler is named rather than recreating the map with `interactive: true`, which
-   * would throw away the tiles already fetched and redraw from blank at the moment the
-   * reader asked to look closer.
-   */
-  const enable = () => {
-    const instance = map.current;
-    const maplibre = lib.current;
-    if (!instance || !maplibre) return;
+  /* The full-screen map: built when it opens, destroyed when it closes. */
+  useEffect(() => {
+    if (!open || !full.current || !BASEMAP) return;
 
-    asked.current = true;
-    giveControl(instance, maplibre);
-    setInteractive(true);
-  };
+    let cancelled = false;
+    let dispose: (() => void) | null = null;
 
-  if (!BASEMAP || failed) {
-    return null;
-  }
+    void (async () => {
+      try {
+        const container = full.current;
+        const built = container ? await mount(container, { interactive: true }) : null;
+
+        if (!built) return;
+
+        if (cancelled) {
+          built.dispose();
+
+          return;
+        }
+
+        dispose = built.dispose;
+        built.instance.addControl(
+          new built.library.NavigationControl({ showCompass: false }),
+          'bottom-right',
+        );
+      } catch {
+        if (!cancelled) setOpen(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      dispose?.();
+    };
+  }, [open, mount]);
+
+  const close = useCallback(() => {
+    setOpen(false);
+    /* Back to the button that opened it, not to the top of the document. */
+    opener.current?.focus();
+  }, []);
+
+  /*
+    Escape leaves, Tab stays inside, and the page underneath does not scroll. A full-screen
+    layer the keyboard can walk out of is modal in appearance only.
+  */
+  useEffect(() => {
+    if (!open) return;
+
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        close();
+
+        return;
+      }
+
+      if (event.key !== 'Tab') return;
+
+      const root = overlay.current;
+      if (!root) return;
+
+      const focusable = root.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKey);
+
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = previous;
+    };
+  }, [open, close]);
+
+  /* Focus moves into the layer, so a keyboard reader is not left on the page behind it. */
+  useEffect(() => {
+    if (!open) return;
+
+    overlay.current?.querySelector<HTMLElement>('button')?.focus();
+  }, [open]);
+
+  if (!BASEMAP || failed) return null;
 
   return (
     <figure className="relative border-t border-line">
       <div
-        ref={container}
+        ref={thumbnail}
         role="region"
         aria-label={labels.region}
         className="h-48 w-full sm:h-56 lg:h-64"
@@ -340,34 +458,92 @@ export function PropertyMap({
         <div aria-hidden className="absolute inset-0 animate-pulse bg-field" />
       ) : null}
 
-      {!interactive ? (
-        <button
-          type="button"
-          onClick={enable}
-          className="btn-gold absolute bottom-3 left-1/2 -translate-x-1/2 cursor-pointer rounded-full px-4 py-2 text-sm font-bold shadow-[var(--shadow-lift)] transition-[transform,box-shadow] duration-150 ease-out-strong hover:shadow-[var(--shadow-lift-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-card active:scale-[0.97] motion-reduce:transition-none"
+      <button
+        type="button"
+        onClick={(event) => {
+          opener.current = event.currentTarget;
+          setOpen(true);
+        }}
+        className="btn-gold absolute bottom-3 left-1/2 -translate-x-1/2 cursor-pointer rounded-full px-4 py-2 text-sm font-bold shadow-[var(--shadow-lift)] transition-[transform,box-shadow] duration-150 ease-out-strong hover:shadow-[var(--shadow-lift-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-card active:scale-[0.97] motion-reduce:transition-none"
+      >
+        {labels.explore}
+      </button>
+
+      {open ? (
+        <div
+          ref={overlay}
+          role="dialog"
+          aria-modal="true"
+          aria-label={labels.dialog}
+          /*
+            `z-[70]` is the slider's own layer, for the same reason: this has to cover the
+            site header, which is sticky. Anything lower and the map opens underneath the
+            navigation.
+          */
+          className="fixed inset-0 z-[70] bg-bg"
         >
-          {labels.explore}
-        </button>
+          {/*
+            `h-full w-full`, NOT `absolute inset-0`.
+
+            MapLibre adds `maplibregl-map` to its container and its own stylesheet declares
+            `.maplibregl-map { position: relative }` — one class beating one class, decided
+            by stylesheet order, which it wins. So `absolute` was overridden, `inset-0`
+            stopped sizing anything, the element collapsed to 1440x0, and MapLibre fell
+            back to a 300px-tall canvas. The middle of the screen showed the backdrop and
+            dragging there moved nothing.
+
+            An explicit height cannot be argued with, and it is why the thumbnail above —
+            which has always carried `h-48 sm:h-56 lg:h-64` — never showed this.
+          */}
+          <div ref={full} className="h-full w-full" />
+
+          {/*
+            Logical properties, so the close control sits opposite the panel in BOTH
+            directions. On the Arabic screen that puts it physically left and the listing
+            physically right, which is the arrangement in the reference.
+          */}
+          <button
+            type="button"
+            onClick={close}
+            className="absolute end-4 top-4 z-10 inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border border-line bg-card px-4 text-sm font-bold text-text shadow-[var(--shadow-lift)] transition-[transform,box-shadow] duration-150 ease-out-strong hover:shadow-[var(--shadow-lift-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold active:scale-[0.97] motion-reduce:transition-none lg:min-h-0 lg:py-2"
+          >
+            <CloseIcon />
+            {labels.close}
+          </button>
+
+          {/*
+            A sheet at the foot of a phone, a column beside the map from `lg` up. The panel
+            is the CONTENT, so it takes the start side — physically right in Arabic.
+
+            `bottom-7` rather than `bottom-3`, and the 16px is not taste: MapLibre draws its
+            attribution across the bottom 20px, the full-width sheet covered the top 8px of
+            it, and ODbL requires that line to be legible rather than «hidden beneath UI».
+            Measured, not eyeballed — the sheet's own rectangle against the attribution's.
+          */}
+          <div className="absolute inset-x-3 bottom-7 z-10 lg:inset-x-auto lg:bottom-auto lg:start-4 lg:top-4 lg:w-[22rem]">
+            <PropertyMapCard data={card} />
+          </div>
+        </div>
       ) : null}
     </figure>
   );
 }
 
-/**
- * Hands a map over to the reader: drag, wheel, pinch and keyboard together.
- *
- * Named handlers rather than rebuilding the map with `interactive: true`, which would
- * throw away the tiles already fetched and redraw from blank at the moment somebody asked
- * to look closer.
- */
-function giveControl(instance: MapLibreMap, maplibre: typeof MapLibre): void {
-  instance.dragPan.enable();
-  instance.scrollZoom.enable();
-  instance.touchZoomRotate.enable();
-  instance.doubleClickZoom.enable();
-  instance.keyboard.enable();
-  instance.addControl(
-    new maplibre.NavigationControl({ showCompass: false }),
-    'top-right',
+/** A cross, in the stroke weight the rest of the product's icons are drawn at. */
+function CloseIcon() {
+  return (
+    <svg
+      aria-hidden
+      width="1em"
+      height="1em"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      className="shrink-0"
+    >
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
   );
 }
