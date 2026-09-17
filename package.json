@@ -29,7 +29,7 @@
     "e2e:headed": "sh -c 'set -a; . ./.env; set +a; playwright test --headed'",
     "db:reset-dev": "pnpm --filter @safra/db db:reset-dev",
     "load:generate": "pnpm --filter @safra/db load:generate",
-    "db:testbed": "pnpm --filter @safra/api db:testbed",
+    "db:testbed": "sh -c 'set -a; . ./.env; set +a; pnpm --filter @safra/api db:testbed'",
     "partner:code": "sh -c 'set -a; . ./.env; set +a; pnpm --filter @safra/api partner:code'",
     "media:bootstrap": "sh -c 'set -a; . ./.env; set +a; pnpm --filter @safra/api media:bootstrap'",
     "load:reset": "pnpm --filter @safra/db load:reset",

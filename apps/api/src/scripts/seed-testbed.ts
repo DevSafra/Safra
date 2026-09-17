@@ -140,6 +140,19 @@ interface PropertySpec {
    * the property page. Two fixtures have one; the rest deliberately do not.
    */
   readonly headlineAr?: string;
+  /**
+   * Where the listing is, for the property page's map. OPTIONAL, like `headlineAr` and for
+   * the same reason: `properties.latitude` is nullable, a partner may never fill it in, and
+   * the absent case is the one that must not leave a hole in the page. Eight fixtures carry
+   * a pair; `qasr-al-sharq-lodge` deliberately does not.
+   *
+   * These are the real neighbourhoods each `address` names, so the map draws the district
+   * the words describe rather than a plausible-looking point somewhere else in the city.
+   * Precision costs nothing here — the API rounds every coordinate to ~100 m before it
+   * reaches a browser, and none of this is anybody's home.
+   */
+  readonly latitude?: string;
+  readonly longitude?: string;
   /** From `TRIP_ATTRIBUTES` — the ONE shared vocabulary (§5.6). Never a list forked here. */
   readonly attributes: readonly string[];
   readonly units: readonly UnitSpec[];
@@ -240,6 +253,8 @@ const PARTNERS: readonly PartnerSpec[] = [
         nameAr: 'فندق قصر الشرق — المالكي',
         nameEn: 'Qasr Al-Sharq Hotel — Malki',
         slug: 'qasr-al-sharq-malki',
+        latitude: '33.5175',
+        longitude: '36.2760',
         attributes: ['history', 'business', 'internet', 'parking'],
         citySlug: 'damascus',
         type: 'hotel',
@@ -283,6 +298,8 @@ const PARTNERS: readonly PartnerSpec[] = [
         nameAr: 'فندق أمية الكبير',
         nameEn: 'Grand Umayyad Hotel',
         slug: 'grand-umayyad-hotel',
+        latitude: '33.5145',
+        longitude: '36.2990',
         attributes: ['history', 'business', 'internet', 'parking'],
         citySlug: 'damascus',
         type: 'hotel',
@@ -470,6 +487,8 @@ const PARTNERS: readonly PartnerSpec[] = [
         nameAr: 'فندق قصر الشرق — أبو رمانة',
         nameEn: 'Qasr Al-Sharq Hotel — Abu Rummaneh',
         slug: 'qasr-al-sharq-abu-rummaneh',
+        latitude: '33.5190',
+        longitude: '36.2820',
         attributes: ['history', 'business', 'internet'],
         citySlug: 'damascus',
         type: 'hotel',
@@ -511,6 +530,8 @@ const PARTNERS: readonly PartnerSpec[] = [
         nameAr: 'استراحة قصر الشرق — مرفوضة',
         nameEn: 'Qasr Al-Sharq Rest House — Rejected',
         slug: 'qasr-al-sharq-rest-house',
+        latitude: '33.5430',
+        longitude: '36.2260',
         attributes: ['families'],
         citySlug: 'damascus',
         type: 'apartment',
@@ -532,6 +553,8 @@ const PARTNERS: readonly PartnerSpec[] = [
         nameAr: 'شقق قصر الشرق المخدومة',
         nameEn: 'Qasr Al-Sharq Serviced Apartments',
         slug: 'qasr-al-sharq-apartments',
+        latitude: '33.5040',
+        longitude: '36.2440',
         attributes: ['families', 'internet', 'parking'],
         citySlug: 'damascus',
         type: 'apartment',
@@ -566,6 +589,8 @@ const PARTNERS: readonly PartnerSpec[] = [
         nameAr: 'شاليهات الساحل — بلوران',
         nameEn: 'Coastal Chalets — Blouran',
         slug: 'coastal-chalets-blouran',
+        latitude: '35.5480',
+        longitude: '35.9200',
         attributes: ['sea', 'pool', 'families'],
         citySlug: 'latakia',
         type: 'chalet',
@@ -593,6 +618,8 @@ const PARTNERS: readonly PartnerSpec[] = [
         nameAr: 'منتجع الساحل',
         nameEn: 'Coastal Resort',
         slug: 'coastal-resort',
+        latitude: '35.5640',
+        longitude: '35.7550',
         attributes: ['sea', 'pool', 'honeymoon'],
         citySlug: 'latakia',
         type: 'hotel',
@@ -627,6 +654,8 @@ const PARTNERS: readonly PartnerSpec[] = [
         nameAr: 'بيت الياسمين الدمشقي',
         nameEn: 'Beit Al-Yasmine Damascene House',
         slug: 'beit-al-yasmine',
+        latitude: '33.5115',
+        longitude: '36.3165',
         attributes: ['history', 'honeymoon', 'nature'],
         citySlug: 'damascus',
         type: 'rural_house',
@@ -1661,6 +1690,8 @@ async function build(db: Seeder): Promise<void> {
           descriptionEn: property.descriptionAr,
           descriptionDe: property.descriptionAr,
           /* `?? null`, so the fixtures WITHOUT one seed a listing that genuinely has none. */
+          latitude: property.latitude ?? null,
+          longitude: property.longitude ?? null,
           headlineAr: property.headlineAr ?? null,
           headlineEn: property.headlineAr ?? null,
           headlineDe: property.headlineAr ?? null,
