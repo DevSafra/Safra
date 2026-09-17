@@ -800,7 +800,14 @@ export default async function PropertyPage({
                             alt: localisedText(property.images[0].alt, locale) ?? name,
                           }
                         : null,
-                      viewHref: '#booking',
+                      /*
+                        The ROOMS, which is what «أعرض» is for — Bashar, 2026-09-17: «the
+                        map should be closed and scroll to the units». `#booking` was the
+                        sidebar panel, which is a summary of a choice not yet made.
+                        `UnitSelector` owns `id="units"` and carries the `scroll-mt` that
+                        keeps the heading clear of the sticky header.
+                      */
+                      viewHref: '#units',
                       viewLabel: t('map.view'),
                     }}
                   />

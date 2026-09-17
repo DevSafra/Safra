@@ -45,7 +45,22 @@ export interface PropertyMapCardData {
  * the CLASSIFICATION rather than the review score — the two are different facts and the
  * page keeps them apart, so this does too.
  */
-export function PropertyMapCard({ data }: { readonly data: PropertyMapCardData }) {
+export function PropertyMapCard({
+  data,
+  onView,
+}: {
+  readonly data: PropertyMapCardData;
+  /**
+   * Pressed «أعرض».
+   *
+   * The anchor keeps its `href` so the destination is real — hover shows it, middle-click
+   * opens it, and nothing here depends on JavaScript to be a link. The handler exists
+   * because following it from INSIDE the overlay does nothing a reader can see: the map is
+   * fixed over the whole page and the body is scroll-locked, so the browser dutifully
+   * changes the hash and lands on a section nobody can see.
+   */
+  readonly onView: (event: React.MouseEvent<HTMLAnchorElement>) => void;
+}) {
   return (
     <div className="overflow-hidden rounded-card border border-line bg-card shadow-[var(--shadow-lift)]">
       <div className="flex gap-3 p-4">
@@ -101,6 +116,7 @@ export function PropertyMapCard({ data }: { readonly data: PropertyMapCardData }
 
         <a
           href={data.viewHref}
+          onClick={onView}
           className="btn-gold inline-flex min-h-10 shrink-0 cursor-pointer items-center rounded-full px-4 text-sm font-bold shadow-[var(--shadow-lift)] transition-[transform,box-shadow] duration-150 ease-out-strong hover:shadow-[var(--shadow-lift-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-card active:scale-[0.97] motion-reduce:transition-none lg:min-h-0 lg:py-2"
         >
           {data.viewLabel}

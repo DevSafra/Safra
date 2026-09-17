@@ -126,6 +126,16 @@ export function PropertyMap({
     is a light map on a dark page until the next reload.
   */
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  /**
+   * A section to reach once the overlay is out of the way.
+   *
+   * Held in state rather than scrolled to inside the click handler, because the scroll
+   * LOCK is released by the overlay effect's cleanup. Scrolling in the handler runs while
+   * `body { overflow: hidden }` is still on, which does nothing, and the reader is left
+   * looking at a map that did not react. An effect keyed on `open` runs after that cleanup
+   * by construction, so the ordering is a guarantee rather than a guess about frames.
+   */
+  const [pending, setPending] = useState<string | null>(null);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -436,6 +446,18 @@ export function PropertyMap({
     };
   }, [open, close]);
 
+  useEffect(() => {
+    if (open || !pending) return;
+
+    const target = document.getElementById(pending);
+    setPending(null);
+
+    if (!target) return;
+
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    target.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'start' });
+  }, [open, pending]);
+
   /* Focus moves into the layer, so a keyboard reader is not left on the page behind it. */
   useEffect(() => {
     if (!open) return;
@@ -521,7 +543,14 @@ export function PropertyMap({
             Measured, not eyeballed — the sheet's own rectangle against the attribution's.
           */}
           <div className="absolute inset-x-3 bottom-7 z-10 lg:inset-x-auto lg:bottom-auto lg:start-4 lg:top-4 lg:w-[22rem]">
-            <PropertyMapCard data={card} />
+            <PropertyMapCard
+              data={card}
+              onView={(event) => {
+                event.preventDefault();
+                setPending(card.viewHref.replace(/^#/, ''));
+                close();
+              }}
+            />
           </div>
         </div>
       ) : null}
