@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import { PARTNER_BASE, PARTNER_STATE } from './partner-session.js';
 import { requirePublishedReference } from './partner-fixtures.js';
 import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
+import { stayFrom } from './free-nights.js';
 
 /**
  * Amenities at TWO levels, along the whole chain.
@@ -198,8 +199,15 @@ test('a facility declared on the property reaches every surface as the property�
   }
 
   // ── 5. THE FILTER finds it by a PROPERTY-level code ────────────────────────
+  /*
+    Derived rather than written down: the literal here was a fortnight out on the day it was
+    typed and became yesterday on 2026-09-18, at which point the search correctly returned
+    nothing and this test failed for a reason that had nothing to do with amenities.
+  */
+  const stay = stayFrom(14, 2);
   const filtered = await request.get(
-    `${api}/search?checkIn=2026-09-17&checkOut=2026-09-19&adults=2&amenityCodes=pool&limit=50`,
+    `${api}/search?checkIn=${stay.checkIn}&checkOut=${stay.checkOut}` +
+      `&adults=2&amenityCodes=pool&limit=50`,
   );
 
   expect(filtered.status()).toBe(200);

@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+import { stayFrom } from './free-nights.js';
+
 /**
  * The results page — paging, filtering, and what its own links are allowed to carry.
  *
@@ -17,8 +19,15 @@ test.use({ baseURL: 'http://localhost:3000' });
  * results and failed — reliably, every evening, for a reason with no relationship to the code
  * under test. Found at 20:48 Damascus on 2026-09-03. A fortnight out is far enough that no cutoff,
  * timezone or clock skew reaches it, and near enough to stay inside the seeded availability.
+ *
+ * DERIVED, not written down. «A fortnight out» was the intention and `2026-09-17` was that
+ * intention frozen on the day it was typed; on 2026-09-18 it became yesterday, the API
+ * correctly returned nothing for a stay in the past, and five tests here failed for a
+ * reason with no relationship to the code under test — the same failure this comment was
+ * already written to describe, reintroduced by spelling the answer instead of computing it.
  */
-const STAY = 'checkIn=2026-09-17&checkOut=2026-09-19&adults=2';
+const { checkIn: CHECK_IN_DATE, checkOut: CHECK_OUT_DATE } = stayFrom(14, 2);
+const STAY = `checkIn=${CHECK_IN_DATE}&checkOut=${CHECK_OUT_DATE}&adults=2`;
 /**
  * The arrival, derived rather than retyped.
  *
