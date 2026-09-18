@@ -96,9 +96,9 @@ export default async function CustomersPage({
         />
 
         {result === 'unauthenticated' ? (
-          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-14 text-muted">{t.dashboard.sessionExpired}</p>
         ) : result === 'failed' ? (
-          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-14 text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <>
             <AdminTable

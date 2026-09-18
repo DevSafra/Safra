@@ -149,7 +149,7 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
         writing a paragraph into a bar that has one line to give.
       */}
       {announcement ? (
-        <p className="border-b border-[rgba(168,122,31,0.12)] bg-[rgba(168,122,31,0.06)] px-4 py-1.5 text-center text-[12px] leading-relaxed font-semibold text-gold-read sm:text-[13px] sm:whitespace-nowrap">
+        <p className="border-b border-[rgba(168,122,31,0.12)] bg-[rgba(168,122,31,0.06)] px-4 py-1.5 text-center text-12 leading-relaxed font-semibold text-gold-read sm:text-13 sm:whitespace-nowrap">
           {announcement}
         </p>
       ) : null}
@@ -231,7 +231,7 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
         */}
         <Link
           href={`/${locale}/partners/join`}
-          className="hidden min-h-10 items-center rounded-lg px-3 py-2 text-[14px] font-semibold text-muted transition-colors hover:bg-gold/10 hover:text-text sm:h-11 lg:inline-flex"
+          className="hidden min-h-10 items-center rounded-lg px-3 py-2 text-14 font-semibold text-muted transition-colors hover:bg-gold/10 hover:text-text sm:h-11 lg:inline-flex"
         >
           {home('partnersCta')}
         </Link>

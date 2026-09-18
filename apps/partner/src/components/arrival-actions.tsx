@@ -73,7 +73,7 @@ export function ArrivalActions({ arrival }: { arrival: PartnerArrival }) {
       <div className="flex flex-wrap items-center gap-2">
         {checkedIn ? (
           <>
-            <span className="rounded-full border border-sky bg-sky/15 px-2.5 py-0.5 text-[14px] font-bold text-sky">
+            <span className="rounded-full border border-sky bg-sky/15 px-2.5 py-0.5 text-14 font-bold text-sky">
               {t.arrivals.checkedIn}
             </span>
             <button
@@ -94,7 +94,7 @@ export function ArrivalActions({ arrival }: { arrival: PartnerArrival }) {
                   if (go) void send('undo-check-in');
                 })();
               }}
-              className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-[14px] text-muted transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
+              className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-14 text-muted transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {t.arrivals.undo}
             </button>
@@ -118,7 +118,7 @@ export function ArrivalActions({ arrival }: { arrival: PartnerArrival }) {
       </div>
 
       {error ? (
-        <p role="alert" className="text-[14px] text-bad">
+        <p role="alert" className="text-14 text-bad">
           {error}
         </p>
       ) : null}

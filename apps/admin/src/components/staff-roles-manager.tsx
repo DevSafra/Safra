@@ -142,10 +142,10 @@ export function StaffRolesManager({
         section puts the sentence explaining what the screen does NOT do — and it was appearing in
         both places, so the panel said the same paragraph twice a few lines apart.
       */}
-      <p className="text-[14px] leading-relaxed text-muted">{copy.intro}</p>
+      <p className="text-14 leading-relaxed text-muted">{copy.intro}</p>
 
       {error ? (
-        <p role="alert" className="text-[14px] text-bad">
+        <p role="alert" className="text-14 text-bad">
           {error}
         </p>
       ) : null}
@@ -155,7 +155,7 @@ export function StaffRolesManager({
           <button
             type="button"
             onClick={() => start('new')}
-            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-ok/40 px-4 py-2 text-[14px] font-semibold text-ok hover:bg-ok/5 lg:min-h-0"
+            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-ok/40 px-4 py-2 text-14 font-semibold text-ok hover:bg-ok/5 lg:min-h-0"
           >
             {copy.create}
           </button>
@@ -171,7 +171,7 @@ export function StaffRolesManager({
           <div className="grid gap-1.5">
             <label
               htmlFor={`${formId}-name`}
-              className="text-[13px] font-semibold text-muted"
+              className="text-13 font-semibold text-muted"
             >
               {copy.nameLabel}
             </label>
@@ -183,18 +183,15 @@ export function StaffRolesManager({
               minLength={2}
               maxLength={60}
               aria-describedby={`${formId}-name-hint`}
-              className="min-h-10 rounded-lg border border-line bg-field px-3 py-2.5 text-[14px] text-text lg:min-h-0"
+              className="min-h-10 rounded-lg border border-line bg-field px-3 py-2.5 text-14 text-text lg:min-h-0"
             />
-            <span
-              id={`${formId}-name-hint`}
-              className="text-[13px] font-normal text-faint"
-            >
+            <span id={`${formId}-name-hint`} className="text-13 font-normal text-faint">
               {copy.nameHint}
             </span>
           </div>
 
           <fieldset className="grid gap-2">
-            <legend className="mb-1 text-[13px] font-semibold text-muted">
+            <legend className="mb-1 text-13 font-semibold text-muted">
               {copy.capabilitiesLabel}
             </legend>
 
@@ -214,7 +211,7 @@ export function StaffRolesManager({
             <div className="grid gap-4">
               {groupPermissions(assignable).map(({ group, permissions }) => (
                 <fieldset key={group} className="grid gap-2">
-                  <legend className="mb-1 text-[13px] font-bold text-faint">
+                  <legend className="mb-1 text-13 font-bold text-faint">
                     {label(copy.group, group)}
                   </legend>
 
@@ -222,7 +219,7 @@ export function StaffRolesManager({
                     {permissions.map((permission) => (
                       <label
                         key={permission}
-                        className="flex cursor-pointer items-center gap-2.5 text-[14px] text-text2"
+                        className="flex cursor-pointer items-center gap-2.5 text-14 text-text2"
                       >
                         <input
                           type="checkbox"
@@ -262,7 +259,7 @@ export function StaffRolesManager({
       )}
 
       {roles.length === 0 ? (
-        <p className="text-[14px] text-faint">{copy.none}</p>
+        <p className="text-14 text-faint">{copy.none}</p>
       ) : (
         <ul className="grid gap-2">
           {roles.map((role) => (
@@ -272,10 +269,10 @@ export function StaffRolesManager({
               data-staff-role={role.id}
             >
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="text-[14px] font-semibold text-text">{role.name}</span>
-                <span className="flex items-center gap-2 text-[13px] text-faint">
+                <span className="text-14 font-semibold text-text">{role.name}</span>
+                <span className="flex items-center gap-2 text-13 text-faint">
                   {role.isSystem ? (
-                    <span className="rounded border border-line px-1.5 py-0.5 text-[13px] text-faint">
+                    <span className="rounded border border-line px-1.5 py-0.5 text-13 text-faint">
                       {copy.systemRole}
                     </span>
                   ) : null}
@@ -283,7 +280,7 @@ export function StaffRolesManager({
                 </span>
               </div>
 
-              <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
+              <p className="mt-1.5 text-13 leading-relaxed text-muted">
                 {role.permissions.map((p) => label(copy.capability, p)).join(' · ')}
               </p>
 
@@ -300,7 +297,7 @@ export function StaffRolesManager({
                 says — so the absence of controls does not read as the role being frozen out.
               */}
               {role.isSystem ? (
-                <p className="mt-2.5 text-[13px] leading-relaxed text-faint">
+                <p className="mt-2.5 text-13 leading-relaxed text-faint">
                   {copy.systemRoleNote}
                 </p>
               ) : (
@@ -321,12 +318,12 @@ export function StaffRolesManager({
                   this screen sometimes do nothing.
                 */}
                   {role.employeeCount > 0 ? (
-                    <span className="text-[13px] leading-relaxed text-gold-read">
+                    <span className="text-13 leading-relaxed text-gold-read">
                       {copy.inUse}
                     </span>
                   ) : confirming === role.id ? (
                     <>
-                      <span className="text-[13px] leading-relaxed text-bad">
+                      <span className="text-13 leading-relaxed text-bad">
                         {fill(copy.confirmRemove, { name: role.name })}
                       </span>
                       <button

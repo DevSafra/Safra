@@ -965,7 +965,7 @@ export default async function PropertyPage({
                           <div className="flex items-center gap-3">
                             <div className="min-w-0">
                               {review.author ? (
-                                <p className="truncate text-[15px] font-bold text-text">
+                                <p className="truncate text-15 font-bold text-text">
                                   {review.author}
                                 </p>
                               ) : null}
@@ -1002,7 +1002,7 @@ export default async function PropertyPage({
                               character, so the marks land where that language puts them and the
                               block aligns to the side it is meant to be read from.
                             */}
-                          <p dir="auto" className="mt-4 text-[15px] leading-7 text-text">
+                          <p dir="auto" className="mt-4 text-15 leading-7 text-text">
                             “{review.body}”
                           </p>
 

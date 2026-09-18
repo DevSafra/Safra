@@ -146,7 +146,7 @@ export async function SearchFilters({
         <span>{t('filters')}</span>
         <span className="flex items-center gap-2">
           {count > 0 ? (
-            <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[13px] font-semibold text-gold-read">
+            <span className="rounded-full bg-gold/15 px-2 py-0.5 text-13 font-semibold text-gold-read">
               {t('filtersActive', { count })}
             </span>
           ) : null}
@@ -179,12 +179,10 @@ export async function SearchFilters({
 
         {/* ── Price ──────────────────────────────────────────────────────── */}
         <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1 text-[14px] font-bold text-text">
-            {t('priceRange')}
-          </legend>
+          <legend className="mb-1 text-14 font-bold text-text">{t('priceRange')}</legend>
 
           <div className="grid grid-cols-2 gap-2">
-            <label className="grid gap-1 text-[13px] text-muted">
+            <label className="grid gap-1 text-13 text-muted">
               {t('priceFrom')}
               {/*
                 No `dir` at all, which gives the page's own direction — the rule for a field a
@@ -202,7 +200,7 @@ export async function SearchFilters({
                 className="min-h-11 w-full rounded-lg border border-line bg-field px-3 text-sm text-text"
               />
             </label>
-            <label className="grid gap-1 text-[13px] text-muted">
+            <label className="grid gap-1 text-13 text-muted">
               {t('priceTo')}
               <input
                 type="number"
@@ -223,9 +221,7 @@ export async function SearchFilters({
             range instead would silently exclude every listing priced in a currency whose rate is
             stale — a filter that hides inventory without saying so.
           */}
-          <p className="text-[14px] leading-relaxed text-faint">
-            {t('priceCurrencyNote')}
-          </p>
+          <p className="text-14 leading-relaxed text-faint">{t('priceCurrencyNote')}</p>
         </fieldset>
 
         {/* ── Free cancellation ──────────────────────────────────────────── */}
@@ -243,7 +239,7 @@ export async function SearchFilters({
         {/* ── Property type ──────────────────────────────────────────────── */}
         {propertyTypes.length > 0 ? (
           <fieldset className="flex flex-col gap-1">
-            <legend className="mb-1 text-[14px] font-bold text-text">
+            <legend className="mb-1 text-14 font-bold text-text">
               {t('propertyType')}
             </legend>
 
@@ -278,7 +274,7 @@ export async function SearchFilters({
                 <span className="flex-1">
                   {dynamicMessage(tt, type.code, localisedName(type, locale))}
                 </span>
-                <span className="text-[13px] text-faint">{type.propertyCount}</span>
+                <span className="text-13 text-faint">{type.propertyCount}</span>
               </label>
             ))}
           </fieldset>
@@ -299,9 +295,7 @@ export async function SearchFilters({
           reader picking 4 should see the shape they will be shown.
         */}
         <fieldset className="flex flex-col gap-1">
-          <legend className="mb-1 text-[14px] font-bold text-text">
-            {t('starRating')}
-          </legend>
+          <legend className="mb-1 text-14 font-bold text-text">{t('starRating')}</legend>
 
           {STAR_VALUES.map((value) => (
             <label
@@ -334,16 +328,14 @@ export async function SearchFilters({
             and chalet in the results. A filter that silently removes whole categories of
             inventory is the failure the price note beside it exists to prevent.
           */}
-          <p className="mt-1 text-[14px] leading-relaxed text-faint">
+          <p className="mt-1 text-14 leading-relaxed text-faint">
             {t('starRatingHotelsOnly')}
           </p>
         </fieldset>
 
         {/* ── Trip attributes ────────────────────────────────────────────── */}
         <fieldset className="flex flex-col gap-1">
-          <legend className="mb-1 text-[14px] font-bold text-text">
-            {t('attributes')}
-          </legend>
+          <legend className="mb-1 text-14 font-bold text-text">{t('attributes')}</legend>
 
           {TRIP_ATTRIBUTES.map((code) => (
             <label
@@ -365,7 +357,7 @@ export async function SearchFilters({
         {/* ── Amenities ──────────────────────────────────────────────────── */}
         {offered.length > 0 ? (
           <fieldset className="flex flex-col gap-1">
-            <legend className="mb-1 text-[14px] font-bold text-text">
+            <legend className="mb-1 text-14 font-bold text-text">
               {t('amenitiesTitle')}
             </legend>
 
@@ -389,7 +381,7 @@ export async function SearchFilters({
                   */}
                   {dynamicMessage(tm, amenity.code, localisedName(amenity, locale))}
                 </span>
-                <span className="text-[13px] text-faint">{amenity.propertyCount}</span>
+                <span className="text-13 text-faint">{amenity.propertyCount}</span>
               </label>
             ))}
           </fieldset>

@@ -231,7 +231,7 @@ export function ViolationActions({
         >
           <div className="flex flex-wrap gap-2">
             <label className="grid gap-1">
-              <span className="text-[13px] text-faint">
+              <span className="text-13 text-faint">
                 {t.sections.enforcement.fineAmountLabel}
               </span>
               {/*
@@ -249,11 +249,11 @@ export function ViolationActions({
                 inputMode="decimal"
                 pattern="\d{1,10}(\.\d{1,2})?"
                 placeholder={t.sections.enforcement.fineAmountPlaceholder}
-                className="w-32 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text"
+                className="w-32 rounded-lg border border-line bg-field px-3 py-2 text-14 text-text"
               />
             </label>
             <label className="grid gap-1">
-              <span className="text-[13px] text-faint">
+              <span className="text-13 text-faint">
                 {t.sections.enforcement.fineCurrencyLabel}
               </span>
               {/*
@@ -277,7 +277,7 @@ export function ViolationActions({
                 name="currencyCode"
                 required
                 defaultValue={FINE_CURRENCIES[0]}
-                className="w-28 cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text"
+                className="w-28 cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-14 text-text"
               >
                 {FINE_CURRENCIES.map((code) => (
                   <option key={code} value={code}>
@@ -291,14 +291,14 @@ export function ViolationActions({
               showing only the total cannot answer "how much did the guest actually get".
             */}
             <label className="grid gap-1">
-              <span className="text-[13px] text-faint">
+              <span className="text-13 text-faint">
                 {t.sections.enforcement.compensationLabel}
               </span>
               <input
                 name="customerCompensation"
                 inputMode="decimal"
                 pattern="\d{1,10}(\.\d{1,2})?"
-                className="w-32 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text"
+                className="w-32 rounded-lg border border-line bg-field px-3 py-2 text-14 text-text"
               />
             </label>
           </div>
@@ -371,7 +371,7 @@ export function ViolationActions({
             whose other three controls do not. Somebody who has clicked «إنذار» and «غرامة» twice is
             not reading carefully by the third, so the sentence is above the box they type into.
           */}
-          <p className="text-[13px] leading-relaxed text-bad">
+          <p className="text-13 leading-relaxed text-bad">
             {t.sections.enforcement.escalateHint}
           </p>
           <Reason
@@ -401,11 +401,11 @@ function Notices({ error, done }: { error: string | null; done: string | null })
   return (
     <>
       {error ? (
-        <p role="alert" className="text-[13px] text-bad">
+        <p role="alert" className="text-13 text-bad">
           {error}
         </p>
       ) : null}
-      {done ? <p className="text-[13px] text-ok">{done}</p> : null}
+      {done ? <p className="text-13 text-ok">{done}</p> : null}
     </>
   );
 }
@@ -436,7 +436,7 @@ function Step({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex min-h-10 cursor-pointer items-center rounded-lg border px-3 py-1.5 text-[13px] lg:min-h-0 ${
+      className={`inline-flex min-h-10 cursor-pointer items-center rounded-lg border px-3 py-1.5 text-13 lg:min-h-0 ${
         active ? (danger ? 'border-bad text-bad' : 'border-gold/60 text-gold-read') : tone
       }`}
     >
@@ -449,7 +449,7 @@ function Step({
 function Reason({ name, label, busy }: { name: string; label: string; busy: boolean }) {
   return (
     <label className="grid gap-1">
-      <span className="text-[13px] text-faint">{label}</span>
+      <span className="text-13 text-faint">{label}</span>
       <textarea
         name={name}
         required
@@ -457,9 +457,9 @@ function Reason({ name, label, busy }: { name: string; label: string; busy: bool
         maxLength={2000}
         rows={2}
         disabled={busy}
-        className="rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text disabled:cursor-not-allowed"
+        className="rounded-lg border border-line bg-field px-3 py-2 text-14 text-text disabled:cursor-not-allowed"
       />
-      <span className="text-[13px] text-faint">{t.sections.enforcement.reasonHint}</span>
+      <span className="text-13 text-faint">{t.sections.enforcement.reasonHint}</span>
     </label>
   );
 }
@@ -477,7 +477,7 @@ function Submit({
     <button
       type="submit"
       disabled={busy}
-      className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-gold/50 px-4 py-2 text-[13px] font-bold text-gold-read hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
+      className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-gold/50 px-4 py-2 text-13 font-bold text-gold-read hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
     >
       {busy ? working : idle}
     </button>

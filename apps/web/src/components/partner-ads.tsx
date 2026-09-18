@@ -76,7 +76,7 @@ export async function PartnerAds({
               Below it, a reader who stops after the first line has read an advertisement without
               being told it was one — and that first line is the half designed to be read.
             */}
-            <span className="w-fit rounded-full border border-gold/40 px-2 py-0.5 text-[13px] font-semibold text-gold-read">
+            <span className="w-fit rounded-full border border-gold/40 px-2 py-0.5 text-13 font-semibold text-gold-read">
               {t('label')}
             </span>
 

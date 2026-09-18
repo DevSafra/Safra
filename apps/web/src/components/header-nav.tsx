@@ -71,7 +71,7 @@ export function HeaderNav({
             key={link.href}
             href={link.href}
             aria-current={here ? 'page' : undefined}
-            className={`inline-flex items-center rounded-lg py-2 text-[14px] font-semibold transition-colors duration-200 ease-out-strong ${linkClassName} ${
+            className={`inline-flex items-center rounded-lg py-2 text-14 font-semibold transition-colors duration-200 ease-out-strong ${linkClassName} ${
               here ? 'text-gold-read' : 'text-muted hover:bg-gold/10 hover:text-text'
             }`}
           >

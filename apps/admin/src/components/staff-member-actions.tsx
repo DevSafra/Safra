@@ -153,7 +153,7 @@ export function StaffMemberActions({
       </form>
 
       {isSelf ? (
-        <p className="text-[14px] text-faint">{t.sections.staff.member.actionsSelf}</p>
+        <p className="text-14 text-faint">{t.sections.staff.member.actionsSelf}</p>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
           {/*

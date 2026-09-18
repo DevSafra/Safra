@@ -52,7 +52,7 @@ export default function ErrorBoundary({
           somebody can find the stack — without the response carrying a query, a parameter or a path.
         */}
         {error.digest ? (
-          <p className="text-faint mt-6 font-mono text-[14px]">{error.digest}</p>
+          <p className="text-faint mt-6 font-mono text-14">{error.digest}</p>
         ) : null}
       </div>
     </main>

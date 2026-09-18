@@ -206,7 +206,7 @@ export function PartnerContractPanel({
       data-contract-status={current?.status ?? 'none'}
       className="rounded-lg border border-line bg-card p-4"
     >
-      <p className="text-[14px] leading-relaxed text-muted">
+      <p className="text-14 leading-relaxed text-muted">
         {current ? state : t.sections.partnerContract.intro}
       </p>
 
@@ -294,7 +294,7 @@ export function PartnerContractPanel({
 
       {/* What the button will do, said before it is pressed rather than after. */}
       {current?.status === 'active' ? (
-        <p className="mt-2 text-[14px] leading-relaxed text-faint">
+        <p className="mt-2 text-14 leading-relaxed text-faint">
           {t.sections.partnerContract.reopenHint}
         </p>
       ) : null}
@@ -316,9 +316,7 @@ export function PartnerContractPanel({
           className="mt-3 grid gap-2 rounded-lg border border-line2 bg-field p-3"
         >
           <label className="grid gap-1">
-            <span className="text-[13px] text-faint">
-              {t.sections.partnerContract.file}
-            </span>
+            <span className="text-13 text-faint">{t.sections.partnerContract.file}</span>
             <input
               key={uploads}
               type="file"
@@ -372,7 +370,7 @@ export function PartnerContractPanel({
           </div>
 
           {joint ? (
-            <p className="text-[14px] leading-relaxed text-faint">
+            <p className="text-14 leading-relaxed text-faint">
               {t.sections.partnerContract.uploadJointHint}
             </p>
           ) : null}
@@ -386,13 +384,13 @@ export function PartnerContractPanel({
             button the operator pressed.
           */}
           {current.status === 'active' ? (
-            <p className="text-[14px] leading-relaxed text-gold-read">
+            <p className="text-14 leading-relaxed text-gold-read">
               {t.sections.partnerContract.replaceWarning}
             </p>
           ) : null}
 
           {joint && current.status !== 'draft' ? (
-            <p className="text-[14px] leading-relaxed text-gold-read">
+            <p className="text-14 leading-relaxed text-gold-read">
               {t.sections.partnerContract.uploadJointReplaceWarning}
             </p>
           ) : null}
@@ -435,7 +433,7 @@ function ContractHistory({ contract }: { readonly contract: ContractItem }) {
 
   return (
     <div className="mt-3 grid gap-1.5 rounded-lg border border-line2 bg-field px-3 py-2.5">
-      <p className="text-[14px] font-bold text-muted">
+      <p className="text-14 font-bold text-muted">
         {t.sections.partnerContract.historyTitle}
       </p>
 
@@ -444,7 +442,7 @@ function ContractHistory({ contract }: { readonly contract: ContractItem }) {
           <li
             /* Index: these carry no id, and the list is server-ordered and static. */
             key={index}
-            className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[14px]"
+            className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-14"
           >
             <span className={event.superseded ? 'text-faint' : 'text-text2'}>
               {event.party === 'partner'

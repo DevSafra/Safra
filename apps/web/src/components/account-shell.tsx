@@ -227,7 +227,7 @@ export async function AccountShell({
                 {badge ? (
                   <span
                     dir="ltr"
-                    className="ms-auto rounded-full bg-sky/15 px-2 py-0.5 text-[12px] font-bold text-sky"
+                    className="ms-auto rounded-full bg-sky/15 px-2 py-0.5 text-12 font-bold text-sky"
                   >
                     {badge}
                   </span>

@@ -27,7 +27,7 @@ import { TIMEZONE_CATALOGUE, utcOffset } from '@safra/contracts';
  */
 
 /** The one input height on these screens — 40px, the project's control floor. */
-const CONTROL = 'h-10 rounded-lg border border-line bg-card px-3 text-[14px] text-text';
+const CONTROL = 'h-10 rounded-lg border border-line bg-card px-3 text-14 text-text';
 
 /**
  * A row of fields that share the width.
@@ -67,7 +67,7 @@ export function Field({
   readonly inputMode?: 'decimal' | 'numeric' | undefined;
 }) {
   return (
-    <label className="grid gap-1.5 text-[13px] font-semibold text-muted">
+    <label className="grid gap-1.5 text-13 font-semibold text-muted">
       {label}
       <input
         {...(name ? { name } : {})}
@@ -80,7 +80,7 @@ export function Field({
           disabled ? 'cursor-not-allowed bg-field text-faint' : ''
         } ${className ?? ''}`}
       />
-      {hint ? <span className="text-[13px] font-normal text-faint">{hint}</span> : null}
+      {hint ? <span className="text-13 font-normal text-faint">{hint}</span> : null}
     </label>
   );
 }
@@ -102,7 +102,7 @@ export function SelectField({
   readonly children: ReactNode;
 }) {
   return (
-    <label className="grid gap-1.5 text-[13px] font-semibold text-muted">
+    <label className="grid gap-1.5 text-13 font-semibold text-muted">
       {label}
       <select
         {...(name ? { name } : {})}
@@ -112,7 +112,7 @@ export function SelectField({
       >
         {children}
       </select>
-      {hint ? <span className="text-[13px] font-normal text-faint">{hint}</span> : null}
+      {hint ? <span className="text-13 font-normal text-faint">{hint}</span> : null}
     </label>
   );
 }
@@ -137,15 +137,15 @@ export function Prose({
   readonly hint?: string | undefined;
 }) {
   return (
-    <label className="grid gap-1.5 text-[13px] font-semibold text-muted">
+    <label className="grid gap-1.5 text-13 font-semibold text-muted">
       {label}
       <textarea
         value={value}
         onChange={(event) => onChange(event.target.value)}
         rows={4}
-        className="rounded-lg border border-line bg-card px-3 py-2 text-[14px] leading-relaxed text-text placeholder:text-faint"
+        className="rounded-lg border border-line bg-card px-3 py-2 text-14 leading-relaxed text-text placeholder:text-faint"
       />
-      {hint ? <span className="text-[13px] font-normal text-faint">{hint}</span> : null}
+      {hint ? <span className="text-13 font-normal text-faint">{hint}</span> : null}
     </label>
   );
 }
@@ -229,7 +229,7 @@ export function CheckboxField({
   return (
     <div className="grid gap-1">
       <label
-        className={`flex items-center gap-2.5 text-[14px] text-text2 ${
+        className={`flex items-center gap-2.5 text-14 text-text2 ${
           disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
         }`}
       >
@@ -242,7 +242,7 @@ export function CheckboxField({
         />
         {label}
       </label>
-      {hint ? <span className="text-[13px] text-faint">{hint}</span> : null}
+      {hint ? <span className="text-13 text-faint">{hint}</span> : null}
     </div>
   );
 }
@@ -276,7 +276,7 @@ export function Panel({
         bare ? '' : 'mb-3 rounded-card border border-line bg-field p-4'
       }`}
     >
-      <p className="text-[13px] font-bold text-gold-read">{heading}</p>
+      <p className="text-13 font-bold text-gold-read">{heading}</p>
       {children}
     </div>
   );
@@ -325,7 +325,7 @@ export function Actions({
 }) {
   return (
     <>
-      {error ? <p className="text-[14px] font-semibold text-bad">{error}</p> : null}
+      {error ? <p className="text-14 font-semibold text-bad">{error}</p> : null}
 
       <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
         <button

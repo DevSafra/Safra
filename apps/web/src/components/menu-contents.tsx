@@ -62,7 +62,7 @@ export function MenuContents({
         links={links}
         label={navLabel}
         className="flex flex-col items-stretch gap-0.5"
-        linkClassName="min-h-12 w-full px-3 text-[16px]"
+        linkClassName="min-h-12 w-full px-3 text-16"
       />
 
       <Link
@@ -78,7 +78,7 @@ export function MenuContents({
         48 is also what the four rows around them already used, so this is one row height in the
         sheet rather than two, which is the reason to prefer it over nudging the assertion.
       */
-        className="inline-flex min-h-12 w-full items-center rounded-lg px-3 text-[16px] font-semibold text-muted transition-colors duration-200 ease-out-strong hover:bg-gold/10 hover:text-text"
+        className="inline-flex min-h-12 w-full items-center rounded-lg px-3 text-16 font-semibold text-muted transition-colors duration-200 ease-out-strong hover:bg-gold/10 hover:text-text"
       >
         {partnerLabel}
       </Link>
@@ -95,7 +95,7 @@ export function MenuContents({
         {session ? (
           <Link
             href={`/${locale}/account`}
-            className="btn-gold inline-flex min-h-12 items-center justify-center rounded-lg px-4 text-[16px] font-bold transition-opacity duration-200 ease-out-strong hover:opacity-90"
+            className="btn-gold inline-flex min-h-12 items-center justify-center rounded-lg px-4 text-16 font-bold transition-opacity duration-200 ease-out-strong hover:opacity-90"
             title={accountTitle}
           >
             {accountLabel}
@@ -112,13 +112,13 @@ export function MenuContents({
             */}
             <Link
               href={`/${locale}/login`}
-              className="btn-gold inline-flex min-h-12 items-center justify-center rounded-lg px-4 text-[16px] font-bold transition-opacity duration-200 ease-out-strong hover:opacity-90"
+              className="btn-gold inline-flex min-h-12 items-center justify-center rounded-lg px-4 text-16 font-bold transition-opacity duration-200 ease-out-strong hover:opacity-90"
             >
               {signInLabel}
             </Link>
             <Link
               href={`/${locale}/register`}
-              className="inline-flex min-h-12 items-center justify-center rounded-lg border border-gold/60 px-4 text-[16px] font-semibold text-text transition-colors duration-200 ease-out-strong hover:border-gold hover:bg-gold/10"
+              className="inline-flex min-h-12 items-center justify-center rounded-lg border border-gold/60 px-4 text-16 font-semibold text-text transition-colors duration-200 ease-out-strong hover:border-gold hover:bg-gold/10"
             >
               {registerLabel}
             </Link>

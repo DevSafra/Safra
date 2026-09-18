@@ -65,14 +65,14 @@ export function ReviewModeration({ reference }: { readonly reference: string }) 
         }}
       >
         {decision === 'uphold' ? (
-          <p className="text-[13px] leading-relaxed text-warn">
+          <p className="text-13 leading-relaxed text-warn">
             {t.sections.reviewModeration.hiddenEffect}
           </p>
         ) : null}
 
         <label
           htmlFor={`note-${reference}`}
-          className="text-[13px] leading-relaxed text-muted"
+          className="text-13 leading-relaxed text-muted"
         >
           {t.sections.reviewModeration.noteLabel}
         </label>
@@ -82,11 +82,11 @@ export function ReviewModeration({ reference }: { readonly reference: string }) 
           rows={2}
           required
           minLength={3}
-          className="rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text"
+          className="rounded-lg border border-line bg-field px-3 py-2 text-14 text-text"
         />
 
         {error ? (
-          <p role="alert" className="text-[13px] text-bad">
+          <p role="alert" className="text-13 text-bad">
             {error}
           </p>
         ) : null}
@@ -95,7 +95,7 @@ export function ReviewModeration({ reference }: { readonly reference: string }) 
           <button
             type="submit"
             disabled={busy}
-            className="min-h-10 cursor-pointer rounded-lg btn-gold px-4 py-2 text-[14px] font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-lg btn-gold px-4 py-2 text-14 font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
           >
             {busy
               ? t.sections.reviewModeration.working
@@ -104,7 +104,7 @@ export function ReviewModeration({ reference }: { readonly reference: string }) 
           <button
             type="button"
             onClick={() => setDecision(null)}
-            className="min-h-10 cursor-pointer rounded-lg border border-line px-4 py-2 text-[14px] text-muted lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-lg border border-line px-4 py-2 text-14 text-muted lg:min-h-0"
           >
             {t.sections.reviewModeration.cancel}
           </button>
@@ -118,14 +118,14 @@ export function ReviewModeration({ reference }: { readonly reference: string }) 
       <button
         type="button"
         onClick={() => setDecision('uphold')}
-        className="min-h-10 cursor-pointer rounded-lg border border-bad/50 px-4 py-2 text-[14px] font-semibold text-bad lg:min-h-0"
+        className="min-h-10 cursor-pointer rounded-lg border border-bad/50 px-4 py-2 text-14 font-semibold text-bad lg:min-h-0"
       >
         {t.sections.reviewModeration.uphold}
       </button>
       <button
         type="button"
         onClick={() => setDecision('dismiss')}
-        className="min-h-10 cursor-pointer rounded-lg border border-line px-4 py-2 text-[14px] text-muted lg:min-h-0"
+        className="min-h-10 cursor-pointer rounded-lg border border-line px-4 py-2 text-14 text-muted lg:min-h-0"
       >
         {t.sections.reviewModeration.dismiss}
       </button>

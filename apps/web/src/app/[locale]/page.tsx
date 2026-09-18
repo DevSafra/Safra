@@ -250,7 +250,7 @@ export default async function HomePage({
             does not describe. `--color-handoff-muted` is the file's value to the byte in the light
             theme and this product's own muted (8.11:1) in the dark one.
           */}
-          <p className="mx-auto mt-4 max-w-[62ch] text-[17px] leading-[1.8] font-medium text-handoff-muted">
+          <p className="mx-auto mt-4 max-w-[62ch] text-17 leading-[1.8] font-medium text-handoff-muted">
             {t('heroSubtitle')} {t('heroPromise')}
           </p>
 
@@ -271,7 +271,7 @@ export default async function HomePage({
           */}
           <ul className="mt-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
             {trust.map(({ icon: Icon, label }) => (
-              <li key={label} className="flex items-center gap-2 text-[14px] text-muted">
+              <li key={label} className="flex items-center gap-2 text-14 text-muted">
                 <span aria-hidden className="shrink-0 text-gold">
                   <Icon />
                 </span>
@@ -442,16 +442,12 @@ export default async function HomePage({
                 */}
                 <span
                   aria-hidden
-                  className="btn-gold inline-flex size-7 items-center justify-center rounded-full text-[14px] font-bold"
+                  className="btn-gold inline-flex size-7 items-center justify-center rounded-full text-14 font-bold"
                 >
                   {index + 1}
                 </span>
-                <h3 className="mt-2.5 text-[16px] font-semibold text-text">
-                  {step.title}
-                </h3>
-                <p className="mt-1.5 text-[14px] leading-relaxed text-muted">
-                  {step.body}
-                </p>
+                <h3 className="mt-2.5 text-16 font-semibold text-text">{step.title}</h3>
+                <p className="mt-1.5 text-14 leading-relaxed text-muted">{step.body}</p>
               </li>
             ))}
           </ol>
@@ -485,16 +481,12 @@ export default async function HomePage({
                 >
                   <pledge.icon />
                 </span>
-                <p className="mt-3 text-[14px] tracking-wide text-faint">
-                  {pledge.ordinal}
-                </p>
+                <p className="mt-3 text-14 tracking-wide text-faint">{pledge.ordinal}</p>
                 <h3 className="mt-1 text-base font-semibold text-balance text-text sm:text-[1.0625rem]">
                   {pledge.title}
                 </h3>
                 <div className="gold-rule mx-auto mt-3 w-12" />
-                <p className="mt-3 text-[14px] leading-relaxed text-muted">
-                  {pledge.body}
-                </p>
+                <p className="mt-3 text-14 leading-relaxed text-muted">{pledge.body}</p>
               </li>
             ))}
           </ul>
@@ -507,7 +499,7 @@ export default async function HomePage({
           <div className="grid gap-6 rounded-card border border-line bg-card p-6 sm:p-7 lg:grid-cols-[1fr_auto] lg:items-center lg:gap-12">
             <div>
               {/* Gold, 12px/700 — the same label treatment every other section on this page has. */}
-              <p className="text-[13px] font-bold tracking-[0.08em] text-gold-read">
+              <p className="text-13 font-bold tracking-[0.08em] text-gold-read">
                 {t('partnersTitle')}
               </p>
               {/*
@@ -516,10 +508,10 @@ export default async function HomePage({
                 than a night to book, and it was set two steps below every other section heading, so
                 it read as a footnote to the page instead of an offer on it.
               */}
-              <h2 className="mt-1 font-display text-2xl font-bold text-balance text-text sm:text-[28px]">
+              <h2 className="mt-1 font-display text-2xl font-bold text-balance text-text sm:text-28">
                 {t('partnersSubtitle')}
               </h2>
-              <p className="mt-3 max-w-[62ch] text-[16px] leading-relaxed text-muted">
+              <p className="mt-3 max-w-[62ch] text-16 leading-relaxed text-muted">
                 {/*
                   The commission comes from settings, never a hardcoded string. The super admin
                   edits it from the Rules Engine page (P-005), and this text has to follow
@@ -544,7 +536,7 @@ export default async function HomePage({
             */}
             <Link
               href={`/${locale}/partners/join`}
-              className="btn-gold inline-flex min-h-12 items-center justify-center justify-self-start rounded-lg px-8 text-[16px] font-bold transition-opacity duration-200 ease-out-strong hover:opacity-90 sm:min-h-[52px]"
+              className="btn-gold inline-flex min-h-12 items-center justify-center justify-self-start rounded-lg px-8 text-16 font-bold transition-opacity duration-200 ease-out-strong hover:opacity-90 sm:min-h-[52px]"
             >
               {t('partnersCta')}
             </Link>
@@ -616,8 +608,8 @@ function SectionHeading({
         argued for it; Bashar has since asked twice for the design's own colours, and the gold inks
         are recorded as his decision in `e2e/contrast.spec.ts`. The design wins.
       */}
-      <p className="text-[13px] font-bold tracking-[0.08em] text-gold-read">{eyebrow}</p>
-      <h2 className="mt-1.5 font-display text-[26px] leading-snug font-bold text-balance text-text sm:text-[32px]">
+      <p className="text-13 font-bold tracking-[0.08em] text-gold-read">{eyebrow}</p>
+      <h2 className="mt-1.5 font-display text-26 leading-snug font-bold text-balance text-text sm:text-32">
         {children}
       </h2>
     </div>
@@ -700,13 +692,13 @@ function CityCard({
         the full width and the row reads as one line of facts about the place.
       */}
       <div className="flex flex-1 flex-col p-4">
-        <h3 className="text-[17px] font-bold text-text sm:text-[20px]">
+        <h3 className="text-17 font-bold text-text sm:text-20">
           {localisedName(city, locale)}
         </h3>
 
         <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5">
           {categories ? (
-            <span className="rounded-full border border-gold/35 bg-gold/10 px-2 py-0.5 text-[13px] text-gold-read">
+            <span className="rounded-full border border-gold/35 bg-gold/10 px-2 py-0.5 text-13 text-gold-read">
               {categories}
             </span>
           ) : null}
@@ -716,7 +708,7 @@ function CityCard({
             place — and it read as a form field rather than as a fact about a city.
           */}
           {city.propertyCount > 0 ? (
-            <span className="text-[14px] text-muted">
+            <span className="text-14 text-muted">
               {stays('cityStays', { count: city.propertyCount })}
             </span>
           ) : null}
@@ -758,22 +750,20 @@ function StayTypeCard({
         remove the circle around them»). It was an 18px glyph inside a 36px `rounded-full` hairline,
         so the ring was the largest thing in the cell and the drawing the smallest thing inside it.
 
-        The size is on the SPAN, not in `ICON`: every glyph is `1.15em`, so `text-[28px]` here
+        The size is on the SPAN, not in `ICON`: every glyph is `1.15em`, so `text-28` here
         draws 32px without touching the search bar or the amenity cells. `type.glyph` — the emoji
         staff chose for a type nobody has drawn yet — scales with it, which is the other reason the
         size belongs on the container rather than on the svg.
       */}
       <span
         aria-hidden
-        className="inline-flex shrink-0 items-center justify-center text-[28px] leading-none text-gold-read"
+        className="inline-flex shrink-0 items-center justify-center text-28 leading-none text-gold-read"
       >
         {Drawn ? <Drawn /> : (type.glyph ?? <StayIcon />)}
       </span>
       <span className="min-w-0">
-        <span className="block truncate text-[14px] font-semibold text-text">
-          {label}
-        </span>
-        <span className="mt-0.5 block text-[13px] text-faint">
+        <span className="block truncate text-14 font-semibold text-text">{label}</span>
+        <span className="mt-0.5 block text-13 text-faint">
           {options('typeOptions', { count: type.propertyCount })}
         </span>
       </span>

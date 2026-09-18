@@ -186,7 +186,7 @@ export default async function PayoutPage({
           <div className="overflow-x-auto">
             <table className="w-full min-w-[680px] text-sm">
               <thead>
-                <tr className="text-start text-[13px] text-faint">
+                <tr className="text-start text-13 text-faint">
                   <Th>{t.sections.payouts.colBooking}</Th>
                   <Th>{t.sections.payouts.colProperty}</Th>
                   <Th>{t.sections.payouts.colStay}</Th>
@@ -202,7 +202,7 @@ export default async function PayoutPage({
                     </Td>
                     <Td>{booking.property ?? t.admin.noData}</Td>
                     <Td>
-                      <Ltr className="text-[14px] tabular-nums text-muted">
+                      <Ltr className="text-14 tabular-nums text-muted">
                         {booking.checkIn} ← {booking.checkOut}
                       </Ltr>
                     </Td>
@@ -242,7 +242,7 @@ export default async function PayoutPage({
               rather than alarming.
             */}
             {payout.bookings.some((one) => Number(one.refunded) > 0) ? (
-              <p className="mt-2 text-[13px] leading-relaxed text-faint">
+              <p className="mt-2 text-13 leading-relaxed text-faint">
                 {t.sections.payouts.refundedNote}
               </p>
             ) : null}
@@ -264,10 +264,10 @@ export default async function PayoutPage({
                 <span className="font-semibold text-text">
                   {auditAction(entry.action)}
                 </span>
-                <Ltr className="text-[13px] text-faint">
+                <Ltr className="text-13 text-faint">
                   {entry.actorEmail ?? t.admin.noData}
                 </Ltr>
-                <Ltr className="ms-auto text-[13px] text-faint">
+                <Ltr className="ms-auto text-13 text-faint">
                   {shortDateTime(entry.createdAt)}
                 </Ltr>
               </li>
@@ -297,7 +297,7 @@ export default async function PayoutPage({
                 className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-card px-4 py-2.5"
               >
                 <span
-                  className={`text-[13px] font-bold ${
+                  className={`text-13 font-bold ${
                     entry.direction === 'debit' ? 'text-sky' : 'text-ok'
                   }`}
                 >
@@ -344,7 +344,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 function Row({ label: name, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex justify-between gap-3 rounded-lg border border-line bg-card px-4 py-2.5">
-      <dt className="text-[14px] text-faint">{name}</dt>
+      <dt className="text-14 text-faint">{name}</dt>
       <dd className="text-text">{value}</dd>
     </div>
   );

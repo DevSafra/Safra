@@ -90,7 +90,7 @@ export default async function PartnerApplicationsPage({
             name="status"
             defaultValue={status ?? ''}
             aria-label={t.table.colStatus}
-            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text"
+            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-14 text-text"
           >
             <option value="">{t.sections.partnerApplications.allStatuses}</option>
             {APPLICATION_STATUSES.map((value) => (
@@ -102,9 +102,9 @@ export default async function PartnerApplicationsPage({
         </TableToolbar>
 
         {result === 'unauthenticated' ? (
-          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-14 text-muted">{t.dashboard.sessionExpired}</p>
         ) : result === 'failed' ? (
-          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-14 text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <>
             <AdminTable
@@ -163,7 +163,7 @@ const columns = (back: string): readonly AdminColumn<PartnerApplicationRow>[] =>
       <span className="min-w-0">
         <span className="block truncate font-semibold text-text">{row.legalName}</span>
         {row.displayName !== row.legalName ? (
-          <span className="block truncate text-[13px] text-faint">{row.displayName}</span>
+          <span className="block truncate text-13 text-faint">{row.displayName}</span>
         ) : null}
       </span>
     ),
@@ -175,7 +175,7 @@ const columns = (back: string): readonly AdminColumn<PartnerApplicationRow>[] =>
     render: (row) => (
       <span className="min-w-0">
         <span className="block truncate text-text2">{row.contactName}</span>
-        <span className="block truncate text-[13px] text-faint">
+        <span className="block truncate text-13 text-faint">
           <Ltr>{row.phone}</Ltr>
         </span>
       </span>
@@ -204,7 +204,7 @@ const columns = (back: string): readonly AdminColumn<PartnerApplicationRow>[] =>
     key: 'submitted',
     header: t.sections.partnerApplications.colSubmitted,
     render: (row) => (
-      <span className="text-[13px] text-faint">
+      <span className="text-13 text-faint">
         <Ltr>{shortDateTime(row.createdAt)}</Ltr>
       </span>
     ),

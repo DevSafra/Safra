@@ -181,7 +181,7 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
               </span>
             </Link>
 
-            <p className="mt-5 max-w-prose text-[14px] leading-relaxed text-muted">
+            <p className="mt-5 max-w-prose text-14 leading-relaxed text-muted">
               {t('about')}
             </p>
 
@@ -280,7 +280,7 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
                         text on it has to be too. A themed colour would turn near-white on
                         near-white the moment somebody switched to the dark theme.
                       */}
-                      <span className="text-[10px] leading-none font-bold tracking-tight text-[#1d2333]">
+                      <span className="text-10 leading-none font-bold tracking-tight text-[#1d2333]">
                         {payment(method)}
                       </span>
                     </li>
@@ -433,7 +433,7 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
           centred, stacked, quiet — is better because neither is asking to be read.
         */}
         <div className="mt-12 border-t border-line pt-7 text-center">
-          <p className="text-[14px] text-text2">
+          <p className="text-14 text-text2">
             {t('rights', { year: new Date().getFullYear() })}
           </p>
           <p className="mt-1.5 text-xs text-muted">{t('madeFor')}</p>
@@ -453,7 +453,7 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
  * reader work out which links belong together.
  */
 function FooterHeading({ children }: { children: React.ReactNode }) {
-  return <h2 className="text-[14px] font-bold text-text">{children}</h2>;
+  return <h2 className="text-14 font-bold text-text">{children}</h2>;
 }
 
 function FooterList({ children }: { children: React.ReactNode }) {
@@ -472,7 +472,7 @@ function FooterLink({ href, children }: { href: string; children: React.ReactNod
     <li>
       <Link
         href={href}
-        className="inline-flex min-h-10 items-center text-[14px] text-muted transition-colors duration-200 ease-out-strong hover:text-gold-read lg:min-h-0 lg:py-1"
+        className="inline-flex min-h-10 items-center text-14 text-muted transition-colors duration-200 ease-out-strong hover:text-gold-read lg:min-h-0 lg:py-1"
       >
         {children}
       </Link>

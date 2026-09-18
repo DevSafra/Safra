@@ -119,7 +119,7 @@ export default async function AccountWalletPage({
               borderColor: 'rgba(var(--goldA), 0.35)',
             }}
           >
-            <p className="text-[13px] font-extrabold tracking-[0.08em] text-gold-read">
+            <p className="text-13 font-extrabold tracking-[0.08em] text-gold-read">
               {t('walletEyebrow')}
             </p>
 
@@ -171,7 +171,7 @@ export default async function AccountWalletPage({
                 — and printing the stored number rather than a sum is what makes that checkable. A total
                 computed on the page could disagree with the balance the API holds; this one cannot.
               */}
-              <span className="text-[16px] font-extrabold text-gold-read" dir="ltr">
+              <span className="text-16 font-extrabold text-gold-read" dir="ltr">
                 {formatMoney(balance.balance, balance.currencyCode, locale, {
                   exact: true,
                 })}
@@ -286,10 +286,10 @@ function BalanceCard({
         own order, but `dir` also flips the element's start edge, which left both figures hugging the
         left of an Arabic card while their titles sat on the right.
       */}
-      <p className={`mt-1 text-[36px] leading-tight font-extrabold ${tone}`}>
+      <p className={`mt-1 text-36 leading-tight font-extrabold ${tone}`}>
         {ltrIsolate(amount)}
       </p>
-      <p className="mt-2 text-[13px] leading-relaxed text-faint">{caption}</p>
+      <p className="mt-2 text-13 leading-relaxed text-faint">{caption}</p>
     </div>
   );
 }

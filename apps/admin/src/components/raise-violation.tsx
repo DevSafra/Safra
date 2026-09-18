@@ -92,7 +92,7 @@ export function RaiseViolation({ reference }: { reference: string }) {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-gold/50 px-4 py-2 text-[14px] font-bold text-gold-read hover:bg-gold/10 lg:min-h-0"
+        className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-gold/50 px-4 py-2 text-14 font-bold text-gold-read hover:bg-gold/10 lg:min-h-0"
       >
         {t.sections.enforcement.raise}
       </button>
@@ -113,9 +113,7 @@ export function RaiseViolation({ reference }: { reference: string }) {
           }}
         >
           <label className="grid gap-1">
-            <span className="text-[13px] text-faint">
-              {t.sections.enforcement.kindLabel}
-            </span>
+            <span className="text-13 text-faint">{t.sections.enforcement.kindLabel}</span>
             {/*
               No default selection. The kind decides what the partner is told they did, so a select
               arriving pre-filled invites recording the wrong offence against a real business.
@@ -124,7 +122,7 @@ export function RaiseViolation({ reference }: { reference: string }) {
               name="kind"
               required
               defaultValue=""
-              className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text"
+              className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-14 text-text"
             >
               <option value="" disabled>
                 {t.sections.enforcement.pickViolationKind}
@@ -138,7 +136,7 @@ export function RaiseViolation({ reference }: { reference: string }) {
           </label>
 
           <label className="grid gap-1">
-            <span className="text-[13px] text-faint">
+            <span className="text-13 text-faint">
               {t.sections.enforcement.violationReasonLabel}
             </span>
             {/* No `dir`: a field a person types into follows the page (docs/i18n.md §9). */}
@@ -148,28 +146,28 @@ export function RaiseViolation({ reference }: { reference: string }) {
               minLength={ENFORCEMENT_REASON_MIN}
               maxLength={2000}
               rows={2}
-              className="rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text"
+              className="rounded-lg border border-line bg-field px-3 py-2 text-14 text-text"
             />
-            <span className="text-[13px] text-faint">
+            <span className="text-13 text-faint">
               {t.sections.enforcement.reasonHint}
             </span>
           </label>
 
           <label className="grid gap-1">
-            <span className="text-[13px] text-faint">
+            <span className="text-13 text-faint">
               {t.sections.enforcement.bookingLabel}
             </span>
             <input
               name="bookingReference"
               maxLength={64}
-              className="w-56 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text"
+              className="w-56 rounded-lg border border-line bg-field px-3 py-2 text-14 text-text"
             />
           </label>
 
           <button
             type="submit"
             disabled={busy}
-            className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-gold/50 px-4 py-2 text-[13px] font-bold text-gold-read hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
+            className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-gold/50 px-4 py-2 text-13 font-bold text-gold-read hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
           >
             {busy ? t.sections.enforcement.raising : t.sections.enforcement.raise}
           </button>

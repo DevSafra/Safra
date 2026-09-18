@@ -120,13 +120,13 @@ export function BookingSummaryCard({
   if (lines.length === 0) {
     return (
       <>
-        <p className="text-[14px] text-faint">{copy.fromLabel}</p>
+        <p className="text-14 text-faint">{copy.fromLabel}</p>
         <p className="mt-0.5 text-2xl font-bold tabular-nums text-gold">{fromPrice}</p>
-        <p className="mt-0.5 text-[13px] text-muted">{copy.fromCaption}</p>
+        <p className="mt-0.5 text-13 text-muted">{copy.fromCaption}</p>
 
         <div className="gold-rule my-4" />
 
-        <p className="text-[14px] leading-relaxed text-faint">{copy.empty}</p>
+        <p className="text-14 leading-relaxed text-faint">{copy.empty}</p>
 
         {/*
           An anchor, not a link: the list is on this page. It moves the reader to the choice rather
@@ -193,7 +193,7 @@ export function BookingSummaryCard({
   return (
     <>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="text-[13px] font-bold tracking-wide text-faint">
+        <span className="text-13 font-bold tracking-wide text-faint">
           {copy.selected}
         </span>
         {/*
@@ -206,7 +206,7 @@ export function BookingSummaryCard({
           <button
             type="button"
             onClick={clear}
-            className="inline-flex min-h-10 cursor-pointer items-center text-[13px] text-muted underline underline-offset-2 transition-colors hover:text-text2 lg:min-h-0"
+            className="inline-flex min-h-10 cursor-pointer items-center text-13 text-muted underline underline-offset-2 transition-colors hover:text-text2 lg:min-h-0"
           >
             {copy.clear}
           </button>
@@ -250,10 +250,10 @@ export function BookingSummaryCard({
               was previously lighter than the figure sitting next to it.
             */}
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <h3 className="font-display text-[16px] font-bold leading-tight text-text">
+              <h3 className="font-display text-16 font-bold leading-tight text-text">
                 {line.room.name}
               </h3>
-              <span className="ms-auto text-[15px] font-bold tabular-nums text-text">
+              <span className="ms-auto text-15 font-bold tabular-nums text-text">
                 {show(subtotalOf(line))}
               </span>
             </div>
@@ -290,7 +290,7 @@ export function BookingSummaryCard({
               the quantity rather than beside the name: both are things a guest DOES to this line,
               and the name row is now purely what-and-how-much.
             */}
-            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-[13px]">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-13">
               <span className="text-muted">
                 {text(copy.roomsCountTexts, line.rooms)} ·{' '}
                 {text(copy.capacityTexts, line.room.maxGuests * line.rooms)}
@@ -299,7 +299,7 @@ export function BookingSummaryCard({
                 type="button"
                 aria-label={`${copy.remove} — ${line.room.name}`}
                 onClick={() => remove(line.room.unitId)}
-                className="-my-2 inline-flex min-h-10 cursor-pointer items-center text-[13px] text-muted underline underline-offset-2 transition-colors hover:text-bad lg:min-h-0"
+                className="-my-2 inline-flex min-h-10 cursor-pointer items-center text-13 text-muted underline underline-offset-2 transition-colors hover:text-bad lg:min-h-0"
               >
                 {copy.remove}
               </button>
@@ -314,7 +314,7 @@ export function BookingSummaryCard({
               have had.
             */}
             {line.rooms >= line.room.maxRooms && line.room.maxRooms > 1 ? (
-              <p className="text-[14px] leading-relaxed text-faint">{copy.lineAll}</p>
+              <p className="text-14 leading-relaxed text-faint">{copy.lineAll}</p>
             ) : null}
 
             {/*
@@ -327,11 +327,11 @@ export function BookingSummaryCard({
               and a tier smaller, on their own line so a long list cannot push the policy out of
               sight.
             */}
-            <p className="text-[14px] leading-relaxed text-muted">
+            <p className="text-14 leading-relaxed text-muted">
               {copy.policy}: {line.room.policyText}
             </p>
             {line.room.amenities.length > 0 ? (
-              <p className="text-[13px] leading-relaxed text-faint">
+              <p className="text-13 leading-relaxed text-faint">
                 {line.room.amenities.map((amenity) => amenity.name).join(' · ')}
               </p>
             ) : null}
@@ -341,12 +341,12 @@ export function BookingSummaryCard({
 
       {/* Said at the ceiling rather than left to a «+» that stops answering. */}
       {rooms >= MAX_BASKET_ROOMS ? (
-        <p className="mt-2 text-[13px] leading-relaxed text-warn">{copy.full}</p>
+        <p className="mt-2 text-13 leading-relaxed text-warn">{copy.full}</p>
       ) : null}
 
       <div className="gold-rule my-3.5" />
 
-      <dl className="grid gap-1.5 text-[14px]">
+      <dl className="grid gap-1.5 text-14">
         {/*
           The arrow sits BETWEEN the dates, not against the check-out (Bashar, 2026-09-13). The row
           was `justify-between` with the arrow inside the `dd`, so all the free space opened on one
@@ -384,7 +384,7 @@ export function BookingSummaryCard({
         </div>
       </dl>
 
-      <dl className="mt-3 grid gap-1.5 border-t border-line pt-3 text-[14px]">
+      <dl className="mt-3 grid gap-1.5 border-t border-line pt-3 text-14">
         <div className="flex items-baseline justify-between gap-3">
           {/* «الإقامة», not «ليلتان» — the row is what the rooms cost, not how long the stay is. */}
           <dt className="text-muted">{copy.accommodation}</dt>
@@ -411,8 +411,8 @@ export function BookingSummaryCard({
         data-summary-total={withFee}
         className="mt-3 flex items-baseline justify-between gap-3 rounded-lg border border-[rgba(var(--goldA),0.35)] bg-[rgba(var(--goldA),0.06)] px-3 py-2.5"
       >
-        <span className="text-[14px] font-bold text-text">{copy.total}</span>
-        <span className="text-[17px] font-extrabold tabular-nums text-gold-read">
+        <span className="text-14 font-bold text-text">{copy.total}</span>
+        <span className="text-17 font-extrabold tabular-nums text-gold-read">
           {show(withFee)}
         </span>
       </div>

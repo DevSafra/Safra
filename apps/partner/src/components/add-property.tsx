@@ -145,7 +145,7 @@ export function AddProperty({
         type="button"
         onClick={() => setOpen(true)}
         /* The handoff's gold CTA gradient, §9.3, used only for primary actions. */
-        className="min-h-10 cursor-pointer rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-4 py-2 text-[14px] font-extrabold text-[#241A05] lg:min-h-0"
+        className="min-h-10 cursor-pointer rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-4 py-2 text-14 font-extrabold text-[#241A05] lg:min-h-0"
       >
         {t.properties.addOpen}
       </button>
@@ -155,13 +155,11 @@ export function AddProperty({
   return (
     <div className="rounded-card border border-gold/40 bg-card p-5">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-[16px] font-extrabold text-gold-read">
-          {t.properties.addOpen}
-        </h2>
+        <h2 className="text-16 font-extrabold text-gold-read">{t.properties.addOpen}</h2>
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="min-h-10 cursor-pointer rounded-lg border border-line px-3 text-[13px] text-muted lg:min-h-0 lg:py-1.5"
+          className="min-h-10 cursor-pointer rounded-lg border border-line px-3 text-13 text-muted lg:min-h-0 lg:py-1.5"
         >
           {t.properties.addClose}
         </button>
@@ -177,7 +175,7 @@ export function AddProperty({
         {error ? (
           <p
             role="alert"
-            className="rounded-lg border border-bad/40 bg-bad/10 p-3 text-[14px] text-bad"
+            className="rounded-lg border border-bad/40 bg-bad/10 p-3 text-14 text-bad"
           >
             {error}
           </p>
@@ -290,16 +288,16 @@ export function AddProperty({
         </div>
 
         <label className="grid gap-1">
-          <span className="text-[13px] text-muted">{t.properties.fDescription}</span>
+          <span className="text-13 text-muted">{t.properties.fDescription}</span>
           <textarea
             name="description"
             rows={3}
-            className="rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text"
+            className="rounded-lg border border-line bg-field px-3 py-2 text-14 text-text"
           />
         </label>
 
         <fieldset className="grid gap-2">
-          <legend className="text-[13px] leading-relaxed text-muted">
+          <legend className="text-13 leading-relaxed text-muted">
             {t.properties.attributesLabel}
           </legend>
           <div className="flex flex-wrap gap-1.5">
@@ -312,7 +310,7 @@ export function AddProperty({
                   type="button"
                   aria-pressed={on}
                   onClick={() => toggle(attribute)}
-                  className={`min-h-10 cursor-pointer rounded-full border px-3 text-[13px] font-semibold lg:min-h-0 lg:py-1 ${
+                  className={`min-h-10 cursor-pointer rounded-full border px-3 text-13 font-semibold lg:min-h-0 lg:py-1 ${
                     on
                       ? 'border-gold bg-gold/15 text-gold-read'
                       : 'border-line text-muted hover:border-gold/40'
@@ -325,7 +323,7 @@ export function AddProperty({
           </div>
         </fieldset>
 
-        <p className="rounded-lg border border-dashed border-line px-3 py-2 text-[13px] leading-relaxed text-faint">
+        <p className="rounded-lg border border-dashed border-line px-3 py-2 text-13 leading-relaxed text-faint">
           {t.properties.imagesLater}
         </p>
 
@@ -333,21 +331,21 @@ export function AddProperty({
           <button
             type="submit"
             disabled={busy}
-            className="min-h-10 cursor-pointer rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-4 py-2 text-[14px] font-extrabold text-[#241A05] disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-4 py-2 text-14 font-extrabold text-[#241A05] disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
           >
             {busy ? t.properties.submitting : t.properties.submit}
           </button>
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="min-h-10 cursor-pointer rounded-lg border border-line px-4 py-2 text-[14px] text-muted lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-lg border border-line px-4 py-2 text-14 text-muted lg:min-h-0"
           >
             {t.properties.cancelForm}
           </button>
         </div>
 
         {/* P-002, quoted. The reason nothing here publishes anything. */}
-        <p className="text-[13px] text-faint">{t.properties.reviewNote}</p>
+        <p className="text-13 text-faint">{t.properties.reviewNote}</p>
       </form>
     </div>
   );
@@ -377,7 +375,7 @@ function Field({
 }) {
   return (
     <label className="grid gap-1">
-      <span className="text-[13px] text-muted">{label}</span>
+      <span className="text-13 text-muted">{label}</span>
       <input
         name={name}
         type={type}
@@ -387,7 +385,7 @@ function Field({
         {...(maxLength === undefined ? {} : { maxLength })}
         {...(placeholder === undefined ? {} : { placeholder })}
         {...(defaultValue === undefined ? {} : { defaultValue })}
-        className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text"
+        className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-14 text-text"
       />
     </label>
   );
@@ -414,14 +412,14 @@ function Select({
 }) {
   return (
     <label className="grid gap-1">
-      <span className="text-[13px] text-muted">{label}</span>
+      <span className="text-13 text-muted">{label}</span>
       <select
         name={name}
         required
         {...(value === undefined
           ? {}
           : { value, onChange: (event) => onChange?.(event.target.value) })}
-        className="min-h-10 cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text"
+        className="min-h-10 cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-14 text-text"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>

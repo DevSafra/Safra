@@ -167,7 +167,7 @@ function LanguageMenu({
                     {current ? (
                       <CheckIcon />
                     ) : (
-                      <span className="text-[13px] tracking-wide text-faint uppercase">
+                      <span className="text-13 tracking-wide text-faint uppercase">
                         {code}
                       </span>
                     )}

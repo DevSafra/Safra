@@ -90,7 +90,7 @@ export function CityPhotographs({
       ))}
 
       {/* The two orders differ on purpose — see `GeoService.cities`. */}
-      <p className="text-[14px] text-faint">{c.imagesOrderNote}</p>
+      <p className="text-14 text-faint">{c.imagesOrderNote}</p>
 
       <ImageSliderFrame
         images={slides}
@@ -265,7 +265,7 @@ function PhotographCard({
   }
 
   const control =
-    'cursor-pointer rounded-lg border border-line px-2 py-0.5 text-[13px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read disabled:cursor-not-allowed disabled:opacity-35';
+    'cursor-pointer rounded-lg border border-line px-2 py-0.5 text-13 text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read disabled:cursor-not-allowed disabled:opacity-35';
 
   return (
     <div
@@ -297,7 +297,7 @@ function PhotographCard({
         <div className="grid min-w-0 flex-1 gap-2">
           <div className="flex flex-wrap items-center gap-1.5">
             {photograph.isHero ? (
-              <span className="rounded-full bg-[rgba(var(--goldA),0.14)] px-2.5 py-0.5 text-[13px] font-extrabold text-gold-read">
+              <span className="rounded-full bg-[rgba(var(--goldA),0.14)] px-2.5 py-0.5 text-13 font-extrabold text-gold-read">
                 {c.imageHero}
               </span>
             ) : (
@@ -314,7 +314,7 @@ function PhotographCard({
 
             {/* Whether this picture says anything at all — the state this screen exists to fix. */}
             {photograph.altAr === null ? (
-              <span className="text-[13px] font-semibold text-bad">{c.imageNoAlt}</span>
+              <span className="text-13 font-semibold text-bad">{c.imageNoAlt}</span>
             ) : null}
 
             <span className="ms-auto flex items-center gap-1">
@@ -350,7 +350,7 @@ function PhotographCard({
                 aria-label={c.imageRemove}
                 data-city-image-remove={photograph.id}
                 onClick={() => void remove()}
-                className="cursor-pointer rounded-lg border border-bad/45 px-2 py-0.5 text-[13px] font-bold text-bad transition-colors hover:bg-bad/10 disabled:cursor-not-allowed disabled:opacity-35"
+                className="cursor-pointer rounded-lg border border-bad/45 px-2 py-0.5 text-13 font-bold text-bad transition-colors hover:bg-bad/10 disabled:cursor-not-allowed disabled:opacity-35"
               >
                 {c.remove}
               </button>
@@ -385,7 +385,7 @@ function PhotographCard({
             />
           </Row>
 
-          {error ? <p className="text-[14px] font-semibold text-bad">{error}</p> : null}
+          {error ? <p className="text-14 font-semibold text-bad">{error}</p> : null}
 
           <div className="flex items-center gap-2">
             <button
@@ -393,12 +393,12 @@ function PhotographCard({
               disabled={busy}
               data-city-image-save={photograph.id}
               onClick={() => void save()}
-              className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1.5 text-[13px] font-bold text-gold-read transition-colors hover:bg-[rgba(var(--goldA),0.08)] disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+              className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1.5 text-13 font-bold text-gold-read transition-colors hover:bg-[rgba(var(--goldA),0.08)] disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
             >
               {busy ? c.saving : c.save}
             </button>
             {saved ? (
-              <span className="text-[13px] font-semibold text-ok">{c.imageSaved}</span>
+              <span className="text-13 font-semibold text-ok">{c.imageSaved}</span>
             ) : null}
           </div>
         </div>

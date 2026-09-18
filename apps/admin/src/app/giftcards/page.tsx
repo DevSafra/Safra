@@ -152,9 +152,9 @@ export default async function GiftCardsPage({
         />
 
         {result === 'unauthenticated' ? (
-          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-14 text-muted">{t.dashboard.sessionExpired}</p>
         ) : result === 'failed' ? (
-          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-14 text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <>
             <AdminTable
@@ -203,7 +203,7 @@ const COLUMNS: readonly AdminColumn<GiftCardItem>[] = [
     render: (row) => (
       <div className="grid min-w-0 gap-0.5">
         <Ltr className="font-semibold text-sky">{row.reference}</Ltr>
-        <Ltr className="text-[13px] text-faint">••••{row.codeLast4}</Ltr>
+        <Ltr className="text-13 text-faint">••••{row.codeLast4}</Ltr>
       </div>
     ),
   },

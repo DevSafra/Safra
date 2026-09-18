@@ -92,7 +92,7 @@ export function ConfirmDialog({
       initialFocus={initial}
       onClose={() => onResolve(false)}
     >
-      <h2 id="safra-confirm-title" className="text-[16px] font-bold text-text">
+      <h2 id="safra-confirm-title" className="text-16 font-bold text-text">
         {request.title}
       </h2>
 
@@ -105,7 +105,7 @@ export function ConfirmDialog({
       */}
       <p
         id="safra-confirm-message"
-        className="text-[14px] leading-relaxed whitespace-pre-line text-muted"
+        className="text-14 leading-relaxed whitespace-pre-line text-muted"
       >
         {request.message}
       </p>

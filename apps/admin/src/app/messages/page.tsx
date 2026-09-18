@@ -79,9 +79,9 @@ export default async function MessagesPage({
         />
 
         {result === 'unauthenticated' ? (
-          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-14 text-muted">{t.dashboard.sessionExpired}</p>
         ) : result === 'failed' ? (
-          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-14 text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <>
             {/*
@@ -90,7 +90,7 @@ export default async function MessagesPage({
               other registry. See `rowAnchor`.
             */}
             {result.items.length === 0 ? (
-              <p className="text-[14px] text-faint">{t.table.empty}</p>
+              <p className="text-14 text-faint">{t.table.empty}</p>
             ) : (
               <ul className="grid gap-2.5">
                 {result.items.map((thread) => (
@@ -161,10 +161,7 @@ function Thread({ thread, back }: { thread: ConversationItem; back: string }) {
             «same party on both sides» check compared «ف فندق قصر الشرق» against «فندق قصر الشرق»
             and passed over exactly the defect it was written for.
           */}
-          <span
-            data-parties={thread.subjectKind}
-            className="text-[14px] font-bold text-text"
-          >
+          <span data-parties={thread.subjectKind} className="text-14 font-bold text-text">
             {partyLine(thread.subjectKind, thread.customer, thread.partner)}
           </span>
           {/*
@@ -175,11 +172,11 @@ function Thread({ thread, back }: { thread: ConversationItem; back: string }) {
             host were indistinguishable. The word is the thing a reader actually needs before
             deciding whether to open it.
           */}
-          <span className="rounded-full border border-line px-2 py-px text-[13px] font-bold text-faint">
+          <span className="rounded-full border border-line px-2 py-px text-13 font-bold text-faint">
             {conversationKind(thread.subjectKind)}
           </span>
           {thread.subjectReference ? (
-            <Ltr className="text-[13px] text-sky">{thread.subjectReference}</Ltr>
+            <Ltr className="text-13 text-sky">{thread.subjectReference}</Ltr>
           ) : null}
         </span>
         <span className="mt-1 block truncate text-xs text-muted">
@@ -188,12 +185,12 @@ function Thread({ thread, back }: { thread: ConversationItem; back: string }) {
       </span>
 
       <span className="text-end">
-        <span className="block text-[13px] text-faint">
+        <span className="block text-13 text-faint">
           {shortDateTime(thread.lastMessageAt)}
         </span>
         {/* The design's red unread pill. Staff-side count — see the schema comment. */}
         {thread.unreadForStaff > 0 ? (
-          <span className="mt-1.5 inline-block rounded-full bg-bad px-2 py-px text-[12px] font-extrabold text-bg">
+          <span className="mt-1.5 inline-block rounded-full bg-bad px-2 py-px text-12 font-extrabold text-bg">
             {count(thread.unreadForStaff)}
           </span>
         ) : null}

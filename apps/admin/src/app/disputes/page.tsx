@@ -73,11 +73,11 @@ export default async function DisputesPage({
     <ConsoleShell title={t.nav.disputes} counts={counts}>
       {result === 'unauthenticated' ? (
         <ConsolePanel>
-          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-14 text-muted">{t.dashboard.sessionExpired}</p>
         </ConsolePanel>
       ) : result === 'failed' ? (
         <ConsolePanel>
-          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-14 text-bad">{t.dashboard.queueFailed}</p>
         </ConsolePanel>
       ) : (
         <div className="grid gap-4">
@@ -94,7 +94,7 @@ export default async function DisputesPage({
                 name="status"
                 defaultValue={status ?? ''}
                 aria-label={t.table.colStatus}
-                className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text"
+                className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-14 text-text"
               >
                 <option value="">{t.sections.bookings.allStatuses}</option>
                 {DISPUTE_STATUSES.map((value) => (
@@ -106,7 +106,7 @@ export default async function DisputesPage({
             </TableToolbar>
 
             {result.items.length === 0 ? (
-              <p className="text-[14px] text-faint">{t.table.empty}</p>
+              <p className="text-14 text-faint">{t.table.empty}</p>
             ) : (
               <div className="grid gap-3">
                 {result.items.map((dispute) => (
@@ -202,7 +202,7 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
           <div className="flex flex-wrap items-center gap-2.5">
             <Ltr className="font-bold text-sky">{dispute.reference}</Ltr>
             {/* The EC code, in the design's small square tag. */}
-            <span className="rounded bg-[rgba(var(--badA),0.14)] px-2 py-0.5 text-[13px] font-extrabold text-bad">
+            <span className="rounded bg-[rgba(var(--badA),0.14)] px-2 py-0.5 text-13 font-extrabold text-bad">
               {label(t.enums.disputeKind, dispute.kind)}
             </span>
             {dispute.freezesPayout ? (
@@ -244,7 +244,7 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
                   default. A JOD stay and a USD stay differ by a factor a reader cannot infer.
                 */}
                 {dispute.frozenAmount && dispute.frozenCurrency ? (
-                  <Ltr className="text-[14px] font-bold text-indigo">
+                  <Ltr className="text-14 font-bold text-indigo">
                     {amount(dispute.frozenAmount, dispute.frozenCurrency)}
                   </Ltr>
                 ) : null}
@@ -253,7 +253,7 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
           </div>
 
           {/* The title is redacted on the way in, so it is rendered on the way out. */}
-          <p className="mt-1.5 text-[14px] font-semibold text-text">
+          <p className="mt-1.5 text-14 font-semibold text-text">
             {renderRedactions(dispute.title, 'ar')}
           </p>
 
@@ -276,14 +276,14 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
             <p
               /* Marked so the browser sweep can find the account and nothing else. */
               data-dispute-account={dispute.reference}
-              className="mt-1.5 text-[13px] leading-relaxed whitespace-pre-line text-text2"
+              className="mt-1.5 text-13 leading-relaxed whitespace-pre-line text-text2"
             >
               {renderRedactions(dispute.description, 'ar')}
             </p>
           ) : null}
 
           {/* Back from the booking returns to النزاعات, the list the reader is actually in. */}
-          <p className="mt-1 text-[13px] text-faint">
+          <p className="mt-1 text-13 text-faint">
             {dispute.bookingReference ? (
               <Link
                 href={`/bookings/${dispute.bookingReference}?from=disputes`}
@@ -335,16 +335,16 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
               data-partner-responses={dispute.reference}
               className="mt-2 rounded-card border border-line bg-field px-3 py-2"
             >
-              <p className="text-[14px] font-semibold text-faint">
+              <p className="text-14 font-semibold text-faint">
                 {t.sections.disputes.partnerResponses}
               </p>
               <ul className="mt-1 divide-y divide-line">
                 {dispute.partnerResponses.map((response) => (
                   <li key={response.at} className="py-1.5 first:pt-0 last:pb-0">
-                    <p className="text-[13px] leading-relaxed whitespace-pre-line text-text2">
+                    <p className="text-13 leading-relaxed whitespace-pre-line text-text2">
                       {renderRedactions(response.body, 'ar')}
                     </p>
-                    <Ltr className="mt-0.5 block text-[13px] text-faint">
+                    <Ltr className="mt-0.5 block text-13 text-faint">
                       {shortDateTime(response.at)}
                     </Ltr>
                   </li>
@@ -364,7 +364,7 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
                 been deleted from the palette. `muted` measures 7.01:1 and is the step the
                 palette's own note calls «carries most secondary reading» — which is what this is.
               */
-              className="mt-2 text-[13px] leading-relaxed text-muted"
+              className="mt-2 text-13 leading-relaxed text-muted"
             >
               {t.sections.disputes.partnerResponsesNone}
             </p>
@@ -372,7 +372,7 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
 
           {/* The resolution, once closed. It is the whole point of requiring one. */}
           {dispute.resolution ? (
-            <p className="mt-2 rounded-card border border-line bg-field px-3 py-2 text-[13px] leading-relaxed text-text2">
+            <p className="mt-2 rounded-card border border-line bg-field px-3 py-2 text-13 leading-relaxed text-text2">
               {dispute.resolution}
               {dispute.compensationAmount && dispute.compensationCurrency ? (
                 <span className="ms-1.5 font-bold text-gold-read">
@@ -389,7 +389,7 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
           <StatusPill tone={statusTone(dispute.status)}>
             {label(t.enums.disputeStatus, dispute.status)}
           </StatusPill>
-          <Ltr className="text-[13px] text-faint">
+          <Ltr className="text-13 text-faint">
             {closed ? shortDateTime(dispute.closedAt) : `${count(dispute.ageHours)}h`}
           </Ltr>
         </div>

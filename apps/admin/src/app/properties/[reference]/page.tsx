@@ -301,7 +301,7 @@ export default async function PropertyPage({
             />
 
             {property.images.length > PHOTO_LIMIT ? (
-              <p className="mt-2 text-[13px] text-faint">
+              <p className="mt-2 text-13 text-faint">
                 {fill(t.sections.propertyDetail.morePhotos, {
                   n: count(property.images.length - PHOTO_LIMIT),
                 })}
@@ -319,7 +319,7 @@ export default async function PropertyPage({
             {property.amenityCodes.map((one) => (
               <li
                 key={one.code}
-                className="rounded-lg border border-line2 px-2.5 py-1 text-[14px] text-text2"
+                className="rounded-lg border border-line2 px-2.5 py-1 text-14 text-text2"
               >
                 {one.nameAr}
               </li>
@@ -339,7 +339,7 @@ export default async function PropertyPage({
       */}
       {property.inventory.length > 0 ? (
         <Section title={t.sections.propertyDetail.inventory}>
-          <p className="mb-2 text-[13px] leading-relaxed text-faint">
+          <p className="mb-2 text-13 leading-relaxed text-faint">
             {t.sections.propertyDetail.inventoryNote}
           </p>
           <ul data-inventory className="grid gap-2 text-sm">
@@ -350,7 +350,7 @@ export default async function PropertyPage({
               >
                 <span className="text-text">
                   {type.nameAr}
-                  <span className="mt-1 block text-[13px] text-faint">
+                  <span className="mt-1 block text-13 text-faint">
                     {plural(t.sections.propertyDetail.unitLine, {
                       guests: type.maxGuests,
                       price: type.basePrice,
@@ -413,7 +413,7 @@ export default async function PropertyPage({
                     declared on the building are different assertions about the world.
                   */}
                   {unit.amenityCodes.length > 0 ? (
-                    <span className="mt-1 block text-[13px] text-faint">
+                    <span className="mt-1 block text-13 text-faint">
                       {unit.amenityCodes.map((one) => one.nameAr).join(' · ')}
                     </span>
                   ) : null}

@@ -115,9 +115,7 @@ export function GuestsField({
           decrease={labels.decrease}
         />
         {/* Said plainly, because a «0» beside «الرضّع» otherwise reads as a bed they are not getting. */}
-        <p className="pt-1 text-[14px] leading-relaxed text-faint">
-          {labels.infantsHint}
-        </p>
+        <p className="pt-1 text-14 leading-relaxed text-faint">{labels.infantsHint}</p>
 
         {/*
           Bedrooms (Bashar, 2026-09-03), and it is a REQUIREMENT rather than a quantity — «find me a

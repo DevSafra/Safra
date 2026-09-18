@@ -134,7 +134,7 @@ export function UnitSelector({
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                     <h3 className="font-display text-lg text-text">{room.name}</h3>
                     {many && room.cheapest ? (
-                      <span className="rounded-full border border-[rgba(var(--goldA),0.4)] px-2 py-0.5 text-[13px] font-semibold text-gold-read">
+                      <span className="rounded-full border border-[rgba(var(--goldA),0.4)] px-2 py-0.5 text-13 font-semibold text-gold-read">
                         {copy.cheapest}
                       </span>
                     ) : null}
@@ -211,7 +211,7 @@ export function UnitSelector({
                       ))}
                     </ul>
                   ) : (
-                    <p className="mt-2.5 text-[14px] text-faint">{copy.amenitiesNone}</p>
+                    <p className="mt-2.5 text-14 text-faint">{copy.amenitiesNone}</p>
                   )}
                 </div>
 
@@ -232,13 +232,13 @@ export function UnitSelector({
                     looked right. The nightly rate stays underneath, because it is how a guest
                     compares rooms — it just is not the number the sentence above promised.
                   */}
-                  <span className="text-[13px] text-faint sm:text-end">
+                  <span className="text-13 text-faint sm:text-end">
                     {copy.stayTotalLabel}
                   </span>
                   <p className="text-xl font-extrabold tabular-nums text-gold sm:text-end">
                     {room.totalText}
                   </p>
-                  <p className="text-[13px] text-muted sm:text-end">{room.stayCaption}</p>
+                  <p className="text-13 text-muted sm:text-end">{room.stayCaption}</p>
 
                   {room.tooShort ? (
                     /*
@@ -250,7 +250,7 @@ export function UnitSelector({
                       finding. So the row states the minimum and what to do about it, and the room
                       stays visible because knowing it exists is worth something.
                     */
-                    <p className="mt-2 text-center text-[13px] font-semibold leading-relaxed text-warn sm:text-end">
+                    <p className="mt-2 text-center text-13 font-semibold leading-relaxed text-warn sm:text-end">
                       {room.tooShortText}
                     </p>
                   ) : room.soldOut ? (

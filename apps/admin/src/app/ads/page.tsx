@@ -141,11 +141,11 @@ export default async function AdsPage({
     <ConsoleShell title={t.nav.ads} counts={counts}>
       {result === 'unauthenticated' ? (
         <ConsolePanel>
-          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-14 text-muted">{t.dashboard.sessionExpired}</p>
         </ConsolePanel>
       ) : result === 'failed' ? (
         <ConsolePanel>
-          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-14 text-bad">{t.dashboard.queueFailed}</p>
         </ConsolePanel>
       ) : (
         <div className="grid gap-4">
@@ -251,9 +251,9 @@ function Invoices({
       */}
       <div data-ad-invoices>
         {invoices === 'unauthenticated' ? (
-          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-14 text-muted">{t.dashboard.sessionExpired}</p>
         ) : invoices === 'failed' ? (
-          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-14 text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <>
             <TableToolbar
@@ -320,7 +320,7 @@ const INVOICE_COLUMNS: readonly AdminColumn<AdInvoiceItem>[] = [
     key: 'period',
     header: t.sections.adInvoices.colPeriod,
     render: (row) => (
-      <span className="text-[13px] text-muted">
+      <span className="text-13 text-muted">
         {/*
           «→», not «←».
 
@@ -353,7 +353,7 @@ const INVOICE_COLUMNS: readonly AdminColumn<AdInvoiceItem>[] = [
           {label(t.enums.adInvoiceStatus, row.status)}
         </StatusPill>
         {row.paidAt ? (
-          <span className="text-[13px] text-faint">
+          <span className="text-13 text-faint">
             {fill(t.sections.adInvoices.paidOn, { date: shortDate(row.paidAt) })}
           </span>
         ) : null}
@@ -437,7 +437,7 @@ function columnsFor(created: string | null): readonly AdminColumn<CampaignItem>[
       render: (row) => (
         <div className="grid gap-0.5 leading-tight">
           <span className="font-semibold text-text">{row.advertiser}</span>
-          <span className="truncate text-[13px] text-faint" title={row.headlineAr}>
+          <span className="truncate text-13 text-faint" title={row.headlineAr}>
             {row.headlineAr}
           </span>
           {/*
@@ -459,7 +459,7 @@ function columnsFor(created: string | null): readonly AdminColumn<CampaignItem>[
             <span
               data-no-creative={row.reference}
               title={t.sections.ads.rowNoCreativeTitle}
-              className="mt-0.5 w-fit rounded border border-dashed border-line px-1.5 py-px text-[13px] text-muted"
+              className="mt-0.5 w-fit rounded border border-dashed border-line px-1.5 py-px text-13 text-muted"
             >
               {t.sections.ads.rowNoCreative}
             </span>
@@ -501,11 +501,11 @@ function columnsFor(created: string | null): readonly AdminColumn<CampaignItem>[
           <span className="text-text2">{periodLabel(row.billingPeriod)}</span>
           {row.priceAmount && row.priceCurrency ? (
             /* Never a bare figure — SYP and USD differ by four orders of magnitude. */
-            <Ltr className="text-[14px] font-bold text-gold-read">
+            <Ltr className="text-14 font-bold text-gold-read">
               {amount(row.priceAmount, row.priceCurrency)}
             </Ltr>
           ) : (
-            <span className="text-[13px] text-faint">{t.sections.ads.noPrice}</span>
+            <span className="text-13 text-faint">{t.sections.ads.noPrice}</span>
           )}
         </div>
       ),
@@ -522,7 +522,7 @@ function columnsFor(created: string | null): readonly AdminColumn<CampaignItem>[
         <span>
           <Ltr className="text-text2">{count(row.clicks)}</Ltr>
           {row.impressions > 0 ? (
-            <Ltr className="ms-1 text-[13px] text-faint">
+            <Ltr className="ms-1 text-13 text-faint">
               {percent(((row.clicks / row.impressions) * 100).toFixed(1))}
             </Ltr>
           ) : null}
@@ -561,7 +561,7 @@ function columnsFor(created: string | null): readonly AdminColumn<CampaignItem>[
             <StatusPill tone={statusTone(row.status)}>
               {label(t.enums.adStatus, row.status)}
             </StatusPill>
-            <span className="text-[13px] text-faint">
+            <span className="text-13 text-faint">
               {row.daysRemaining < 0
                 ? t.sections.ads.ended
                 : plural(t.sections.ads.endsIn, { days: row.daysRemaining })}
@@ -569,7 +569,7 @@ function columnsFor(created: string | null): readonly AdminColumn<CampaignItem>[
           </div>
 
           {/* «→» inside an `Ltr` run — see the note on the invoice period column above. */}
-          <Ltr className="text-[13px] whitespace-nowrap text-faint">
+          <Ltr className="text-13 whitespace-nowrap text-faint">
             {shortDate(row.startsAt)} → {shortDate(row.endsAt)}
           </Ltr>
 

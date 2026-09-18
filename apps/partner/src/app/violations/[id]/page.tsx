@@ -64,7 +64,7 @@ export default async function ViolationDetailPage({
         */}
         <Link
           href="/violations"
-          className="inline-flex min-h-10 w-fit items-center gap-2 text-[14px] text-muted hover:text-gold-read lg:min-h-0"
+          className="inline-flex min-h-10 w-fit items-center gap-2 text-14 text-muted hover:text-gold-read lg:min-h-0"
         >
           <span aria-hidden="true">→</span>
           {t.violations.back}
@@ -104,10 +104,10 @@ export default async function ViolationDetailPage({
     <>
       <section className="grid gap-3 rounded-card border border-line bg-card p-4">
         <div className="flex flex-wrap items-center gap-2.5">
-          <h2 className="text-[16px] font-bold text-text">
+          <h2 className="text-16 font-bold text-text">
             {t.violations.kind[violation.kind] ?? violation.kind}
           </h2>
-          <span className="rounded-lg border border-line px-1.5 py-0.5 text-[13px] text-muted">
+          <span className="rounded-lg border border-line px-1.5 py-0.5 text-13 text-muted">
             {t.violations.stage[violation.stage] ?? violation.stage}
           </span>
         </div>
@@ -122,8 +122,8 @@ export default async function ViolationDetailPage({
         */}
         {described ? (
           <div className="grid gap-1">
-            <h3 className="text-[13px] text-faint">{t.violations.whatHappened}</h3>
-            <p className="text-[14px] leading-relaxed text-text">{described}</p>
+            <h3 className="text-13 text-faint">{t.violations.whatHappened}</h3>
+            <p className="text-14 leading-relaxed text-text">{described}</p>
           </div>
         ) : null}
 
@@ -147,16 +147,12 @@ export default async function ViolationDetailPage({
       {/* The warning, and only once somebody actually issued one. */}
       {violation.warnedAt ? (
         <section className="grid gap-1.5 rounded-card border border-line bg-card p-4">
-          <h3 className="text-[13px] font-semibold text-muted">
-            {t.violations.theWarning}
-          </h3>
-          <p className="text-[13px] text-faint">
+          <h3 className="text-13 font-semibold text-muted">{t.violations.theWarning}</h3>
+          <p className="text-13 text-faint">
             {fill(t.violations.warnedOn, { date: violation.warnedAt })}
           </p>
           {violation.warningNote ? (
-            <p className="text-[14px] leading-relaxed text-text">
-              {violation.warningNote}
-            </p>
+            <p className="text-14 leading-relaxed text-text">{violation.warningNote}</p>
           ) : null}
         </section>
       ) : null}
@@ -168,21 +164,21 @@ export default async function ViolationDetailPage({
         fine was ZERO, which is a different fact and the opposite of the truth.
       */}
       {moneyHidden ? (
-        <p className="rounded-lg border border-line bg-card px-3 py-2 text-[14px] text-faint">
+        <p className="rounded-lg border border-line bg-card px-3 py-2 text-14 text-faint">
           {t.violations.moneyHidden}
         </p>
       ) : fine ? (
         <section className="grid gap-2 rounded-card border border-line bg-card p-4">
-          <h3 className="text-[13px] font-semibold text-muted">{t.violations.theFine}</h3>
+          <h3 className="text-13 font-semibold text-muted">{t.violations.theFine}</h3>
 
           <p
-            className={`text-[14px] ${violation.waived ? 'text-faint line-through' : 'text-text'}`}
+            className={`text-14 ${violation.waived ? 'text-faint line-through' : 'text-text'}`}
           >
             <Ltr>{fine}</Ltr>
           </p>
 
           {violation.customerCompensationAmount ? (
-            <p className="text-[13px] text-text2">
+            <p className="text-13 text-text2">
               {fill(t.violations.compensation, {
                 amount: `${violation.customerCompensationAmount} ${violation.fineCurrency ?? ''}`,
               })}
@@ -190,12 +186,12 @@ export default async function ViolationDetailPage({
           ) : null}
 
           {violation.fineReason ? (
-            <p className="text-[14px] leading-relaxed text-text2">
+            <p className="text-14 leading-relaxed text-text2">
               {fill(t.violations.fineReason, { reason: violation.fineReason })}
             </p>
           ) : null}
 
-          <p className="text-[13px] text-faint">
+          <p className="text-13 text-faint">
             {violation.collectedAt
               ? fill(t.violations.collectedOnLabel, { date: violation.collectedAt })
               : t.violations.notCollected}
@@ -212,19 +208,15 @@ export default async function ViolationDetailPage({
       */}
       {violation.waived ? (
         <section className="grid gap-1.5 rounded-card border border-ok/40 bg-ok/5 p-4">
-          <h3 className="text-[13px] font-semibold text-ok">{t.violations.theWaiver}</h3>
+          <h3 className="text-13 font-semibold text-ok">{t.violations.theWaiver}</h3>
           {violation.waivedReason ? (
-            <p className="text-[14px] leading-relaxed text-text">
-              {violation.waivedReason}
-            </p>
+            <p className="text-14 leading-relaxed text-text">{violation.waivedReason}</p>
           ) : null}
         </section>
       ) : null}
 
-      <p className="text-[13px] leading-relaxed text-faint">
-        {t.violations.noRankingEffect}
-      </p>
-      <p className="text-[13px] leading-relaxed text-faint">{t.violations.appeal}</p>
+      <p className="text-13 leading-relaxed text-faint">{t.violations.noRankingEffect}</p>
+      <p className="text-13 leading-relaxed text-faint">{t.violations.appeal}</p>
     </>,
   );
 }
@@ -238,8 +230,8 @@ function Fact({
 }) {
   return (
     <div className="grid gap-0.5">
-      <dt className="text-[13px] text-faint">{label}</dt>
-      <dd className="text-[14px] text-text">{children}</dd>
+      <dt className="text-13 text-faint">{label}</dt>
+      <dd className="text-14 text-text">{children}</dd>
     </div>
   );
 }

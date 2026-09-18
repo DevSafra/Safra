@@ -240,7 +240,7 @@ export function AdminSidebar({
       aria-label={t.nav.heading}
       className="console-sidebar flex flex-col rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-3.5"
     >
-      <p className="px-2.5 py-1 text-[14px] font-bold tracking-[0.1em] text-faint">
+      <p className="px-2.5 py-1 text-14 font-bold tracking-[0.1em] text-faint">
         {t.nav.heading}
       </p>
 
@@ -281,7 +281,7 @@ export function AdminSidebar({
                   would compete with the selection state on every row at once.
                 */
                 <span
-                  className={`rounded-full px-2 py-px text-[12px] font-extrabold ${
+                  className={`rounded-full px-2 py-px text-12 font-extrabold ${
                     item.warn
                       ? 'bg-[rgba(var(--badA),0.18)] text-bad'
                       : 'bg-[rgba(var(--skyA),0.15)] text-sky'
@@ -315,7 +315,7 @@ export function AdminSidebar({
 
           // 8px radius on nav items (§9.5).
           const shared =
-            'flex min-h-10 items-center justify-between rounded-lg px-2.5 py-2 text-[14px]';
+            'flex min-h-10 items-center justify-between rounded-lg px-2.5 py-2 text-14';
 
           if (!item.href) {
             /**

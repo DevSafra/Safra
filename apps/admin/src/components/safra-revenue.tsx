@@ -56,18 +56,18 @@ export function SafraRevenueSummary({ revenue }: { readonly revenue: SafraRevenu
       </div>
 
       {overdrawn ? (
-        <p className="text-[13px] leading-relaxed text-warn">{c.overTransferredNote}</p>
+        <p className="text-13 leading-relaxed text-warn">{c.overTransferredNote}</p>
       ) : null}
 
       <div className="grid gap-2">
-        <h3 className="text-[13px] font-bold text-faint">{c.bySource}</h3>
+        <h3 className="text-13 font-bold text-faint">{c.bySource}</h3>
 
         <ul className="grid gap-1.5">
           {revenue.byAccount.map((row) => (
             <li
               key={row.account}
               data-revenue-source={row.account}
-              className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg border border-line2 px-3 py-2 text-[14px]"
+              className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg border border-line2 px-3 py-2 text-14"
             >
               <span className="font-semibold text-text">{sourceLabel(row.account)}</span>
 
@@ -130,9 +130,9 @@ function Figure({
       data-figure-value={signed ?? value}
       className={`grid gap-1 rounded-card border p-4 ${tone}`}
     >
-      <span className="text-[13px] text-faint">{label}</span>
+      <span className="text-13 text-faint">{label}</span>
       <span
-        className={`text-[19px] font-extrabold tabular-nums ${
+        className={`text-19 font-extrabold tabular-nums ${
           warn ? 'text-warn' : emphasis ? 'text-gold-read' : 'text-text'
         }`}
       >

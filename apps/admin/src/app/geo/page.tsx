@@ -103,11 +103,11 @@ export default async function GeoPage({
     <ConsoleShell title={t.nav.geo} counts={counts}>
       {result === 'unauthenticated' ? (
         <ConsolePanel>
-          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-14 text-muted">{t.dashboard.sessionExpired}</p>
         </ConsolePanel>
       ) : result === 'failed' ? (
         <ConsolePanel>
-          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-14 text-bad">{t.dashboard.queueFailed}</p>
         </ConsolePanel>
       ) : (
         <div className="grid gap-4">
@@ -246,7 +246,7 @@ function Countries({
 function Currencies({ rows }: { rows: Geography['currencies'] }) {
   return (
     <ConsolePanel>
-      <h2 className="mb-2.5 text-[16px] font-extrabold text-gold-read">
+      <h2 className="mb-2.5 text-16 font-extrabold text-gold-read">
         {t.sections.geo.currencies}
       </h2>
 

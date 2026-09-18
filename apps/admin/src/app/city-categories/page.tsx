@@ -40,9 +40,9 @@ export default async function CityCategoriesPage() {
     <ConsoleShell title={t.nav.cityCategories} counts={counts}>
       <ConsolePanel>
         {result === 'unauthenticated' ? (
-          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-14 text-muted">{t.dashboard.sessionExpired}</p>
         ) : result === 'failed' ? (
-          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-14 text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <CityCategoryManager categories={result.categories} />
         )}

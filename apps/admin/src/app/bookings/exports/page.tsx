@@ -46,7 +46,7 @@ const COLUMNS: AdminColumn<ExportItem>[] = [
   {
     key: 'reference',
     header: t.table.colId,
-    render: (row) => <span className="font-mono text-[13px]">{row.reference}</span>,
+    render: (row) => <span className="font-mono text-13">{row.reference}</span>,
   },
   {
     key: 'status',
@@ -67,7 +67,7 @@ const COLUMNS: AdminColumn<ExportItem>[] = [
 
       /* "كل الحجوزات" rather than an empty cell: an unfiltered export is a fact, not a blank. */
       return (
-        <span className="text-[13px] text-muted">
+        <span className="text-13 text-muted">
           {parts.length > 0 ? parts.join(' · ') : t.sections.exports.filtersNone}
         </span>
       );
@@ -77,16 +77,14 @@ const COLUMNS: AdminColumn<ExportItem>[] = [
     key: 'rows',
     header: t.sections.exports.rows,
     render: (row) => (
-      <span className="text-[13px]">
-        {row.rowCount === null ? '—' : count(row.rowCount)}
-      </span>
+      <span className="text-13">{row.rowCount === null ? '—' : count(row.rowCount)}</span>
     ),
   },
   {
     key: 'requested',
     header: t.sections.exports.requested,
     render: (row) => (
-      <span className="text-[13px] text-muted">{shortDateTime(row.createdAt)}</span>
+      <span className="text-13 text-muted">{shortDateTime(row.createdAt)}</span>
     ),
   },
   {
@@ -101,12 +99,12 @@ const COLUMNS: AdminColumn<ExportItem>[] = [
         <a
           href={`/bookings/exports/download/${row.reference}`}
           download
-          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-gold px-3 text-[13px] font-bold text-gold-read lg:min-h-0 lg:py-1.5"
+          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-gold px-3 text-13 font-bold text-gold-read lg:min-h-0 lg:py-1.5"
         >
           {t.sections.exports.download}
         </a>
       ) : (
-        <span className="text-[13px] text-faint">
+        <span className="text-13 text-faint">
           {row.status === 'failed' ? t.sections.exports.failed : '—'}
         </span>
       ),
@@ -162,22 +160,22 @@ export default async function ExportsPage({
 
         {/* The request itself failed — distinct from an export that failed to BUILD. */}
         {failed ? (
-          <p role="alert" className="mb-3 text-[14px] text-bad">
+          <p role="alert" className="mb-3 text-14 text-bad">
             {t.sections.exports.requestFailed}
           </p>
         ) : null}
 
         {/* The COLLECTION failed: expired, missing, or not this reader's to take. */}
         {unavailable ? (
-          <p role="alert" className="mb-3 text-[14px] text-bad">
+          <p role="alert" className="mb-3 text-14 text-bad">
             {t.sections.exports.downloadUnavailable}
           </p>
         ) : null}
 
         {result === 'unauthenticated' ? (
-          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-14 text-muted">{t.dashboard.sessionExpired}</p>
         ) : result === 'failed' ? (
-          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-14 text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <>
             {/*

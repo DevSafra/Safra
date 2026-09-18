@@ -104,7 +104,7 @@ export function PropertyMapCard({
 
       <div className="flex flex-wrap items-end justify-between gap-3 border-t border-line px-4 py-3">
         <p className="min-w-0">
-          <span className="block text-[11px] text-faint">{data.fromLabel}</span>
+          <span className="block text-11 text-faint">{data.fromLabel}</span>
           {/*
             The amount and its currency in ONE span, because `formatMoney` has already put
             them together — «no amount is ever written without its currency», and the

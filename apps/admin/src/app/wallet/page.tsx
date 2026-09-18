@@ -99,9 +99,9 @@ export default async function WalletPage({
         />
 
         {result === 'unauthenticated' ? (
-          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-14 text-muted">{t.dashboard.sessionExpired}</p>
         ) : result === 'failed' ? (
-          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-14 text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <>
             <AdminTable
@@ -190,13 +190,13 @@ const COLUMNS: readonly AdminColumn<WalletItem>[] = [
           className="grid min-w-0 gap-0.5 hover:underline"
         >
           <span className="truncate text-sky">{row.customer}</span>
-          <Ltr className="text-[13px] text-faint">{row.customerReference}</Ltr>
+          <Ltr className="text-13 text-faint">{row.customerReference}</Ltr>
         </Link>
       ) : (
         <div className="grid min-w-0 gap-0.5">
           <span className="truncate text-text">{row.customer}</span>
           {row.customerReference ? (
-            <Ltr className="text-[13px] text-faint">{row.customerReference}</Ltr>
+            <Ltr className="text-13 text-faint">{row.customerReference}</Ltr>
           ) : null}
         </div>
       ),
@@ -234,7 +234,7 @@ const COLUMNS: readonly AdminColumn<WalletItem>[] = [
           line that matters.
         */}
         {Number(row.restrictedAmount) > 0 ? (
-          <span className="text-[14px] leading-normal text-muted">
+          <span className="text-14 leading-normal text-muted">
             {t.sections.wallet.restrictedPart}
             {/*
               The figure only when it differs from the amount above it.
@@ -280,7 +280,7 @@ const COLUMNS: readonly AdminColumn<WalletItem>[] = [
         <Ltr className="font-bold text-text2">
           {money(row.balanceAfter)} {row.currency}
         </Ltr>
-        <Ltr className="text-[13px] text-muted">{shortDateTime(row.at)}</Ltr>
+        <Ltr className="text-13 text-muted">{shortDateTime(row.at)}</Ltr>
       </div>
     ),
   },

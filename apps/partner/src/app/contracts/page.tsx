@@ -110,7 +110,7 @@ export default async function ContractsPage({
     >
       <div className="grid gap-5">
         {fileUnavailable ? (
-          <p role="alert" className="text-[14px] text-bad">
+          <p role="alert" className="text-14 text-bad">
             {t.contracts.downloadUnavailable}
           </p>
         ) : null}
@@ -170,12 +170,12 @@ export default async function ContractsPage({
       <StagePanel stage={stage} />
 
       <section>
-        <h2 className="mb-2 text-[16px] font-extrabold text-gold-read">
+        <h2 className="mb-2 text-16 font-extrabold text-gold-read">
           {t.contracts.contractsTitle}
         </h2>
 
         {contractsResult.contracts.length === 0 ? (
-          <p className="text-[14px] text-faint">{t.contracts.contractsEmpty}</p>
+          <p className="text-14 text-faint">{t.contracts.contractsEmpty}</p>
         ) : (
           <ul className="grid gap-2">
             {contractsResult.contracts.map((contract) => (
@@ -185,7 +185,7 @@ export default async function ContractsPage({
         )}
       </section>
 
-      {locked ? <p className="text-[13px] text-faint">{t.contracts.lockedNote}</p> : null}
+      {locked ? <p className="text-13 text-faint">{t.contracts.lockedNote}</p> : null}
     </>,
   );
 }
@@ -207,7 +207,7 @@ function Steps({ stage }: { readonly stage: Stage }) {
   const labels = [t.contracts.stepReview, t.contracts.stepReady];
 
   return (
-    <ol className="flex flex-wrap items-center gap-x-2 gap-y-2 text-[13px]">
+    <ol className="flex flex-wrap items-center gap-x-2 gap-y-2 text-13">
       {labels.map((label, index) => {
         const step = index + 1;
         const state = step < reached ? 'past' : step === reached ? 'now' : 'ahead';
@@ -275,8 +275,8 @@ function StagePanel({ stage }: { readonly stage: Stage }) {
             : 'border-[rgba(var(--goldA),0.3)] bg-[rgba(var(--goldA),0.05)]'
       }`}
     >
-      <h2 className="text-[16px] font-bold text-text">{copy.title}</h2>
-      <p className="mt-1 text-[14px] leading-relaxed text-text2">{copy.body}</p>
+      <h2 className="text-16 font-bold text-text">{copy.title}</h2>
+      <p className="mt-1 text-14 leading-relaxed text-text2">{copy.body}</p>
 
       {/*
         No call to action on the finished panel (Bashar, 2026-08-21).
@@ -294,24 +294,22 @@ function ContractCard({ contract }: { readonly contract: PartnerContract }) {
   return (
     <li className="grid gap-2 rounded-card border border-line bg-card px-3.5 py-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="text-[14px] font-bold text-text">
-          {contractKind(contract.kind)}
-        </span>
+        <span className="text-14 font-bold text-text">{contractKind(contract.kind)}</span>
         <span
-          className={`rounded-full border px-2.5 py-0.5 text-[14px] font-bold ${TONES[statusTone(contract.status)]}`}
+          className={`rounded-full border px-2.5 py-0.5 text-14 font-bold ${TONES[statusTone(contract.status)]}`}
         >
           {contractStatus(contract.status)}
         </span>
-        <span className="text-[13px] text-faint">
+        <span className="text-13 text-faint">
           {t.contracts.contractUploaded} <Ltr>{contract.uploadedAt.slice(0, 10)}</Ltr>
         </span>
         {contract.signedAt ? (
-          <span className="text-[13px] text-faint">
+          <span className="text-13 text-faint">
             {t.contracts.contractSigned} <Ltr>{contract.signedAt.slice(0, 10)}</Ltr>
           </span>
         ) : null}
         {contract.expiresAt ? (
-          <span className="text-[13px] text-faint">
+          <span className="text-13 text-faint">
             {t.contracts.contractExpires} <Ltr>{contract.expiresAt.slice(0, 10)}</Ltr>
           </span>
         ) : null}
@@ -325,7 +323,7 @@ function ContractCard({ contract }: { readonly contract: PartnerContract }) {
       */}
       <a
         href={`/api/contracts/${encodeURIComponent(contract.id)}/file`}
-        className="inline-flex min-h-10 w-fit items-center rounded-lg border border-gold px-4 text-[14px] text-gold-read transition-colors btn-gold-hover hover:text-ink lg:min-h-0 lg:py-2"
+        className="inline-flex min-h-10 w-fit items-center rounded-lg border border-gold px-4 text-14 text-gold-read transition-colors btn-gold-hover hover:text-ink lg:min-h-0 lg:py-2"
       >
         {/* Names which copy: after SAFRA signs, this link serves the document carrying that
             signature rather than the blank original the partner was previously given. */}
@@ -396,10 +394,10 @@ function ContractHistory({ contract }: { readonly contract: PartnerContract }) {
 
   return (
     <div className="grid gap-1.5 rounded-lg border border-line2 bg-field px-3 py-2.5">
-      <p className="text-[13px] font-bold text-text2">{t.contracts.historyTitle}</p>
+      <p className="text-13 font-bold text-text2">{t.contracts.historyTitle}</p>
 
       {theirSignatureWasUndone ? (
-        <p className="text-[13px] leading-relaxed text-gold-read">
+        <p className="text-13 leading-relaxed text-gold-read">
           {t.contracts.historyReplaced}
         </p>
       ) : null}
@@ -409,7 +407,7 @@ function ContractHistory({ contract }: { readonly contract: PartnerContract }) {
           <li
             /* Index: these have no id of their own, and the list is server-ordered and static. */
             key={index}
-            className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px]"
+            className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-13"
           >
             <span className={event.superseded ? 'text-faint' : 'text-text2'}>
               {event.party === 'partner'
@@ -430,7 +428,7 @@ function ContractHistory({ contract }: { readonly contract: PartnerContract }) {
               two different meanings in one colour on one screen is exactly what that rule forbids.
             */}
             <span
-              className={`rounded-full border px-2 py-0.5 text-[14px] font-bold ${
+              className={`rounded-full border px-2 py-0.5 text-14 font-bold ${
                 event.superseded ? TONES[statusTone('superseded')] : TONES.teal
               }`}
             >

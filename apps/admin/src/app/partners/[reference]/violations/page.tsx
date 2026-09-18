@@ -141,13 +141,11 @@ export default async function PartnerViolationsPage({
           {canManage ? <RaiseViolation reference={reference} /> : null}
 
           {result === 'unauthenticated' ? (
-            <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
+            <p className="text-14 text-muted">{t.dashboard.sessionExpired}</p>
           ) : result === 'failed' ? (
-            <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
+            <p className="text-14 text-bad">{t.dashboard.queueFailed}</p>
           ) : result.items.length === 0 ? (
-            <p className="text-[14px] text-faint">
-              {t.sections.enforcement.noViolations}
-            </p>
+            <p className="text-14 text-faint">{t.sections.enforcement.noViolations}</p>
           ) : (
             <>
               <ul className="grid gap-2.5">
@@ -219,21 +217,21 @@ function Row({
   return (
     <>
       <div className="flex flex-wrap items-baseline gap-2.5">
-        <span className="text-[14px] font-bold text-text">
+        <span className="text-14 font-bold text-text">
           {label(t.enums.violationKind, violation.kind)}
         </span>
-        <span className="text-[14px] text-muted">
+        <span className="text-14 text-muted">
           {label(t.enums.violationStage, violation.stage)}
         </span>
-        <span className="text-[14px] text-muted">
+        <span className="text-14 text-muted">
           {fill(t.sections.enforcement.occurrenceNumber, {
             n: String(violation.occurrenceNumber),
           })}
         </span>
         {violation.bookingReference ? (
-          <Ltr className="text-[13px] text-sky">{violation.bookingReference}</Ltr>
+          <Ltr className="text-13 text-sky">{violation.bookingReference}</Ltr>
         ) : null}
-        <Ltr className="ms-auto text-[13px] text-faint">
+        <Ltr className="ms-auto text-13 text-faint">
           {shortDateTime(violation.createdAt)}
         </Ltr>
       </div>
@@ -247,11 +245,11 @@ function Row({
         is the earlier fact: what the violation IS, before what anybody said about it.
       */}
       {described ? (
-        <p className="mt-1.5 text-[13px] leading-relaxed text-text">{described}</p>
+        <p className="mt-1.5 text-13 leading-relaxed text-text">{described}</p>
       ) : null}
 
       {violation.warningNote ? (
-        <p className="mt-1.5 text-[13px] leading-relaxed text-text2">
+        <p className="mt-1.5 text-13 leading-relaxed text-text2">
           {violation.warningNote}
         </p>
       ) : null}
@@ -284,7 +282,7 @@ function Money({ violation }: { violation: Violation }) {
   const waiver = violation.waiver;
 
   return (
-    <dl className="mt-2 grid gap-1 rounded border border-line bg-field p-2.5 text-[13px]">
+    <dl className="mt-2 grid gap-1 rounded border border-line bg-field p-2.5 text-13">
       {/* Why the fine, inside the money box it explains rather than loose on the row. */}
       {violation.fineReason ? (
         <div className="flex flex-wrap items-baseline gap-2">
@@ -299,7 +297,7 @@ function Money({ violation }: { violation: Violation }) {
           <Ltr>{fine}</Ltr>
         </dd>
         {violation.collectedAt ? (
-          <dd className="text-[14px] text-faint">
+          <dd className="text-14 text-faint">
             {fill(t.sections.enforcement.collectedOn, {
               when: shortDateTime(violation.collectedAt),
             })}
@@ -330,7 +328,7 @@ function Money({ violation }: { violation: Violation }) {
             <dd className="text-ok">
               <Ltr>{`− ${amount(waiver.amount, waiver.currency)}`}</Ltr>
             </dd>
-            <dd className="text-[14px] text-faint">
+            <dd className="text-14 text-faint">
               {fill(t.sections.enforcement.waivedOn, {
                 when: shortDateTime(waiver.at),
               })}
@@ -354,7 +352,7 @@ function Money({ violation }: { violation: Violation }) {
             money moved and not why, which is the state the whole never-delete-history rule exists
             to prevent.
           */}
-          <p className="text-[13px] leading-relaxed text-text2">{waiver.reason}</p>
+          <p className="text-13 leading-relaxed text-text2">{waiver.reason}</p>
         </>
       ) : null}
     </dl>

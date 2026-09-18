@@ -191,12 +191,12 @@ export function SettingRow({
             reads it, which is precisely why it does not belong in a line a person reads. It is in
             «التفاصيل», with the value's type and the change log (Bashar, 2026-08-31).
           */}
-          <p className="text-[14px] leading-normal font-semibold text-text2">{name}</p>
+          <p className="text-14 leading-normal font-semibold text-text2">{name}</p>
 
           {editable ? null : (
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
               <Chip tone="faint">{t.sections.settings.readOnly}</Chip>
-              <span className="text-[13px] leading-relaxed text-faint">
+              <span className="text-13 leading-relaxed text-faint">
                 {t.sections.settings.notEditable}
               </span>
             </p>
@@ -207,7 +207,7 @@ export function SettingRow({
             «never changed» counterpart would repeat fifteen times and say nothing.
           */}
           {setting.updatedByEmail ? (
-            <p className="mt-1 text-[14px] text-faint">
+            <p className="mt-1 text-14 text-faint">
               {fill(t.sections.settings.lastChanged, {
                 who: setting.updatedByEmail,
                 when: shortDate(setting.updatedAt),
@@ -241,7 +241,7 @@ export function SettingRow({
             type="button"
             onClick={() => setShowingDetails(!showingDetails)}
             aria-expanded={showingDetails}
-            className="cursor-pointer rounded-lg px-2 py-1 text-[13px] text-faint transition-colors hover:text-gold-read"
+            className="cursor-pointer rounded-lg px-2 py-1 text-13 text-faint transition-colors hover:text-gold-read"
           >
             {showingDetails
               ? t.sections.settings.detailsHide
@@ -261,7 +261,7 @@ export function SettingRow({
             <button
               type="button"
               onClick={open}
-              className="cursor-pointer rounded-lg border border-line px-3 py-1 text-[13px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold-read"
+              className="cursor-pointer rounded-lg border border-line px-3 py-1 text-13 text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold-read"
             >
               {t.sections.settings.change}
             </button>
@@ -279,9 +279,9 @@ export function SettingRow({
       */}
       {display.kind === 'routing' ? (
         <div className="mt-2 overflow-x-auto rounded-lg border border-line bg-field">
-          <table className="w-full text-[13px]">
+          <table className="w-full text-13">
             <thead>
-              <tr className="border-b border-line2 text-[13px] text-faint">
+              <tr className="border-b border-line2 text-13 text-faint">
                 <th scope="col" className="px-3 py-1.5 text-start font-semibold">
                   {t.sections.settings.routingCountry}
                 </th>
@@ -302,7 +302,7 @@ export function SettingRow({
                     {row.providers.join(' · ')}
                     {/* Only worth saying when there is an order to state. */}
                     {row.providers.length > 1 ? (
-                      <span className="ms-1.5 text-[13px] text-faint">
+                      <span className="ms-1.5 text-13 text-faint">
                         {t.sections.settings.routingOrder}
                       </span>
                     ) : null}
@@ -322,7 +322,7 @@ export function SettingRow({
       {display.kind === 'json' ? (
         <pre
           dir="ltr"
-          className="mt-2 overflow-x-auto rounded-lg border border-line bg-field p-2.5 font-mono text-[13px] leading-relaxed text-text2"
+          className="mt-2 overflow-x-auto rounded-lg border border-line bg-field p-2.5 font-mono text-13 leading-relaxed text-text2"
         >
           {display.text}
         </pre>
@@ -331,7 +331,7 @@ export function SettingRow({
       {showingDetails ? <SettingDetails setting={setting} alwaysUsd={alwaysUsd} /> : null}
 
       {error ? (
-        <p role="alert" className="mt-2 text-[13px] text-bad">
+        <p role="alert" className="mt-2 text-13 text-bad">
           {error}
         </p>
       ) : null}
@@ -360,11 +360,11 @@ export function SettingRow({
             />
 
             <label className="grid content-start gap-1">
-              <span className="text-[13px] text-faint">{t.sections.settings.reason}</span>
+              <span className="text-13 text-faint">{t.sections.settings.reason}</span>
               <input
                 name="reason"
                 maxLength={500}
-                className="rounded-lg border border-line bg-card px-2.5 py-2 text-[14px] text-text"
+                className="rounded-lg border border-line bg-card px-2.5 py-2 text-14 text-text"
               />
             </label>
           </div>
@@ -373,21 +373,19 @@ export function SettingRow({
             <button
               type="submit"
               disabled={busy}
-              className="cursor-pointer rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-4 py-1.5 text-[13px] font-extrabold text-[#241A05] disabled:cursor-default disabled:opacity-60"
+              className="cursor-pointer rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-4 py-1.5 text-13 font-extrabold text-[#241A05] disabled:cursor-default disabled:opacity-60"
             >
               {busy ? t.sections.settings.saving : t.sections.settings.save}
             </button>
             <button
               type="button"
               onClick={() => setEditing(false)}
-              className="cursor-pointer rounded-lg border border-line px-4 py-1.5 text-[13px] text-muted"
+              className="cursor-pointer rounded-lg border border-line px-4 py-1.5 text-13 text-muted"
             >
               {t.sections.settings.cancel}
             </button>
 
-            <span className="text-[13px] text-faint">
-              {t.sections.settings.auditNote}
-            </span>
+            <span className="text-13 text-faint">{t.sections.settings.auditNote}</span>
           </div>
         </form>
       ) : null}
@@ -415,12 +413,12 @@ function Value({
   display: Exclude<SettingDisplay, { kind: 'json' | 'routing' }>;
 }) {
   if (display.kind === 'missing') {
-    return <span className="text-[14px] text-faint">{t.admin.noData}</span>;
+    return <span className="text-14 text-faint">{t.admin.noData}</span>;
   }
 
   if (display.kind === 'flag') {
     return (
-      <span className={`text-[14px] font-bold ${display.on ? 'text-ok' : 'text-faint'}`}>
+      <span className={`text-14 font-bold ${display.on ? 'text-ok' : 'text-faint'}`}>
         {display.on ? t.sections.settings.enabled : t.sections.settings.disabled}
       </span>
     );
@@ -428,7 +426,7 @@ function Value({
 
   if (display.kind === 'choice') {
     return (
-      <span className="block max-w-[30ch] text-[14px] leading-normal font-bold text-text">
+      <span className="block max-w-[30ch] text-14 leading-normal font-bold text-text">
         {display.text}
       </span>
     );
@@ -436,7 +434,7 @@ function Value({
 
   if (display.kind === 'text') {
     return (
-      <Ltr className="max-w-[30ch] text-[14px] leading-normal font-bold text-text">
+      <Ltr className="max-w-[30ch] text-14 leading-normal font-bold text-text">
         {display.text}
       </Ltr>
     );
@@ -445,9 +443,9 @@ function Value({
   if (display.kind === 'money') {
     return (
       <>
-        <Ltr className="block text-[16px] font-extrabold text-text">{display.text}</Ltr>
+        <Ltr className="block text-16 font-extrabold text-text">{display.text}</Ltr>
         {display.note ? (
-          <span className="mt-0.5 block max-w-[34ch] text-[13px] leading-relaxed text-warn">
+          <span className="mt-0.5 block max-w-[34ch] text-13 leading-relaxed text-warn">
             {display.note}
           </span>
         ) : null}
@@ -464,7 +462,7 @@ function Value({
         «دقيقة 120», because the digits are a left-to-right run inside a right-to-left paragraph.
         `docs/i18n.md` §9 — isolate the VALUE, never the label.
       */}
-      <span className="block text-[16px] font-extrabold text-text">
+      <span className="block text-16 font-extrabold text-text">
         <Ltr>{display.text}</Ltr>
         {display.unit ? <span className="ms-1">{display.unit}</span> : null}
       </span>
@@ -474,7 +472,7 @@ function Value({
         isolate inside the string, so the element must NOT override the direction.
       */}
       {display.aside ? (
-        <span className="mt-0.5 block text-[13px] text-faint">{display.aside}</span>
+        <span className="mt-0.5 block text-13 text-faint">{display.aside}</span>
       ) : null}
     </>
   );
@@ -536,7 +534,7 @@ function ValueInput({
   fieldRef: RefObject<HTMLInputElement | HTMLSelectElement | null>;
 }) {
   const common =
-    'w-full rounded-lg border border-line bg-card px-3 py-2.5 text-[14px] text-text';
+    'w-full rounded-lg border border-line bg-card px-3 py-2.5 text-14 text-text';
 
   /*
     The announcement: one box per language, because that is what a person is editing.
@@ -572,7 +570,7 @@ function ValueInput({
       <div className="grid gap-3 sm:col-span-2">
         {ANNOUNCEMENT_LOCALES.map((locale, index) => (
           <label key={locale} className="grid content-start gap-1">
-            <span className="text-[13px] text-faint">{labels[locale]}</span>
+            <span className="text-13 text-faint">{labels[locale]}</span>
             <input
               ref={
                 index === 0
@@ -598,7 +596,7 @@ function ValueInput({
   if (setting.valueSchema === 'feeMode') {
     return (
       <label className="grid content-start gap-1">
-        <span className="text-[13px] text-faint">{t.sections.settings.mode}</span>
+        <span className="text-13 text-faint">{t.sections.settings.mode}</span>
         <select
           ref={(node) => {
             fieldRef.current = node;
@@ -624,7 +622,7 @@ function ValueInput({
   if (setting.valueSchema === 'sanctionsPolicy') {
     return (
       <label className="grid content-start gap-1">
-        <span className="text-[13px] text-faint">{t.sections.settings.policy}</span>
+        <span className="text-13 text-faint">{t.sections.settings.policy}</span>
         <select
           ref={(node) => {
             fieldRef.current = node;
@@ -656,7 +654,7 @@ function ValueInput({
 
   return (
     <label className="grid content-start gap-1">
-      <span className="text-[13px] text-faint">
+      <span className="text-13 text-faint">
         {setting.valueSchema === 'money'
           ? `${t.sections.settings.amount} (${currency})`
           : t.sections.settings.value}
@@ -679,9 +677,9 @@ function ValueInput({
         above the hint, in the gold the rest of the console uses for a live figure, rather than
         being read as the first two words of a sentence about fractions.
       */}
-      {echo ? <span className="text-[13px] font-bold text-gold-read">{echo}</span> : null}
+      {echo ? <span className="text-13 font-bold text-gold-read">{echo}</span> : null}
 
-      <span className="text-[13px] text-faint">{schemaHint(setting.valueSchema)}</span>
+      <span className="text-13 text-faint">{schemaHint(setting.valueSchema)}</span>
     </label>
   );
 }

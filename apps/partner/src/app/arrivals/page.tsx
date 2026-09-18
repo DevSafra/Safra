@@ -137,7 +137,7 @@ export default async function ArrivalsPage({
 
   return shell(
     <>
-      <p className="text-[14px] leading-relaxed text-muted">{t.arrivals.intro}</p>
+      <p className="text-14 leading-relaxed text-muted">{t.arrivals.intro}</p>
 
       <Lookup reference="" />
 
@@ -179,7 +179,7 @@ function Lookup({ reference }: { reference: string }) {
       method="get"
       className="flex flex-wrap items-end gap-2 rounded-card border border-line bg-card p-3"
     >
-      <label className="grid min-w-0 flex-1 gap-1 text-[13px] text-muted">
+      <label className="grid min-w-0 flex-1 gap-1 text-13 text-muted">
         {t.arrivals.lookup.label}
         <input
           type="search"
@@ -200,7 +200,7 @@ function Lookup({ reference }: { reference: string }) {
       {reference === '' ? null : (
         <Link
           href="/arrivals"
-          className="inline-flex min-h-10 items-center px-2 text-[14px] text-muted lg:min-h-0"
+          className="inline-flex min-h-10 items-center px-2 text-14 text-muted lg:min-h-0"
         >
           {t.arrivals.lookup.clear}
         </Link>
@@ -226,7 +226,7 @@ function Row({ arrival }: { arrival: PartnerArrival }) {
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="grid gap-0.5">
           <p className="text-sm font-semibold text-text">{arrival.guestName}</p>
-          <p className="text-[14px] text-muted">
+          <p className="text-14 text-muted">
             {arrival.propertyName} · {arrival.unitName}
             {/*
               HOW MANY, and WHICH.
@@ -251,21 +251,21 @@ function Row({ arrival }: { arrival: PartnerArrival }) {
             shown as a suite, so the person preparing rooms prepared one.
           */}
           {arrival.lines.length > 1 ? (
-            <p data-arrival-lines className="text-[13px] text-text2">
+            <p data-arrival-lines className="text-13 text-text2">
               {t.editProperty.arrivalRooms}:{' '}
               {arrival.lines.map((line) => `${line.nameAr} × ${line.rooms}`).join(' · ')}
             </p>
           ) : null}
           {arrival.roomLabels && arrival.rooms > 1 ? (
-            <p className="text-[13px] text-faint">
+            <p className="text-13 text-faint">
               {t.editProperty.arrivalRoomNumbers}: <Ltr>{arrival.roomLabels}</Ltr>
             </p>
           ) : null}
           {/* The reference is a Latin run on an Arabic line — isolated as a VALUE, never a label. */}
-          <Ltr className="text-[13px] text-faint">{arrival.reference}</Ltr>
+          <Ltr className="text-13 text-faint">{arrival.reference}</Ltr>
         </div>
 
-        <div className="grid justify-items-end gap-0.5 text-[13px] text-muted">
+        <div className="grid justify-items-end gap-0.5 text-13 text-muted">
           <Ltr>{arrival.checkIn}</Ltr>
           <span>
             {plural(t.arrivals.nights, { n: arrival.nights })} ·{' '}

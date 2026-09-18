@@ -99,11 +99,11 @@ export function NotificationRedrive({
         type="button"
         disabled={busy || done}
         onClick={() => void submit()}
-        className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-2.5 py-1 text-[13px] font-bold text-gold-read transition-colors hover:bg-[rgba(var(--goldA),0.08)] disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+        className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-2.5 py-1 text-13 font-bold text-gold-read transition-colors hover:bg-[rgba(var(--goldA),0.08)] disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
       >
         {busy ? t.table.working : done ? c.redriveQueued : c.redrive}
       </button>
-      {error ? <span className="text-[14px] text-bad">{error}</span> : null}
+      {error ? <span className="text-14 text-bad">{error}</span> : null}
       {dialog}
     </div>
   );

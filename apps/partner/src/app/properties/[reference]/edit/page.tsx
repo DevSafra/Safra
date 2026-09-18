@@ -72,16 +72,14 @@ export default async function EditPropertyPage({
       <div className="grid gap-4">
         <Back />
 
-        <h2 className="text-[16px] font-bold text-text">{property.name.ar}</h2>
+        <h2 className="text-16 font-bold text-text">{property.name.ar}</h2>
 
         {property.reviewNotes ? (
           <section className="rounded-card border border-bad/40 bg-bad/10 p-4">
-            <h3 className="pb-1 text-[14px] font-bold text-bad">
+            <h3 className="pb-1 text-14 font-bold text-bad">
               {t.editProperty.rejectedTitle}
             </h3>
-            <p className="text-[14px] leading-relaxed text-text">
-              {property.reviewNotes}
-            </p>
+            <p className="text-14 leading-relaxed text-text">{property.reviewNotes}</p>
           </section>
         ) : null}
 
@@ -113,7 +111,7 @@ export default async function EditPropertyPage({
         />
 
         <section className="grid gap-2">
-          <h3 className="text-[14px] font-bold text-text">{t.editProperty.units}</h3>
+          <h3 className="text-14 font-bold text-text">{t.editProperty.units}</h3>
           <UnitEditor
             reference={property.reference}
             units={property.units}
@@ -150,7 +148,7 @@ function Back() {
   return (
     <Link
       href="/properties"
-      className="inline-flex min-h-10 w-fit items-center gap-2 rounded-lg border border-line px-3 text-[14px] text-muted lg:min-h-0 lg:py-1.5"
+      className="inline-flex min-h-10 w-fit items-center gap-2 rounded-lg border border-line px-3 text-14 text-muted lg:min-h-0 lg:py-1.5"
     >
       {/* The arrow is its own flex item so `dir="rtl"` places it, not the bidi algorithm. */}
       <span aria-hidden="true">→</span>
@@ -168,28 +166,26 @@ function Back() {
 function Locked({ reference }: { readonly reference: string }) {
   return (
     <section className="grid gap-3 rounded-card border border-line bg-card p-4">
-      <h3 className="text-[14px] font-bold text-text">{t.editProperty.lockedTitle}</h3>
-      <p className="text-[14px] leading-relaxed text-muted">{t.editProperty.lockedWhy}</p>
-      <p className="text-[14px] leading-relaxed text-muted">
+      <h3 className="text-14 font-bold text-text">{t.editProperty.lockedTitle}</h3>
+      <p className="text-14 leading-relaxed text-muted">{t.editProperty.lockedWhy}</p>
+      <p className="text-14 leading-relaxed text-muted">
         {t.editProperty.lockedWhatYouCan}
       </p>
       <div className="flex flex-wrap gap-2">
         <Link
           href={`/properties/${reference}/calendar`}
-          className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-[13px] text-muted lg:min-h-0 lg:py-1.5"
+          className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-13 text-muted lg:min-h-0 lg:py-1.5"
         >
           {t.editProperty.goCalendar}
         </Link>
         <Link
           href={`/properties/${reference}/images`}
-          className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-[13px] text-muted lg:min-h-0 lg:py-1.5"
+          className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-13 text-muted lg:min-h-0 lg:py-1.5"
         >
           {t.editProperty.goImages}
         </Link>
       </div>
-      <p className="text-[13px] leading-relaxed text-faint">
-        {t.editProperty.lockedContact}
-      </p>
+      <p className="text-13 leading-relaxed text-faint">{t.editProperty.lockedContact}</p>
     </section>
   );
 }

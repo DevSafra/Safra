@@ -206,21 +206,21 @@ export default async function CalendarsPage({
 
   return shell(
     <>
-      <p className="text-[14px] leading-relaxed text-faint">{t.calendars.intro}</p>
+      <p className="text-14 leading-relaxed text-faint">{t.calendars.intro}</p>
 
       <nav aria-label={t.unitCalendar.month} className="flex items-center gap-2">
         <Link
           href={monthHref(shift(month, -1))}
           aria-label={t.unitCalendar.previousMonth}
-          className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-[13px] text-muted lg:min-h-0 lg:py-1.5"
+          className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-13 text-muted lg:min-h-0 lg:py-1.5"
         >
           <span aria-hidden="true">→</span>
         </Link>
-        <span className="text-[14px] font-bold text-text">{heading}</span>
+        <span className="text-14 font-bold text-text">{heading}</span>
         <Link
           href={monthHref(shift(month, 1))}
           aria-label={t.unitCalendar.nextMonth}
-          className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-[13px] text-muted lg:min-h-0 lg:py-1.5"
+          className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-13 text-muted lg:min-h-0 lg:py-1.5"
         >
           <span aria-hidden="true">←</span>
         </Link>
@@ -229,7 +229,7 @@ export default async function CalendarsPage({
       <DayLegend />
 
       {calendar.properties.length === 0 ? (
-        <p className="text-[14px] text-faint">{t.calendars.noProperties}</p>
+        <p className="text-14 text-faint">{t.calendars.noProperties}</p>
       ) : null}
 
       {/*
@@ -251,13 +251,11 @@ export default async function CalendarsPage({
         /* The عقار's own line — name, reference, how many rooms. The same open or shut. */
         const title = (
           <>
-            <h2 className="text-[16px] font-extrabold text-gold-read">
-              {property.nameAr}
-            </h2>
-            <span className="text-[13px] text-faint" dir="ltr">
+            <h2 className="text-16 font-extrabold text-gold-read">{property.nameAr}</h2>
+            <span className="text-13 text-faint" dir="ltr">
               {property.reference}
             </span>
-            <span className="ms-auto text-[13px] text-faint">
+            <span className="ms-auto text-13 text-faint">
               {fill(t.calendars.unitsInside, { n: count(property.units.length) })}
             </span>
           </>
@@ -271,7 +269,7 @@ export default async function CalendarsPage({
               href={openHref(property.reference)}
               className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-4"
             >
-              <span aria-hidden className="text-[13px] text-faint">
+              <span aria-hidden className="text-13 text-faint">
                 ‹
               </span>
               {title}
@@ -292,7 +290,7 @@ export default async function CalendarsPage({
             <summary className="flex list-none cursor-pointer flex-wrap items-baseline gap-x-3 gap-y-1">
               <span
                 aria-hidden
-                className="text-[13px] text-faint transition-transform group-open:rotate-90"
+                className="text-13 text-faint transition-transform group-open:rotate-90"
               >
                 ‹
               </span>
@@ -324,21 +322,19 @@ export default async function CalendarsPage({
                 {highlight ? <input type="hidden" name="date" value={highlight} /> : null}
 
                 <label className="grid gap-1">
-                  <span className="text-[13px] text-muted">
-                    {t.calendars.searchLabel}
-                  </span>
+                  <span className="text-13 text-muted">{t.calendars.searchLabel}</span>
                   <input
                     name="unit"
                     defaultValue={search}
                     maxLength={20}
                     placeholder={t.calendars.searchPlaceholder}
-                    className="min-h-10 w-44 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text lg:min-h-0"
+                    className="min-h-10 w-44 rounded-lg border border-line bg-field px-3 py-2 text-14 text-text lg:min-h-0"
                   />
                 </label>
 
                 <button
                   type="submit"
-                  className="min-h-10 cursor-pointer rounded-lg border border-gold px-4 text-[14px] text-gold-read transition-colors btn-gold-hover hover:text-ink lg:min-h-0 lg:py-2"
+                  className="min-h-10 cursor-pointer rounded-lg border border-gold px-4 text-14 text-gold-read transition-colors btn-gold-hover hover:text-ink lg:min-h-0 lg:py-2"
                 >
                   {t.calendars.searchAction}
                 </button>
@@ -346,7 +342,7 @@ export default async function CalendarsPage({
                 {searching ? (
                   <Link
                     href={openHref(property.reference)}
-                    className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-[14px] text-muted lg:min-h-0 lg:py-2"
+                    className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-14 text-muted lg:min-h-0 lg:py-2"
                   >
                     {t.calendars.searchClear}
                   </Link>
@@ -354,12 +350,12 @@ export default async function CalendarsPage({
               </form>
 
               {property.units.length === 0 ? (
-                <p className="text-[13px] text-faint">{t.calendars.noUnits}</p>
+                <p className="text-13 text-faint">{t.calendars.noUnits}</p>
               ) : null}
 
               {/* A search that matched nothing says so, rather than leaving the folder empty. */}
               {property.units.length > 0 && units.length === 0 ? (
-                <p className="text-[13px] text-faint">
+                <p className="text-13 text-faint">
                   {fill(t.calendars.searchNothing, { query: search })}
                 </p>
               ) : null}
@@ -371,20 +367,20 @@ export default async function CalendarsPage({
                   className="grid gap-3 border-t border-line2 pt-3.5"
                 >
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <h3 className="text-[14px] font-bold text-text">
+                    <h3 className="text-14 font-bold text-text">
                       {unit.nameAr}
                       {/* The room this actually is, where the partner picks which room to manage. */}
                       {unit.unitLabel ? (
-                        <span className="ms-2 whitespace-nowrap text-[13px] font-semibold text-muted">
+                        <span className="ms-2 whitespace-nowrap text-13 font-semibold text-muted">
                           {t.editProperty.unitLabel} <Ltr>{unit.unitLabel}</Ltr>
                         </span>
                       ) : null}
                     </h3>
-                    <span className="text-[14px] text-muted" dir="ltr">
+                    <span className="text-14 text-muted" dir="ltr">
                       {amount(unit.basePrice, unit.currencyCode)}{' '}
                       {t.unitCalendar.perNight}
                     </span>
-                    <span className="text-[13px] text-faint">
+                    <span className="text-13 text-faint">
                       {t.unitCalendar.minNightsShort} {count(unit.minNights)}
                     </span>
                     {/*
@@ -392,7 +388,7 @@ export default async function CalendarsPage({
                   so it has to SAY it is off sale. A greyed row with no explanation reads as a fault.
                 */}
                     {!unit.isActive ? (
-                      <span className="rounded-full border border-warn/40 bg-warn/10 px-2 py-0.5 text-[13px] text-warn">
+                      <span className="rounded-full border border-warn/40 bg-warn/10 px-2 py-0.5 text-13 text-warn">
                         {t.calendars.inactive}
                       </span>
                     ) : null}
@@ -418,7 +414,7 @@ export default async function CalendarsPage({
                 open, it is exactly the editor it was.
               */}
                   <details className="rounded-lg border border-line2">
-                    <summary className="min-h-10 list-none cursor-pointer px-3 py-2 text-[13px] text-muted lg:min-h-0">
+                    <summary className="min-h-10 list-none cursor-pointer px-3 py-2 text-13 text-muted lg:min-h-0">
                       {t.calendars.editRange}
                     </summary>
                     <div className="border-t border-line2 p-3">

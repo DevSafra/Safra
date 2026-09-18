@@ -83,8 +83,8 @@ export function FieldPopover({
           </span>
         ) : null}
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] text-muted">{label}</span>
-          <span className="block truncate text-[14px] text-text">{value}</span>
+          <span className="block truncate text-13 text-muted">{label}</span>
+          <span className="block truncate text-14 text-text">{value}</span>
         </span>
       </button>
 
@@ -108,7 +108,7 @@ export function FieldPopover({
                 setOpen(false);
                 trigger.current?.focus();
               }}
-              className="btn-gold min-h-10 cursor-pointer lg:min-h-9 rounded-lg px-5 text-[14px] font-bold transition-[opacity] duration-200 ease-out-strong hover:opacity-90"
+              className="btn-gold min-h-10 cursor-pointer lg:min-h-9 rounded-lg px-5 text-14 font-bold transition-[opacity] duration-200 ease-out-strong hover:opacity-90"
             >
               {doneLabel}
             </button>
@@ -156,7 +156,7 @@ export function Stepper({
 }) {
   return (
     <div className="flex items-center justify-between gap-6">
-      <span className="text-[14px] text-text">{label}</span>
+      <span className="text-14 text-text">{label}</span>
       <span className="flex items-center gap-1">
         <Step
           label={decrease.replace('{field}', label)}
@@ -173,7 +173,7 @@ export function Stepper({
           counted word — «غرفة», «غرفتان» — and it broke the column: four rows that should read as
           one control had three numbers and one phrase, at three different widths.
         */}
-        <span className="w-7 text-center text-[14px] font-semibold tabular-nums text-text">
+        <span className="w-7 text-center text-14 font-semibold tabular-nums text-text">
           {value}
         </span>
         <Step

@@ -53,20 +53,20 @@ export function CountryRows({
 
   return (
     <>
-      <ul className="grid gap-2 text-[14px]">
+      <ul className="grid gap-2 text-14">
         {rows.map((row) => (
           <li
             key={row.code}
             className="flex flex-wrap items-center gap-2.5 rounded-lg border border-line bg-field px-3 py-2.5"
           >
             <span className="font-bold text-text">{row.nameAr}</span>
-            <span className="text-[13px] text-faint">
+            <span className="text-13 text-faint">
               {row.currencyCode ?? t.admin.noData} ·{' '}
               {fill(c.activeCitiesShort, { n: String(row.activeCities) })}
             </span>
             <span className="ms-auto flex items-center gap-2">
               <span
-                className={`text-[13px] font-bold ${row.isActive ? 'text-ok' : 'text-faint'}`}
+                className={`text-13 font-bold ${row.isActive ? 'text-ok' : 'text-faint'}`}
               >
                 {row.isActive ? c.active : c.inactive}
               </span>
@@ -74,7 +74,7 @@ export function CountryRows({
                 type="button"
                 data-country-edit={row.code}
                 onClick={() => setEditing(editing === row.code ? null : row.code)}
-                className="cursor-pointer rounded-lg border border-line px-2.5 py-1 text-[13px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read"
+                className="cursor-pointer rounded-lg border border-line px-2.5 py-1 text-13 text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read"
               >
                 {c.edit}
               </button>
@@ -304,7 +304,7 @@ export function CurrencyRows({ rows }: { readonly rows: readonly Currency[] }) {
 
   return (
     <>
-      <ul className="grid gap-2 text-[14px]">
+      <ul className="grid gap-2 text-14">
         {rows.map((row) => (
           <li
             key={row.code}
@@ -315,14 +315,14 @@ export function CurrencyRows({ rows }: { readonly rows: readonly Currency[] }) {
             </span>
 
             {row.isAccounting ? (
-              <span className="rounded-full bg-[rgba(var(--goldA),0.14)] px-2.5 py-0.5 text-[13px] font-extrabold text-gold-read">
+              <span className="rounded-full bg-[rgba(var(--goldA),0.14)] px-2.5 py-0.5 text-13 font-extrabold text-gold-read">
                 {c.accounting}
               </span>
             ) : null}
 
             {/* State, because a currency can be withdrawn now — see `CountryRows`. */}
             {row.isActive ? null : (
-              <span className="text-[13px] font-bold text-faint">{c.inactive}</span>
+              <span className="text-13 font-bold text-faint">{c.inactive}</span>
             )}
           </li>
         ))}

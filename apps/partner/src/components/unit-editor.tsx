@@ -59,7 +59,7 @@ export function UnitEditor({
   if (units.length === 0) {
     return (
       <div className="grid gap-3">
-        <p className="text-[14px] text-faint">{t.editProperty.unitsEmpty}</p>
+        <p className="text-14 text-faint">{t.editProperty.unitsEmpty}</p>
         <AddUnit
           reference={reference}
           currencyCode={fallbackCurrency}
@@ -72,7 +72,7 @@ export function UnitEditor({
 
   return (
     <div className="grid gap-3">
-      <p className="text-[13px] leading-relaxed text-faint">{t.editProperty.unitsNote}</p>
+      <p className="text-13 leading-relaxed text-faint">{t.editProperty.unitsNote}</p>
 
       {/*
         Grouped by TYPE, not listed flat.
@@ -131,19 +131,17 @@ export function UnitEditor({
             <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-2.5 gap-y-1">
               <span
                 aria-hidden
-                className="text-[13px] text-faint transition-transform group-open:rotate-90"
+                className="text-13 text-faint transition-transform group-open:rotate-90"
               >
                 ‹
               </span>
-              <span className="text-[14px] font-bold text-text">
+              <span className="text-14 font-bold text-text">
                 {group.units[0]?.nameAr}
               </span>
-              <span className="text-[13px] font-semibold text-gold-read">
+              <span className="text-13 font-semibold text-gold-read">
                 {plural(t.editProperty.unitTypeCount, { count: group.units.length })}
               </span>
-              <span className="text-[13px] text-faint">
-                {t.editProperty.unitTypeHint}
-              </span>
+              <span className="text-13 text-faint">{t.editProperty.unitTypeHint}</span>
             </summary>
 
             <div className="mt-3 grid gap-3 border-t border-line pt-3">{rooms}</div>
@@ -335,7 +333,7 @@ function UnitRow({
       {message ? (
         <p
           role="alert"
-          className={`rounded-lg border p-2.5 text-[13px] ${
+          className={`rounded-lg border p-2.5 text-13 ${
             message.kind === 'ok'
               ? 'border-ok/40 bg-ok/10 text-ok'
               : 'border-bad/40 bg-bad/10 text-bad'
@@ -469,11 +467,11 @@ function UnitRow({
           onChange={(event) => set('isActive')(event.target.checked)}
           className="size-4 cursor-pointer"
         />
-        <span className="text-[13px] text-muted">{t.editProperty.unitActive}</span>
+        <span className="text-13 text-muted">{t.editProperty.unitActive}</span>
       </label>
 
       {form.isActive ? null : (
-        <p className="text-[14px] leading-relaxed text-warn">
+        <p className="text-14 leading-relaxed text-warn">
           {t.editProperty.unitInactiveNote}
         </p>
       )}
@@ -482,14 +480,14 @@ function UnitRow({
         <button
           type="submit"
           disabled={busy}
-          className="min-h-10 cursor-pointer rounded-lg border border-gold px-4 py-1.5 text-[13px] font-bold text-gold-read disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+          className="min-h-10 cursor-pointer rounded-lg border border-gold px-4 py-1.5 text-13 font-bold text-gold-read disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
         >
           {busy ? t.editProperty.unitSaving : t.editProperty.unitSave}
         </button>
 
         <Link
           href={`/properties/${reference}/calendar?unit=${unit.id}`}
-          className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-[13px] text-muted lg:min-h-0 lg:py-1.5"
+          className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-13 text-muted lg:min-h-0 lg:py-1.5"
         >
           {t.editProperty.openUnitCalendar}
         </Link>
@@ -513,14 +511,14 @@ function Field({
 }) {
   return (
     <label className="grid gap-1">
-      <span className="text-[13px] text-muted">{label}</span>
+      <span className="text-13 text-muted">{label}</span>
       <input
         id={id}
         dir={dir}
         value={value}
         maxLength={160}
         onChange={(event) => onChange(event.target.value)}
-        className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text lg:min-h-0"
+        className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-14 text-text lg:min-h-0"
       />
     </label>
   );
@@ -551,12 +549,12 @@ function Choice({
 }) {
   return (
     <label className="grid gap-1 sm:max-w-64">
-      <span className="text-[13px] text-muted">{label}</span>
+      <span className="text-13 text-muted">{label}</span>
       <select
         id={id}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="min-h-10 cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text lg:min-h-0"
+        className="min-h-10 cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-14 text-text lg:min-h-0"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -594,7 +592,7 @@ function Number_({
 }) {
   return (
     <label className="grid gap-1">
-      <span className="text-[13px] text-muted">{label}</span>
+      <span className="text-13 text-muted">{label}</span>
       <input
         id={id}
         type="number"
@@ -602,7 +600,7 @@ function Number_({
         {...(step ? { step } : {})}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="field-ltr min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text lg:min-h-0"
+        className="field-ltr min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-14 text-text lg:min-h-0"
       />
     </label>
   );

@@ -70,10 +70,57 @@
    * partner and an operator read the same booking and must not be given two different type sizes
    * for it.
    */
-  --text-xs: 13px;
-  --text-sm: 14px;
-  --text-base: 16px;
-  --text-lg: 18px;
+  /*
+    ── The type scale in REM, so a reader who enlarges their browser text gets it ──
+    ────
+
+    Same numbers, different unit. `13px` is `13px` whatever the reader has set their
+    browser's default font size to, so somebody who raises it from 16 to 20 — the commonest
+    accommodation there is, and the one people with low vision actually use — got no larger
+    type anywhere on this platform. In rem the whole scale follows that setting, and at the
+    default 16px root every size below computes to exactly the pixel value it replaces:
+    nothing moves for a reader who has changed nothing.
+
+    Bashar asked for this on 2026-09-18 with a screenshot of booking.com's own stylesheet,
+    where the same idea is written `calc(var(--bui_rem_pixel) * 14)`. The arithmetic here is
+    done once rather than per declaration, but it is the same technique and the same reason.
+  */
+  --text-xs: 0.8125rem; /* 13px */
+  --text-sm: 0.875rem; /* 14px */
+  --text-base: 1rem; /* 16px */
+  --text-lg: 1.125rem; /* 18px */
+
+  /*
+    The sizes the components ask for BY NUMBER, for the ones the four steps above do not
+    name — `text-[13px]` and its 1,400 siblings bypassed the scale entirely and were the
+    real reason nothing scaled.
+
+    Numbered rather than named because the number is the point: `text-13` is the same
+    13px it always was, readable at the call site, and the rem arithmetic stays here. These
+    deliberately define NO `--text-*--line-height`, so each sets font-size and nothing else
+    — exactly what the arbitrary value it replaces did. A `text-sm` would additionally
+    impose Tailwind's own line-height on 666 elements that never asked for one.
+
+    The family runs PAST 16 deliberately. Converting only the small sizes inverted the
+    hierarchy for exactly the reader this was done for: at a 20px root the body text became
+    17.5px while a heading left on `text-[17px]` stayed 17px, so the heading came out
+    smaller than the paragraph under it. A scale that half scales is not a scale.
+  */
+  --text-10: 0.625rem;
+  --text-11: 0.6875rem;
+  --text-12: 0.75rem;
+  --text-13: 0.8125rem;
+  --text-14: 0.875rem;
+  --text-15: 0.9375rem;
+  --text-16: 1rem;
+  --text-17: 1.0625rem;
+  --text-18: 1.125rem;
+  --text-19: 1.1875rem;
+  --text-20: 1.25rem;
+  --text-26: 1.625rem;
+  --text-28: 1.75rem;
+  --text-32: 2rem;
+  --text-36: 2.25rem;
   --color-bg: #0c0a1c;
   /*
    * The ink that goes ON a gold surface, and it does NOT change with the theme.

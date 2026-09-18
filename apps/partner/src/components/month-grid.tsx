@@ -91,7 +91,7 @@ export function MonthGrid({
         */}
         <ol
           aria-hidden
-          className="mb-1 grid grid-cols-7 gap-1 text-center text-[13px] text-faint"
+          className="mb-1 grid grid-cols-7 gap-1 text-center text-13 text-faint"
         >
           {WEEKDAY_LABELS.map((label) => (
             <li key={label}>{label}</li>
@@ -153,14 +153,14 @@ export function MonthGrid({
                 } ${day.date === highlight ? 'ring-2 ring-sky ring-inset' : ''}`}
               >
                 {/* The day number is a Latin numeral inside an Arabic page — its own `dir`. */}
-                <span className="block text-[13px] font-bold" dir="ltr">
+                <span className="block text-13 font-bold" dir="ltr">
                   {count(Number(day.date.slice(-2)))}
                 </span>
-                <span className="block text-[13px] leading-tight">
+                <span className="block text-13 leading-tight">
                   {dayStatus(day.status)}
                 </span>
                 <span
-                  className={`block text-[13px] leading-tight ${
+                  className={`block text-13 leading-tight ${
                     day.isPriceOverridden ? 'font-bold' : 'opacity-70'
                   }`}
                   dir="ltr"
@@ -180,11 +180,11 @@ export function MonthGrid({
 export function DayLegend() {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-[13px] text-faint">{t.unitCalendar.legend}</span>
+      <span className="text-13 text-faint">{t.unitCalendar.legend}</span>
       {['available', 'booked', 'closed', 'maintenance'].map((state) => (
         <span
           key={state}
-          className={`rounded-full border px-2.5 py-0.5 text-[13px] ${DAY_TONES[state] ?? ''}`}
+          className={`rounded-full border px-2.5 py-0.5 text-13 ${DAY_TONES[state] ?? ''}`}
         >
           {dayStatus(state)}
         </span>

@@ -102,7 +102,7 @@ export default async function BookingPage({
           already is, and it is searchable the same way.
         */}
         {booking.tripReference ? (
-          <p className="font-mono text-[14px] text-faint">
+          <p className="font-mono text-14 text-faint">
             {t.sections.bookingDetail.tripReference}: {booking.tripReference}
           </p>
         ) : null}
@@ -117,7 +117,7 @@ export default async function BookingPage({
         <p className="mt-2">
           <Link
             href={`/messages?to=booking&ref=${encodeURIComponent(booking.reference)}`}
-            className="inline-flex min-h-10 items-center rounded-lg border border-line px-3.5 py-1.5 text-[13px] font-bold text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read lg:min-h-0"
+            className="inline-flex min-h-10 items-center rounded-lg border border-line px-3.5 py-1.5 text-13 font-bold text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read lg:min-h-0"
           >
             {t.sections.messages.messageAction}
           </Link>

@@ -157,7 +157,7 @@ export function AddUnit({
         type="button"
         onClick={() => setOpen(true)}
         data-add-unit={reference}
-        className="min-h-10 w-fit cursor-pointer rounded-lg border border-line px-4 py-1.5 text-[13px] font-semibold text-muted lg:min-h-0"
+        className="min-h-10 w-fit cursor-pointer rounded-lg border border-line px-4 py-1.5 text-13 font-semibold text-muted lg:min-h-0"
       >
         {t.editProperty.unitAdd}
       </button>
@@ -170,16 +170,14 @@ export function AddUnit({
       onSubmit={(event) => void add(event)}
       className="grid gap-3 rounded-card border border-gold/40 bg-card p-4"
     >
-      <h4 className="text-[14px] font-bold text-text">{t.editProperty.unitAddTitle}</h4>
+      <h4 className="text-14 font-bold text-text">{t.editProperty.unitAddTitle}</h4>
 
-      <p className="text-[13px] leading-relaxed text-faint">
-        {t.editProperty.unitAddHint}
-      </p>
+      <p className="text-13 leading-relaxed text-faint">{t.editProperty.unitAddHint}</p>
 
       {message ? (
         <p
           role="alert"
-          className={`rounded-lg border p-2.5 text-[13px] ${
+          className={`rounded-lg border p-2.5 text-13 ${
             message.kind === 'ok'
               ? 'border-ok/40 bg-ok/10 text-ok'
               : 'border-bad/40 bg-bad/10 text-bad'
@@ -199,19 +197,19 @@ export function AddUnit({
         correctly inside an RTL field without being told.
       */}
       <label className="grid gap-1">
-        <span className="text-[13px] text-muted">{t.editProperty.unitName}</span>
+        <span className="text-13 text-muted">{t.editProperty.unitName}</span>
         <input
           value={form.name}
           onChange={(event) => set('name')(event.target.value)}
           maxLength={160}
           required
-          className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text lg:min-h-0"
+          className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-14 text-text lg:min-h-0"
         />
       </label>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="grid gap-1">
-          <span className="text-[13px] text-muted">{t.editProperty.unitGuestsField}</span>
+          <span className="text-13 text-muted">{t.editProperty.unitGuestsField}</span>
           <input
             type="number"
             min={1}
@@ -219,7 +217,7 @@ export function AddUnit({
             value={form.maxGuests}
             onChange={(event) => set('maxGuests')(event.target.value)}
             required
-            className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text lg:min-h-0"
+            className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-14 text-text lg:min-h-0"
           />
         </label>
 
@@ -228,11 +226,11 @@ export function AddUnit({
           one thought a partner has about the room, and the two answers belong on one line.
         */}
         <label className="grid gap-1">
-          <span className="text-[13px] text-muted">{t.editProperty.unitBedType}</span>
+          <span className="text-13 text-muted">{t.editProperty.unitBedType}</span>
           <select
             value={form.bedType}
             onChange={(event) => set('bedType')(event.target.value)}
-            className="min-h-10 cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-14 text-text lg:min-h-0"
           >
             <option value="single">{t.editProperty.unitBedTypeSingle}</option>
             <option value="double">{t.editProperty.unitBedTypeDouble}</option>
@@ -240,7 +238,7 @@ export function AddUnit({
         </label>
 
         <label className="grid gap-1">
-          <span className="text-[13px] text-muted">{t.editProperty.unitPrice}</span>
+          <span className="text-13 text-muted">{t.editProperty.unitPrice}</span>
           <input
             type="number"
             min={0}
@@ -248,7 +246,7 @@ export function AddUnit({
             value={form.basePrice}
             onChange={(event) => set('basePrice')(event.target.value)}
             required
-            className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text lg:min-h-0"
+            className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-14 text-text lg:min-h-0"
           />
         </label>
 
@@ -260,12 +258,12 @@ export function AddUnit({
           than a field anybody types into, and the rule that forbids the override is about typing.
         */}
         <label className="grid gap-1">
-          <span className="text-[13px] text-muted">{t.editProperty.unitCurrency}</span>
+          <span className="text-13 text-muted">{t.editProperty.unitCurrency}</span>
           <input
             value={currencyCode}
             readOnly
             dir="ltr"
-            className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-faint lg:min-h-0"
+            className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-14 text-faint lg:min-h-0"
           />
         </label>
       </div>
@@ -279,7 +277,7 @@ export function AddUnit({
         rooms rather than six of anything else.
       */}
       <label className="grid gap-1">
-        <span className="text-[13px] text-muted">{t.editProperty.unitQuantity}</span>
+        <span className="text-13 text-muted">{t.editProperty.unitQuantity}</span>
         <input
           type="number"
           min={1}
@@ -287,9 +285,9 @@ export function AddUnit({
           value={form.quantity}
           onChange={(event) => set('quantity')(event.target.value)}
           required
-          className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text sm:w-40 lg:min-h-0"
+          className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-14 text-text sm:w-40 lg:min-h-0"
         />
-        <span className="text-[13px] leading-relaxed text-faint">
+        <span className="text-13 leading-relaxed text-faint">
           {t.editProperty.unitQuantityHint}
         </span>
       </label>
@@ -305,7 +303,7 @@ export function AddUnit({
         <button
           type="submit"
           disabled={busy || !ready}
-          className="min-h-10 cursor-pointer rounded-lg border border-gold px-4 py-1.5 text-[13px] font-bold text-gold-read disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+          className="min-h-10 cursor-pointer rounded-lg border border-gold px-4 py-1.5 text-13 font-bold text-gold-read disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
         >
           {busy ? t.editProperty.unitAddSaving : t.editProperty.unitAddSubmit}
         </button>
@@ -318,7 +316,7 @@ export function AddUnit({
               setOpen(false);
               setMessage(null);
             }}
-            className="min-h-10 cursor-pointer rounded-lg border border-line px-4 py-1.5 text-[13px] text-muted lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-lg border border-line px-4 py-1.5 text-13 text-muted lg:min-h-0"
           >
             {t.dialog.cancel}
           </button>

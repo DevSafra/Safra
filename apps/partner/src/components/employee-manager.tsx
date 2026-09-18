@@ -147,7 +147,7 @@ export function EmployeeInvite({ roles }: { roles: PartnerEmployeeRole[] }) {
         out correctly inside an RTL field without being told. `dir="ltr"` would move the caret and
         the value to the far side of a label sitting on the right.
       */}
-      <label className="grid gap-1 text-[14px] text-muted">
+      <label className="grid gap-1 text-14 text-muted">
         {t.employees.fullName}
         <input
           type="text"
@@ -160,7 +160,7 @@ export function EmployeeInvite({ roles }: { roles: PartnerEmployeeRole[] }) {
         />
       </label>
 
-      <label className="grid gap-1 text-[14px] text-muted">
+      <label className="grid gap-1 text-14 text-muted">
         {t.employees.email}
         <input
           type="email"
@@ -171,7 +171,7 @@ export function EmployeeInvite({ roles }: { roles: PartnerEmployeeRole[] }) {
         />
       </label>
 
-      <label className="grid gap-1 text-[14px] text-muted">
+      <label className="grid gap-1 text-14 text-muted">
         {t.employees.role}
         <select
           value={roleId}
@@ -287,7 +287,7 @@ export function EmployeeActions({
           onChange={(event) =>
             void send({ method: 'PATCH', body: { roleId: event.target.value } })
           }
-          className="cursor-pointer rounded-lg border border-line bg-bg px-2.5 py-1.5 text-[14px] text-text disabled:cursor-not-allowed disabled:opacity-60"
+          className="cursor-pointer rounded-lg border border-line bg-bg px-2.5 py-1.5 text-14 text-text disabled:cursor-not-allowed disabled:opacity-60"
         >
           {roles.map((role) => (
             <option key={role.id} value={role.id}>
@@ -309,7 +309,7 @@ export function EmployeeActions({
               body: { status: suspended ? 'active' : 'suspended' },
             })
           }
-          className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-[14px] text-text transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
+          className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-14 text-text transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {suspended ? t.employees.restore : t.employees.suspend}
         </button>
@@ -331,18 +331,16 @@ export function EmployeeActions({
               if (go) void send({ method: 'DELETE' });
             })();
           }}
-          className="cursor-pointer rounded-lg border border-bad/50 px-3 py-1.5 text-[14px] text-bad transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
+          className="cursor-pointer rounded-lg border border-bad/50 px-3 py-1.5 text-14 text-bad transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {t.employees.remove}
         </button>
 
-        {busy ? (
-          <span className="text-[13px] text-faint">{t.employees.working}</span>
-        ) : null}
+        {busy ? <span className="text-13 text-faint">{t.employees.working}</span> : null}
       </div>
 
       {error ? (
-        <p role="alert" className="text-[14px] text-bad">
+        <p role="alert" className="text-14 text-bad">
           {error}
         </p>
       ) : null}

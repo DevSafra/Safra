@@ -260,9 +260,9 @@ function Kpi({
 }) {
   return (
     <div className="rounded-card border border-gold/15 bg-card p-4.5">
-      <p className="text-[13px] text-faint">{label}</p>
-      <p className={`mt-1.5 text-[26px] font-extrabold ${tone}`}>{value}</p>
-      <p className="mt-1 text-[14px] text-ok">{sub}</p>
+      <p className="text-13 text-faint">{label}</p>
+      <p className={`mt-1.5 text-26 font-extrabold ${tone}`}>{value}</p>
+      <p className="mt-1 text-14 text-ok">{sub}</p>
     </div>
   );
 }
@@ -281,10 +281,8 @@ function Requests({
   return (
     <section className="rounded-card border border-warn/40 bg-card p-5">
       <div className="flex flex-wrap items-center gap-2.5">
-        <h2 className="text-[16px] font-extrabold text-warn">
-          {t.dashboard.requestsTitle}
-        </h2>
-        <span className="rounded-full border border-warn bg-warn/15 px-2.5 py-0.5 text-[13px] font-extrabold text-warn">
+        <h2 className="text-16 font-extrabold text-warn">{t.dashboard.requestsTitle}</h2>
+        <span className="rounded-full border border-warn bg-warn/15 px-2.5 py-0.5 text-13 font-extrabold text-warn">
           {fill(t.dashboard.requestsRule, {
             window: plural(
               window.unit === 'hours'
@@ -300,7 +298,7 @@ function Requests({
       </div>
 
       {requests.length === 0 ? (
-        <p className="mt-3.5 text-[14px] text-faint">{t.dashboard.requestsEmpty}</p>
+        <p className="mt-3.5 text-14 text-faint">{t.dashboard.requestsEmpty}</p>
       ) : (
         <ul className="mt-3.5 flex flex-col gap-3">
           {requests.map((request) => (
@@ -311,10 +309,10 @@ function Requests({
               <div className="flex flex-wrap items-center gap-3">
                 <div className="min-w-0">
                   {/* A reference is a Latin run on an Arabic line. */}
-                  <p className="text-[16px] font-bold text-sky">
+                  <p className="text-16 font-bold text-sky">
                     <Ltr>{request.reference}</Ltr>
                   </p>
-                  <p className="mt-0.5 text-[14px] text-muted">
+                  <p className="mt-0.5 text-14 text-muted">
                     {request.unitName}
                     {/*
                       HOW MANY rooms are being asked for. A partner has two hours to accept, and a
@@ -350,7 +348,7 @@ function Requests({
                 </div>
 
                 <div className="ms-auto text-end">
-                  <p className="text-[16px] font-extrabold text-gold-read">
+                  <p className="text-16 font-extrabold text-gold-read">
                     <Ltr>{amount(request.amount, request.currencyCode)}</Ltr>
                   </p>
                   {/*
@@ -361,7 +359,7 @@ function Requests({
                     a server-rendered sibling of the decision control, so `li:has([data-decided])`
                     is what lets the answer retire it without lifting state through the row.
                   */}
-                  <p data-deadline className="text-[14px] font-bold text-warn">
+                  <p data-deadline className="text-14 font-bold text-warn">
                     <Deadline at={request.deadlineAt} />
                   </p>
                 </div>
@@ -381,7 +379,7 @@ function Requests({
         </ul>
       )}
 
-      <p className="mt-3 text-[14px] text-faint">{t.dashboard.requestsNote}</p>
+      <p className="mt-3 text-14 text-faint">{t.dashboard.requestsNote}</p>
     </section>
   );
 }
@@ -417,7 +415,7 @@ function Calendar({ calendar }: { readonly calendar: PartnerDashboard['calendar'
   if (!calendar) {
     return (
       <section className="rounded-card border border-gold/15 bg-card p-5">
-        <p className="text-[14px] text-faint">{t.dashboard.calendarNoUnits}</p>
+        <p className="text-14 text-faint">{t.dashboard.calendarNoUnits}</p>
       </section>
     );
   }
@@ -428,10 +426,10 @@ function Calendar({ calendar }: { readonly calendar: PartnerDashboard['calendar'
   return (
     <section className="rounded-card border border-gold/15 bg-card p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-[16px] font-extrabold text-gold-read">
+        <h2 className="text-16 font-extrabold text-gold-read">
           {fill(t.dashboard.calendarTitle, { month: monthName })}
         </h2>
-        <span className="text-[14px] text-muted">
+        <span className="text-14 text-muted">
           {/*
             Money interpolated into an Arabic sentence is ISOLATED — measured, not assumed.
 
@@ -495,7 +493,7 @@ function Calendar({ calendar }: { readonly calendar: PartnerDashboard['calendar'
                 prefetch={false}
                 title={detail}
                 aria-label={detail}
-                className={`grid aspect-square min-h-10 cursor-pointer place-items-center rounded-lg border text-[13px] font-semibold transition-colors hover:border-gold ${portfolioTone(
+                className={`grid aspect-square min-h-10 cursor-pointer place-items-center rounded-lg border text-13 font-semibold transition-colors hover:border-gold ${portfolioTone(
                   day.available,
                   calendar.unitCount,
                 )}`}
@@ -507,15 +505,15 @@ function Calendar({ calendar }: { readonly calendar: PartnerDashboard['calendar'
         })}
       </ol>
 
-      <p className="mt-2.5 text-[14px] text-faint">{t.dashboard.calendarClickHint}</p>
+      <p className="mt-2.5 text-14 text-faint">{t.dashboard.calendarClickHint}</p>
 
-      <div className="mt-3 flex flex-wrap gap-3.5 text-[13px] text-faint">
+      <div className="mt-3 flex flex-wrap gap-3.5 text-13 text-faint">
         <Legend tone="text-ok" label={t.dashboard.legendPortfolioFree} />
         <Legend tone="text-warn" label={t.dashboard.legendPortfolioSome} />
         <Legend tone="text-bad" label={t.dashboard.legendPortfolioFull} />
       </div>
 
-      <p className="mt-2.5 rounded-lg border border-dashed border-warn/40 bg-warn/8 px-3 py-2 text-[14px] text-warn">
+      <p className="mt-2.5 rounded-lg border border-dashed border-warn/40 bg-warn/8 px-3 py-2 text-14 text-warn">
         {t.dashboard.calendarReminder}
       </p>
     </section>
@@ -578,14 +576,14 @@ function Legend({ tone, label }: { readonly tone: string; readonly label: string
 function Notices({ notices }: { readonly notices: PartnerDashboard['notices'] }) {
   return (
     <section data-notices className="rounded-card border border-gold/15 bg-card p-5">
-      <h2 className="mb-3 text-[16px] font-extrabold text-gold-read">
+      <h2 className="mb-3 text-16 font-extrabold text-gold-read">
         {t.dashboard.noticesTitle}
       </h2>
 
       {notices.length === 0 ? (
-        <p className="text-[14px] text-faint">{t.dashboard.noticesEmpty}</p>
+        <p className="text-14 text-faint">{t.dashboard.noticesEmpty}</p>
       ) : (
-        <ul className="flex flex-col gap-2.25 text-[14px]">
+        <ul className="flex flex-col gap-2.25 text-14">
           {notices.map((notice) => (
             <li
               key={`${notice.templateKey}-${notice.at}`}
@@ -597,7 +595,7 @@ function Notices({ notices }: { readonly notices: PartnerDashboard['notices'] })
               <span className="text-text">
                 {t.dashboard.notice[notice.templateKey] ?? notice.templateKey}
               </span>
-              <Ltr className="text-[13px] text-faint">{notice.at}</Ltr>
+              <Ltr className="text-13 text-faint">{notice.at}</Ltr>
               {/*
                 Suspension notices point at the dashboard, where the banner and its reason already
                 are; everything else points at مخالفات, where the violation is.
@@ -609,7 +607,7 @@ function Notices({ notices }: { readonly notices: PartnerDashboard['notices'] })
                     ? '/'
                     : '/violations'
                 }
-                className="ms-auto text-[13px] text-gold-read underline"
+                className="ms-auto text-13 text-gold-read underline"
               >
                 {t.dashboard.noticeDetail}
               </Link>
@@ -630,11 +628,11 @@ function Alerts({
 }) {
   return (
     <section className="rounded-card border border-gold/15 bg-card p-5">
-      <h2 className="mb-3 text-[16px] font-extrabold text-gold-read">
+      <h2 className="mb-3 text-16 font-extrabold text-gold-read">
         {t.dashboard.alertsTitle}
       </h2>
 
-      <ul className="flex flex-col gap-2.25 text-[14px]">
+      <ul className="flex flex-col gap-2.25 text-14">
         {alerts.map((alert) => (
           <li
             key={`${alert.kind}-${alert.createdAt}`}
@@ -726,9 +724,7 @@ function NoSections() {
     <Shell title={t.employees.noSectionsTitle} partnerName="" active="dashboard">
       <div className="grid gap-1.5 rounded-card border border-line bg-card p-4">
         <p className="text-sm font-semibold text-text">{t.employees.noSectionsTitle}</p>
-        <p className="text-[14px] leading-relaxed text-muted">
-          {t.employees.noSectionsBody}
-        </p>
+        <p className="text-14 leading-relaxed text-muted">{t.employees.noSectionsBody}</p>
       </div>
     </Shell>
   );

@@ -98,11 +98,11 @@ export default async function PaymentsPage({
       <MarkSectionSeen section="payments" readTo={oldestShown} readFrom={newestShown} />
       {result === 'unauthenticated' ? (
         <ConsolePanel>
-          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-14 text-muted">{t.dashboard.sessionExpired}</p>
         </ConsolePanel>
       ) : result === 'failed' ? (
         <ConsolePanel>
-          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-14 text-bad">{t.dashboard.queueFailed}</p>
         </ConsolePanel>
       ) : (
         <div className="grid gap-4">
@@ -246,7 +246,7 @@ const COLUMNS: readonly AdminColumn<FinanceItem>[] = [
         <StatusPill tone={statusTone(row.status)}>
           {label(t.enums.paymentStatus, row.status)}
         </StatusPill>
-        <Ltr className="text-[13px] text-faint">{shortDateTime(row.at)}</Ltr>
+        <Ltr className="text-13 text-faint">{shortDateTime(row.at)}</Ltr>
       </div>
     ),
   },

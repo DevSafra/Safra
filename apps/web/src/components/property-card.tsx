@@ -124,7 +124,7 @@ export async function PropertyCard({
 
       <div className="flex flex-1 flex-col p-4">
         <div className="flex items-start justify-between gap-3">
-          <h3 className="text-[16px] font-bold text-text">
+          <h3 className="text-16 font-bold text-text">
             {/*
               The WHOLE CARD is the target, and there is still only one link (Bashar, 2026-09-02).
 
@@ -152,7 +152,7 @@ export async function PropertyCard({
             </Link>
           </h3>
           {item.rating ? (
-            <span className="shrink-0 text-[14px] font-bold text-gold-read">
+            <span className="shrink-0 text-14 font-bold text-gold-read">
               ★ {item.rating}
             </span>
           ) : null}
@@ -175,7 +175,7 @@ export async function PropertyCard({
           Absent when it is null. 2,703 listings predate the field and inventing «١ نجمة» for a
           hotel nobody has classified would be a claim, not a blank.
         */}
-        <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[14px] text-muted">
+        <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-14 text-muted">
           <span>{dynamicMessage(tt, item.propertyTypeCode, item.propertyTypeCode)}</span>
           {item.starRating ? (
             <StarRating
@@ -201,7 +201,7 @@ export async function PropertyCard({
         ) : null}
 
         {item.reviewsCount > 0 ? (
-          <p className="mt-2 text-[14px] text-muted">
+          <p className="mt-2 text-14 text-muted">
             {t('reviews', { count: item.reviewsCount })}
           </p>
         ) : null}
@@ -223,8 +223,8 @@ export async function PropertyCard({
         <div className="mt-auto pt-5">
           <div className="border-t-2 border-dotted border-line pt-4">
             <p className="text-base text-text">
-              <span className="text-[18px] font-bold text-gold-read">{nightly}</span>{' '}
-              <span className="text-[14px] text-muted">{t('perNight')}</span>
+              <span className="text-18 font-bold text-gold-read">{nightly}</span>{' '}
+              <span className="text-14 text-muted">{t('perNight')}</span>
             </p>
             {/*
           The total, only when it says something the line above does not. On a one-night search the

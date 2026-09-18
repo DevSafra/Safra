@@ -82,11 +82,11 @@ export default async function CommsPage({
     <ConsoleShell title={t.nav.whatsapp} counts={counts}>
       {result === 'unauthenticated' ? (
         <ConsolePanel>
-          <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
+          <p className="text-14 text-muted">{t.dashboard.sessionExpired}</p>
         </ConsolePanel>
       ) : result === 'failed' ? (
         <ConsolePanel>
-          <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
+          <p className="text-14 text-bad">{t.dashboard.queueFailed}</p>
         </ConsolePanel>
       ) : (
         <div className="grid gap-4">
@@ -104,7 +104,7 @@ export default async function CommsPage({
                 name="status"
                 defaultValue={status ?? ''}
                 aria-label={t.table.colStatus}
-                className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[14px] text-text"
+                className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-14 text-text"
               >
                 <option value="">{t.sections.bookings.allStatuses}</option>
                 {(['queued', 'sent', 'delivered', 'failed'] as const).map((value) => (
@@ -151,10 +151,10 @@ function Templates({ templates }: { templates: Notifications['templates'] }) {
   return (
     <ConsolePanel>
       <div className="mb-2.5 flex flex-wrap items-center gap-2.5">
-        <h2 className="text-[16px] font-extrabold text-gold-read">
+        <h2 className="text-16 font-extrabold text-gold-read">
           {t.sections.comms.templates}
         </h2>
-        <span className="ms-auto text-[13px] text-faint">
+        <span className="ms-auto text-13 text-faint">
           {t.sections.comms.templatesLocales}
         </span>
       </div>
@@ -177,7 +177,7 @@ function Templates({ templates }: { templates: Notifications['templates'] }) {
             >
               {label(t.notificationTemplate, template.key)}
               {template.implemented ? null : (
-                <span className="ms-1.5 text-[13px]">({t.sections.comms.notWired})</span>
+                <span className="ms-1.5 text-13">({t.sections.comms.notWired})</span>
               )}
             </span>
           </li>
@@ -194,7 +194,7 @@ function Summary({ counters }: { counters: Notifications['counters'] }) {
   if (entries.length === 0) return null;
 
   return (
-    <span className="text-[13px] text-faint">
+    <span className="text-13 text-faint">
       {fill(t.sections.comms.window, { days: count(counters.windowDays) })}
       {entries.map(([channel, statuses]) => {
         const failed = statuses['failed'] ?? 0;
@@ -234,7 +234,7 @@ const COLUMNS: readonly AdminColumn<NotificationItem>[] = [
     render: (row) => (
       <span className="text-text">
         {label(t.notificationTemplate, row.templateKey)}
-        <span className="ms-1.5 text-[13px] text-faint">({row.locale})</span>
+        <span className="ms-1.5 text-13 text-faint">({row.locale})</span>
       </span>
     ),
   },
@@ -272,7 +272,7 @@ const COLUMNS: readonly AdminColumn<NotificationItem>[] = [
               connection refused» call for opposite decisions. They were the quietest text on the
               row (finding 248).
             */}
-            <span className="text-[14px] leading-normal text-muted">
+            <span className="text-14 leading-normal text-muted">
               {plural(t.sections.comms.attempts, { n: row.attempts })}
               {row.failureReason ? ` · ${renderRedactions(row.failureReason, 'ar')}` : ''}
             </span>

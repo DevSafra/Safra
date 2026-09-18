@@ -97,9 +97,7 @@ export function CityCategoryManager({
     {
       key: 'code',
       header: c.colCode,
-      render: (row) => (
-        <span className="font-mono text-[13px] text-faint">{row.code}</span>
-      ),
+      render: (row) => <span className="font-mono text-13 text-faint">{row.code}</span>,
     },
     {
       key: 'ar',
@@ -150,7 +148,7 @@ export function CityCategoryManager({
               data-category-up={row.code}
               aria-label={`${c.moveUp} — ${row.nameAr}`}
               onClick={() => void move(row.code, -1)}
-              className="cursor-pointer rounded-lg border border-line px-1.5 py-0.5 text-[13px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read disabled:cursor-not-allowed disabled:opacity-35"
+              className="cursor-pointer rounded-lg border border-line px-1.5 py-0.5 text-13 text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read disabled:cursor-not-allowed disabled:opacity-35"
             >
               ↑
             </button>
@@ -160,7 +158,7 @@ export function CityCategoryManager({
               data-category-down={row.code}
               aria-label={`${c.moveDown} — ${row.nameAr}`}
               onClick={() => void move(row.code, 1)}
-              className="cursor-pointer rounded-lg border border-line px-1.5 py-0.5 text-[13px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read disabled:cursor-not-allowed disabled:opacity-35"
+              className="cursor-pointer rounded-lg border border-line px-1.5 py-0.5 text-13 text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read disabled:cursor-not-allowed disabled:opacity-35"
             >
               ↓
             </button>
@@ -179,7 +177,7 @@ export function CityCategoryManager({
             setAdding(false);
             setEditing(editing === row.code ? null : row.code);
           }}
-          className="cursor-pointer rounded-lg border border-line px-2.5 py-1 text-[13px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read"
+          className="cursor-pointer rounded-lg border border-line px-2.5 py-1 text-13 text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read"
         >
           {c.edit}
         </button>
@@ -190,7 +188,7 @@ export function CityCategoryManager({
   return (
     <>
       <div className="mb-3.5 flex flex-wrap items-center gap-2.5">
-        <h2 className="text-[16px] font-extrabold text-gold-read">{c.title}</h2>
+        <h2 className="text-16 font-extrabold text-gold-read">{c.title}</h2>
         <span className="ms-auto">
           <button
             type="button"
@@ -200,7 +198,7 @@ export function CityCategoryManager({
               setEditing(null);
               setAdding(!adding);
             }}
-            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1.5 text-[13px] font-bold text-gold-read transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1.5 text-13 font-bold text-gold-read transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
           >
             {c.add}
           </button>
@@ -424,7 +422,7 @@ function EditCategory({
           <Field label={c.colNameDe} value={nameDe} onChange={setNameDe} />
         </Row>
 
-        <p className="text-[14px] text-faint">
+        <p className="text-14 text-faint">
           {plural(c.cityCount, { n: category.cities })}
         </p>
 

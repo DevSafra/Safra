@@ -86,9 +86,9 @@ export default async function PropertiesPage({
           />
 
           {registry === 'unauthenticated' ? (
-            <p className="text-[14px] text-muted">{t.dashboard.sessionExpired}</p>
+            <p className="text-14 text-muted">{t.dashboard.sessionExpired}</p>
           ) : registry === 'failed' ? (
-            <p className="text-[14px] text-bad">{t.dashboard.queueFailed}</p>
+            <p className="text-14 text-bad">{t.dashboard.queueFailed}</p>
           ) : (
             <>
               <AdminTable
@@ -129,7 +129,7 @@ export default async function PropertiesPage({
                     href={`/properties/${property.reference}${back}`}
                     className="block rounded-card border border-line bg-field px-3.5 py-3 transition-colors hover:border-[rgba(var(--goldA),0.4)]"
                   >
-                    <span className="flex items-center gap-2 text-[14px] font-bold text-text">
+                    <span className="flex items-center gap-2 text-14 font-bold text-text">
                       <span className="min-w-0 truncate">{property.nameAr}</span>
                       {/*
                         The claimed classification, IN THE QUEUE (Bashar, 2026-09-04: «Admins
@@ -148,7 +148,7 @@ export default async function PropertiesPage({
                         />
                       ) : null}
                     </span>
-                    <span className="block text-[13px] text-faint">
+                    <span className="block text-13 text-faint">
                       <Ltr>{property.reference}</Ltr> · {property.city.nameAr} ·{' '}
                       {property.partner.displayName} · {t.dashboard.submitted}{' '}
                       <Ltr>{shortDate(property.createdAt)}</Ltr>
@@ -160,7 +160,7 @@ export default async function PropertiesPage({
                       visible after opening the row gets read too late.
                     */}
                     {property.reviewNotes ? (
-                      <span className="mt-1 block text-[13px] text-warn">
+                      <span className="mt-1 block text-13 text-warn">
                         {property.reviewNotes}
                       </span>
                     ) : null}
@@ -205,7 +205,7 @@ export default async function PropertiesPage({
           set, and a pager over seven rows is worse than seven rows.
         */}
         <ConsolePanel title={t.sections.propertyTypes.title}>
-          <p className="mb-3 text-[14px] text-muted">{t.sections.propertyTypes.intro}</p>
+          <p className="mb-3 text-14 text-muted">{t.sections.propertyTypes.intro}</p>
 
           {types === 'unauthenticated' || types === 'failed' ? (
             <p className="text-sm text-bad">{t.sections.panels.failed}</p>
@@ -273,11 +273,11 @@ const columns = (back: string): readonly AdminColumn<PropertyListItem>[] => [
     render: (row) =>
       !usesStarRating(row.propertyType) ? (
         /* A villa is not unclassified — the scheme does not reach it. Different word. */
-        <span className="whitespace-nowrap text-[13px] text-faint">
+        <span className="whitespace-nowrap text-13 text-faint">
           {t.sections.properties.starNotApplicable}
         </span>
       ) : row.starRating === null ? (
-        <span className="whitespace-nowrap text-[13px] text-faint">
+        <span className="whitespace-nowrap text-13 text-faint">
           {t.sections.properties.starUnset}
         </span>
       ) : (

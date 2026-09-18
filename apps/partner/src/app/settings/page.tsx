@@ -60,9 +60,7 @@ export default async function SettingsPage() {
       {/* A readable measure: a 1080px password field is a form nobody designed. */}
       <div className="grid max-w-2xl gap-4">
         <section className="grid gap-3 rounded-card border border-line bg-card p-4.5">
-          <h2 className="text-[14px] font-bold text-text">
-            {t.settings.accountsHeading}
-          </h2>
+          <h2 className="text-14 font-bold text-text">{t.settings.accountsHeading}</h2>
 
           {access !== 'open' ? (
             <SectionRefusal access={access} />
@@ -72,7 +70,7 @@ export default async function SettingsPage() {
             <p className="text-sm text-bad">{t.dashboard.loadFailed}</p>
           ) : (
             <>
-              <p className="text-[13px] leading-relaxed text-faint">
+              <p className="text-13 leading-relaxed text-faint">
                 {t.payoutAccounts.intro}
               </p>
               <PayoutAccountsManager accounts={accounts} />
@@ -81,9 +79,7 @@ export default async function SettingsPage() {
         </section>
 
         <section className="grid gap-3 rounded-card border border-line bg-card p-4.5">
-          <h2 className="text-[14px] font-bold text-text">
-            {t.settings.passwordHeading}
-          </h2>
+          <h2 className="text-14 font-bold text-text">{t.settings.passwordHeading}</h2>
           <ChangePassword />
         </section>
       </div>

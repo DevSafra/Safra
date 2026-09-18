@@ -77,7 +77,7 @@ export default async function ReviewsPage({
       ) : (
         <div className="grid gap-3.5">
           <header className="grid gap-1">
-            <p className="text-[14px] font-bold text-gold-read">
+            <p className="text-14 font-bold text-gold-read">
               {result.summary.average
                 ? fill(t.reviews.summary, {
                     average: result.summary.average,
@@ -86,7 +86,7 @@ export default async function ReviewsPage({
                 : t.reviews.summaryEmpty}
             </p>
             {/* The rule, quoted. It is the reason there is no third button below. */}
-            <p className="text-[13px] text-faint">{t.reviews.rule}</p>
+            <p className="text-13 text-faint">{t.reviews.rule}</p>
           </header>
 
           {result.items.length === 0 ? (
@@ -104,7 +104,7 @@ export default async function ReviewsPage({
           {result.pages > 1 ? (
             <nav
               aria-label={t.reviews.title}
-              className="flex flex-wrap items-center gap-2 text-[13px] text-muted"
+              className="flex flex-wrap items-center gap-2 text-13 text-muted"
             >
               {page > 1 ? (
                 <a
@@ -155,41 +155,39 @@ function Row({ review }: { readonly review: PartnerReview }) {
       className={`rounded-card border bg-card p-3.5 ${hidden ? 'border-bad/40 opacity-80' : 'border-line'}`}
     >
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-        <span className="text-[14px] font-bold text-text">{review.guestName}</span>
-        <span className="text-[13px] font-semibold text-gold-read">
+        <span className="text-14 font-bold text-text">{review.guestName}</span>
+        <span className="text-13 font-semibold text-gold-read">
           {review.propertyName}
         </span>
-        <span className="text-[13px] text-faint">{review.unitName}</span>
-        <span className="text-[14px] font-extrabold text-gold-read">
+        <span className="text-13 text-faint">{review.unitName}</span>
+        <span className="text-14 font-extrabold text-gold-read">
           <Ltr>★ {review.rating}</Ltr>
         </span>
 
         {hidden ? (
-          <span className="rounded-full border border-bad bg-bad/15 px-2 py-0.5 text-[13px] font-bold text-bad">
+          <span className="rounded-full border border-bad bg-bad/15 px-2 py-0.5 text-13 font-bold text-bad">
             {t.reviews.hidden}
           </span>
         ) : null}
 
         {/* The date is pushed to the far side — §7.3, verbatim. */}
-        <span className="ms-auto text-[13px] text-faint">
+        <span className="ms-auto text-13 text-faint">
           <Ltr>{review.createdAt.slice(0, 10)}</Ltr>
         </span>
       </div>
 
-      <p className="mt-2 text-[14px] leading-[1.8] text-muted">{review.body}</p>
+      <p className="mt-2 text-14 leading-[1.8] text-muted">{review.body}</p>
 
       {hidden ? (
-        <p className="mt-2 rounded-lg border border-dashed border-bad/40 px-3 py-2 text-[13px] text-faint">
+        <p className="mt-2 rounded-lg border border-dashed border-bad/40 px-3 py-2 text-13 text-faint">
           {t.reviews.hiddenNote}
         </p>
       ) : null}
 
       {review.partnerReply ? (
         <div className="mt-2.5 rounded-lg border border-gold/30 bg-gold/5 px-3 py-2">
-          <p className="text-[14px] font-bold text-gold-read">{t.reviews.replied}</p>
-          <p className="mt-1 text-[14px] leading-relaxed text-muted">
-            {review.partnerReply}
-          </p>
+          <p className="text-14 font-bold text-gold-read">{t.reviews.replied}</p>
+          <p className="mt-1 text-14 leading-relaxed text-muted">{review.partnerReply}</p>
         </div>
       ) : null}
 

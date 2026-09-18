@@ -118,14 +118,12 @@ export function StaffScopeEditor({
       ) : null}
 
       <fieldset className="grid gap-1.5">
-        <legend className="text-[13px] text-faint">
-          {t.sections.staff.scopeKindLabel}
-        </legend>
+        <legend className="text-13 text-faint">{t.sections.staff.scopeKindLabel}</legend>
         {/*
           Radios rather than a select, because the two choices are the whole decision and a
           collapsed control hides the one that is not chosen.
         */}
-        <div className="flex flex-wrap gap-4 text-[14px]">
+        <div className="flex flex-wrap gap-4 text-14">
           <label className="inline-flex cursor-pointer items-center gap-2">
             <input
               type="radio"
@@ -154,13 +152,13 @@ export function StaffScopeEditor({
       </fieldset>
 
       <fieldset className="grid gap-1.5">
-        <legend className="text-[13px] text-faint">
+        <legend className="text-13 text-faint">
           {t.sections.staff.scopeCitiesLabel}
         </legend>
         {cities.length === 0 ? (
-          <p className="text-[14px] text-warn">{t.sections.staff.scopeCitiesFailed}</p>
+          <p className="text-14 text-warn">{t.sections.staff.scopeCitiesFailed}</p>
         ) : (
-          <div className="flex flex-wrap gap-x-4 gap-y-2 text-[14px]">
+          <div className="flex flex-wrap gap-x-4 gap-y-2 text-14">
             {cities.map((city) => (
               <label
                 key={city.slug}
@@ -191,9 +189,7 @@ export function StaffScopeEditor({
 
       <div className="flex flex-wrap items-end gap-2">
         <label className="grid gap-1">
-          <span className="text-[13px] text-faint">
-            {t.sections.staff.scopeOutsideLabel}
-          </span>
+          <span className="text-13 text-faint">{t.sections.staff.scopeOutsideLabel}</span>
           <select
             value={outside}
             disabled={busy}
@@ -208,7 +204,7 @@ export function StaffScopeEditor({
         </label>
 
         <label className="grid flex-1 gap-1">
-          <span className="text-[13px] text-faint">{t.sections.staff.scopeReason}</span>
+          <span className="text-13 text-faint">{t.sections.staff.scopeReason}</span>
           <input
             type="text"
             value={reason}

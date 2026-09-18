@@ -291,7 +291,7 @@ export function DisputeEvidence({
 
   return (
     <div className="mt-3 border-t border-line pt-3">
-      <p className="mb-2 text-[14px] font-semibold text-faint">{c.evidenceTitle}</p>
+      <p className="mb-2 text-14 font-semibold text-faint">{c.evidenceTitle}</p>
 
       <div className="flex flex-wrap items-center gap-2">
         {evidence.map((one) =>
@@ -299,7 +299,7 @@ export function DisputeEvidence({
             <span
               key={one.id}
               data-evidence-pending={one.id}
-              className="grid h-16 w-20 place-items-center rounded-lg border border-dashed border-line px-1 text-center text-[13px] text-faint"
+              className="grid h-16 w-20 place-items-center rounded-lg border border-dashed border-line px-1 text-center text-13 text-faint"
             >
               {slow ? c.evidenceSlow : c.evidenceProcessing}
             </span>
@@ -343,7 +343,7 @@ export function DisputeEvidence({
                 {one.sharedWithPartner ? (
                   <span
                     data-evidence-shared={one.id}
-                    className="absolute inset-x-0 bottom-0 rounded-b-lg bg-[rgba(12,14,20,0.66)] px-1 py-[2px] text-center text-[13px] font-semibold text-white"
+                    className="absolute inset-x-0 bottom-0 rounded-b-lg bg-[rgba(12,14,20,0.66)] px-1 py-[2px] text-center text-13 font-semibold text-white"
                   >
                     {c.evidenceSharedBadge}
                   </span>
@@ -360,7 +360,7 @@ export function DisputeEvidence({
                       setReplacing(one.id);
                       file.current?.click();
                     }}
-                    className="cursor-pointer text-[13px] text-faint transition-colors hover:text-gold-read disabled:opacity-50"
+                    className="cursor-pointer text-13 text-faint transition-colors hover:text-gold-read disabled:opacity-50"
                   >
                     {c.evidenceReplace}
                   </button>
@@ -369,7 +369,7 @@ export function DisputeEvidence({
                     disabled={busy || removing !== null}
                     data-evidence-remove={one.id}
                     onClick={() => void remove(one.id)}
-                    className="cursor-pointer text-[13px] text-faint transition-colors hover:text-bad disabled:opacity-50"
+                    className="cursor-pointer text-13 text-faint transition-colors hover:text-bad disabled:opacity-50"
                   >
                     {removing === one.id ? c.evidenceRemoving : c.evidenceRemove}
                   </button>
@@ -384,7 +384,7 @@ export function DisputeEvidence({
                       disabled={busy || sharing !== null}
                       data-evidence-share={one.id}
                       onClick={() => void toggleShare(one.id, !one.sharedWithPartner)}
-                      className="cursor-pointer text-[13px] text-faint transition-colors hover:text-sky disabled:opacity-50"
+                      className="cursor-pointer text-13 text-faint transition-colors hover:text-sky disabled:opacity-50"
                     >
                       {sharing === one.id
                         ? c.evidenceSharing
@@ -405,7 +405,7 @@ export function DisputeEvidence({
               type="button"
               disabled={busy}
               onClick={() => file.current?.click()}
-              className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-dashed border-line px-3 py-1.5 text-[13px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read disabled:opacity-50 lg:min-h-0"
+              className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-dashed border-line px-3 py-1.5 text-13 text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read disabled:opacity-50 lg:min-h-0"
             >
               {busy ? c.evidenceUploading : c.evidenceAdd}
             </button>
@@ -428,14 +428,12 @@ export function DisputeEvidence({
         )}
       </div>
 
-      {error ? (
-        <p className="mt-1.5 text-[14px] font-semibold text-bad">{error}</p>
-      ) : null}
+      {error ? <p className="mt-1.5 text-14 font-semibold text-bad">{error}</p> : null}
 
       {/* What «حذف» actually does, said before it is pressed rather than after. */}
       {closed || evidence.length === 0 ? null : (
         <>
-          <p className="mt-1.5 text-[14px] text-faint">{c.evidenceRemoveNote}</p>
+          <p className="mt-1.5 text-14 text-faint">{c.evidenceRemoveNote}</p>
           {/*
             The DEFAULT stated where the decision is made.
 
@@ -451,7 +449,7 @@ export function DisputeEvidence({
               and the whole model is in that sentence. It was set in the decorative tone at 2.3:1,
               which an operator has to read before pressing «شارِك». `faint` is 4.82:1.
             */
-            <p className="mt-1 text-[14px] leading-relaxed text-faint">
+            <p className="mt-1 text-14 leading-relaxed text-faint">
               {c.evidenceShareNote}
             </p>
           ) : null}
