@@ -579,6 +579,31 @@ html[data-theme='dark'] {
   color-scheme: dark;
 }
 
+/**
+ * In-page jumps GLIDE rather than teleport.
+ *
+ * Every anchor on this app points at a section of the page the reader is already on —
+ * «الموقع», «تقييمات الضيوف», the rooms, the booking panel. An instant jump gives them a
+ * completely different screen with no account of how they got there, and the commonest
+ * recovery is to scroll back up to check nothing was missed. The movement IS the
+ * explanation, which is the one purpose that earns an animation on something a reader does
+ * often.
+ *
+ * Declared here rather than per link, because the alternative is one anchor that glides
+ * while the three beside it snap — an inconsistency a reader feels without being able to
+ * name it.
+ *
+ * `prefers-reduced-motion` is not optional: this moves the entire viewport, which is the
+ * motion most likely to make somebody ill. Outside the query the jump stays instant, which
+ * is the correct behaviour rather than a degraded one. The `scroll-mt-*` on each target
+ * keeps the heading clear of the sticky header either way.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
 body {
   font-family: var(--font-sans);
   /* Arabic needs a little more line height than Latin at the same size. */

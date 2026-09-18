@@ -654,15 +654,25 @@ export default async function PropertyPage({
                     them off the line they were just aligned to. Top-aligned, the text keeps
                     its position and the target still reaches 40px.
 
-                    The underline is present rather than hover-only — a link nobody can see
-                    is a link nobody presses — but drawn in the text's own colour at 40% so
-                    it does not shout beside the two buttons above it.
+                    No underline (Bashar, 2026-09-18). The affordance is the colour change on
+                    hover and the cursor; the star beside it is gold, which already marks the
+                    block as something other than the grey line opposite.
                   */}
                   <a
                     href="#reviews"
-                    className="inline-flex min-h-10 flex-wrap items-start gap-x-1.5 text-muted underline decoration-muted/40 underline-offset-4 transition-colors hover:text-gold-read hover:decoration-gold focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold lg:min-h-0"
+                    className="inline-flex min-h-10 cursor-pointer flex-wrap items-start gap-x-1.5 text-muted transition-colors hover:text-gold-read focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold lg:min-h-0"
                   >
-                    {property.rating ? <span>★ {property.rating}</span> : null}
+                    {/*
+                      `text-gold-read`, the same gold `StarRating` paints the classification
+                      with — so the two stars on this screen are one colour rather than two
+                      that nearly match. It is also the value that clears 4.5:1 at this size;
+                      `--color-gold` is the brand's surface tone and only clears 3:1.
+                    */}
+                    {property.rating ? (
+                      <span>
+                        <span className="text-gold-read">★</span> {property.rating}
+                      </span>
+                    ) : null}
                     {property.reviewsCount > 0 ? (
                       <span>
                         {property.rating ? '· ' : ''}
