@@ -626,7 +626,28 @@ export default async function PropertyPage({
                 one thing they must never do is read as one.
               */}
               {property.rating || property.reviewsCount > 0 ? (
-                <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-muted">
+                /*
+                  Dropped one line when the listing has star CLASSIFICATION, so it reads level
+                  with «فندق · دمشق» in the other column rather than level with the stars
+                  above it (Bashar, 2026-09-18: «move it to the next line»).
+
+                  Measured, not guessed: without the offset the score sat 31px above that line
+                  at every width where the two columns are side by side, which is exactly the
+                  height the stars' own line occupies in the opposite column. `mt-8` is the
+                  token that lands on it.
+
+                  Conditional, because the gap is CAUSED by the stars: a listing with no
+                  classification has no such line, and three of the seeded ones do not — the
+                  offset would push the score a line below the text it is meant to sit beside.
+
+                  `sm:` because below that the two columns stack, and there is nothing left to
+                  line up with.
+                */
+                <p
+                  className={`flex flex-wrap items-center gap-x-1.5 text-sm text-muted${
+                    property.starRating ? ' sm:mt-8' : ''
+                  }`}
+                >
                   {property.rating ? <span>★ {property.rating}</span> : null}
                   {property.reviewsCount > 0 ? (
                     <span>
