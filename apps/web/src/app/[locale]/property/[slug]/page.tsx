@@ -643,18 +643,33 @@ export default async function PropertyPage({
                   `sm:` because below that the two columns stack, and there is nothing left to
                   line up with.
                 */
-                <p
-                  className={`flex flex-wrap items-center gap-x-1.5 text-sm text-muted${
-                    property.starRating ? ' sm:mt-8' : ''
-                  }`}
-                >
-                  {property.rating ? <span>★ {property.rating}</span> : null}
-                  {property.reviewsCount > 0 ? (
-                    <span>
-                      {property.rating ? '· ' : ''}
-                      {t('reviews', { count: property.reviewsCount })}
-                    </span>
-                  ) : null}
+                <p className={`text-sm${property.starRating ? ' sm:mt-8' : ''}`}>
+                  {/*
+                    A LINK to «تقييمات الضيوف» (Bashar, 2026-09-18). A score and a count are
+                    a summary of that section, and a reader who reads them wants the reviews
+                    behind them — booking.com makes the same block the way in.
+
+                    `items-start` rather than the house `items-center`: the 40px touch floor
+                    below `lg` would otherwise centre the words inside a taller box and push
+                    them off the line they were just aligned to. Top-aligned, the text keeps
+                    its position and the target still reaches 40px.
+
+                    The underline is present rather than hover-only — a link nobody can see
+                    is a link nobody presses — but drawn in the text's own colour at 40% so
+                    it does not shout beside the two buttons above it.
+                  */}
+                  <a
+                    href="#reviews"
+                    className="inline-flex min-h-10 flex-wrap items-start gap-x-1.5 text-muted underline decoration-muted/40 underline-offset-4 transition-colors hover:text-gold-read hover:decoration-gold focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold lg:min-h-0"
+                  >
+                    {property.rating ? <span>★ {property.rating}</span> : null}
+                    {property.reviewsCount > 0 ? (
+                      <span>
+                        {property.rating ? '· ' : ''}
+                        {t('reviews', { count: property.reviewsCount })}
+                      </span>
+                    ) : null}
+                  </a>
                 </p>
               ) : null}
             </div>
@@ -861,7 +876,13 @@ export default async function PropertyPage({
             </section>
 
             {/* ── What guests said (§5.6, §7.3) ──────────────────────────────── */}
-            <section>
+            {/*
+              `id` and `scroll-mt-28` because the score in the header now links here
+              (Bashar, 2026-09-18). The scroll margin is not decoration: the site header is
+              sticky, and without it the browser lands with «تقييمات الضيوف» underneath it —
+              the same reason `#location` and `#booking` carry one.
+            */}
+            <section id="reviews" className="scroll-mt-28">
               <h2 className="font-display text-xl text-text">{t('reviewsTitle')}</h2>
 
               {property.reviews.length === 0 ? (
