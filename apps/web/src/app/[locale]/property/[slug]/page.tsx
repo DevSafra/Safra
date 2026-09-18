@@ -1280,13 +1280,23 @@ export default async function PropertyPage({
   );
 }
 
-/** A location mark, in the stroke weight the rest of the product's icons are drawn at. */
+/**
+ * A location mark, at the size and stroke the rest of the product's icons are drawn at.
+ *
+ * `1.25rem`, not `1em`. Sized in `em` it inherited the address line's 14px and came out
+ * smaller than every other icon on the platform — the slider's controls and the map's close
+ * cross are all 20px on the same 24px grid. Bashar asked for it bigger on 2026-09-18; the
+ * house size is what it should have been.
+ *
+ * A fixed size rather than a larger multiple, because `em` ties the mark to whatever text
+ * it happens to sit beside, and this one sits beside the smallest text on the screen.
+ */
 function PinIcon() {
   return (
     <svg
       aria-hidden
-      width="1em"
-      height="1em"
+      width="1.25rem"
+      height="1.25rem"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
