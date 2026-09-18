@@ -523,23 +523,39 @@ export default async function PropertyPage({
                 </p>
               ) : null}
 
-              <p className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted">
-                <span>
-                  {dynamicMessage(
-                    tt,
-                    property.propertyTypeCode,
-                    property.propertyTypeCode,
-                  )}
+              {/*
+                Two groups at opposite ends (Bashar, 2026-09-18): what the place IS at the
+                reading start, what guests SCORED it at the end — physically left in Arabic.
+                They were one run of `·`-separated text, which read as a single list in which
+                the score was just another item.
+
+                The property reference used to close that list and is gone entirely, on the
+                same instruction: «remove the property code, do not write it please». Nothing
+                else on this page printed it, so the customer site no longer shows it at all.
+              */}
+              <p className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm text-muted">
+                <span className="flex flex-wrap items-center gap-x-1.5">
+                  <span>
+                    {dynamicMessage(
+                      tt,
+                      property.propertyTypeCode,
+                      property.propertyTypeCode,
+                    )}
+                  </span>
+                  <span>· {cityName}</span>
                 </span>
-                <span>
-                  · {cityName}
-                  {property.rating ? ` · ★ ${property.rating}` : ''}
-                  {property.reviewsCount > 0
-                    ? ` · ${t('reviews', { count: property.reviewsCount })}`
-                    : ''}
-                  {' · '}
-                  <span className="text-faint">{property.reference}</span>
-                </span>
+
+                {property.rating || property.reviewsCount > 0 ? (
+                  <span className="flex flex-wrap items-center gap-x-1.5">
+                    {property.rating ? <span>★ {property.rating}</span> : null}
+                    {property.reviewsCount > 0 ? (
+                      <span>
+                        {property.rating ? '· ' : ''}
+                        {t('reviews', { count: property.reviewsCount })}
+                      </span>
+                    ) : null}
+                  </span>
+                ) : null}
               </p>
 
               {/*
