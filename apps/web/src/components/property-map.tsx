@@ -529,8 +529,8 @@ export function PropertyMap({
             onClick={close}
             className="absolute end-4 top-4 z-10 inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border border-line bg-card px-4 text-sm font-bold text-text shadow-[var(--shadow-lift)] transition-[transform,box-shadow] duration-150 ease-out-strong hover:shadow-[var(--shadow-lift-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold active:scale-[0.97] motion-reduce:transition-none lg:min-h-0 lg:py-2"
           >
-            <CloseIcon />
             {labels.close}
+            <CloseIcon />
           </button>
 
           {/*
@@ -558,18 +558,30 @@ export function PropertyMap({
   );
 }
 
-/** A cross, in the stroke weight the rest of the product's icons are drawn at. */
+/**
+ * The product's close cross, drawn to the same specification as the image slider's.
+ *
+ * `1.25rem` and a 1.75 stroke on a 24px grid — identical geometry to `Icon name="close"`
+ * in `@safra/ui`, because two crosses that differ by a few pixels read as a mistake rather
+ * than a choice. It was `1em`, which at this button's 14px made a 14px cross beside
+ * 700-weight Arabic: spindly, and smaller than every other close control on the platform.
+ *
+ * Copied rather than imported: the slider's `Icon` is private to that file, and exporting
+ * it to share one path would make a public API out of an implementation detail. If a third
+ * cross appears, that is the moment to lift all three into one place.
+ */
 function CloseIcon() {
   return (
     <svg
       aria-hidden
-      width="1em"
-      height="1em"
+      width="1.25rem"
+      height="1.25rem"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
       strokeWidth={1.75}
       strokeLinecap="round"
+      strokeLinejoin="round"
       className="shrink-0"
     >
       <path d="M6 6l12 12M18 6L6 18" />

@@ -172,7 +172,7 @@
     "map": {
       "show": "Show on map",
       "region": "Map of the area around the property",
-      "close": "Close map",
+      "close": "Close",
       "dialog": "Map of the property's location",
       "view": "View"
     },
