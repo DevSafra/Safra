@@ -524,38 +524,23 @@ export default async function PropertyPage({
               ) : null}
 
               {/*
-                Two groups at opposite ends (Bashar, 2026-09-18): what the place IS at the
-                reading start, what guests SCORED it at the end — physically left in Arabic.
-                They were one run of `·`-separated text, which read as a single list in which
-                the score was just another item.
+                What the place IS, and nothing else.
 
-                The property reference used to close that list and is gone entirely, on the
-                same instruction: «remove the property code, do not write it please». Nothing
-                else on this page printed it, so the customer site no longer shows it at all.
+                The guest score left this line on 2026-09-18 (Bashar: «move them to the other
+                side under the share and favorite buttons») and now sits with the actions. The
+                property reference left it on the same day and is gone from the site entirely —
+                «remove the property code, do not write it please» — and nothing else on this
+                page printed it.
               */}
-              <p className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm text-muted">
-                <span className="flex flex-wrap items-center gap-x-1.5">
-                  <span>
-                    {dynamicMessage(
-                      tt,
-                      property.propertyTypeCode,
-                      property.propertyTypeCode,
-                    )}
-                  </span>
-                  <span>· {cityName}</span>
+              <p className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted">
+                <span>
+                  {dynamicMessage(
+                    tt,
+                    property.propertyTypeCode,
+                    property.propertyTypeCode,
+                  )}
                 </span>
-
-                {property.rating || property.reviewsCount > 0 ? (
-                  <span className="flex flex-wrap items-center gap-x-1.5">
-                    {property.rating ? <span>★ {property.rating}</span> : null}
-                    {property.reviewsCount > 0 ? (
-                      <span>
-                        {property.rating ? '· ' : ''}
-                        {t('reviews', { count: property.reviewsCount })}
-                      </span>
-                    ) : null}
-                  </span>
-                ) : null}
+                <span>· {cityName}</span>
               </p>
 
               {/*
@@ -601,16 +586,17 @@ export default async function PropertyPage({
             bar at the foot of the viewport rather than putting this back, because that is the
             pattern that keeps the action visible without duplicating it.
           */}
-            <div className="flex flex-wrap items-center gap-2">
-              <ShareButton
-                labels={{
-                  share: t('share'),
-                  copied: t('shareCopied'),
-                  failed: t('shareFailed'),
-                }}
-              />
+            <div className="flex flex-col items-start gap-2 sm:items-end">
+              <div className="flex flex-wrap items-center gap-2">
+                <ShareButton
+                  labels={{
+                    share: t('share'),
+                    copied: t('shareCopied'),
+                    failed: t('shareFailed'),
+                  }}
+                />
 
-              {/*
+                {/*
               «حفظ في المفضلة» (Bashar, 2026-09-03). It sat under the name before, in the column
               that answers «what is this» — and saving is not a fact about the listing, it is
               something the reader does to it.
@@ -619,15 +605,37 @@ export default async function PropertyPage({
               between readers and must carry nobody's shortlist. The button asks for its own state
               after mounting, which keeps the page cacheable.
             */}
-              <SaveButton
-                slug={property.slug}
-                signInHref={`/${locale}/login?next=${encodeURIComponent(backHere)}`}
-                labels={{
-                  save: t('save'),
-                  saved: t('saved'),
-                  failed: t('saveFailed'),
-                }}
-              />
+                <SaveButton
+                  slug={property.slug}
+                  signInHref={`/${locale}/login?next=${encodeURIComponent(backHere)}`}
+                  labels={{
+                    save: t('save'),
+                    saved: t('saved'),
+                    failed: t('saveFailed'),
+                  }}
+                />
+              </div>
+
+              {/*
+                The guest score, under the two actions (Bashar, 2026-09-18).
+
+                It is the only fact on this screen that belongs to READERS rather than to the
+                listing, which is why it now sits with the controls a reader uses rather than
+                in the line describing the building. A whole column separates it from the
+                classification stars under the name — the two are different measures and the
+                one thing they must never do is read as one.
+              */}
+              {property.rating || property.reviewsCount > 0 ? (
+                <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-muted">
+                  {property.rating ? <span>★ {property.rating}</span> : null}
+                  {property.reviewsCount > 0 ? (
+                    <span>
+                      {property.rating ? '· ' : ''}
+                      {t('reviews', { count: property.reviewsCount })}
+                    </span>
+                  ) : null}
+                </p>
+              ) : null}
             </div>
           </div>
 
