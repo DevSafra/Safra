@@ -414,6 +414,7 @@ export class PropertiesService {
       cover_key: string | null;
       cover_widths: number[] | null;
       unit_count: number;
+      has_location: boolean;
       from_price: string | null;
       currency_code: string | null;
       created_at: string;
@@ -438,6 +439,11 @@ export class PropertiesService {
              img.file_key AS cover_key,
              img.variant_widths AS cover_widths,
              coalesce(u.unit_count, 0)::int AS unit_count,
+             -- Whether a guest can see this listing on a map at all. Read from the PUBLIC
+             -- column, because that is the one the customer site consults: a listing whose
+             -- latitude is a blank string has a raw value and no location, and saying
+             -- otherwise here would tell a partner the job was done.
+             (pr.public_latitude IS NOT NULL AND pr.public_longitude IS NOT NULL) AS has_location,
              u.from_price::text AS from_price,
              u.currency_code,
              to_char(pr.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at
@@ -488,6 +494,7 @@ export class PropertiesService {
       coverKey: row.cover_key,
       coverWidths: row.cover_widths ?? [],
       unitCount: row.unit_count,
+      hasLocation: row.has_location,
       fromPrice: row.from_price,
       currencyCode: row.currency_code,
       createdAt: row.created_at,
@@ -685,8 +692,47 @@ export class PropertiesService {
     */
     const structural = Object.keys(input).filter((key) => key !== 'amenityCodes');
 
+    /*
+      ## A location a listing has never had is a GAP, not a change
+
+      §8.1 freezes what SAFRA verified — the address, the city, the classification — and this
+      guard is what enforces it. Coordinates were inside that freeze, and the consequence was
+      measured on 2026-09-23: **67 of 2,017 published listings had them.** Every map feature
+      the guest side offers was dark for the rest, and the only route to fixing one was a
+      support ticket per listing.
+
+      The distinction that makes this safe is between SETTING and MOVING:
+
+      - Setting a location that is currently null does not contradict anything SAFRA checked.
+        The address is unchanged and still verified; the partner is saying where that address
+        already is. Nothing about the «موثّق» badge becomes untrue.
+      - MOVING an existing one is a claim about a different place, and is still refused at
+        every published status — which is what P-002 is protecting.
+
+      So the exception is narrow by construction: allowed only while BOTH stored coordinates
+      are null, and only for the coordinate pair. Anything else in the same patch falls back
+      to the ordinary rule, so a partner cannot smuggle an address change alongside a pin.
+
+      `properties-location-gap.integration.test.ts` holds both halves — that a placed listing
+      is still frozen, and that an unplaced one can be completed.
+    */
+    const onlyCoordinates =
+      structural.length > 0 &&
+      structural.every((key) => key === 'latitude' || key === 'longitude');
+
+    const unplaced =
+      (property.latitude === null || property.latitude === '') &&
+      (property.longitude === null || property.longitude === '');
+
+    /* Clearing a location on a published listing is a change, not a completion. */
+    const settingNotClearing =
+      (input.latitude ?? null) !== null && (input.longitude ?? null) !== null;
+
+    const completingTheGap = onlyCoordinates && unplaced && settingNotClearing;
+
     if (
       structural.length > 0 &&
+      !completingTheGap &&
       !STRUCTURALLY_EDITABLE.includes(
         property.status as (typeof STRUCTURALLY_EDITABLE)[number],
       )
@@ -1176,7 +1222,18 @@ export class PropertiesService {
         eq(schema.properties.partnerId, partnerId),
         isNull(schema.properties.deletedAt),
       ),
-      columns: { id: true, status: true, slug: true, starRating: true },
+      /*
+        The coordinates too, because `update` has to know whether this listing has a location
+        BEFORE deciding whether setting one is a completion or a change — see the note there.
+      */
+      columns: {
+        id: true,
+        status: true,
+        slug: true,
+        starRating: true,
+        latitude: true,
+        longitude: true,
+      },
       /*
         The TYPE, because the star classification is a hotel classification and `update` has to
         know what kind of place this is. Only the code — one text column through an existing

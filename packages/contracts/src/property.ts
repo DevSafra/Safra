@@ -303,7 +303,26 @@ export const propertyUpdateSchema = propertyBaseSchema
     Found on 2026-09-06 by an amenity-only patch answering 409 property.not_structurally_editable —
     the refusal named a field the caller had never sent.
   */
-  .extend({ attributes: z.array(tripAttributeSchema).max(10).optional() })
+  .extend({
+    attributes: z.array(tripAttributeSchema).max(10).optional(),
+    /*
+      NULLABLE on a patch, and only on a patch.
+
+      «A listing has no location» is a state the database has always allowed and 1,950 of
+      2,017 listings were in — so a partner who opens the map picker and decides not to
+      publish a location must be able to say so. `undefined` cannot: on a PATCH it means
+      «leave this alone», which is a different sentence.
+
+      Not on the base schema, because a CREATE has nothing to unset. Widening both would let
+      `{latitude: null}` arrive at creation, which is `{}` written the long way.
+
+      `PropertiesService.update` refuses this on a published listing — clearing a verified
+      location is a change, not the gap-completion the narrow exception allows. The contract
+      states what is EXPRESSIBLE; the service states who may do it.
+    */
+    latitude: latitudeSchema.nullable().optional(),
+    longitude: longitudeSchema.nullable().optional(),
+  })
   .strict()
   /*
     The half of the hotel rule a PATCH can decide on its own.

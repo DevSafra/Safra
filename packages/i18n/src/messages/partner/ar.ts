@@ -750,9 +750,19 @@ export const ar = {
     city: 'المدينة',
     type: 'النوع',
     policy: 'سياسة الإلغاء',
-    latitude: 'خط العرض (اختياري)',
-    longitude: 'خط الطول (اختياري)',
-    coordinatesHint: 'بالدرجات العشرية، مثل 33.5138',
+    /*
+      The two decimal-degree fields these replace were «optional» and had been filled for 67
+      of 2,017 listings. A partner who runs a guest house has no way to obtain a latitude;
+      they know exactly where their building is on a map.
+    */
+    locationHeading: 'موقع العقار على الخريطة',
+    locationHelp:
+      'حرّك الخريطة حتى تقع العلامة على مبناك. الضيوف يرون منطقة تقريبية فقط، لا العنوان الدقيق.',
+    locationMissing: 'لم تُحدَّد بعد — الخريطة والمسافات لن تظهر للضيوف بدونها.',
+    locationSet: 'استخدم مركز الخريطة',
+    locationClear: 'إزالة التحديد',
+    locationCoordinates: 'الإحداثيات',
+    locationUnavailable: 'الخريطة غير متاحة الآن. يمكنك الحفظ والعودة لاحقاً.',
     save: 'حفظ التعديلات',
     saving: 'جارٍ الحفظ…',
     saved: 'حُفظت التعديلات.',
@@ -957,6 +967,15 @@ export const ar = {
     reviews: 'من {n} تقييماً',
     /** Shown where a listing has no photo yet, in place of the 140px image. */
     noPhoto: 'لا صورة بعد',
+    /*
+      The location prompt, on the CARD rather than only inside the editor.
+
+      67 of 2,017 listings had coordinates, and a partner has no reason to open a form to
+      look for something they do not know is missing. Naming the consequence — «لا تظهر على
+      الخريطة» — rather than the field is what makes it worth acting on.
+    */
+    noLocation: 'لا تظهر على الخريطة',
+    addLocation: 'حدّد الموقع',
     from: 'من',
     edit: 'تعديل',
     calendar: 'التقويم',
