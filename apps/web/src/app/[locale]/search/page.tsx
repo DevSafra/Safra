@@ -20,6 +20,7 @@ import {
   getPublicSettings,
 } from '@/lib/catalog';
 import { searchSafely } from '@/lib/api';
+import { localisedText } from '@/lib/localise';
 import { todayInDamascus } from '@/lib/settings';
 
 /**
@@ -352,6 +353,18 @@ export default async function SearchPage({
     infants: String(infants),
   }).toString()}`;
 
+  /* The landmark's NAME, for the distance line on each card. */
+  const nearLandmarkLabel = nearLandmark
+    ? localisedText(
+        landmarks.find((one) => one.slug === nearLandmark)?.name ?? {
+          ar: null,
+          en: null,
+          de: null,
+        },
+        locale,
+      ) || undefined
+    : undefined;
+
   const sortOptions: { value: Sort; label: string }[] = [
     { value: 'recommended', label: t('sortRecommended') },
     { value: 'price_asc', label: t('sortPriceAsc') },
@@ -495,7 +508,17 @@ export default async function SearchPage({
               <ul className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {results.items.map((item) => (
                   <li key={item.propertyReference}>
-                    <PropertyCard item={item} locale={locale} stay={stay} />
+                    <PropertyCard
+                      item={item}
+                      locale={locale}
+                      stay={stay}
+                      /*
+                        Resolved once for the page rather than per card: the landmark list is
+                        already in hand, and a lookup inside the card would repeat for every
+                        result to answer the same question.
+                      */
+                      nearLandmarkName={nearLandmarkLabel}
+                    />
                   </li>
                 ))}
               </ul>

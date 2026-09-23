@@ -48,9 +48,17 @@ export async function PropertyCard({
   item,
   locale,
   stay,
+  nearLandmarkName,
 }: {
   item: SearchResultItem;
   locale: Locale;
+  /**
+   * The landmark the search measured from, in the reader's language.
+   *
+   * A NAME rather than a slug, resolved by the caller: only the page holds the landmark list,
+   * and a card that looked one up would be a second fetch per result.
+   */
+  nearLandmarkName?: string | undefined;
   /**
    * The party and the dates the reader searched for, as a ready-made `?…` string.
    *
@@ -68,6 +76,7 @@ export async function PropertyCard({
   const t = await getTranslations('property');
   const tt = await getTranslations('propertyTypes');
   const ts = await getTranslations('starRating');
+  const tsearch = await getTranslations('search');
 
   /*
     No conversion: the platform prices, quotes and charges in ONE currency (Bashar, 2026-09-14).
@@ -215,18 +224,31 @@ export async function PropertyCard({
           is: the input is a coordinate good to about 100 m, so a sharper figure would claim
           precision the data never had.
         */}
-        {item.distanceMetres !== null ? (
+        {item.distanceMetres !== null && nearLandmarkName ? (
           <p className="mt-1 text-13 tabular-nums text-faint">
-            {item.distanceMetres < 1000
-              ? t('distanceM', {
-                  value: new Intl.NumberFormat(locale).format(item.distanceMetres),
-                })
-              : t('distanceKm', {
-                  value: new Intl.NumberFormat(locale, {
-                    minimumFractionDigits: 1,
-                    maximumFractionDigits: 1,
-                  }).format(item.distanceMetres / 1000),
-                })}
+            {/*
+              «على بعد ١٫٠ كم من الجامع الأموي» — the distance NAMES its origin.
+
+              A bare «1.0 كم» on a card is a number with no stated reference. The filter that
+              produced it is on the same screen, so a reader can infer it — but a card is the
+              thing people screenshot, share and compare side by side, and it has to carry its
+              own meaning. Rendered only WITH a landmark for the same reason: without one there
+              is nothing true to say.
+            */}
+            {tsearch('resultDistance', {
+              value:
+                item.distanceMetres < 1000
+                  ? t('distanceM', {
+                      value: new Intl.NumberFormat(locale).format(item.distanceMetres),
+                    })
+                  : t('distanceKm', {
+                      value: new Intl.NumberFormat(locale, {
+                        minimumFractionDigits: 1,
+                        maximumFractionDigits: 1,
+                      }).format(item.distanceMetres / 1000),
+                    }),
+              landmark: nearLandmarkName,
+            })}
           </p>
         ) : null}
 
