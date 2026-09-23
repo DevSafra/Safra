@@ -27,8 +27,12 @@ import {
   createCitySchema,
   createCountrySchema,
   createCurrencySchema,
+  createLandmarkKindSchema,
+  createLandmarkSchema,
   updateCityCategorySchema,
   updateCitySchema,
+  updateLandmarkKindSchema,
+  updateLandmarkSchema,
   updateCountrySchema,
   updateCurrencySchema,
   giftCardCancelSchema,
@@ -40,7 +44,11 @@ import {
   type CreateCityInput,
   type CreateCountryInput,
   type CreateCurrencyInput,
+  type CreateLandmarkInput,
+  type CreateLandmarkKindInput,
   type UpdateCityCategoryInput,
+  type UpdateLandmarkInput,
+  type UpdateLandmarkKindInput,
   type UpdateCityInput,
   type UpdateCountryInput,
   type UpdateCurrencyInput,
@@ -65,6 +73,7 @@ import { PromotionsService } from './promotions.service.js';
 import { GeoService } from './geo.service.js';
 import { GeoWriteService } from './geo-write.service.js';
 import { GeoCategoryService } from './geo-category.service.js';
+import { LandmarkService } from './landmark.service.js';
 import { ReportsService } from './reports.service.js';
 import { StaffOverviewService } from './staff-overview.service.js';
 import { ExportRequestService } from './export-request.service.js';
@@ -87,6 +96,17 @@ import {
 const listQuerySchema = pageQuerySchema.extend({
   /** Free text. Bounded because it reaches a `LIKE` pattern. */
   q: z.string().trim().min(1).max(80).optional(),
+});
+
+/**
+ * The landmark registry's page request.
+ *
+ * `.strict()` for the reason `listQuerySchema` records: a typo'd filter must be refused rather
+ * than ignored, because ignoring it shows more rows than the caller asked for and says nothing.
+ */
+const landmarkQuerySchema = listQuerySchema.extend({
+  citySlug: z.string().trim().min(1).max(80).optional(),
+  kindCode: z.string().trim().min(1).max(40).optional(),
 });
 
 /** One definition, used by both the list and the export, so their filters cannot diverge. */
@@ -170,6 +190,7 @@ export class RegistriesController {
     private readonly geo: GeoService,
     private readonly geoWrite: GeoWriteService,
     private readonly geoCategories: GeoCategoryService,
+    private readonly landmarkRegistry: LandmarkService,
     private readonly reports: ReportsService,
     private readonly staffOverview: StaffOverviewService,
     private readonly emergency: EmergencyService,
@@ -620,6 +641,108 @@ export class RegistriesController {
     @Body(new ZodValidationPipe(updateCityCategorySchema)) body: UpdateCityCategoryInput,
   ) {
     return this.geoCategories.update(user, code, body);
+  }
+
+  /*
+    ── المعالم ──────────────────────────────────────────────────────────────
+
+    Landmarks and the kinds that carry their icons. `SETTINGS_READ` opens the registry, because
+    reading which places exist is the same authority as reading which markets do; writing is
+    `GEO_MANAGE`, which is what already governs cities and categories — a landmark IS geography.
+
+    Every write is `AuditExempt` because `LandmarkService` records inside the transaction: a row
+    written and an audit line missing is the pair this codebase keeps refusing to allow.
+
+    Nothing hard-deletes. `archive` sets `deleted_at`, so a distance a guest saw last week still
+    has a row behind it when support is asked about it.
+  */
+
+  @Get('landmarks')
+  @RequirePermissions(P.SETTINGS_READ)
+  async landmarks(
+    @Query(new ZodValidationPipe(landmarkQuerySchema))
+    query: z.infer<typeof landmarkQuerySchema>,
+  ) {
+    /*
+      `pageQuerySchema` names the page SIZE `limit`; the service and the URL both call it
+      `size`. Mapped here rather than renamed on either side — the schema is shared by every
+      registry, and the console's bar is specified in terms of `?size=`.
+    */
+    return this.landmarkRegistry.list({
+      page: query.page,
+      size: query.limit,
+      citySlug: query.citySlug,
+      kindCode: query.kindCode,
+      q: query.q,
+    });
+  }
+
+  @Get('landmarks/kinds')
+  @RequirePermissions(P.SETTINGS_READ)
+  async landmarkKinds() {
+    return { kinds: await this.landmarkRegistry.listKinds() };
+  }
+
+  @Post('landmarks/kinds')
+  @RequirePermissions(P.GEO_MANAGE)
+  @AuditExempt('LandmarkService records landmark_kind.created inside the transaction.')
+  async createLandmarkKind(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Body(new ZodValidationPipe(createLandmarkKindSchema)) body: CreateLandmarkKindInput,
+  ) {
+    return this.landmarkRegistry.createKind(user, body);
+  }
+
+  @Patch('landmarks/kinds/:code')
+  @RequirePermissions(P.GEO_MANAGE)
+  @AuditExempt('LandmarkService records landmark_kind.updated inside the transaction.')
+  async updateLandmarkKind(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('code') code: string,
+    @Body(new ZodValidationPipe(updateLandmarkKindSchema)) body: UpdateLandmarkKindInput,
+  ) {
+    return this.landmarkRegistry.updateKind(user, code, body);
+  }
+
+  @Delete('landmarks/kinds/:code')
+  @RequirePermissions(P.GEO_MANAGE)
+  @AuditExempt('LandmarkService records landmark_kind.archived inside the transaction.')
+  async archiveLandmarkKind(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('code') code: string,
+  ) {
+    return this.landmarkRegistry.archiveKind(user, code);
+  }
+
+  @Post('landmarks')
+  @RequirePermissions(P.GEO_MANAGE)
+  @AuditExempt('LandmarkService records landmark.created inside the transaction.')
+  async createLandmark(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Body(new ZodValidationPipe(createLandmarkSchema)) body: CreateLandmarkInput,
+  ) {
+    return this.landmarkRegistry.create(user, body);
+  }
+
+  @Patch('landmarks/:slug')
+  @RequirePermissions(P.GEO_MANAGE)
+  @AuditExempt('LandmarkService records landmark.updated inside the transaction.')
+  async updateLandmark(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('slug') slug: string,
+    @Body(new ZodValidationPipe(updateLandmarkSchema)) body: UpdateLandmarkInput,
+  ) {
+    return this.landmarkRegistry.update(user, slug, body);
+  }
+
+  @Delete('landmarks/:slug')
+  @RequirePermissions(P.GEO_MANAGE)
+  @AuditExempt('LandmarkService records landmark.archived inside the transaction.')
+  async archiveLandmark(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('slug') slug: string,
+  ) {
+    return this.landmarkRegistry.archive(user, slug);
   }
 
   @Post('geo/currencies')

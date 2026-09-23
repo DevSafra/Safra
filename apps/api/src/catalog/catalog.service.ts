@@ -129,14 +129,19 @@ export class CatalogService {
       name_en: string;
       name_de: string;
     }>(sql`
-      SELECT l.slug, l.kind::text AS kind, l.name_ar, l.name_en, l.name_de
+      SELECT l.slug, k.code AS kind, l.name_ar, l.name_en, l.name_de
       FROM landmarks l
       JOIN cities c ON c.id = l.city_id
+      JOIN landmark_kinds k ON k.id = l.kind_id
       WHERE c.slug = ${citySlug}
         AND c.deleted_at IS NULL
         AND l.is_active
         AND l.deleted_at IS NULL
-      ORDER BY l.sort_order, l.slug
+        -- A kind staff deactivated takes its landmarks with it, on every surface. Otherwise
+        -- retiring a category leaves its places in a filter with no label behind them.
+        AND k.is_active
+        AND k.deleted_at IS NULL
+      ORDER BY k.sort_order, l.sort_order, l.slug
     `);
 
     return rows.rows.map((r) => ({

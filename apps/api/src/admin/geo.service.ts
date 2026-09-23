@@ -50,6 +50,14 @@ export interface GeoCityRow {
   /** The raw values, so an editor can show which are ticked. */
   readonly categories: readonly string[];
   readonly timezone: string;
+  /**
+   * Where the city IS, for the landmark picker's opening view.
+   *
+   * Nullable because a city seeded before coordinates mattered may have none; the picker then
+   * falls back to Damascus rather than an empty ocean at 0,0.
+   */
+  readonly latitude: string | null;
+  readonly longitude: string | null;
   readonly properties: number;
   readonly isActive: boolean;
   /**
@@ -266,6 +274,8 @@ export class GeoService {
       category: string;
       categories: string[];
       timezone: string;
+      latitude: string | null;
+      longitude: string | null;
       properties: number;
       is_active: boolean;
       country_active: boolean;
@@ -307,7 +317,7 @@ export class GeoService {
                JOIN city_categories cc ON cc.id = l.category_id
                WHERE l.city_id = ci.id AND cc.deleted_at IS NULL
              ), '{}')::text[]           AS categories,
-             ci.timezone,
+             ci.timezone, ci.latitude, ci.longitude,
              coalesce(pr.n, 0)::int     AS properties,
              ci.is_active,
              coalesce(co.is_active, false) AS country_active,
@@ -384,6 +394,8 @@ export class GeoService {
       category: row.category,
       categories: row.categories,
       timezone: row.timezone,
+      latitude: row.latitude,
+      longitude: row.longitude,
       properties: row.properties,
       isActive: row.is_active,
       countryActive: row.country_active,

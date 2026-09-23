@@ -79,6 +79,7 @@ const SECTION_HANDLERS: Record<
   whatsapp: [CommsController, 'listNotifications', 'getNotifications'],
   geo: [RegistriesController, 'geography', 'getGeography'],
   cityCategories: [RegistriesController, 'cityCategories', 'getCityCategories'],
+  landmarks: [RegistriesController, 'landmarks', 'getLandmarks'],
   /*
     كتالوج المنصّة reads three lists. `amenities` is the PRIMARY one — it is the table at the top
     of the page and the one a reader opens the section for; the other two degrade to their own

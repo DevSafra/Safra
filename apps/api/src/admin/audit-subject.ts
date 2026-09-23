@@ -315,6 +315,26 @@ const SOURCES: Record<string, Source> = {
     label: sql`name_ar`,
     href: () => '/city-categories',
   },
+  /*
+    A landmark, and the kind it is filed under. Both lead to المعالم, where they are managed.
+
+    Only `landmark` is written today — `landmark_kind` is here because the service audits it and
+    the first kind an operator edits would otherwise render a uuid to whoever opened the entry.
+    That is the gap `city_image` above records: a subject type nothing had written yet, so the
+    resolver was never asked and the hole was invisible until somebody used the feature.
+  */
+  landmark: {
+    table: 'landmarks',
+    reference: sql`slug`,
+    label: sql`name_ar`,
+    href: () => '/landmarks',
+  },
+  landmark_kind: {
+    table: 'landmark_kinds',
+    reference: sql`code`,
+    label: sql`name_ar`,
+    href: () => '/landmarks',
+  },
   /* `/geo` since 2026-08-30: a city is editable there, so the entry can lead somewhere. */
   city: {
     table: 'cities',

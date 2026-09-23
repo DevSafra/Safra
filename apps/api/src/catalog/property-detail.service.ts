@@ -495,12 +495,19 @@ export class PropertyDetailService {
     if (typeof cityId !== 'string' || !publicLatitude || !publicLongitude) return [];
 
     const rows = await this.db.execute<Record<string, unknown>>(sql`
-      SELECT l.slug, l.kind, l.name_ar, l.name_en, l.name_de, l.latitude, l.longitude
+      SELECT l.slug, l.name_ar, l.name_en, l.name_de, l.latitude, l.longitude,
+             k.code AS kind, k.name_ar AS kind_name_ar, k.name_en AS kind_name_en,
+             k.name_de AS kind_name_de, k.icon_paths
       FROM landmarks l
+      JOIN landmark_kinds k ON k.id = l.kind_id
       WHERE l.city_id = ${cityId}
         AND l.is_active
         AND l.deleted_at IS NULL
-      ORDER BY l.sort_order, l.slug
+        -- A kind staff deactivated takes its landmarks off the page with it. Otherwise
+        -- retiring a category leaves its places on every listing with no label behind them.
+        AND k.is_active
+        AND k.deleted_at IS NULL
+      ORDER BY k.sort_order, l.sort_order, l.slug
     `);
 
     const from = { lat: Number(publicLatitude), lon: Number(publicLongitude) };
@@ -510,6 +517,17 @@ export class PropertyDetailService {
         .map((r) => ({
           slug: r['slug'],
           kind: r['kind'],
+          /*
+            The kind's WORDS and its MARKS travel with the row, because both are data now — a
+            kind staff added has no entry in any catalogue the app ships, and an icon nobody
+            could change was the reason kinds stopped being an enum.
+          */
+          kindName: {
+            ar: r['kind_name_ar'],
+            en: r['kind_name_en'],
+            de: r['kind_name_de'],
+          },
+          iconPaths: Array.isArray(r['icon_paths']) ? r['icon_paths'] : [],
           name: { ar: r['name_ar'], en: r['name_en'], de: r['name_de'] },
           distanceMetres: publicDistanceMetres(
             from.lat,

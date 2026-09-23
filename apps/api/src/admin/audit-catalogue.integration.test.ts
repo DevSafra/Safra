@@ -92,6 +92,25 @@ const UNTRANSLATABLE = new Set<string>([
 
   /* Fixture noise from the testbed seed, which is not a code at all. */
   'test',
+
+  /*
+    Landmark KIND codes, for the same reason city-category codes are here, one layer further on:
+    a kind is a row an operator creates in المعالم with its own `name_ar`, so no catalogue
+    shipped with the code can know it. `landmark.created` audits `kindCode` because the code is
+    the stable identifier — auditing the NAME instead would be worse, since `audit_log` is
+    append-only and a kind renamed next year would silently rewrite what last year's entry says
+    happened.
+
+    ONLY what has actually been written, which is why this list is one entry rather than the
+    eight the seed ships. The sibling assertion — «exempts nothing that has stopped being
+    written» — refuses a speculative exemption, and it is right to: a list of codes nobody has
+    audited is the decay this file exists to prevent, written by the person adding the feature.
+
+    A kind an operator adds later will fail this test on its first audited write. That is the
+    intended behaviour and NOT a reason to loosen the check: it is the moment somebody decides
+    whether the new code is readable enough to stand in a log that is append-only.
+  */
+  'city_centre',
 ]);
 
 describeIfDb('what the platform has written, the console can name', () => {
