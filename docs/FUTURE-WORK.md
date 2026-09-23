@@ -2886,9 +2886,64 @@ through the `DOM.sanitize()` that GHSA-jrc7-96c5-q579 bypasses — so the obviou
 have made a CRITICAL advisory live through a feature that looks purely cosmetic. The exemption in
 `package.json` stays true, and the pills are keyboard-reachable anchors for it.
 
-**Still open:** no staff registry screen for landmarks — they are seeded, so adding one is a seed
-change and a deploy rather than a screen. SRS §1.4's «without modifying the code» is satisfied in
-the DATA but not in the workflow.
+### O-web-14 — المعالم: landmarks stop being seed-only data
+
+**Built 2026-09-23**, closing the gap O-web-13 recorded. Bashar, approving the map work: «I do not
+want landmarks to remain seed-only data… a proper Super Admin management interface». Create, edit,
+archive, categorise, assign to a city, and manage the icons — all without a deployment.
+
+**The kinds stopped being an enum, and the icon stopped being code.** The enum's own comment had
+argued the opposite case: a kind picks an ICON and a sort priority, both of which are code, so a
+kind staff could add would render as a blank glyph. That reasoning was sound and its conclusion was
+wrong, because it treated «the icon is drawn in code» as a fact rather than a choice.
+`landmark_kinds.icon_paths` holds SVG path `d` values, and `LandmarkMark` draws them — the SAME
+component on the console's preview and the customer's page, so what an operator sees while typing
+is what a guest gets.
+
+**Path data, never an uploaded `.svg`.** An SVG is an HTML document: it can carry `<script>`,
+`<foreignObject>`, event handlers and external references, and serving one from our own origin
+would hand an operator a stored-XSS primitive on the customer site. `landmarkIconPathSchema`
+restricts the value to the SVG path alphabet — no `<`, no quote, no `&`, no `(`, no `:` — so the
+string cannot open an element, close an attribute, start an entity, or form a `url()` or a
+`javascript:`, whatever a future caller does with it. React setting `d` as an attribute is the
+second, independent reason; the schema is the one that does not depend on a call site staying
+careful. `landmark-icon-safety.test.ts` asserts the GENERAL property — that no accepted value
+contains any character markup is built from — rather than a list of payloads, and three mutations
+that widened it were each caught.
+
+**A transposed coordinate is caught before it is saved.** `36.2, 33.5` instead of `33.5, 36.2` is a
+plausible pair that lands in Iraq, and every distance on every property page in that city would
+then be wrong by hundreds of kilometres with nothing on screen looking wrong.
+`LANDMARK_MAX_KM_FROM_CITY` refuses it, and the console uses the same map picker the partner portal
+does, so the pair is placed rather than typed.
+
+**The picker moved to `@safra/ui`**, because a second copy would have been a second set of MapLibre
+lifecycle bugs to find — the RTL plugin, the ResizeObserver, the rebuild-on-every-render trap. It
+takes its basemap URL as a PROP: Next inlines `process.env.NEXT_PUBLIC_*` at build time and only
+compiles the app, so an env read inside the `tsc`-built package would be `undefined` in the browser
+and the map would quietly not appear.
+
+**What the console's own guards demanded, and got.** Adding a section is not one file here — the
+codebase refuses a half-finished one, and each refusal was a real gap:
+
+| Guard                                 | What it insisted on                                                                                                                                                                                     |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `console-sections.test.ts`            | the section names a real controller route                                                                                                                                                               |
+| `audit-actions.test.ts`               | every audited action has an Arabic label                                                                                                                                                                |
+| `audit-catalogue.integration.test.ts` | every payload key and coded value is nameable — and **nothing is exempted that is not actually written**, which is why the untranslatable list holds one kind code rather than the eight the seed ships |
+| `audit-subject.integration.test.ts`   | `landmark` and `landmark_kind` resolve to a name and a link, not a uuid                                                                                                                                 |
+| `scope-coverage.test.ts`              | the routes declare their city scope, or say why they have none                                                                                                                                          |
+| `admin-sections.spec.ts`              | the sidebar's count is a literal, so a new entry is a deliberate edit                                                                                                                                   |
+
+**Verified by driving it**: signed into the console, created a landmark on the map, found it by
+search, confirmed the PUBLIC API served it to guests with no deployment in between, archived it, and
+confirmed it was gone from the public API. That round trip is the claim; a screenshot of a form is
+not.
+
+**Still open:** a landmark kind an operator adds will fail `audit-catalogue.integration.test.ts` the
+first time it is audited, by design — that is the moment somebody decides whether the new code reads
+acceptably in an append-only log. It is a prompt, not a defect, and loosening the check would be the
+exemption decay the file exists to prevent.
 
 ### O-ui-11 — Closed: the brand gold came back, and gold text got its own token
 
