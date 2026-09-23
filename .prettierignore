@@ -23,3 +23,4 @@ skills-lock.json
 # whole of `pnpm verify` fails on a vendored LICENSE.md the moment anybody runs a build.
 apps/web/public/map
 apps/partner/public/map
+apps/admin/public/map

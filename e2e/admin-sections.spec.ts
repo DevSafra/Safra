@@ -143,8 +143,13 @@ test.describe('every admin section the design specifies', () => {
       the company had earned, taken out, or was still owed itself. It sits below الإعلانات and
       above التقارير because it reads as the last of the money sections rather than the first of
       the reporting ones.
+
+      25 since 2026-09-23: المعالم. Landmarks are what every distance on a property page is
+      measured to, and they shipped as seed data — so adding one was a code change and a
+      deployment. Bashar closed that the same day he approved the map work. It sits directly
+      under الفئات because a landmark is geography, like a city and its category.
     */
-    expect(hrefs.length).toBe(24);
+    expect(hrefs.length).toBe(25);
 
     for (const href of hrefs) {
       const response = await page.goto(href);
