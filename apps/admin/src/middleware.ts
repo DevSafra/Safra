@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import {
   SESSION_MAX_AGE_SECONDS,
   STAFF_SESSION_COOKIE,
+  basemapBase,
   buildCsp,
   callAuth,
   createNonce,
@@ -74,6 +75,17 @@ export default async function middleware(request: NextRequest) {
    * Named origins rather than a blanket `https:`, for the reason `mediaOrigins` records — a
    * wildcard turns every image tag on a staff console into an exfiltration channel.
    */
+  /*
+    One derivation, shared with `LandmarkRegistry`, so the policy names exactly what the map
+    fetches. The console grew a map on 2026-09-23 — the landmark picker — and a CSP that did
+    not know about it produced a blank box with three console errors and a 200 response, which
+    is the failure mode `pnpm verify` cannot see. Found by driving the screen, not by reading it.
+  */
+  const basemap = basemapBase({
+    NEXT_PUBLIC_BASEMAP_URL: process.env['NEXT_PUBLIC_BASEMAP_URL'],
+    NEXT_PUBLIC_MEDIA_URL: process.env['NEXT_PUBLIC_MEDIA_URL'],
+  });
+
   const csp = buildCsp({
     nonce: createNonce(),
     imgSrc: [
@@ -83,8 +95,16 @@ export default async function middleware(request: NextRequest) {
       ...mediaOrigins([
         process.env['NEXT_PUBLIC_MEDIA_URL'],
         process.env['API_URL'] ?? 'http://localhost:4000',
+        /* The basemap's sprite sheet is an image; its tiles and glyphs are fetches. */
+        basemap,
       ]),
     ].join(' '),
+    /* The basemap, which MapLibre reaches with `fetch`. One origin — ours — and nothing else. */
+    connectSrc: mediaOrigins([basemap]).join(' '),
+    /* MapLibre starts its tile workers from `blob:` URLs; see `blobWorkers`. */
+    blobWorkers: Boolean(basemap),
+    /* Its Arabic text plugin is WebAssembly; see `wasm` for why this is not `unsafe-eval`. */
+    wasm: Boolean(basemap),
     /*
       TLS, not the BUILD MODE.
 

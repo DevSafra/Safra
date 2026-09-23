@@ -151,6 +151,7 @@ export const ar = {
     whatsapp: 'واتساب والبريد',
     geo: 'المدن والدول والعملات',
     cityCategories: 'الفئات',
+    landmarks: 'المعالم',
     catalogue: 'كتالوج المنصّة',
     treasury: 'خزينة سفرة',
     reports: 'التقارير',
@@ -422,6 +423,72 @@ export const ar = {
       evidence and an ad creative all open the SAME component, and a copy of these keys per screen
       is how four galleries came to behave four different ways.
     */
+    landmarks: {
+      title: 'المعالم',
+      note: 'المعالم هي ما تُقاس إليه المسافات على صفحة العقار — «وسط المدينة»، «مطار دمشق الدولي». المسافة تُحسب من منطقة العقار التقريبية لا من عنوانه الدقيق، فدقّة إحداثيات المعلم تنعكس على كل عقار في مدينته.',
+      /* The registry table. */
+      colName: 'المعلم',
+      colCity: 'المدينة',
+      colKind: 'الفئة',
+      colCoordinates: 'الإحداثيات',
+      colStatus: 'الحالة',
+      active: 'ظاهر',
+      inactive: 'مخفي',
+      empty: 'لا معالم مطابقة.',
+      search: 'ابحث بالاسم أو المعرّف',
+      allCities: 'كل المدن',
+      allKinds: 'كل الفئات',
+      /* Creating and editing one. */
+      add: '+ إضافة معلم',
+      addTitle: 'معلم جديد',
+      edit: 'تعديل',
+      editTitle: 'تعديل المعلم',
+      slug: 'المعرّف',
+      slugHint: 'يظهر في روابط البحث ولا يُعدَّل بعد الإنشاء — أحرف لاتينية صغيرة وشرطات',
+      nameAr: 'الاسم بالعربية',
+      nameEn: 'الاسم بالإنجليزية',
+      nameDe: 'الاسم بالألمانية',
+      city: 'المدينة',
+      kind: 'الفئة',
+      activeLabel: 'ظاهر — يُحتسب في قوائم المسافات وفي البحث القريب',
+      /* Archiving. */
+      archive: 'أرشفة',
+      archiveTitle: 'أرشفة معلم',
+      archiveBody:
+        'يختفي «{name}» من قوائم المسافات ومن فلتر «قريب من» فوراً. لا يُحذف السجل، فالمسافات التي رآها الضيوف تبقى قابلة للمراجعة.',
+      /* The kinds panel. */
+      kindsTitle: 'فئات المعالم',
+      kindsNote:
+        'الفئة تحمل الأيقونة التي تظهر بجانب كل معلم. أضف فئة جديدة هنا دون الحاجة إلى إصدار برمجي.',
+      kindCode: 'المعرّف',
+      kindCodeHint: 'أحرف لاتينية صغيرة وأرقام وشرطة سفلية — لا يُعدَّل بعد الإنشاء',
+      kindIcon: 'الأيقونة',
+      kindLandmarks: 'المعالم',
+      addKind: '+ إضافة فئة',
+      addKindTitle: 'فئة معالم جديدة',
+      editKindTitle: 'تعديل الفئة',
+      archiveKindTitle: 'أرشفة فئة',
+      archiveKindBody:
+        'لا يمكن أرشفة فئة تستخدمها معالم قائمة. أوقفها بدل ذلك فتختفي من الاختيار.',
+      kindActiveLabel: 'مفعَّلة — تظهر معالمها للضيوف',
+      /* The icon editor. */
+      iconPaths: 'مسارات الأيقونة',
+      iconPathsHint:
+        'بيانات مسار SVG على مربّع ‎24×24‎ — سطر لكل خط. مثال: M4 12h16. لا تُقبل وسوم ولا روابط.',
+      iconPreview: 'معاينة',
+      iconEmpty: 'بلا أيقونة',
+      /* The map picker, shared with the partner portal. */
+      locationHeading: 'موقع المعلم على الخريطة',
+      locationHelp:
+        'حرّك الخريطة حتى تقع العلامة على المعلم. موقع المعلم عام ويُحفظ بدقّته الكاملة — لا يخضع للتقريب الذي يحمي مواقع العقارات.',
+      locationMissing: 'لم يُحدَّد الموقع بعد.',
+      locationSet: 'استخدم مركز الخريطة',
+      locationClear: 'إزالة التحديد',
+      locationCoordinates: 'الإحداثيات',
+      locationUnavailable: 'الخريطة غير متاحة الآن.',
+      saved: 'حُفظ.',
+      failed: 'تعذّر الحفظ. راجع الحقول وحاول مرة أخرى.',
+    },
     cityCategories: {
       title: 'فئات المدن',
       note: 'الفئة تصف المدينة على صفحتها وفي البحث العام — «ساحلية»، «تاريخية». تُستخدم في المدن ولا تُحذف: يمكن إيقافها فتختفي من الاختيار وتبقى المدن المصنّفة تحتها كما هي.',
@@ -3705,6 +3772,8 @@ export const ar = {
     conversation: 'محادثة',
     city: 'مدينة',
     city_category: 'فئة مدن',
+    landmark: 'معلم',
+    landmark_kind: 'فئة معالم',
     /*
       Reached this catalogue the way `dispute` and `conversation` did — the first time one was
       actually written. `city_image.archived` had existed since city photography shipped and its
@@ -3787,6 +3856,13 @@ export const ar = {
     'city_category.created': 'إضافة فئة مدن',
     'city_category.updated': 'تعديل فئة مدن',
     'city_category.deleted': 'حذف فئة مدن',
+    /* المعالم — managed in the console since 2026-09-23. */
+    'landmark.created': 'إضافة معلم',
+    'landmark.updated': 'تعديل معلم',
+    'landmark.archived': 'أرشفة معلم',
+    'landmark_kind.created': 'إضافة فئة معالم',
+    'landmark_kind.updated': 'تعديل فئة معالم',
+    'landmark_kind.archived': 'أرشفة فئة معالم',
 
     /* كتالوج المنصّة — الخدمات وسياسات الإلغاء وأنواع الشركاء (2026-09-04). */
     'amenity.created': 'إضافة خدمة',
@@ -4197,6 +4273,9 @@ export const ar = {
      * the payload at all is that a dispute can turn on which fine was applied.
      */
     payloadKey: {
+      /* المعالم: المدينة التي يتبعها المعلم وفئته — كلاهما معرّف لا اسم. */
+      citySlug: 'المدينة',
+      kindCode: 'الفئة',
       /* كم بيانات تواصل حُجبت من ردّ الشريك على نزاع — العدد لا المحتوى. */
       redactedCount: 'بيانات تواصل محجوبة',
 

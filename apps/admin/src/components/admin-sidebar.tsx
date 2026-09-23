@@ -126,6 +126,8 @@ const NAV: readonly NavItem[] = [
   { key: 'geo', href: '/geo' },
   /* Directly under المدن، because a category is a property OF a city (Bashar, 2026-08-30). */
   { key: 'cityCategories', href: '/city-categories' },
+  /* Beside الفئات: a landmark is geography, and it is what distances are measured to. */
+  { key: 'landmarks', href: '/landmarks' },
   { key: 'catalogue', href: '/catalogue' },
   { key: 'treasury', href: '/treasury' },
   { key: 'reports', href: '/reports' },

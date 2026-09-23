@@ -1493,6 +1493,9 @@ const geoSchema = z.object({
       category: z.string(),
       categories: z.array(z.string()),
       timezone: z.string(),
+      /* Where the landmark picker opens when a city is chosen. */
+      latitude: z.string().nullable(),
+      longitude: z.string().nullable(),
       properties: z.number(),
       isActive: z.boolean(),
       /* Its place in the public destinations grid — what the arrows on المدن write. */
@@ -1713,6 +1716,76 @@ export async function getCityCategories() {
   return staffFetch(
     '/admin/geo/categories',
     z.object({ categories: z.array(cityCategorySchema) }),
+  );
+}
+
+const landmarkKindSchema = z.object({
+  code: z.string(),
+  nameAr: z.string(),
+  nameEn: z.string(),
+  nameDe: z.string(),
+  /* SVG path data. Never rendered as markup — see `LandmarkMark`. */
+  iconPaths: z.array(z.string()).default([]),
+  isActive: z.boolean(),
+  sortOrder: z.number(),
+  landmarks: z.number(),
+});
+
+export type LandmarkKind = z.infer<typeof landmarkKindSchema>;
+
+const landmarkSchema = z.object({
+  slug: z.string(),
+  nameAr: z.string(),
+  nameEn: z.string(),
+  nameDe: z.string(),
+  citySlug: z.string(),
+  cityNameAr: z.string(),
+  kindCode: z.string(),
+  kindNameAr: z.string(),
+  iconPaths: z.array(z.string()).default([]),
+  latitude: z.string(),
+  longitude: z.string(),
+  isActive: z.boolean(),
+  sortOrder: z.number(),
+});
+
+export type Landmark = z.infer<typeof landmarkSchema>;
+
+export async function getLandmarkKinds() {
+  return staffFetch(
+    '/admin/landmarks/kinds',
+    z.object({ kinds: z.array(landmarkKindSchema) }),
+  );
+}
+
+export async function getLandmarks(query: {
+  page: number;
+  size: number;
+  citySlug?: string | undefined;
+  kindCode?: string | undefined;
+  q?: string | undefined;
+}) {
+  const search = new URLSearchParams({
+    page: String(query.page),
+    limit: String(query.size),
+  });
+
+  /*
+    Only the filters that were actually chosen. The endpoint's schema is `.strict()`, so an
+    empty `citySlug=` would be a 400 rather than «all cities» — the refusal a caller cannot
+    act on, for a parameter they did not knowingly send.
+  */
+  if (query.citySlug) search.set('citySlug', query.citySlug);
+  if (query.kindCode) search.set('kindCode', query.kindCode);
+  if (query.q) search.set('q', query.q);
+
+  return staffFetch(
+    `/admin/landmarks?${search.toString()}`,
+    z.object({
+      items: z.array(landmarkSchema),
+      total: z.number(),
+      capped: z.boolean(),
+    }),
   );
 }
 
