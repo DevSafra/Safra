@@ -40,6 +40,7 @@ export default tseslint.config(
       // The RTL text plugin, copied out of node_modules at build time (2026-09-17). Somebody
       // else's compiled WebAssembly loader; git-ignored, in no tsconfig project, not ours to lint.
       'apps/web/public/map/**',
+      'apps/partner/public/map/**',
       // k6 load scripts (`docs/load-testing.md`). They execute inside k6's own JavaScript
       // runtime, not Node: they import `k6/http`, which resolves nowhere on this machine, and
       // rely on the `__ENV` / `__VU` / `__ITER` globals k6 injects. Type-aware linting needs a

@@ -22,3 +22,4 @@ skills-lock.json
 # output plus their licence file. Prettier does not read `.gitignore`, so without this the
 # whole of `pnpm verify` fails on a vendored LICENSE.md the moment anybody runs a build.
 apps/web/public/map
+apps/partner/public/map

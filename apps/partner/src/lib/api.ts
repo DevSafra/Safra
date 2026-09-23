@@ -113,6 +113,14 @@ const propertySchema = z.object({
   coverKey: z.string().nullable(),
   coverWidths: z.array(z.number()),
   unitCount: z.number(),
+  /**
+   * Whether a guest can find this listing on a map.
+   *
+   * `.default(false)` so a partner reading a page served by an older API is told the
+   * location is MISSING rather than being shown nothing — the cautious direction for a
+   * prompt whose whole job is to be noticed.
+   */
+  hasLocation: z.boolean().default(false),
   /** The CHEAPEST unit's nightly rate — the "from" price. See the note on `listOwn`. */
   fromPrice: z.string().nullable(),
   currencyCode: z.string().nullable(),
@@ -582,7 +590,15 @@ export function sidebarBadges(profile: PartnerProfile | 'failed' | 'unauthentica
 
 /** The reference data the §7.2 add form's selects need. All public catalogue reads. */
 const referenceSchema = z.object({
-  cities: z.array(z.object({ slug: z.string(), nameAr: z.string() })),
+  cities: z.array(
+    z.object({
+      slug: z.string(),
+      nameAr: z.string(),
+      /* Where the location picker opens for a listing that has none of its own. */
+      latitude: z.string().nullable().default(null),
+      longitude: z.string().nullable().default(null),
+    }),
+  ),
   propertyTypes: z.array(z.object({ code: z.string(), nameAr: z.string() })),
   policies: z.array(z.object({ code: z.string(), nameAr: z.string() })),
 });

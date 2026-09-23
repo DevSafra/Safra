@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+
+import { LocationPicker } from './location-picker';
 import { useRouter } from 'next/navigation';
 
 import type { PartnerPropertyDetail, PropertyFormReference } from '@/lib/api';
@@ -63,6 +65,13 @@ export function PropertyEditor({
   });
 
   const [attributes, setAttributes] = useState<readonly string[]>(property.attributes);
+
+  /*
+    Where the picker opens for a listing that has no coordinates yet. Read from the SELECTED
+    city rather than the saved one, so changing the city moves the map to it — a partner
+    correcting «Aleppo, not Damascus» should not then have to pan across the country.
+  */
+  const city = reference.cities.find((one) => one.slug === form.citySlug);
 
   const set = (key: keyof typeof form) => (value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -157,11 +166,19 @@ export function PropertyEditor({
     if (form.cancellationPolicyCode !== property.cancellationPolicyCode) {
       patch['cancellationPolicyCode'] = form.cancellationPolicyCode;
     }
-    if ((form.latitude.trim() || null) !== property.latitude && form.latitude.trim()) {
-      patch['latitude'] = form.latitude.trim();
+    /*
+      An EMPTY value is a real change now, not a no-op.
+
+      The old fields could only ever be typed into, so «blank» meant «left alone» and the
+      patch skipped it. The picker has a «remove» control, so blank means the partner
+      deliberately unset the location — and dropping that silently would make the control do
+      nothing while appearing to work.
+    */
+    if ((form.latitude.trim() || null) !== property.latitude) {
+      patch['latitude'] = form.latitude.trim() || null;
     }
-    if ((form.longitude.trim() || null) !== property.longitude && form.longitude.trim()) {
-      patch['longitude'] = form.longitude.trim();
+    if ((form.longitude.trim() || null) !== property.longitude) {
+      patch['longitude'] = form.longitude.trim() || null;
     }
 
     const sameAttributes =
@@ -419,22 +436,37 @@ export function PropertyEditor({
         ) : null}
       </fieldset>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        {/* `dir="ltr"` on both: decimal degrees are a Latin number and RTL reorders the sign. */}
-        <Field
-          label={t.editProperty.latitude}
-          value={form.latitude}
-          onChange={set('latitude')}
-          dir="ltr"
-          hint={t.editProperty.coordinatesHint}
-        />
-        <Field
-          label={t.editProperty.longitude}
-          value={form.longitude}
-          onChange={set('longitude')}
-          dir="ltr"
-        />
-      </div>
+      {/*
+        A MAP, not two number fields.
+
+        The fields this replaces were `dir="ltr"`, which the UI conventions forbid on anything
+        a person types into — and the deeper problem was that nobody typed into them at all:
+        67 of 2,017 published listings had coordinates, so every map feature the guest side
+        offers was dark for 97% of the catalogue. A partner cannot look up a latitude; they
+        can find their own building on a map in seconds.
+      */}
+      <LocationPicker
+        latitude={form.latitude}
+        longitude={form.longitude}
+        fallbackLatitude={city?.latitude ?? null}
+        fallbackLongitude={city?.longitude ?? null}
+        onChange={(next) =>
+          setForm((current) => ({
+            ...current,
+            latitude: next.latitude,
+            longitude: next.longitude,
+          }))
+        }
+        copy={{
+          heading: t.editProperty.locationHeading,
+          help: t.editProperty.locationHelp,
+          missing: t.editProperty.locationMissing,
+          set: t.editProperty.locationSet,
+          clear: t.editProperty.locationClear,
+          coordinates: t.editProperty.locationCoordinates,
+          unavailable: t.editProperty.locationUnavailable,
+        }}
+      />
 
       <button
         type="submit"

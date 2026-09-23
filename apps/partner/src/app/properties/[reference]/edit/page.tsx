@@ -11,6 +11,7 @@ import {
 } from '@/lib/api';
 import { PropertyAmenities } from '@/components/property-amenities';
 import { PropertyEditor } from '@/components/property-editor';
+import { PropertyLocationForm } from '@/components/property-location-form';
 import { SubmitForReview } from '@/components/submit-for-review';
 import { UnitEditor } from '@/components/unit-editor';
 import { requireVerifiedPartner } from '@/lib/gate';
@@ -62,6 +63,16 @@ export default async function EditPropertyPage({
   /* Unknown, or another partner's. The same answer either way, deliberately. */
   if (property === 'failed') notFound();
 
+  /*
+    Where the location picker opens for a listing that has none — its own city, which is a
+    published fact and somewhere the partner recognises. Null when the reference lookup
+    failed; the picker then falls back to Damascus rather than an empty ocean.
+  */
+  const city =
+    formReference === 'failed'
+      ? undefined
+      : formReference.cities.find((one) => one.slug === property.citySlug);
+
   return (
     <Shell
       title={t.editProperty.title}
@@ -90,7 +101,26 @@ export default async function EditPropertyPage({
             <PropertyEditor property={property} reference={formReference} />
           )
         ) : (
-          <Locked reference={property.reference} />
+          <>
+            <Locked reference={property.reference} />
+
+            {/*
+              The one structural thing a published listing may still complete: a location it
+              has never had. See `PropertyLocationForm` — setting a null coordinate is not a
+              change to anything SAFRA verified, and without this the 97% of published
+              listings with no coordinates could only be fixed by a support ticket each.
+
+              Rendered only while it is genuinely absent, so the panel disappears the moment
+              it is set and the partner is never offered a control the API will refuse.
+            */}
+            {!property.latitude || !property.longitude ? (
+              <PropertyLocationForm
+                reference={property.reference}
+                cityLatitude={city?.latitude ?? null}
+                cityLongitude={city?.longitude ?? null}
+              />
+            ) : null}
+          </>
         )}
 
         {/*

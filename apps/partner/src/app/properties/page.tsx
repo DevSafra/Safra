@@ -258,6 +258,27 @@ function Card({ property }: { readonly property: PartnerProperty }) {
           </ul>
         ) : null}
 
+        {/*
+          The missing-location prompt, where a partner will actually meet it.
+
+          A warning tone rather than an error: nothing is broken, a capability is simply
+          switched off, and the card says WHICH — «لا تظهر على الخريطة» — instead of naming a
+          database column. It links straight into the editor, because a prompt that tells
+          somebody about a gap and then makes them find the form is half a feature.
+        */}
+        {!property.hasLocation ? (
+          <p className="mt-3 flex items-center gap-1.5 text-12 text-warn-ink">
+            <PinOffIcon />
+            <span>{t.properties.noLocation}</span>
+            <Link
+              href={`/properties/${property.reference}`}
+              className="cursor-pointer font-bold underline underline-offset-2"
+            >
+              {t.properties.addLocation}
+            </Link>
+          </p>
+        ) : null}
+
         <div className="mt-auto pt-3.5">
           {property.fromPrice ? (
             <p className="text-17 font-extrabold text-gold-read">
@@ -309,5 +330,28 @@ function StatusPill({ status }: { readonly status: string }) {
     >
       {propertyStatus(status)}
     </span>
+  );
+}
+
+/** A pin with a stroke through it — «this has no place on the map yet». */
+function PinOffIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="1rem"
+      height="1rem"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+      className="shrink-0"
+    >
+      <path d="M12 21s7-6.5 7-11a7 7 0 0 0-11.9-5" />
+      <path d="M5.3 7.2A7 7 0 0 0 5 10c0 4.5 7 11 7 11" />
+      <path d="M3 3l18 18" />
+    </svg>
   );
 }
