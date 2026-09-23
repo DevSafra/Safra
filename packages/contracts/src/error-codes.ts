@@ -404,6 +404,7 @@ export const ERROR = {
   VALIDATION_DATE_FORMAT: 'validation.date_format',
   VALIDATION_DATE_UNREAL: 'validation.date_unreal',
   VALIDATION_DEPARTURE_AFTER_ARRIVAL: 'validation.departure_after_arrival',
+  VALIDATION_DISTANCE_SORT_NEEDS_LANDMARK: 'validation.distance_sort_needs_landmark',
   VALIDATION_END_BEFORE_START: 'validation.end_before_start',
   VALIDATION_RANGE_TOO_LONG: 'validation.range_too_long',
   VALIDATION_AMOUNT_POSITIVE: 'validation.amount_positive',

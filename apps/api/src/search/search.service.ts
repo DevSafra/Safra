@@ -58,6 +58,19 @@ export interface SearchResultItem {
    * `null`, never a default: a card that draws an image element around a `fileKey` that does not
    * exist renders a broken frame, where a real `null` renders the card's own fallback.
    */
+  /**
+   * The PUBLIC coordinates, so a result can be placed on the search map.
+   *
+   * Null for a listing whose partner has not set a location — 1,950 of 2,017 at the time
+   * this was written, which is why the partner picker was built in the same change.
+   */
+  publicLatitude: string | null;
+  publicLongitude: string | null;
+  /**
+   * Metres from the landmark named by `nearLandmark`, rounded to `PUBLIC_DISTANCE_STEP_METRES`.
+   * Null when the search named no landmark — there is no centre to measure from.
+   */
+  distanceMetres: number | null;
   cover: {
     fileKey: string;
     variantWidths: number[];
@@ -115,6 +128,17 @@ export class SearchService {
       true,
     );
     const timezone = await this.resolveTimezone(query.citySlug);
+    /*
+      «قريب من». Resolved to a coordinate ONCE, here, rather than joined per row: the centre
+      is a single point and a join would re-read it for every candidate unit in the country.
+
+      An unknown slug is not an error — it is an empty result, which is what «near a place
+      that does not exist» honestly means, and it keeps the endpoint from confirming which
+      landmark slugs exist to somebody probing it.
+    */
+    const near = query.nearLandmark
+      ? await this.resolveLandmark(query.nearLandmark, query.withinKm)
+      : null;
     const verdict = evaluateArrival(
       query.checkIn,
       now,
@@ -132,6 +156,28 @@ export class SearchService {
         reason: verdict.reason,
         firstBookableDate: verdict.firstBookableDate,
       });
+    }
+
+    /*
+      A named landmark nobody published. Answered as an empty page rather than a 404: a 404
+      would tell anybody willing to ask which landmark slugs exist, and «no listings near a
+      place that is not on our map» is the literally true answer.
+
+      Short-circuited rather than filtered later, because with no centre there is no box —
+      running the full query would return every listing in the country under a filter the
+      caller believes is applied, which is the worst of the three possible answers.
+
+      After the arrival check, not before: a search with an impossible date is a 400 whether
+      or not the landmark resolves, and reordering those two would make the error a visitor
+      sees depend on which mistake they made first.
+    */
+    if (query.nearLandmark !== undefined && near === null) {
+      return {
+        items: [],
+        nextCursor: null,
+        previousCursor: null,
+        firstBookableDate: verdict.firstBookableDate,
+      };
     }
 
     const maxNights = await this.settings.getNumber('search.max_nights', 90);
@@ -168,6 +214,46 @@ export class SearchService {
       unique across the result set — which is exactly what makes the order total. It sorts last, so
       it decides nothing except between rows that were already equal.
     */
+    /*
+      The distance expression, in SQL, over the PUBLIC pair.
+
+      Two implementations of haversine now exist — this one and `distanceMetres` in
+      @safra/contracts, which the property page uses. That is a cost paid deliberately:
+      search has to SORT and PAGE on distance, which cannot be done after the rows are in
+      memory, and the property page has a dozen rows and should not encode geodesy in SQL.
+      `distance-parity.integration.test.ts` proves the two agree to under a metre across a
+      spread of real points, so the duplication cannot drift unnoticed.
+
+      p.public_latitude, never p.latitude. There is no index on the raw columns and no way
+      to name them here without it being obvious in review.
+    */
+    const distanceExpr = near
+      ? sql`(6371008.8 * 2 * asin(sqrt(
+              power(sin(radians(p.public_latitude - ${near.latitude}::numeric) / 2), 2)
+              + cos(radians(${near.latitude}::numeric)) * cos(radians(p.public_latitude))
+                * power(sin(radians(p.public_longitude - ${near.longitude}::numeric) / 2), 2)
+            )))`
+      : sql`NULL::numeric`;
+
+    /*
+      The filter. The bounding box comes FIRST and is what makes it an index scan on
+      properties_public_coords_idx; the haversine then trims the box's corners, which are up
+      to 1.41x the radius out. Box alone would be a square pretending to be a circle.
+
+      A degree of latitude is ~111.32 km everywhere; a degree of longitude shrinks by
+      cos(latitude), so the east-west half-width is divided by it — the same correction
+      areaCircle makes, and for the same reason.
+    */
+    const nearFilter = near
+      ? sql`
+          AND p.public_latitude IS NOT NULL
+          AND p.public_latitude BETWEEN ${near.latitude - near.deltaLat}::numeric
+                                    AND ${near.latitude + near.deltaLat}::numeric
+          AND p.public_longitude BETWEEN ${near.longitude - near.deltaLon}::numeric
+                                     AND ${near.longitude + near.deltaLon}::numeric
+          AND ${distanceExpr} <= ${near.radiusMetres}::numeric`
+      : sql``;
+
     const tiebreak = sql`, c.property_id_sort ASC`;
 
     const orderBy = {
@@ -178,6 +264,13 @@ export class SearchService {
       price_asc: sql`c.stay_total_sort ASC, c.recommendation_score DESC${tiebreak}`,
       price_desc: sql`c.stay_total_sort DESC, c.recommendation_score DESC${tiebreak}`,
       rating_desc: sql`c.rating DESC NULLS LAST, c.recommendation_score DESC${tiebreak}`,
+      /*
+        Nearest first. The contract refuses this sort without a landmark, so distance_sort is
+        never NULL here — but NULLS LAST is written anyway, because a null sorting first would
+        put every unplaceable listing above the nearest one and the failure would look like a
+        ranking bug rather than a missing filter.
+      */
+      distance_asc: sql`c.distance_sort ASC NULLS LAST, c.recommendation_score DESC${tiebreak}`,
     }[query.sort];
 
     const offset = this.decodeOffset(query.cursor);
@@ -332,6 +425,10 @@ export class SearchService {
                     )`
               : sql``
           }
+          -- The proximity filter, applied here for the same reason city and type are: it is a
+          -- predicate on the PROPERTY, and running it before pricing is the difference between
+          -- pricing the listings near a landmark and pricing every unit in the country.
+          ${nearFilter}
 
           -- Anti-join 1: the calendar says no.
           --
@@ -491,11 +588,23 @@ export class SearchService {
           b.stay_total         AS "stayTotal",
           ROUND(b.stay_total / ${nights}, 2) AS "nightlyFrom",
           ${nights}::int       AS nights,
+          p.public_latitude    AS "publicLatitude",
+          p.public_longitude   AS "publicLongitude",
+          -- Rounded to PUBLIC_DISTANCE_STEP_METRES (100 m) for the same honesty reason the
+          -- property page's list is: the input is a coordinate good to about 100 m, so a
+          -- sharper figure would claim precision the data never had.
+          CASE WHEN ${distanceExpr} IS NULL THEN NULL
+               ELSE ROUND(${distanceExpr} / 100) * 100 END AS "distanceMetres",
           -- Duplicated in snake_case purely to drive ORDER BY; stripped before
           -- the rows are returned. property_id_sort drives the cover subquery in the OUTER
           -- select instead, and is stripped with them.
           p.recommendation_score,
           b.stay_total         AS stay_total_sort,
+          -- The UNROUNDED distance drives the order. Sorting on the rounded one would make
+          -- every listing inside the same 100 m band a tie, and ties are decided by
+          -- recommendation — so "nearest first" would visibly disagree with the distances
+          -- printed beside it.
+          ${distanceExpr}      AS distance_sort,
           p.id                 AS property_id_sort
         FROM bookable b
         JOIN properties p            ON p.id = b.property_id
@@ -651,6 +760,56 @@ export class SearchService {
   }
 
   /**
+   * A landmark slug to the point a «near this» search measures from.
+   *
+   * Returns null for a slug nobody published, and the caller turns that into an empty
+   * result rather than an error. A 404 here would answer «does this landmark exist?» for
+   * anybody willing to ask, which is a question a public search endpoint has no reason to
+   * answer; an empty result is also the literally true response to "listings near a place
+   * that is not on our map".
+   *
+   * The bounding-box half-widths are computed here, once, beside the coordinate they
+   * belong to — the caller needs a box and a radius, and deriving them at the call site
+   * would put trigonometry inside a SQL template.
+   */
+  private async resolveLandmark(
+    slug: string,
+    withinKm: number,
+  ): Promise<{
+    latitude: number;
+    longitude: number;
+    radiusMetres: number;
+    deltaLat: number;
+    deltaLon: number;
+  } | null> {
+    const rows = await this.db.execute<{ latitude: string; longitude: string }>(
+      sql`SELECT latitude, longitude FROM landmarks
+          WHERE slug = ${slug} AND is_active AND deleted_at IS NULL
+          LIMIT 1`,
+    );
+
+    const row = rows.rows[0];
+    if (!row) return null;
+
+    const latitude = Number(row.latitude);
+    const longitude = Number(row.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+
+    const radiusMetres = withinKm * 1000;
+    const METRES_PER_DEGREE_LAT = 111_320;
+    const deltaLat = radiusMetres / METRES_PER_DEGREE_LAT;
+    /*
+      Longitude degrees shorten toward the poles. Without the cosine the box is too NARROW
+      east-west and listings inside the radius fall outside the box — a filter that silently
+      loses results rather than one that visibly breaks. Clamped because cos(90 deg) is 0.
+    */
+    const cos = Math.max(0.01, Math.cos((latitude * Math.PI) / 180));
+    const deltaLon = deltaLat / cos;
+
+    return { latitude, longitude, radiusMetres, deltaLat, deltaLon };
+  }
+
+  /**
    * Timezone for the cutoff decision.
    *
    * With no city selected the search spans markets, so the EARLIEST-closing
@@ -710,6 +869,7 @@ function stripSortColumns(row: Record<string, unknown>): SearchResultItem {
   const {
     recommendation_score: _rs,
     stay_total_sort: _st,
+    distance_sort: _ds,
     property_id_sort: _pid,
     ...rest
   } = row;

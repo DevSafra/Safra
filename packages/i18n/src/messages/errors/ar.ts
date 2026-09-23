@@ -260,6 +260,8 @@ export const ar = {
   'validation.date_format': 'التاريخ بصيغة سنة-شهر-يوم.',
   'validation.date_unreal': 'هذا التاريخ غير موجود في التقويم.',
   'validation.departure_after_arrival': 'تاريخ المغادرة يجب أن يكون بعد تاريخ الوصول.',
+  'validation.distance_sort_needs_landmark':
+    'الترتيب حسب المسافة يحتاج إلى معلم تُقاس منه المسافة.',
   'validation.end_before_start': 'تاريخ النهاية لا يمكن أن يسبق تاريخ البداية.',
   'validation.range_too_long': 'لا يمكن أن تتجاوز المدة {maxDays} يوماً.',
   'validation.amount_positive': 'يجب أن يكون المبلغ أكبر من صفر.',

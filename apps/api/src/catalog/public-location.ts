@@ -1,23 +1,28 @@
-import { PUBLIC_COORDINATE_DECIMALS } from '@safra/contracts';
-
 /**
- * Rounds a coordinate to roughly 100 m for public display.
+ * Narrowing for the coordinates a visitor is allowed to see.
  *
- * The precision, the map's zoom and the area disc all come from `@safra/contracts` —
- * one promise, read by the API that publishes the number and by the app that draws it.
+ * ## The rounding moved into the database, deliberately
  *
- * The blank check is not defensive tidying. `latitude` and `longitude` are nullable TEXT
- * columns, and `Number('')` is `0` — so an empty string used to round to `"0.000"` and
- * publish the listing at null island in the Gulf of Guinea. Nothing showed it while the
- * payload only carried two numbers nobody rendered; the map turned it into a card of the
- * Atlantic, which is how the test that found it came to be written.
+ * This file used to hold `fuzzCoordinate`, which rounded `properties.latitude` on the way
+ * out of the one endpoint that published it. That worked exactly as long as every read path
+ * remembered to call it — and the map work of 2026-09-23 added three more paths that need
+ * the public pair. Each was a fresh chance to select the raw column by mistake, and the
+ * mistake is invisible in review: the payload looks the same, only sharper.
+ *
+ * `properties.public_latitude` / `public_longitude` are now GENERATED ALWAYS columns, so the
+ * rounding is the schema's job and the finer value is unreachable from a public query rather
+ * than merely discouraged. The empty-string guard moved with it: `nullif(latitude, '')` in
+ * the column definition, instead of a check each caller had to repeat. (`Number('')` is 0,
+ * which used to publish a listing at null island in the Gulf of Guinea.)
+ *
+ * What is left here is the narrowing every raw-SQL row needs. `node-postgres` returns
+ * `numeric` as a STRING to avoid the precision loss of a float64 — which is what we want,
+ * since the value is already formatted to exactly three decimals — but a raw row is typed
+ * `unknown`, and coercing an unexpected object would publish `"[object Object]"` as a
+ * latitude.
  */
-export function fuzzCoordinate(value: unknown): string | null {
-  if (typeof value !== 'string' && typeof value !== 'number') return null;
-  if (typeof value === 'string' && value.trim() === '') return null;
-
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return null;
-
-  return parsed.toFixed(PUBLIC_COORDINATE_DECIMALS);
+export function publicCoordinate(value: unknown): string | null {
+  if (typeof value === 'string') return value.trim() === '' ? null : value;
+  if (typeof value === 'number') return Number.isFinite(value) ? String(value) : null;
+  return null;
 }

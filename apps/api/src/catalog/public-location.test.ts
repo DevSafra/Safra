@@ -1,62 +1,42 @@
 import { describe, expect, it } from 'vitest';
 
-import { PUBLIC_COORDINATE_DECIMALS } from '@safra/contracts';
-
-import { fuzzCoordinate } from './public-location.js';
+import { publicCoordinate } from './public-location.js';
 
 /**
- * What a listing's public coordinates are allowed to be.
- *
- * This is the arithmetic behind a promise the product makes in words — «الموقع الدقيق
- * يظهر بعد تأكيد الحجز» — and it is the ONLY thing protecting the exact location, because
- * it protects it by never sending it. Every assertion here was watched to fail.
+ * These cover the NARROWING. The rounding itself is a generated column now, and
+ * `catalog.integration.test.ts` holds it to account against a real database — a unit test
+ * here could only re-implement the rounding and then agree with itself.
  */
-describe('fuzzCoordinate', () => {
-  it('rounds to about 100 m, discarding the metres that would find a door', () => {
-    expect(fuzzCoordinate('33.5138192')).toBe('33.514');
-    expect(fuzzCoordinate('36.2765401')).toBe('36.277');
+describe('publicCoordinate', () => {
+  it('passes a formatted numeric through unchanged', () => {
+    expect(publicCoordinate('33.515')).toBe('33.515');
+    /* Trailing zeros are significant: numeric(6,3) emits them and they state the precision. */
+    expect(publicCoordinate('33.500')).toBe('33.500');
+    expect(publicCoordinate('-0.001')).toBe('-0.001');
   });
 
-  it('keeps three decimals even when they are zeros, so the precision is not readable from the string', () => {
-    /*
-      `33.5` and `33.500` are the same number and a DIFFERENT disclosure: a bare `33.5`
-      tells a reader the value was never more precise, and `toFixed` is what stops the
-      payload leaking how much was thrown away.
-    */
-    expect(fuzzCoordinate('33.5')).toBe('33.500');
-    expect(fuzzCoordinate(33)).toBe('33.000');
+  it('answers null for a row that has no coordinate', () => {
+    expect(publicCoordinate(null)).toBeNull();
+    expect(publicCoordinate(undefined)).toBeNull();
   });
 
-  it('rounds to the precision the contract states, not a local copy of it', () => {
-    expect(PUBLIC_COORDINATE_DECIMALS).toBe(3);
-    expect(fuzzCoordinate('1.23456789')?.split('.')[1]).toHaveLength(
-      PUBLIC_COORDINATE_DECIMALS,
-    );
+  /*
+    The Gulf of Guinea regression, kept pointed at this layer too.
+
+    A blank string must never become a coordinate. It cannot arrive from the generated
+    column any more — `nullif(latitude, '')` makes it null before it gets here — but this
+    function is the last narrowing before a number reaches a map, and a future caller
+    handing it a raw text column must not land a listing at 0,0.
+  */
+  it('refuses a blank string rather than reading it as zero', () => {
+    expect(publicCoordinate('')).toBeNull();
+    expect(publicCoordinate('   ')).toBeNull();
   });
 
-  it('answers null for anything that is not a coordinate, rather than inventing one', () => {
-    for (const value of [
-      null,
-      undefined,
-      'somewhere',
-      {},
-      [],
-      true,
-      Number.NaN,
-      Infinity,
-    ]) {
-      expect(fuzzCoordinate(value)).toBeNull();
-    }
-  });
-
-  it('answers null for a BLANK string rather than the Gulf of Guinea', () => {
-    /*
-      `Number('')` is 0, so a blank column used to round to "0.000" — a real pair of
-      coordinates, 600 km off the coast of Ghana. Two numbers nobody rendered hid it;
-      a map drawn on them would not have.
-    */
-    for (const value of ['', '   ', '\n']) {
-      expect(fuzzCoordinate(value)).toBeNull();
-    }
+  it('refuses anything that is not a number or a string', () => {
+    expect(publicCoordinate({})).toBeNull();
+    expect(publicCoordinate([33.5])).toBeNull();
+    expect(publicCoordinate(true)).toBeNull();
+    expect(publicCoordinate(Number.NaN)).toBeNull();
   });
 });

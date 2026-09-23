@@ -113,6 +113,39 @@ export class CatalogService {
    * The consumer then swallowed it and the destinations grid rendered EMPTY, permanently. The
    * aggregate below is jsonb for the same reason.
    */
+  /**
+   * The landmarks a visitor can search «near», for one city.
+   *
+   * Public, because it is the vocabulary of a public filter — and because every row in it is
+   * already a published fact about a city. Scoped to a city rather than served whole: a
+   * «قريب من» selector offering the airports of three countries is a worse control than no
+   * control, and the list is what the search page puts in a `<select>`.
+   */
+  async landmarks(citySlug: string) {
+    const rows = await this.db.execute<{
+      slug: string;
+      kind: string;
+      name_ar: string;
+      name_en: string;
+      name_de: string;
+    }>(sql`
+      SELECT l.slug, l.kind::text AS kind, l.name_ar, l.name_en, l.name_de
+      FROM landmarks l
+      JOIN cities c ON c.id = l.city_id
+      WHERE c.slug = ${citySlug}
+        AND c.deleted_at IS NULL
+        AND l.is_active
+        AND l.deleted_at IS NULL
+      ORDER BY l.sort_order, l.slug
+    `);
+
+    return rows.rows.map((r) => ({
+      slug: r.slug,
+      kind: r.kind,
+      name: { ar: r.name_ar, en: r.name_en, de: r.name_de },
+    }));
+  }
+
   async cities() {
     const rows = await this.db.execute<{
       slug: string;
@@ -120,6 +153,8 @@ export class CatalogService {
       name_en: string;
       name_de: string;
       country_code: string;
+      latitude: string | null;
+      longitude: string | null;
       categories: { code: string; nameAr: string; nameEn: string; nameDe: string }[];
       cover: {
         fileKey: string;
@@ -133,6 +168,9 @@ export class CatalogService {
       SELECT
         c.slug, c.name_ar, c.name_en, c.name_de,
         co.code AS country_code,
+        -- Where a map should OPEN when it has nothing else to centre on. A city's position
+        -- is a published fact, unlike a listing's, so it is served exactly as stored.
+        c.latitude, c.longitude,
         ${CITY_CATEGORIES_JSON} AS categories,
         ${CITY_COVER_JSON} AS cover,
         -- The count shown on a destination card must reflect what a visitor can
@@ -164,6 +202,8 @@ export class CatalogService {
       nameEn: r.name_en,
       nameDe: r.name_de,
       countryCode: r.country_code,
+      latitude: r.latitude,
+      longitude: r.longitude,
       categories: r.categories,
       /* `null` where a city has no photograph — the grid draws that case deliberately. */
       cover: r.cover,

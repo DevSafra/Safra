@@ -6,9 +6,9 @@ import type { Database } from '@safra/db';
 import { DATABASE } from '../database/database.module.js';
 import { imageIsPublished } from '../storage/image-visibility.js';
 import { SettingsService } from '../settings/settings.service.js';
-import { ERROR } from '@safra/contracts';
+import { ERROR, publicDistanceMetres } from '@safra/contracts';
 import { notFound } from '../common/errors/app-error.js';
-import { fuzzCoordinate } from './public-location.js';
+import { publicCoordinate } from './public-location.js';
 
 /**
  * How many days of calendar the property page shows (§5.6 requires the calendar
@@ -37,7 +37,17 @@ export class PropertyDetailService {
         p.name_ar, p.name_en, p.name_de,
         p.description_ar, p.description_en, p.description_de,
         p.headline_ar, p.headline_en, p.headline_de,
-        p.address, p.latitude, p.longitude,
+        p.address,
+        /*
+          The PUBLIC pair, which the database computes -- never p.latitude. See the column
+          comment in the schema: the finer value is unreachable from here by construction,
+          which is the point of it being a generated column rather than a rounding call.
+
+          (No backticks in here: this is inside a sql template literal, and one would
+          terminate it.)
+        */
+        p.public_latitude, p.public_longitude,
+        p.city_id,
         p.star_rating, p.rating, p.reviews_count, p.badges, p.attributes,
         /*
           The BUILDING's amenities, separate from each unit's (Bashar, 2026-09-06).
@@ -76,12 +86,16 @@ export class PropertyDetailService {
     const row = rows.rows[0];
     if (!row) throw notFound(ERROR.PROPERTY_NOT_FOUND);
 
-    const [units, images, calendar, fees, reviews] = await Promise.all([
+    const publicLatitude = publicCoordinate(row['public_latitude']);
+    const publicLongitude = publicCoordinate(row['public_longitude']);
+
+    const [units, images, calendar, fees, reviews, landmarks] = await Promise.all([
       this.units(slug, stay),
       this.images(slug),
       this.calendar(slug),
       this.publicFees(),
       this.reviews(slug),
+      this.landmarks(row['city_id'], publicLatitude, publicLongitude),
     ]);
 
     return {
@@ -109,8 +123,9 @@ export class PropertyDetailService {
       addressApproximate: firstAddressLine(
         typeof row['address'] === 'string' ? row['address'] : '',
       ),
-      latitude: fuzzCoordinate(row['latitude']),
-      longitude: fuzzCoordinate(row['longitude']),
+      latitude: publicLatitude,
+      longitude: publicLongitude,
+      landmarks,
       exactLocationAfterBooking: true,
       city: {
         slug: row['city_slug'],
@@ -408,6 +423,108 @@ export class PropertyDetailService {
       status: r['status'],
       fromPrice: r['from_price'],
     }));
+  }
+
+  /**
+   * Just the published coordinates for one listing, for the neighbours endpoint.
+   *
+   * A narrow query rather than reusing `bySlug`: the map needs two numbers, and building the
+   * whole property payload — units, images, sixty days of calendar, reviews — to read them
+   * would be five queries for a pair of decimals.
+   *
+   * Same WHERE clause as `bySlug`, so an unpublished or deleted listing has no location here
+   * either. A neighbours endpoint that answered for a draft would leak the existence of one.
+   */
+  async publicLocation(
+    slug: string,
+  ): Promise<{ latitude: string; longitude: string } | null> {
+    const rows = await this.db.execute<Record<string, unknown>>(sql`
+      SELECT p.public_latitude, p.public_longitude
+      FROM properties p
+      WHERE p.slug = ${slug}
+        AND p.status = 'published'
+        AND p.deleted_at IS NULL
+      LIMIT 1
+    `);
+
+    const row = rows.rows[0];
+    if (!row) return null;
+
+    const latitude = publicCoordinate(row['public_latitude']);
+    const longitude = publicCoordinate(row['public_longitude']);
+    if (!latitude || !longitude) return null;
+
+    return { latitude, longitude };
+  }
+
+  /**
+   * What this listing is near, and how far — «وسط مدينة دمشق · ١٫٢ كم».
+   *
+   * ## Every distance here is computed from the PUBLISHED pair
+   *
+   * That is not a detail, it is the whole privacy argument. A distance is a coordinate
+   * wearing a disguise: three accurate distances to three known landmarks locate a point by
+   * trilateration, to whatever precision those distances carry. Measuring from
+   * `p.latitude` and printing «١٫٨٣ كم» would therefore hand out the building through a
+   * feature that never mentions a coordinate — and walk straight around the rounding that
+   * exists to stop exactly that.
+   *
+   * Measured from `public_latitude`/`public_longitude` instead, every distance is a pure
+   * function of two numbers the reader was already given. The set of them tells nobody
+   * anything they could not have computed themselves, which is a stronger guarantee than
+   * "we rounded it" because it survives somebody later printing more decimal places.
+   * `publicDistanceMetres` rounds to 100 m on top, for honesty rather than secrecy.
+   *
+   * `location-privacy.integration.test.ts` holds this to account by recomputing every
+   * published distance from the published pair alone and failing on any that does not match.
+   *
+   * ## Why the arithmetic is in TypeScript and not in SQL
+   *
+   * One implementation. The search filter needs haversine in SQL because it sorts and pages
+   * on it; this list is at most a dozen rows already in memory, so calling the same shared
+   * function the contract exports keeps the definition in one place. `distance-parity.
+   * integration.test.ts` proves the SQL and this agree, so the second implementation that
+   * search does need is held against this one.
+   */
+  private async landmarks(
+    cityId: unknown,
+    publicLatitude: string | null,
+    publicLongitude: string | null,
+  ) {
+    /* No coordinates means no distances. An empty list, never a list measured from nothing. */
+    if (typeof cityId !== 'string' || !publicLatitude || !publicLongitude) return [];
+
+    const rows = await this.db.execute<Record<string, unknown>>(sql`
+      SELECT l.slug, l.kind, l.name_ar, l.name_en, l.name_de, l.latitude, l.longitude
+      FROM landmarks l
+      WHERE l.city_id = ${cityId}
+        AND l.is_active
+        AND l.deleted_at IS NULL
+      ORDER BY l.sort_order, l.slug
+    `);
+
+    const from = { lat: Number(publicLatitude), lon: Number(publicLongitude) };
+
+    return (
+      rows.rows
+        .map((r) => ({
+          slug: r['slug'],
+          kind: r['kind'],
+          name: { ar: r['name_ar'], en: r['name_en'], de: r['name_de'] },
+          distanceMetres: publicDistanceMetres(
+            from.lat,
+            from.lon,
+            Number(r['latitude']),
+            Number(r['longitude']),
+          ),
+        }))
+        /*
+        Nearest first, because «how far is this from me» is the question. `sort_order` broke
+        the tie in the query above, so two landmarks the same distance away keep the
+        curated order rather than an arbitrary one.
+      */
+        .sort((a, b) => a.distanceMetres - b.distanceMetres)
+    );
   }
 
   /** §5.6 requires SAFRA's fees to be visible on the property page. */

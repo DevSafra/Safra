@@ -314,6 +314,8 @@ export const de = {
   'validation.date_unreal': 'Dieses Datum existiert nicht.',
   'validation.departure_after_arrival':
     'Das Abreisedatum muss nach dem Anreisedatum liegen.',
+  'validation.distance_sort_needs_landmark':
+    'Die Sortierung nach Entfernung braucht einen Bezugspunkt.',
   'validation.end_before_start': 'Das Enddatum darf nicht vor dem Startdatum liegen.',
   'validation.range_too_long': 'Ein Zeitraum darf {maxDays} Tage nicht überschreiten.',
   'validation.amount_positive': 'Der Betrag muss größer als null sein.',

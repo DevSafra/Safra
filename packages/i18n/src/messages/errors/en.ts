@@ -278,6 +278,8 @@ export const en = {
   'validation.date_format': 'Date must be in YYYY-MM-DD format.',
   'validation.date_unreal': 'Date is not a real calendar date.',
   'validation.departure_after_arrival': 'Departure date must be after the arrival date.',
+  'validation.distance_sort_needs_landmark':
+    'Sorting by distance needs a landmark to measure from.',
   'validation.end_before_start': 'End date must not be before the start date.',
   'validation.range_too_long': 'A calendar range may not exceed {maxDays} days.',
   'validation.amount_positive': 'Amount must be greater than zero.',

@@ -5,7 +5,7 @@ import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { SearchService } from './search.service.js';
 import { SettingsService } from '../settings/settings.service.js';
-import type { SearchQuery } from '@safra/contracts';
+import { DEFAULT_SEARCH_RADIUS_KM, type SearchQuery } from '@safra/contracts';
 
 /**
  * §5.2 search, against a real PostgreSQL.
@@ -87,6 +87,7 @@ describeIfDb('SearchService', () => {
     starRatings: [],
     amenityCodes: [],
     freeCancellationOnly: false,
+    withinKm: DEFAULT_SEARCH_RADIUS_KM,
     sort: 'recommended',
     limit: 20,
     citySlug,

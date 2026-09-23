@@ -3,6 +3,7 @@ import { Controller, Get, Module, Param, Query } from '@nestjs/common';
 import { Public } from '../rbac/decorators.js';
 import { CatalogService } from './catalog.service.js';
 import { PropertyDetailService } from './property-detail.service.js';
+import { NearbyService } from './nearby.service.js';
 
 /**
  * Public catalogue. @Public() because §5.1 requires a visitor to browse and search
@@ -13,6 +14,7 @@ class CatalogController {
   constructor(
     private readonly catalog: CatalogService,
     private readonly properties: PropertyDetailService,
+    private readonly nearby: NearbyService,
   ) {}
 
   @Public()
@@ -49,6 +51,50 @@ class CatalogController {
         : undefined;
 
     return this.properties.bySlug(slug, stay);
+  }
+
+  /**
+   * The listings around this one, for the map's price markers.
+   *
+   * ## A separate request, on purpose
+   *
+   * It could have ridden along inside the property payload. It does not, for two reasons.
+   * The property page is server-rendered and cached; the neighbour list is only ever needed
+   * once somebody opens the full-screen map, which most readers never do — putting it in the
+   * main payload would make every visitor pay for a feature a minority use. And it lets the
+   * map degrade honestly: if this call fails the map still draws, just without neighbours.
+   *
+   * ## It takes a SLUG, not a coordinate
+   *
+   * The centre is looked up from the listing rather than accepted from the caller. A
+   * caller-supplied centre would make this a general proximity oracle over the catalogue —
+   * ask it about a moving point and the answers map out the area. Anchored to a slug, it can
+   * only ever answer the question its own property page already answers.
+   */
+  @Public()
+  @Get('properties/:slug/nearby')
+  async nearbyListings(@Param('slug') slug: string) {
+    const location = await this.properties.publicLocation(slug);
+    if (!location) return { items: [] };
+
+    return {
+      items: await this.nearby.around(location.latitude, location.longitude, slug),
+    };
+  }
+
+  /**
+   * The landmarks of one city, for the «قريب من» filter.
+   *
+   * A query parameter rather than a path segment under `cities/:slug`, because the filter
+   * asks for it independently of the city PAGE and nesting it would imply the city payload
+   * carries it. An unknown city answers an empty list, not a 404: the caller is populating a
+   * `<select>`, and an error status there is a broken filter rather than a message.
+   */
+  @Public()
+  @Get('landmarks')
+  async landmarks(@Query('citySlug') citySlug?: string) {
+    if (!citySlug) return { items: [] };
+    return { items: await this.catalog.landmarks(citySlug) };
   }
 
   /** The business kinds «انضم كشريك» offers. See the service for why these are rows. */
@@ -116,7 +162,7 @@ class CatalogController {
 
 @Module({
   controllers: [CatalogController],
-  providers: [CatalogService, PropertyDetailService],
-  exports: [CatalogService, PropertyDetailService],
+  providers: [CatalogService, PropertyDetailService, NearbyService],
+  exports: [CatalogService, PropertyDetailService, NearbyService],
 })
 export class CatalogModule {}

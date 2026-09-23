@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ERROR } from './error-codes.js';
+import { DEFAULT_SEARCH_RADIUS_KM, MAX_SEARCH_RADIUS_KM } from './location.js';
 
 /**
  * Search contract and the same-day booking cutoff (SRS §5.2, §5.3).
@@ -109,15 +110,52 @@ export const searchQuerySchema = z
      */
     starRatings: queryArray(z.coerce.number().int().min(1).max(5)).default([]),
 
+    /**
+     * «قريب من» — restrict the results to listings near a named landmark.
+     *
+     * A landmark SLUG rather than a free-text place or a raw lat/lon pair, and that is a
+     * security decision as much as a product one. A caller-supplied coordinate would turn
+     * search into a general-purpose proximity oracle: ask «within 0.1 km of X» for a moving
+     * X and the answers trace out a listing's position far more finely than the rounding
+     * allows. A slug can only name a row staff have published, so the set of centres an
+     * attacker can pivot around is fixed, small, and known.
+     *
+     * The filter itself compares against `public_latitude`/`public_longitude` — the rounded
+     * pair — so even a well-chosen landmark cannot resolve a listing below ~100 m.
+     */
+    nearLandmark: z.string().trim().min(1).max(80).optional(),
+
+    /**
+     * How far «near» reaches, in kilometres. Ignored unless `nearLandmark` is given.
+     *
+     * Capped rather than free: an uncapped radius is a whole-country scan wearing a
+     * location filter, which §2 forbids. The cap is not a privacy control — the rounded
+     * coordinate is that — it is a cost control.
+     */
+    withinKm: z.coerce
+      .number()
+      .min(0.5)
+      .max(MAX_SEARCH_RADIUS_KM)
+      .default(DEFAULT_SEARCH_RADIUS_KM),
+
     /** §5.5: default order is "SAFRA recommends", NOT cheapest-first. */
     sort: z
-      .enum(['recommended', 'price_asc', 'price_desc', 'rating_desc'])
+      .enum(['recommended', 'price_asc', 'price_desc', 'rating_desc', 'distance_asc'])
       .default('recommended'),
 
     limit: z.coerce.number().int().min(1).max(60).default(20),
     cursor: z.string().max(200).optional(),
   })
   .strict()
+  /*
+    «Nearest first» with nothing to be near is not a weaker sort, it is an unanswerable
+    one — the service would have to invent a centre, and whichever it picked would be a
+    different order from the one the reader asked for. Rejected at the boundary instead.
+  */
+  .refine((q) => q.sort !== 'distance_asc' || q.nearLandmark !== undefined, {
+    message: ERROR.VALIDATION_DISTANCE_SORT_NEEDS_LANDMARK,
+    path: ['sort'],
+  })
   .refine((q) => q.checkOut > q.checkIn, {
     message: ERROR.VALIDATION_DEPARTURE_AFTER_ARRIVAL,
     path: ['checkOut'],
