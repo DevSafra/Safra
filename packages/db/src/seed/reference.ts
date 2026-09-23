@@ -812,15 +812,8 @@ export interface LandmarkSeed {
   /** `cities.slug` this landmark belongs to. */
   city: string;
   slug: string;
-  kind:
-    | 'city_centre'
-    | 'airport'
-    | 'transit'
-    | 'attraction'
-    | 'beach'
-    | 'shopping'
-    | 'hospital'
-    | 'university';
+  /** A `landmark_kinds.code`. Open, because staff add kinds without a deployment. */
+  kind: string;
   nameAr: string;
   nameEn: string;
   nameDe: string;
@@ -850,6 +843,101 @@ export interface LandmarkSeed {
  * Sorted within a city by what a guest planning a trip actually asks first: where the centre
  * is, then how to arrive, then what to see.
  */
+export interface LandmarkKindSeed {
+  code: string;
+  nameAr: string;
+  nameEn: string;
+  nameDe: string;
+  /** SVG path `d` values on a 24x24 box. See `landmarkIconPathSchema` for why these are safe. */
+  iconPaths: string[];
+  sortOrder: number;
+}
+
+/**
+ * The starting taxonomy, and the marks that go with it.
+ *
+ * Seeded rather than hard-coded, because staff manage these in the console now — migration
+ * `0081` created the table and put these eight in it so existing rows had somewhere to land,
+ * and this keeps a fresh database identical to a migrated one. A kind an operator adds is not
+ * here and does not need to be.
+ */
+export const LANDMARK_KINDS: LandmarkKindSeed[] = [
+  {
+    code: 'city_centre',
+    nameAr: 'وسط المدينة',
+    nameEn: 'City centre',
+    nameDe: 'Stadtzentrum',
+    iconPaths: ['M4 9h16M4 15h16M9 4v16M15 4v16', 'M3 3h18v18H3z'],
+    sortOrder: 1,
+  },
+  {
+    code: 'airport',
+    nameAr: 'المطارات',
+    nameEn: 'Airports',
+    nameDe: 'Flughäfen',
+    iconPaths: ['M3.5 14.5 21 9l-1 3.5-7 2.5-2.5 5-2-1 .8-3.6-3.3.9z'],
+    sortOrder: 2,
+  },
+  {
+    code: 'transit',
+    nameAr: 'المواصلات',
+    nameEn: 'Getting around',
+    nameDe: 'Verkehr',
+    iconPaths: [
+      'M7 3h10a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z',
+      'M5 10h14M9 20l-2 2M15 20l2 2M9.5 16v4M14.5 16v4',
+    ],
+    sortOrder: 3,
+  },
+  {
+    code: 'attraction',
+    nameAr: 'معالم وأنشطة',
+    nameEn: 'Things to see',
+    nameDe: 'Sehenswürdigkeiten',
+    iconPaths: ['M3 9.5 12 4l9 5.5', 'M5 9.5V19M12 9.5V19M19 9.5V19M3 19h18'],
+    sortOrder: 4,
+  },
+  {
+    code: 'beach',
+    nameAr: 'الشواطئ',
+    nameEn: 'Beaches',
+    nameDe: 'Strände',
+    iconPaths: [
+      'M12 3v9',
+      'M4 12a8 8 0 0 1 16 0z',
+      'M3 19c2 0 2 1.5 4.5 1.5S10 19 12 19s2 1.5 4.5 1.5S19 19 21 19',
+    ],
+    sortOrder: 5,
+  },
+  {
+    code: 'shopping',
+    nameAr: 'التسوق',
+    nameEn: 'Shopping',
+    nameDe: 'Einkaufen',
+    iconPaths: ['M5 8h14l-1 12H6z', 'M9 8V6a3 3 0 0 1 6 0v2'],
+    sortOrder: 6,
+  },
+  {
+    code: 'hospital',
+    nameAr: 'المستشفيات',
+    nameEn: 'Hospitals',
+    nameDe: 'Krankenhäuser',
+    iconPaths: ['M4 4h16v16H4z', 'M12 8.5v7M8.5 12h7'],
+    sortOrder: 7,
+  },
+  {
+    code: 'university',
+    nameAr: 'الجامعات',
+    nameEn: 'Universities',
+    nameDe: 'Universitäten',
+    iconPaths: [
+      'M2.5 9 12 5l9.5 4L12 13z',
+      'M6.5 11v4.5c0 1.4 2.5 2.5 5.5 2.5s5.5-1.1 5.5-2.5V11',
+    ],
+    sortOrder: 8,
+  },
+];
+
 export const LANDMARKS: LandmarkSeed[] = [
   // ── Damascus ───────────────────────────────────────────────────────────────
   {

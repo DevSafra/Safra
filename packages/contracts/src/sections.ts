@@ -87,6 +87,13 @@ export const CONSOLE_SECTION_PERMISSIONS = {
   /* الفئات — the same authority as المدن: reading which categories exist is reading geography. */
   cityCategories: P.SETTINGS_READ,
   /*
+    المعالم — landmarks and their kinds (Bashar, 2026-09-23).
+
+    `SETTINGS_READ` opens it, the same authority as المدن and الفئات beside it: reading which
+    places exist is reading geography. Writing is `GEO_MANAGE`, declared on the routes.
+  */
+  landmarks: P.SETTINGS_READ,
+  /*
     كتالوج المنصّة — الخدمات وسياسات الإلغاء وأنواع الشركاء (2026-09-04).
 
     `SETTINGS_READ` to open it, because operations staff work against this catalogue all day and

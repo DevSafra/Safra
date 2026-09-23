@@ -355,6 +355,12 @@ export const ERROR = {
   GEO_CURRENCY_ACCOUNTING: 'geo.currency_accounting',
   /* A code or slug already in use — cities are unique per country, codes globally. */
   GEO_CODE_TAKEN: 'geo.code_taken',
+  /* The landmark registry — codes, slugs, icon marks and the typo catch on coordinates. */
+  LANDMARK_NOT_FOUND: 'landmark.not_found',
+  LANDMARK_KIND_NOT_FOUND: 'landmark.kind_not_found',
+  LANDMARK_SLUG_TAKEN: 'landmark.slug_taken',
+  LANDMARK_KIND_IN_USE: 'landmark.kind_in_use',
+  LANDMARK_TOO_FAR_FROM_CITY: 'landmark.too_far_from_city',
   GEO_SLUG_TAKEN: 'geo.slug_taken',
   /* Not an IANA zone. The same-day cutoff is 17:00 in the CITY's time, so this is load-bearing. */
   GEO_TIMEZONE_INVALID: 'geo.timezone_invalid',
@@ -410,6 +416,9 @@ export const ERROR = {
   VALIDATION_AMOUNT_POSITIVE: 'validation.amount_positive',
   VALIDATION_REASON_REQUIRED: 'validation.reason_required',
   VALIDATION_REJECTION_REASON_REQUIRED: 'validation.rejection_reason_required',
+  VALIDATION_CODE_FORMAT: 'validation.code_format',
+  VALIDATION_SLUG_FORMAT: 'validation.slug_format',
+  VALIDATION_ICON_PATH: 'validation.icon_path',
   VALIDATION_LATITUDE_RANGE: 'validation.latitude_range',
   VALIDATION_LATITUDE_FORMAT: 'validation.latitude_format',
   VALIDATION_LONGITUDE_RANGE: 'validation.longitude_range',

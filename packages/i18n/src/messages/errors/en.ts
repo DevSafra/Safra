@@ -280,6 +280,17 @@ export const en = {
   'validation.departure_after_arrival': 'Departure date must be after the arrival date.',
   'validation.distance_sort_needs_landmark':
     'Sorting by distance needs a landmark to measure from.',
+  'landmark.not_found': 'Landmark not found.',
+  'landmark.kind_not_found': 'Landmark category not found.',
+  'landmark.slug_taken': 'That identifier is already used in this city.',
+  'landmark.kind_in_use':
+    'A category still used by landmarks cannot be removed. Deactivate it instead.',
+  'landmark.too_far_from_city':
+    'The coordinates are far from the city — check that latitude and longitude are not swapped.',
+  'validation.code_format': 'A code is lowercase Latin letters, digits and underscores.',
+  'validation.slug_format':
+    'An identifier is lowercase Latin letters, digits and hyphens.',
+  'validation.icon_path': 'An icon path accepts SVG path commands and numbers only.',
   'validation.end_before_start': 'End date must not be before the start date.',
   'validation.range_too_long': 'A calendar range may not exceed {maxDays} days.',
   'validation.amount_positive': 'Amount must be greater than zero.',

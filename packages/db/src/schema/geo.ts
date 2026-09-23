@@ -21,7 +21,7 @@ import {
   primaryId,
   timestamps,
 } from './_shared.js';
-import { cityCategory, landmarkKind } from './enums.js';
+import { cityCategory } from './enums.js';
 
 /**
  * Currencies, countries and cities are TABLES, not enums or constants: SRS §1.4
@@ -218,6 +218,57 @@ export const fxRates = pgTable(
 );
 
 /**
+ * What KIND of place a landmark is — «مطار», «محطة», «معلم سياحي» — as a TABLE.
+ *
+ * ## It was a pgEnum for four days, and that was wrong
+ *
+ * The enum's own comment argued the case: a kind picks an ICON and a sort priority, both of
+ * which are code, so a kind staff could add would render as a blank glyph. Bashar overruled
+ * it on 2026-09-23 and named the principle — operational data is managed through the
+ * platform, not through a deployment — which means the ICON has to become data too. That is
+ * the part the enum argument got wrong: an icon is only code if you decide to draw it in
+ * code.
+ *
+ * This is the same move `city_categories` made, for the same reason, and it lands in the same
+ * place: `amenities` says it outright — «Admin-managed so a new filter needs no deploy».
+ *
+ * ## `icon_paths` is SVG path data, and it is not markup
+ *
+ * Each entry is the `d` attribute of one `<path>`, rendered by React as an attribute value.
+ * React sets attributes rather than parsing HTML, so nothing here can become an element — but
+ * the contract does not rely on that alone. `landmarkIconPathSchema` restricts the value to
+ * the SVG path alphabet, which contains no `<`, `"`, `'`, `&` or `(`, so the string cannot
+ * form markup or a `url()` even if a future caller interpolated it somewhere careless.
+ *
+ * Paths rather than an uploaded file: an SVG upload is an HTML document that can carry script
+ * and external references, and serving one from our own origin would hand an operator a
+ * stored-XSS primitive on the customer site.
+ */
+export const landmarkKinds = pgTable(
+  'landmark_kinds',
+  {
+    id: primaryId(),
+    /** `airport` | `transit` | whatever staff add next. Stable across renames. */
+    code: text('code').notNull(),
+    nameAr: text('name_ar').notNull(),
+    nameEn: text('name_en').notNull(),
+    nameDe: text('name_de').notNull(),
+    /**
+     * The mark, as one or more SVG path `d` strings on a 24x24 viewBox.
+     *
+     * An array because a legible mark often needs two strokes — a tram body and its rails, a
+     * parasol and its wave. Empty is allowed and draws nothing rather than a broken glyph.
+     */
+    iconPaths: text('icon_paths').array().notNull().default([]),
+    /** Retired rather than deleted: landmarks already filed under it keep working. */
+    isActive: boolean('is_active').notNull().default(true),
+    sortOrder: integer('sort_order').notNull().default(0),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex('landmark_kinds_code_unique').on(t.code).where(notDeleted)],
+);
+
+/**
  * The places a guest measures a listing against — «وسط المدينة», «مطار دمشق الدولي».
  *
  * ## Why these coordinates are not fuzzed and a property's are
@@ -246,7 +297,15 @@ export const landmarks = pgTable(
       .references(() => cities.id),
     /** Stable key for a URL and for the search filter: `damascus-international-airport`. */
     slug: text('slug').notNull(),
-    kind: landmarkKind('kind').notNull(),
+    /**
+     * The category, and with it the icon. A FOREIGN KEY rather than an enum member, so staff
+     * can add one without a migration — see `landmarkKinds`.
+     *
+     * `notNull`, because «a place of no kind» has nothing to draw and nothing to group under.
+     */
+    kindId: foreignId('kind_id')
+      .notNull()
+      .references(() => landmarkKinds.id),
     nameAr: text('name_ar').notNull(),
     nameEn: text('name_en').notNull(),
     nameDe: text('name_de').notNull(),
@@ -264,11 +323,17 @@ export const landmarks = pgTable(
       builds its distance list and how the search filter resolves a named landmark.
     */
     index('landmarks_city_active_idx').on(t.cityId, t.isActive, t.sortOrder),
+    /* The console's registry reads «every landmark, newest or by city», paged. */
+    index('landmarks_kind_idx').on(t.kindId),
   ],
 );
 
 export const landmarksRelations = relations(landmarks, ({ one }) => ({
   city: one(cities, { fields: [landmarks.cityId], references: [cities.id] }),
+  kind: one(landmarkKinds, {
+    fields: [landmarks.kindId],
+    references: [landmarkKinds.id],
+  }),
 }));
 
 export const countriesRelations = relations(countries, ({ one, many }) => ({

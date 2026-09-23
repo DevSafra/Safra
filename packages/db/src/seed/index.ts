@@ -8,6 +8,7 @@ import {
   CITIES,
   COUNTRIES,
   CURRENCIES,
+  LANDMARK_KINDS,
   LANDMARKS,
   PARTNER_TYPES,
   PROPERTY_TYPES,
@@ -125,6 +126,39 @@ async function seed(db: Database): Promise<void> {
     }
     console.log(`  cities:              ${CITIES.length}`);
 
+    // ── Landmark kinds ───────────────────────────────────────────────────────
+    /*
+      Before the landmarks, which reference them. Upserted on `code`, so a mark redrawn in the
+      console survives a re-seed only if the seed is not also claiming it — these eight ARE
+      claimed, deliberately: they are the platform's starting taxonomy and a deploy should put
+      them back the way they shipped. Anything staff add is untouched.
+    */
+    for (const k of LANDMARK_KINDS) {
+      const existing = await tx.query.landmarkKinds.findFirst({
+        where: eq(schema.landmarkKinds.code, k.code),
+        columns: { id: true },
+      });
+
+      const values = {
+        code: k.code,
+        nameAr: k.nameAr,
+        nameEn: k.nameEn,
+        nameDe: k.nameDe,
+        iconPaths: k.iconPaths,
+        sortOrder: k.sortOrder,
+      };
+
+      if (existing) {
+        await tx
+          .update(schema.landmarkKinds)
+          .set(values)
+          .where(eq(schema.landmarkKinds.id, existing.id));
+      } else {
+        await tx.insert(schema.landmarkKinds).values(values);
+      }
+    }
+    console.log(`  landmark kinds:      ${LANDMARK_KINDS.length}`);
+
     // ── Landmarks ────────────────────────────────────────────────────────────
     /*
       Keyed on (city, slug), the same shape as the partial unique index. A landmark that
@@ -143,10 +177,17 @@ async function seed(db: Database): Promise<void> {
       */
       if (!city) continue;
 
+      const kind = await tx.query.landmarkKinds.findFirst({
+        where: eq(schema.landmarkKinds.code, l.kind),
+        columns: { id: true },
+      });
+      /* A landmark whose kind is not seeded is skipped, for the same reason its city is. */
+      if (!kind) continue;
+
       const values = {
         cityId: city.id,
+        kindId: kind.id,
         slug: l.slug,
-        kind: l.kind,
         nameAr: l.nameAr,
         nameEn: l.nameEn,
         nameDe: l.nameDe,

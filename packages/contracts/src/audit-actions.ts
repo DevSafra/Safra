@@ -275,6 +275,13 @@ export const AUDIT_ACTIONS = [
   /* A support thread ended from the console rather than by the person who opened it. */
   'city_category.created',
   'city_category.updated',
+  /* المعالم — landmarks and their kinds, managed in the console since 2026-09-23. */
+  'landmark.created',
+  'landmark.updated',
+  'landmark.archived',
+  'landmark_kind.created',
+  'landmark_kind.updated',
+  'landmark_kind.archived',
   'city.created',
   'city.updated',
   'country.created',

@@ -262,6 +262,15 @@ export const ar = {
   'validation.departure_after_arrival': 'تاريخ المغادرة يجب أن يكون بعد تاريخ الوصول.',
   'validation.distance_sort_needs_landmark':
     'الترتيب حسب المسافة يحتاج إلى معلم تُقاس منه المسافة.',
+  'landmark.not_found': 'لم يُعثر على المعلم.',
+  'landmark.kind_not_found': 'لم يُعثر على فئة المعلم.',
+  'landmark.slug_taken': 'المعرّف مستخدم في هذه المدينة بالفعل.',
+  'landmark.kind_in_use': 'لا يمكن حذف فئة تستخدمها معالم قائمة. عطّلها بدلاً من ذلك.',
+  'landmark.too_far_from_city':
+    'الإحداثيات بعيدة جداً عن المدينة — تأكّد من عدم تبديل خطي الطول والعرض.',
+  'validation.code_format': 'الرمز يتكوّن من حروف لاتينية صغيرة وأرقام وشرطة سفلية.',
+  'validation.slug_format': 'المعرّف يتكوّن من حروف لاتينية صغيرة وأرقام وشرطات.',
+  'validation.icon_path': 'مسار الأيقونة يقبل أوامر SVG وأرقاماً فقط.',
   'validation.end_before_start': 'تاريخ النهاية لا يمكن أن يسبق تاريخ البداية.',
   'validation.range_too_long': 'لا يمكن أن تتجاوز المدة {maxDays} يوماً.',
   'validation.amount_positive': 'يجب أن يكون المبلغ أكبر من صفر.',

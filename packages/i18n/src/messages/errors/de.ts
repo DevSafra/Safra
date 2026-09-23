@@ -316,6 +316,18 @@ export const de = {
     'Das Abreisedatum muss nach dem Anreisedatum liegen.',
   'validation.distance_sort_needs_landmark':
     'Die Sortierung nach Entfernung braucht einen Bezugspunkt.',
+  'landmark.not_found': 'Ort nicht gefunden.',
+  'landmark.kind_not_found': 'Ortskategorie nicht gefunden.',
+  'landmark.slug_taken': 'Diese Kennung wird in dieser Stadt bereits verwendet.',
+  'landmark.kind_in_use':
+    'Eine Kategorie, die noch von Orten genutzt wird, kann nicht entfernt werden. Deaktiviere sie stattdessen.',
+  'landmark.too_far_from_city':
+    'Die Koordinaten liegen weit von der Stadt entfernt — prüfe, ob Breiten- und Längengrad vertauscht sind.',
+  'validation.code_format':
+    'Ein Code besteht aus lateinischen Kleinbuchstaben, Ziffern und Unterstrichen.',
+  'validation.slug_format':
+    'Eine Kennung besteht aus lateinischen Kleinbuchstaben, Ziffern und Bindestrichen.',
+  'validation.icon_path': 'Ein Icon-Pfad akzeptiert nur SVG-Pfadbefehle und Zahlen.',
   'validation.end_before_start': 'Das Enddatum darf nicht vor dem Startdatum liegen.',
   'validation.range_too_long': 'Ein Zeitraum darf {maxDays} Tage nicht überschreiten.',
   'validation.amount_positive': 'Der Betrag muss größer als null sein.',

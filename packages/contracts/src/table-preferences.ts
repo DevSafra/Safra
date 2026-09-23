@@ -97,6 +97,15 @@ export const TABLE_SECTIONS = [
    * the campaigns list along every time they stepped through the billing.
    */
   'adInvoices',
+  /**
+   * المعالم — the landmark registry, its own sidebar section.
+   *
+   * Its own key because it is its own screen and its own table. Read the way an audit log is —
+   * searched, filtered by city — rather than the way a queue is scanned, which is the
+   * distinction this list exists to keep: «ten bookings is a queue you scan; a hundred audit
+   * rows is a log you search».
+   */
+  'landmarks',
 ] as const;
 
 export type TableSection = (typeof TABLE_SECTIONS)[number];
@@ -139,6 +148,7 @@ export const TABLE_SECTION_PATHS: Readonly<Record<TableSection, string>> = {
   partnersPending: '/partners',
   propertiesPending: '/properties',
   adInvoices: '/ads',
+  landmarks: '/landmarks',
 };
 
 /**
@@ -161,6 +171,8 @@ const NAMESPACED: Readonly<
   /* Namespaced like `staffScope`: the record screen may carry its own parameters too. */
   partnerViolations: { page: 'vpage', size: 'vsize' },
   adInvoices: { page: 'ipage', size: 'isize' },
+  /* The only table on its screen, so the plain names. */
+  landmarks: { page: 'page', size: 'size' },
 };
 
 export const TABLE_SECTION_PARAMS: Readonly<
