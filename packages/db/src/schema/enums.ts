@@ -571,3 +571,29 @@ export const jobRunStatus = pgEnum('job_run_status', [
  * a third kind is added in both, and the database refuses anything the two disagree about.
  */
 export const bedType = pgEnum('bed_type', ['single', 'double']);
+
+/**
+ * What KIND of place a landmark is — «مطار», «محطة», «معلم سياحي».
+ *
+ * An enum rather than the table `city_categories` became, and the difference is real: a
+ * city category is a filter whose only rendering is its own name, so staff can add one and
+ * the product absorbs it. A landmark kind picks an ICON and a sort priority, and both of
+ * those are code. A `kind` staff could add would render as a blank glyph at the bottom of
+ * every list — a capability with nothing behind it, which is worse than not having it.
+ *
+ * The WORDS are still not here: `label(t.enums.landmarkKind.airport)` resolves them per
+ * locale, and an enum VALUE is one of `docs/i18n.md`'s named exceptions.
+ *
+ * Ordered by how much a guest planning a trip cares, which is the order `landmarks` sorts
+ * by when two are the same distance away.
+ */
+export const landmarkKind = pgEnum('landmark_kind', [
+  'city_centre',
+  'airport',
+  'transit',
+  'attraction',
+  'beach',
+  'shopping',
+  'hospital',
+  'university',
+]);

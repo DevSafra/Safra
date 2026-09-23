@@ -805,3 +805,518 @@ export const SETTINGS: {
     descriptionEn: 'Maximum nights per booking',
   },
 ];
+
+// ─── Landmarks ───────────────────────────────────────────────────────────────
+
+export interface LandmarkSeed {
+  /** `cities.slug` this landmark belongs to. */
+  city: string;
+  slug: string;
+  kind:
+    | 'city_centre'
+    | 'airport'
+    | 'transit'
+    | 'attraction'
+    | 'beach'
+    | 'shopping'
+    | 'hospital'
+    | 'university';
+  nameAr: string;
+  nameEn: string;
+  nameDe: string;
+  latitude: string;
+  longitude: string;
+  sortOrder: number;
+}
+
+/**
+ * The places a guest measures a listing against.
+ *
+ * ## These coordinates are exact, and that is correct
+ *
+ * A property's position is rounded to ~100 m before it leaves the API, because it is
+ * somebody's home. An airport's is a published fact on every map in the world, and rounding
+ * it would make every distance wrong while protecting nobody. The asymmetry IS the model:
+ * the listing is the secret, the landmark is the reference frame, and the distance between
+ * them is computed from the listing's ROUNDED pair — so no set of distances can locate a
+ * building more precisely than the rounding already allows. See `publicDistanceMetres`.
+ *
+ * ## Reference data, not demo content
+ *
+ * This file's own header says it: currencies, countries and cities are seeded because the
+ * product cannot function without them, and the same is true here — a distance list with no
+ * landmarks is an empty section on every property page in the country.
+ *
+ * Sorted within a city by what a guest planning a trip actually asks first: where the centre
+ * is, then how to arrive, then what to see.
+ */
+export const LANDMARKS: LandmarkSeed[] = [
+  // ── Damascus ───────────────────────────────────────────────────────────────
+  {
+    city: 'damascus',
+    slug: 'damascus-city-centre',
+    kind: 'city_centre',
+    nameAr: 'وسط مدينة دمشق',
+    nameEn: 'Damascus city centre',
+    nameDe: 'Stadtzentrum Damaskus',
+    latitude: '33.510200',
+    longitude: '36.291300',
+    sortOrder: 1,
+  },
+  {
+    city: 'damascus',
+    slug: 'damascus-international-airport',
+    kind: 'airport',
+    nameAr: 'مطار دمشق الدولي',
+    nameEn: 'Damascus International Airport',
+    nameDe: 'Flughafen Damaskus',
+    latitude: '33.411400',
+    longitude: '36.515600',
+    sortOrder: 2,
+  },
+  {
+    city: 'damascus',
+    slug: 'hijaz-railway-station',
+    kind: 'transit',
+    nameAr: 'محطة الحجاز',
+    nameEn: 'Hijaz Railway Station',
+    nameDe: 'Hedschasbahnhof',
+    latitude: '33.504900',
+    longitude: '36.293900',
+    sortOrder: 3,
+  },
+  {
+    city: 'damascus',
+    slug: 'baramkeh-bus-station',
+    kind: 'transit',
+    nameAr: 'كراجات البرامكة',
+    nameEn: 'Baramkeh Bus Station',
+    nameDe: 'Busbahnhof Baramkeh',
+    latitude: '33.508900',
+    longitude: '36.283600',
+    sortOrder: 4,
+  },
+  {
+    city: 'damascus',
+    slug: 'umayyad-mosque',
+    kind: 'attraction',
+    nameAr: 'الجامع الأموي',
+    nameEn: 'Umayyad Mosque',
+    nameDe: 'Umayyaden-Moschee',
+    latitude: '33.511700',
+    longitude: '36.306500',
+    sortOrder: 5,
+  },
+  {
+    city: 'damascus',
+    slug: 'souq-al-hamidiyah',
+    kind: 'shopping',
+    nameAr: 'سوق الحميدية',
+    nameEn: 'Souq Al-Hamidiyah',
+    nameDe: 'Souk al-Hamidiyya',
+    latitude: '33.511300',
+    longitude: '36.302500',
+    sortOrder: 6,
+  },
+  {
+    city: 'damascus',
+    slug: 'azm-palace',
+    kind: 'attraction',
+    nameAr: 'قصر العظم',
+    nameEn: 'Azm Palace',
+    nameDe: 'Azim-Palast',
+    latitude: '33.510400',
+    longitude: '36.307000',
+    sortOrder: 7,
+  },
+  {
+    city: 'damascus',
+    slug: 'mount-qasioun',
+    kind: 'attraction',
+    nameAr: 'جبل قاسيون',
+    nameEn: 'Mount Qasioun',
+    nameDe: 'Berg Qasyun',
+    latitude: '33.540600',
+    longitude: '36.266400',
+    sortOrder: 8,
+  },
+  {
+    city: 'damascus',
+    slug: 'shaalan-street',
+    kind: 'shopping',
+    nameAr: 'شارع الشعلان',
+    nameEn: 'Shaalan Street',
+    nameDe: 'Shaalan-Straße',
+    latitude: '33.519400',
+    longitude: '36.287100',
+    sortOrder: 9,
+  },
+  {
+    city: 'damascus',
+    slug: 'damascus-university',
+    kind: 'university',
+    nameAr: 'جامعة دمشق',
+    nameEn: 'Damascus University',
+    nameDe: 'Universität Damaskus',
+    latitude: '33.513800',
+    longitude: '36.277900',
+    sortOrder: 10,
+  },
+  {
+    city: 'damascus',
+    slug: 'al-assad-university-hospital',
+    kind: 'hospital',
+    nameAr: 'مشفى الأسد الجامعي',
+    nameEn: 'Al-Assad University Hospital',
+    nameDe: 'Al-Assad-Universitätsklinik',
+    latitude: '33.486900',
+    longitude: '36.238500',
+    sortOrder: 11,
+  },
+
+  // ── Aleppo ─────────────────────────────────────────────────────────────────
+  {
+    city: 'aleppo',
+    slug: 'aleppo-city-centre',
+    kind: 'city_centre',
+    nameAr: 'وسط مدينة حلب',
+    nameEn: 'Aleppo city centre',
+    nameDe: 'Stadtzentrum Aleppo',
+    latitude: '36.201000',
+    longitude: '37.159000',
+    sortOrder: 1,
+  },
+  {
+    city: 'aleppo',
+    slug: 'aleppo-international-airport',
+    kind: 'airport',
+    nameAr: 'مطار حلب الدولي',
+    nameEn: 'Aleppo International Airport',
+    nameDe: 'Flughafen Aleppo',
+    latitude: '36.180700',
+    longitude: '37.224400',
+    sortOrder: 2,
+  },
+  {
+    city: 'aleppo',
+    slug: 'aleppo-citadel',
+    kind: 'attraction',
+    nameAr: 'قلعة حلب',
+    nameEn: 'Citadel of Aleppo',
+    nameDe: 'Zitadelle von Aleppo',
+    latitude: '36.199500',
+    longitude: '37.162600',
+    sortOrder: 3,
+  },
+  {
+    city: 'aleppo',
+    slug: 'souq-al-madina',
+    kind: 'shopping',
+    nameAr: 'الأسواق المسقوفة',
+    nameEn: 'Souq Al-Madina',
+    nameDe: 'Souk al-Madina',
+    latitude: '36.198800',
+    longitude: '37.155700',
+    sortOrder: 4,
+  },
+  {
+    city: 'aleppo',
+    slug: 'great-mosque-of-aleppo',
+    kind: 'attraction',
+    nameAr: 'الجامع الأموي الكبير',
+    nameEn: 'Great Mosque of Aleppo',
+    nameDe: 'Große Moschee von Aleppo',
+    latitude: '36.199300',
+    longitude: '37.156700',
+    sortOrder: 5,
+  },
+  {
+    city: 'aleppo',
+    slug: 'university-of-aleppo',
+    kind: 'university',
+    nameAr: 'جامعة حلب',
+    nameEn: 'University of Aleppo',
+    nameDe: 'Universität Aleppo',
+    latitude: '36.217200',
+    longitude: '37.125800',
+    sortOrder: 6,
+  },
+
+  // ── Latakia ────────────────────────────────────────────────────────────────
+  {
+    city: 'latakia',
+    slug: 'latakia-city-centre',
+    kind: 'city_centre',
+    nameAr: 'وسط مدينة اللاذقية',
+    nameEn: 'Latakia city centre',
+    nameDe: 'Stadtzentrum Latakia',
+    latitude: '35.519600',
+    longitude: '35.791500',
+    sortOrder: 1,
+  },
+  {
+    city: 'latakia',
+    slug: 'bassel-al-assad-airport',
+    kind: 'airport',
+    nameAr: 'مطار باسل الأسد الدولي',
+    nameEn: 'Bassel Al-Assad International Airport',
+    nameDe: 'Flughafen Bassel al-Assad',
+    latitude: '35.401100',
+    longitude: '35.948700',
+    sortOrder: 2,
+  },
+  {
+    city: 'latakia',
+    slug: 'latakia-port',
+    kind: 'transit',
+    nameAr: 'مرفأ اللاذقية',
+    nameEn: 'Port of Latakia',
+    nameDe: 'Hafen von Latakia',
+    latitude: '35.519700',
+    longitude: '35.774200',
+    sortOrder: 3,
+  },
+  {
+    city: 'latakia',
+    slug: 'blue-beach',
+    kind: 'beach',
+    nameAr: 'الشاطئ الأزرق',
+    nameEn: 'Blue Beach',
+    nameDe: 'Blauer Strand',
+    latitude: '35.572200',
+    longitude: '35.753900',
+    sortOrder: 4,
+  },
+  {
+    city: 'latakia',
+    slug: 'ugarit',
+    kind: 'attraction',
+    nameAr: 'أوغاريت',
+    nameEn: 'Ugarit',
+    nameDe: 'Ugarit',
+    latitude: '35.601900',
+    longitude: '35.781700',
+    sortOrder: 5,
+  },
+
+  // ── Tartus ─────────────────────────────────────────────────────────────────
+  {
+    city: 'tartus',
+    slug: 'tartus-city-centre',
+    kind: 'city_centre',
+    nameAr: 'وسط مدينة طرطوس',
+    nameEn: 'Tartus city centre',
+    nameDe: 'Stadtzentrum Tartus',
+    latitude: '34.889000',
+    longitude: '35.886600',
+    sortOrder: 1,
+  },
+  {
+    city: 'tartus',
+    slug: 'arwad-island',
+    kind: 'beach',
+    nameAr: 'جزيرة أرواد',
+    nameEn: 'Arwad Island',
+    nameDe: 'Insel Arwad',
+    latitude: '34.855600',
+    longitude: '35.856400',
+    sortOrder: 2,
+  },
+  {
+    city: 'tartus',
+    slug: 'tartus-cathedral',
+    kind: 'attraction',
+    nameAr: 'كاتدرائية طرطوس',
+    nameEn: 'Cathedral of Our Lady of Tortosa',
+    nameDe: 'Kathedrale von Tartus',
+    latitude: '34.892500',
+    longitude: '35.883000',
+    sortOrder: 3,
+  },
+
+  // ── Kasab ──────────────────────────────────────────────────────────────────
+  {
+    city: 'kasab',
+    slug: 'kasab-village-centre',
+    kind: 'city_centre',
+    nameAr: 'وسط كسب',
+    nameEn: 'Kasab centre',
+    nameDe: 'Ortszentrum Kasab',
+    latitude: '35.933300',
+    longitude: '35.983300',
+    sortOrder: 1,
+  },
+  {
+    city: 'kasab',
+    slug: 'kasab-forest',
+    kind: 'attraction',
+    nameAr: 'غابات كسب',
+    nameEn: 'Kasab Forest',
+    nameDe: 'Wälder von Kasab',
+    latitude: '35.916700',
+    longitude: '35.966700',
+    sortOrder: 2,
+  },
+
+  // ── Palmyra ────────────────────────────────────────────────────────────────
+  {
+    city: 'palmyra',
+    slug: 'palmyra-town-centre',
+    kind: 'city_centre',
+    nameAr: 'وسط تدمر',
+    nameEn: 'Palmyra town centre',
+    nameDe: 'Ortszentrum Palmyra',
+    latitude: '34.560600',
+    longitude: '38.284100',
+    sortOrder: 1,
+  },
+  {
+    city: 'palmyra',
+    slug: 'temple-of-bel',
+    kind: 'attraction',
+    nameAr: 'معبد بل',
+    nameEn: 'Temple of Bel',
+    nameDe: 'Baaltempel',
+    latitude: '34.547900',
+    longitude: '38.274200',
+    sortOrder: 2,
+  },
+  {
+    city: 'palmyra',
+    slug: 'palmyra-colonnade',
+    kind: 'attraction',
+    nameAr: 'شارع الأعمدة',
+    nameEn: 'Great Colonnade',
+    nameDe: 'Große Kolonnade',
+    latitude: '34.552000',
+    longitude: '38.268700',
+    sortOrder: 3,
+  },
+
+  // ── Aqaba ──────────────────────────────────────────────────────────────────
+  {
+    city: 'aqaba',
+    slug: 'aqaba-city-centre',
+    kind: 'city_centre',
+    nameAr: 'وسط مدينة العقبة',
+    nameEn: 'Aqaba city centre',
+    nameDe: 'Stadtzentrum Aqaba',
+    latitude: '29.532100',
+    longitude: '35.006300',
+    sortOrder: 1,
+  },
+  {
+    city: 'aqaba',
+    slug: 'king-hussein-international-airport',
+    kind: 'airport',
+    nameAr: 'مطار الملك حسين الدولي',
+    nameEn: 'King Hussein International Airport',
+    nameDe: 'King-Hussein-Flughafen',
+    latitude: '29.611600',
+    longitude: '35.018100',
+    sortOrder: 2,
+  },
+  {
+    city: 'aqaba',
+    slug: 'aqaba-south-beach',
+    kind: 'beach',
+    nameAr: 'الشاطئ الجنوبي',
+    nameEn: 'South Beach',
+    nameDe: 'Südstrand',
+    latitude: '29.437200',
+    longitude: '34.975000',
+    sortOrder: 3,
+  },
+  {
+    city: 'aqaba',
+    slug: 'aqaba-fort',
+    kind: 'attraction',
+    nameAr: 'قلعة العقبة',
+    nameEn: 'Aqaba Fort',
+    nameDe: 'Festung von Aqaba',
+    latitude: '29.523600',
+    longitude: '35.001100',
+    sortOrder: 4,
+  },
+
+  // ── Petra ──────────────────────────────────────────────────────────────────
+  {
+    city: 'petra',
+    slug: 'wadi-musa-centre',
+    kind: 'city_centre',
+    nameAr: 'وسط وادي موسى',
+    nameEn: 'Wadi Musa centre',
+    nameDe: 'Ortszentrum Wadi Musa',
+    latitude: '30.322500',
+    longitude: '35.479500',
+    sortOrder: 1,
+  },
+  {
+    city: 'petra',
+    slug: 'petra-visitor-centre',
+    kind: 'attraction',
+    nameAr: 'مدخل البتراء',
+    nameEn: 'Petra Visitor Centre',
+    nameDe: 'Besucherzentrum Petra',
+    latitude: '30.328500',
+    longitude: '35.444400',
+    sortOrder: 2,
+  },
+  {
+    city: 'petra',
+    slug: 'petra-treasury',
+    kind: 'attraction',
+    nameAr: 'الخزنة',
+    nameEn: 'The Treasury',
+    nameDe: 'Schatzhaus',
+    latitude: '30.322200',
+    longitude: '35.451500',
+    sortOrder: 3,
+  },
+
+  // ── Tripoli ────────────────────────────────────────────────────────────────
+  {
+    city: 'tripoli',
+    slug: 'tripoli-city-centre',
+    kind: 'city_centre',
+    nameAr: 'وسط مدينة طرابلس',
+    nameEn: 'Tripoli city centre',
+    nameDe: 'Stadtzentrum Tripoli',
+    latitude: '34.436700',
+    longitude: '35.849700',
+    sortOrder: 1,
+  },
+  {
+    city: 'tripoli',
+    slug: 'tripoli-citadel',
+    kind: 'attraction',
+    nameAr: 'قلعة طرابلس',
+    nameEn: 'Citadel of Tripoli',
+    nameDe: 'Zitadelle von Tripoli',
+    latitude: '34.435800',
+    longitude: '35.848100',
+    sortOrder: 2,
+  },
+  {
+    city: 'tripoli',
+    slug: 'tripoli-old-souqs',
+    kind: 'shopping',
+    nameAr: 'أسواق طرابلس القديمة',
+    nameEn: 'Old Souqs of Tripoli',
+    nameDe: 'Altstadt-Souks von Tripoli',
+    latitude: '34.437200',
+    longitude: '35.845500',
+    sortOrder: 3,
+  },
+  {
+    city: 'tripoli',
+    slug: 'port-of-tripoli',
+    kind: 'transit',
+    nameAr: 'مرفأ طرابلس',
+    nameEn: 'Port of Tripoli',
+    nameDe: 'Hafen von Tripoli',
+    latitude: '34.452500',
+    longitude: '35.820600',
+    sortOrder: 4,
+  },
+];

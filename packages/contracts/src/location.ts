@@ -97,3 +97,90 @@ export function areaCircle(latitude: number, longitude: number): AreaCircle {
     properties: {},
   };
 }
+
+/**
+ * How coarse a published distance is allowed to be, in metres.
+ *
+ * Presentation, not secrecy — the same distinction `PUBLIC_MAP_MAX_ZOOM` draws. A distance
+ * computed from an already-rounded pair is worth about ±100 m whatever precision it is
+ * printed to, and «1.83 كم» claims a sharpness the input never had. 100 m steps say what
+ * the number actually knows.
+ */
+export const PUBLIC_DISTANCE_STEP_METRES = 100;
+
+/**
+ * Great-circle distance in metres between two points.
+ *
+ * ## Read this before calling it with a property's location
+ *
+ * **A distance is a coordinate wearing a disguise.** Three accurate distances to three
+ * known landmarks locate a point by trilateration, to whatever precision those distances
+ * carry. Publishing «1,834 m from the Umayyad Mosque», «2,417 m from Hijaz Station» and
+ * «4,120 m from the citadel» would therefore hand an attacker the building — through a
+ * feature that never mentions coordinates at all, and past the rounding that exists to
+ * prevent exactly that.
+ *
+ * So the rule for anything a visitor can read is: **measure from the PUBLIC pair**, the
+ * one the API already publishes, never from the raw column. Then every distance is a pure
+ * function of data the reader already has, and the set of them tells nobody anything they
+ * could not compute themselves. That is a stronger guarantee than "we rounded it", because
+ * it survives somebody later printing more decimal places.
+ *
+ * `publicDistanceMetres` below is the call that enforces it; this one is the primitive and
+ * is correct for a partner's own listing, staff tooling, or two landmarks.
+ */
+export function distanceMetres(
+  fromLatitude: number,
+  fromLongitude: number,
+  toLatitude: number,
+  toLongitude: number,
+): number {
+  const EARTH_RADIUS_METRES = 6_371_008.8;
+  const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
+
+  const dLat = toRadians(toLatitude - fromLatitude);
+  const dLon = toRadians(toLongitude - fromLongitude);
+  const lat1 = toRadians(fromLatitude);
+  const lat2 = toRadians(toLatitude);
+
+  const a =
+    Math.sin(dLat / 2) ** 2 + Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+
+  return 2 * EARTH_RADIUS_METRES * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+/**
+ * The distance a visitor is allowed to read, in metres, snapped to `PUBLIC_DISTANCE_STEP_METRES`.
+ *
+ * Both arguments describing the listing must be the PUBLISHED coordinates — see the warning
+ * on `distanceMetres`. `publishedDistanceIsDerivable` in the API's tests holds that to
+ * account by recomputing every published distance from the published pair alone.
+ */
+export function publicDistanceMetres(
+  publicLatitude: number,
+  publicLongitude: number,
+  landmarkLatitude: number,
+  landmarkLongitude: number,
+): number {
+  const exact = distanceMetres(
+    publicLatitude,
+    publicLongitude,
+    landmarkLatitude,
+    landmarkLongitude,
+  );
+  return Math.round(exact / PUBLIC_DISTANCE_STEP_METRES) * PUBLIC_DISTANCE_STEP_METRES;
+}
+
+/**
+ * How far out a «near this landmark» search may reach, in kilometres.
+ *
+ * A cap rather than a preference: the filter compares against the PUBLIC coordinate, so it
+ * cannot be used to binary-search a listing's true position — but an uncapped radius would
+ * let one query ask for every published listing in the country with a sort attached, which
+ * is a table scan wearing a location filter. 50 km covers "near the airport" and every
+ * city's own hinterland.
+ */
+export const MAX_SEARCH_RADIUS_KM = 50;
+
+/** The radius a «near this landmark» search uses when the caller names none. */
+export const DEFAULT_SEARCH_RADIUS_KM = 5;

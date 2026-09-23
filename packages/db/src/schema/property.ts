@@ -142,6 +142,43 @@ export const properties = pgTable(
     latitude: text('latitude'),
     longitude: text('longitude'),
 
+    /**
+     * The ONLY coordinates a visitor is ever given — the raw pair above, rounded to
+     * `PUBLIC_COORDINATE_DECIMALS`, computed by the database and unwritable by anyone.
+     *
+     * ## Why this is a column and not a function call
+     *
+     * It was a function call: `fuzzCoordinate` rounded on the way out of the property
+     * endpoint. That works exactly as long as every future read path remembers to call it,
+     * and the map features added on 2026-09-23 need the public pair in THREE more places —
+     * a nearby-listings query, a landmark distance, and a «within N km» search filter. Each
+     * would have been a fresh chance to select `p.latitude` by mistake, and the mistake is
+     * invisible: the payload looks identical, just sharper.
+     *
+     * As a generated column the finer value cannot reach a public query, because the public
+     * query does not name a column that holds it. That is the difference between a rule
+     * people follow and a rule the schema enforces.
+     *
+     * ## The `numeric` cast also closes the null-island bug
+     *
+     * `Number('')` is `0`, so an empty string used to publish a listing at 0,0 in the Gulf
+     * of Guinea. `NULLIF(latitude, '')` makes a blank string null here, in the definition,
+     * rather than in a guard each caller has to repeat.
+     *
+     * Rounding moves a handful of listings by one step: Postgres rounds an exact half away
+     * from zero where JavaScript's `toFixed` has already lost it to binary floating point —
+     * `33.5145` published as `33.514` before and `33.515` now. Both are inside the ~100 m
+     * the rounding promises, and the database's answer is the arithmetically correct one.
+     */
+    publicLatitude: numeric('public_latitude', {
+      precision: 6,
+      scale: 3,
+    }).generatedAlwaysAs(sql`round(nullif(latitude, '')::numeric, 3)`),
+    publicLongitude: numeric('public_longitude', {
+      precision: 7,
+      scale: 3,
+    }).generatedAlwaysAs(sql`round(nullif(longitude, '')::numeric, 3)`),
+
     status: propertyStatus('status').notNull().default('draft'),
     verifiedAt: timestamp('verified_at', { withTimezone: true }),
     verifiedByUserId: foreignId('verified_by_user_id').references(() => users.id),
@@ -230,6 +267,21 @@ export const properties = pgTable(
     index('properties_star_rating_idx')
       .on(t.starRating)
       .where(sql`status = 'published' AND deleted_at IS NULL`),
+    /*
+      The map's two new questions: «which published listings sit in this box» (the nearby
+      markers) and «which are within N km of this landmark» (the distance filter). Both
+      arrive as a bounding-box predicate on the PUBLIC pair, so the index is on the public
+      pair — there is no index on the raw columns and deliberately so, which is what makes
+      a precise geographic query unformulatable rather than merely discouraged.
+
+      Partial on the same predicate as the star index: an unpublished or deleted listing is
+      never a map candidate, and indexing one is paying to store a row no query returns.
+    */
+    index('properties_public_coords_idx')
+      .on(t.publicLatitude, t.publicLongitude)
+      .where(
+        sql`status = 'published' AND deleted_at IS NULL AND public_latitude IS NOT NULL`,
+      ),
   ],
 );
 

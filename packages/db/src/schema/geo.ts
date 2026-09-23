@@ -4,6 +4,7 @@ import {
   char,
   index,
   integer,
+  numeric,
   pgTable,
   primaryKey,
   smallint,
@@ -20,7 +21,7 @@ import {
   primaryId,
   timestamps,
 } from './_shared.js';
-import { cityCategory } from './enums.js';
+import { cityCategory, landmarkKind } from './enums.js';
 
 /**
  * Currencies, countries and cities are TABLES, not enums or constants: SRS §1.4
@@ -215,6 +216,60 @@ export const fxRates = pgTable(
     index('fx_rates_lookup_idx').on(t.baseCurrencyId, t.quoteCurrencyId, t.effectiveFrom),
   ],
 );
+
+/**
+ * The places a guest measures a listing against — «وسط المدينة», «مطار دمشق الدولي».
+ *
+ * ## Why these coordinates are not fuzzed and a property's are
+ *
+ * An airport is not somebody's home. Its position is a published fact, on every map in the
+ * world, and rounding it would make the DISTANCES wrong without protecting anybody. The
+ * asymmetry is the whole point of the model: the listing's location is the secret, the
+ * landmark's is the reference frame, and a distance between them is published only after
+ * being computed from the listing's ROUNDED pair — see `publicDistanceMetres`.
+ *
+ * `numeric` rather than the `text` that `properties.latitude` still uses. That column is
+ * text for historical reasons and is paid for at every comparison; there is no reason to
+ * repeat it in a table being written now, and the range checks below are only expressible
+ * against a real numeric type.
+ *
+ * Seeded rather than screen-managed today, which is a known gap: SRS §1.4's «without
+ * modifying the code» is satisfied in the DATA (a row is a row) but there is no registry
+ * screen yet, so adding one is a seed change. Recorded in `docs/FUTURE-WORK.md`.
+ */
+export const landmarks = pgTable(
+  'landmarks',
+  {
+    id: primaryId(),
+    cityId: foreignId('city_id')
+      .notNull()
+      .references(() => cities.id),
+    /** Stable key for a URL and for the search filter: `damascus-international-airport`. */
+    slug: text('slug').notNull(),
+    kind: landmarkKind('kind').notNull(),
+    nameAr: text('name_ar').notNull(),
+    nameEn: text('name_en').notNull(),
+    nameDe: text('name_de').notNull(),
+    latitude: numeric('latitude', { precision: 9, scale: 6 }).notNull(),
+    longitude: numeric('longitude', { precision: 9, scale: 6 }).notNull(),
+    /** Retired rather than deleted: a listing's distance list may still reference it. */
+    isActive: boolean('is_active').notNull().default(true),
+    sortOrder: integer('sort_order').notNull().default(0),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('landmarks_city_slug_unique').on(t.cityId, t.slug).where(notDeleted),
+    /*
+      The read path is «every live landmark in this city», which is how a property page
+      builds its distance list and how the search filter resolves a named landmark.
+    */
+    index('landmarks_city_active_idx').on(t.cityId, t.isActive, t.sortOrder),
+  ],
+);
+
+export const landmarksRelations = relations(landmarks, ({ one }) => ({
+  city: one(cities, { fields: [landmarks.cityId], references: [cities.id] }),
+}));
 
 export const countriesRelations = relations(countries, ({ one, many }) => ({
   displayCurrency: one(currencies, {

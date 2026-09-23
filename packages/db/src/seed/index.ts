@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 
 import { createDatabase, type Database } from '../client.js';
 import * as schema from '../schema/index.js';
@@ -8,6 +8,7 @@ import {
   CITIES,
   COUNTRIES,
   CURRENCIES,
+  LANDMARKS,
   PARTNER_TYPES,
   PROPERTY_TYPES,
   SETTINGS,
@@ -123,6 +124,55 @@ async function seed(db: Database): Promise<void> {
       }
     }
     console.log(`  cities:              ${CITIES.length}`);
+
+    // ── Landmarks ────────────────────────────────────────────────────────────
+    /*
+      Keyed on (city, slug), the same shape as the partial unique index. A landmark that
+      moves in the seed UPDATES rather than duplicating — an airport gaining a second row
+      at slightly different coordinates would show a guest two distances to one place.
+    */
+    for (const l of LANDMARKS) {
+      const city = await tx.query.cities.findFirst({
+        where: eq(schema.cities.slug, l.city),
+        columns: { id: true },
+      });
+      /*
+        A landmark whose city is not seeded is skipped rather than throwing. The cities
+        list is the launch set and this list may run ahead of it; a seed that aborts
+        half-way leaves the reference data in a state nobody can reason about.
+      */
+      if (!city) continue;
+
+      const values = {
+        cityId: city.id,
+        slug: l.slug,
+        kind: l.kind,
+        nameAr: l.nameAr,
+        nameEn: l.nameEn,
+        nameDe: l.nameDe,
+        latitude: l.latitude,
+        longitude: l.longitude,
+        sortOrder: l.sortOrder,
+      };
+
+      const existing = await tx.query.landmarks.findFirst({
+        where: and(
+          eq(schema.landmarks.cityId, city.id),
+          eq(schema.landmarks.slug, l.slug),
+        ),
+        columns: { id: true },
+      });
+
+      if (existing) {
+        await tx
+          .update(schema.landmarks)
+          .set(values)
+          .where(eq(schema.landmarks.id, existing.id));
+      } else {
+        await tx.insert(schema.landmarks).values(values);
+      }
+    }
+    console.log(`  landmarks:           ${LANDMARKS.length}`);
 
     // ── Property types ───────────────────────────────────────────────────────
     for (const t of PROPERTY_TYPES) {
