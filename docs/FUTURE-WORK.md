@@ -1563,6 +1563,31 @@ nobody has restored is not a backup.
 
 ---
 
+### M-11 — `SafraPayoutService.accruedIn` times out at testbed scale
+
+**Status:** open · **Owner:** Backend · **Found 2026-09-23**, incidentally, while running the
+e2e suite for the map work. **Not caused by it** — the query reads `ledger_entries`, `refunds` and
+`bookings` and touches no table that change modified.
+
+`POST /api/v1/admin/safra-payouts` answers **500** when opening a payout period over a window with
+ordinary traffic in it. The cause is a 15-second query read timeout in `accruedIn`, measured at
+**16.2 s** running the exact statement by hand against 254,631 ledger entries.
+
+It is a PLAN problem rather than a missing index. Both subqueries are fast alone — the `xfer`
+DISTINCT over `safra_payout` returns 21 rows in a bitmap index scan, and the `refunded` aggregate
+runs in 45 ms — so the cost appears only when they are joined into the outer aggregate. Likely a
+nested loop the planner chooses over a hash join; `EXPLAIN (ANALYZE)` on the combined statement is
+the starting point.
+
+**Why it matters beyond a red test.** §3 sets an API p95 of 200 ms, and this is a staff action on
+the treasury screen that fails outright rather than degrading. The operator sees «حدث خطأ ما.» —
+the generic fallback, because a 500 carries no code the screen can explain — so the one refusal a
+person cannot act on is also the only one that is not a sentence.
+
+**How it shows:** `e2e/safra-treasury.spec.ts` › «the whole lifecycle». The spec loops backwards
+through dates until a period opens; it asserts every refusal reads as a sentence, and a 500 does
+not. 531 of 532 e2e tests pass around it.
+
 ## 5. Should-have before production
 
 ### O-i18n-1 — The staff console is Arabic-only, and its catalogue is ready for more
@@ -2801,6 +2826,69 @@ column empty beside a full-height cover, which reads as an image that failed to 
 - **The amenity chips as bordered icon boxes**, which is how the reference draws them; they are a
   plain grid today.
 - **The address line** under the name, with its «اعرض الخريطة» link.
+
+### O-web-13 — The map experience: neighbours, landmarks, distance search, and a picker partners can use
+
+**Built 2026-09-23**, on Bashar's instruction to implement the remaining map features. Four pieces,
+all over the self-hosted Protomaps basemap O-web-12 established — still no vendor, no key, no
+subscription.
+
+**The privacy model moved from a convention into the schema.** `fuzzCoordinate` rounded on the way
+out of ONE endpoint; three new read paths needed the public pair, and each was a fresh chance to
+select `p.latitude` by mistake — a mistake that is invisible in review because the payload looks
+identical, only sharper. `properties.public_latitude` / `public_longitude` are now
+`GENERATED ALWAYS … STORED` columns, so the finer value is unreachable from a public query rather
+than merely discouraged, and `nullif(latitude, '')` puts the old Gulf-of-Guinea guard in the column
+definition. The only index on coordinates is on the PUBLIC pair, which is what makes a precise
+geographic query unformulatable.
+
+| Piece                       | What it does                                                                                                                | What holds it honest                                                                                                         |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **Price markers**           | Up to 12 neighbouring PLACES on the full-screen map, each a pill with its «from» price; a listing with no price draws a dot | `location-privacy.integration.test.ts` — every neighbour is published at its own ~100 m precision                            |
+| **Landmarks and distances** | «ما حول العقار»: 41 seeded landmarks across nine cities, nearest first, kind icons drawn not glyphed                        | The published distance must be **exactly reproducible from the published coordinates**, asserted per landmark                |
+| **Distance search**         | «قريب من» + a radius, and a `distance_asc` sort                                                                             | The filter compares the ROUNDED pair, so a binary search on `withinKm` cannot resolve below the rounding                     |
+| **Partner picker**          | A map the partner pans under a fixed pin, replacing two decimal-degree fields                                               | `properties-location-gap.integration.test.ts` — setting a null location is allowed on a published listing, moving one is not |
+
+**A distance is a coordinate wearing a disguise.** Three accurate distances to three known
+landmarks locate a building by trilateration, to whatever precision they carry — so a «how far is
+the airport» feature could have handed out the address while never printing a coordinate. Every
+published distance is therefore computed from the PUBLISHED pair, which makes it a pure function of
+what the reader already holds: the set of them conveys nothing further, however many are collected.
+That is a stronger guarantee than "we rounded it", because it survives somebody later printing more
+decimal places.
+
+**Rounding GUARANTEES collisions, and the map has to say so.** Two hotels on one street share a
+published coordinate and no zoom level will ever separate them. The neighbours query groups by
+point and the limit is a budget of PLACES, so one dense cluster cannot fill the map — measured on
+the dev database, where 60 co-located fixtures had crowded out every real neighbour.
+
+**The coordinate gap was the whole reason none of this was usable.** 67 of 2,017 published listings
+had coordinates — 3%. The cause was not partner reluctance: «خط العرض (اختياري)» asks somebody who
+runs a guest house for a figure they have no way to obtain. §8.1 also froze coordinates on a
+published listing, so the 97% could only be fixed by a support ticket each. Both are addressed: a
+map picker, and a NARROW exception that lets a partner SET a location that is null while still
+refusing to MOVE or CLEAR one — setting a null coordinate contradicts nothing SAFRA verified.
+
+**Two defects found in existing guards while doing this, both now closed:**
+
+- **`map-sanitiser-reach.test.ts` had a hole big enough to drive the advisory through.** It matched
+  `new Marker(` and `maplibre*.Marker`, but `property-map.tsx` reaches the library through an object
+  it calls `built.library` — so `new built.library.Marker()` swept clean. That is the alias the file
+  already uses for `NavigationControl`, so the first marker anybody added would have been written
+  that way. Found by mutating the component with a real marker and watching the sweep pass. It now
+  matches the CONSTRUCTOR on any receiver, and all five doors are mutation-tested.
+- The same sweep failed on COMMENTS explaining why markers are not used. It now strips comments
+  before scanning, which is stricter as well as correct.
+
+**The price pills are React elements positioned from `map.project()`, deliberately not
+`maplibre.Marker`.** A pill carries a partner-supplied name, and MapLibre v5's marker path runs
+through the `DOM.sanitize()` that GHSA-jrc7-96c5-q579 bypasses — so the obvious implementation would
+have made a CRITICAL advisory live through a feature that looks purely cosmetic. The exemption in
+`package.json` stays true, and the pills are keyboard-reachable anchors for it.
+
+**Still open:** no staff registry screen for landmarks — they are seeded, so adding one is a seed
+change and a deploy rather than a screen. SRS §1.4's «without modifying the code» is satisfied in
+the DATA but not in the workflow.
 
 ### O-ui-11 — Closed: the brand gold came back, and gold text got its own token
 
