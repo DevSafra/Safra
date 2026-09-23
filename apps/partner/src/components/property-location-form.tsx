@@ -6,7 +6,20 @@ import { useRouter } from 'next/navigation';
 import { codeOfResponse, refusalFor } from '@/lib/refusal';
 import { t } from '@/lib/strings';
 
-import { LocationPicker } from './location-picker';
+import { LocationPicker } from '@safra/ui';
+import { basemapBase } from '@safra/session';
+
+/**
+ * Where the self-hosted basemap lives.
+ *
+ * Derived HERE rather than inside `LocationPicker`: Next inlines `process.env.NEXT_PUBLIC_*`
+ * at build time and only compiles this app, so an env read inside the `tsc`-built shared
+ * package would be `undefined` in the browser and the map would quietly not appear.
+ */
+const BASEMAP = basemapBase({
+  NEXT_PUBLIC_BASEMAP_URL: process.env['NEXT_PUBLIC_BASEMAP_URL'],
+  NEXT_PUBLIC_MEDIA_URL: process.env['NEXT_PUBLIC_MEDIA_URL'],
+});
 
 /**
  * Setting a location on a listing that is PUBLISHED and has never had one.
@@ -91,6 +104,7 @@ export function PropertyLocationForm({
   return (
     <section className="grid gap-3 rounded-card border border-line bg-card p-4">
       <LocationPicker
+        basemapUrl={BASEMAP}
         latitude={latitude}
         longitude={longitude}
         fallbackLatitude={cityLatitude}

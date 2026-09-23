@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 
-import { LocationPicker } from './location-picker';
+import { LocationPicker } from '@safra/ui';
+import { basemapBase } from '@safra/session';
 import { useRouter } from 'next/navigation';
 
 import type { PartnerPropertyDetail, PropertyFormReference } from '@/lib/api';
@@ -10,6 +11,18 @@ import { codeOfResponse, refusalFor } from '@/lib/refusal';
 import { STAR_VALUES } from '@/lib/stars';
 import { t, tripAttribute } from '@/lib/strings';
 import { PROPERTY_HEADLINE_MAX, TRIP_ATTRIBUTES, usesStarRating } from '@safra/contracts';
+
+/**
+ * Where the self-hosted basemap lives.
+ *
+ * Derived HERE rather than inside `LocationPicker`: Next inlines `process.env.NEXT_PUBLIC_*`
+ * at build time and only compiles this app, so an env read inside the `tsc`-built shared
+ * package would be `undefined` in the browser and the map would quietly not appear.
+ */
+const BASEMAP = basemapBase({
+  NEXT_PUBLIC_BASEMAP_URL: process.env['NEXT_PUBLIC_BASEMAP_URL'],
+  NEXT_PUBLIC_MEDIA_URL: process.env['NEXT_PUBLIC_MEDIA_URL'],
+});
 
 /**
  * تعديل العقار — the form, for a listing that may still be edited.
@@ -446,6 +459,7 @@ export function PropertyEditor({
         can find their own building on a map in seconds.
       */}
       <LocationPicker
+        basemapUrl={BASEMAP}
         latitude={form.latitude}
         longitude={form.longitude}
         fallbackLatitude={city?.latitude ?? null}

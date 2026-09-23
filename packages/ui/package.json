@@ -31,6 +31,9 @@
     "dist"
   ],
   "dependencies": {
-    "@safra/contracts": "workspace:*"
+    "@protomaps/basemaps": "^5.7.2",
+    "@safra/contracts": "workspace:*",
+    "maplibre-gl": "^5.24.0",
+    "pmtiles": "^4.5.0"
   }
 }

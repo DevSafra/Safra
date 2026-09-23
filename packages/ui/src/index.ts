@@ -31,3 +31,4 @@ export {
 } from './image-slider.js';
 export { ConfirmDialog, useConfirm, type ConfirmRequest } from './confirm-dialog.js';
 export { Modal } from './modal.js';
+export { LocationPicker, type LocationPickerCopy } from './location-picker.js';

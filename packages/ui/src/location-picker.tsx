@@ -4,14 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type * as MapLibre from 'maplibre-gl';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 
-import { basemapBase } from '@safra/session';
-
 import 'maplibre-gl/dist/maplibre-gl.css';
-
-const BASEMAP = basemapBase({
-  NEXT_PUBLIC_BASEMAP_URL: process.env['NEXT_PUBLIC_BASEMAP_URL'],
-  NEXT_PUBLIC_MEDIA_URL: process.env['NEXT_PUBLIC_MEDIA_URL'],
-});
 
 export interface LocationPickerCopy {
   readonly heading: string;
@@ -24,7 +17,23 @@ export interface LocationPickerCopy {
 }
 
 /**
- * Where a partner puts their property ON A MAP, instead of typing two decimal numbers.
+ * A map somebody pans under a fixed pin, to say where a thing is.
+ *
+ * ## One picker, two callers, and why it moved here
+ *
+ * Built for the partner portal on 2026-09-23; the console's landmark registry needed the same
+ * control the same day. A second copy would have been a second set of MapLibre lifecycle bugs
+ * to find — the RTL plugin, the ResizeObserver, the rebuild-on-every-render trap — which is
+ * exactly the reasoning `ImageSlider` and `useConfirm` already record: built once, used
+ * everywhere, never written again.
+ *
+ * The two callers differ only in their COPY and in what they do with the value:
+ *
+ * - a PARTNER places their own listing, and the public read path rounds it to ~100 m;
+ * - an OPERATOR places a landmark, whose position is a published fact and is stored exactly.
+ *
+ * Neither difference belongs in here. This component answers «where», at full precision, and
+ * the rounding lives where it belongs — in `properties.public_latitude`, a generated column.
  *
  * ## Why the two fields had to go
  *
@@ -55,6 +64,7 @@ export interface LocationPickerCopy {
  * drag-and-drop onto a moving target.
  */
 export function LocationPicker({
+  basemapUrl,
   latitude,
   longitude,
   fallbackLatitude,
@@ -62,6 +72,15 @@ export function LocationPicker({
   copy,
   onChange,
 }: {
+  /**
+   * Where the self-hosted basemap lives, PASSED IN rather than read from the environment.
+   *
+   * Next inlines `process.env.NEXT_PUBLIC_*` at build time, and it only compiles the app — this
+   * package is `tsc`-built to `dist` before Next ever sees it, so an env read in here would be
+   * `undefined` in the browser and the picker would quietly render «الخريطة غير متاحة» on every
+   * screen. Each app derives it with `basemapBase` in its own code, where the inlining happens.
+   */
+  readonly basemapUrl: string | undefined;
   readonly latitude: string;
   readonly longitude: string;
   /** Where to open when the listing has no coordinates — its city. */
@@ -126,7 +145,7 @@ export function LocationPicker({
   }, []);
 
   useEffect(() => {
-    if (!container.current || !BASEMAP) return;
+    if (!container.current || !basemapUrl) return;
 
     let cancelled = false;
     let dispose: (() => void) | null = null;
@@ -158,12 +177,12 @@ export function LocationPicker({
           container: container.current,
           style: {
             version: 8,
-            glyphs: `${BASEMAP}/fonts/{fontstack}/{range}.pbf`,
-            sprite: `${BASEMAP}/sprites/light`,
+            glyphs: `${basemapUrl}/fonts/{fontstack}/{range}.pbf`,
+            sprite: `${basemapUrl}/sprites/light`,
             sources: {
               protomaps: {
                 type: 'vector',
-                tiles: [`pmtiles://${BASEMAP}/tiles.pmtiles/{z}/{x}/{y}`],
+                tiles: [`pmtiles://${basemapUrl}/tiles.pmtiles/{z}/{x}/{y}`],
                 minzoom: 0,
                 maxzoom: 14,
                 attribution: '© OpenStreetMap contributors',
@@ -224,9 +243,9 @@ export function LocationPicker({
       so this list is genuinely complete — the map is built once and survives every later
       render. No lint suppression, because there is nothing to suppress.
     */
-  }, [publish]);
+  }, [publish, basemapUrl]);
 
-  if (!BASEMAP || failed) {
+  if (!basemapUrl || failed) {
     return (
       <div className="rounded-lg border border-line bg-field p-4">
         <p className="text-13 text-muted">{copy.unavailable}</p>
