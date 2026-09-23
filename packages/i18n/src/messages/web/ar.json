@@ -275,16 +275,6 @@
     "distanceM": "{value} م",
     "showAllLandmarks": "اعرض كل المعالم",
     "showFewerLandmarks": "اعرض أقل",
-    "kinds": {
-      "city_centre": "وسط المدينة",
-      "airport": "المطارات",
-      "transit": "المواصلات",
-      "attraction": "معالم وأنشطة",
-      "beach": "الشواطئ",
-      "shopping": "التسوق",
-      "hospital": "المستشفيات",
-      "university": "الجامعات"
-    },
     "nearbyStays": "إقامات قريبة",
     "nearbyStaysHint": "الأسعار من، لليلة الواحدة.",
     "nearbyCount": "{count} إقامات هنا",

@@ -275,16 +275,6 @@
     "distanceM": "{value} m",
     "showAllLandmarks": "Show all places",
     "showFewerLandmarks": "Show fewer",
-    "kinds": {
-      "city_centre": "City centre",
-      "airport": "Airports",
-      "transit": "Getting around",
-      "attraction": "Things to see",
-      "beach": "Beaches",
-      "shopping": "Shopping",
-      "hospital": "Hospitals",
-      "university": "Universities"
-    },
     "nearbyStays": "Stays nearby",
     "nearbyStaysHint": "Prices are per night, from.",
     "nearbyCount": "{count} stays here",

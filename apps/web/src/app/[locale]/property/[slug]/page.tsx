@@ -908,7 +908,8 @@ export default async function PropertyPage({
                 <NearbyLandmarks
                   entries={property.landmarks.map((entry) => ({
                     slug: entry.slug,
-                    kind: entry.kind,
+                    kindLabel: localisedText(entry.kindName, locale) || entry.kind,
+                    iconPaths: entry.iconPaths,
                     name: localisedText(entry.name, locale) ?? entry.slug,
                     distanceMetres: entry.distanceMetres,
                     /*
@@ -936,16 +937,6 @@ export default async function PropertyPage({
                     intro: t('nearbyIntro'),
                     showAll: t('showAllLandmarks'),
                     showFewer: t('showFewerLandmarks'),
-                    kinds: {
-                      city_centre: t('kinds.city_centre'),
-                      airport: t('kinds.airport'),
-                      transit: t('kinds.transit'),
-                      attraction: t('kinds.attraction'),
-                      beach: t('kinds.beach'),
-                      shopping: t('kinds.shopping'),
-                      hospital: t('kinds.hospital'),
-                      university: t('kinds.university'),
-                    },
                   }}
                 />
               </div>

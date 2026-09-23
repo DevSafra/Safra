@@ -2,11 +2,18 @@
 
 import { useState } from 'react';
 
-import { LandmarkIcon, type LandmarkKind } from './landmark-icon';
+import { LandmarkIcon } from './landmark-icon';
 
 export interface LandmarkEntry {
   readonly slug: string;
-  readonly kind: LandmarkKind;
+  /**
+   * The kind's LABEL and its MARKS, resolved by the page.
+   *
+   * Not a `kind` code and a lookup in here: staff add kinds in the console now, so a code this
+   * file did not ship would have no word and no shape. Both travel with the row.
+   */
+  readonly kindLabel: string;
+  readonly iconPaths: readonly string[];
   readonly name: string;
   /**
    * Already written out — «١٫٢ كم» — because the page that renders it is a Server
@@ -27,7 +34,6 @@ export interface NearbyLandmarkLabels {
   readonly intro: string;
   readonly showAll: string;
   readonly showFewer: string;
-  readonly kinds: Readonly<Record<LandmarkKind, string>>;
 }
 
 /** How many rows show before the list asks to be opened. */
@@ -78,10 +84,13 @@ export function NearbyLandmarks({
       <ul className="mt-4 grid gap-x-8 gap-y-3 sm:grid-cols-2">
         {shown.map((entry) => (
           <li key={entry.slug} className="flex items-start gap-2.5">
-            <LandmarkIcon kind={entry.kind} className="mt-0.5 shrink-0 text-gold-read" />
+            <LandmarkIcon
+              paths={entry.iconPaths}
+              className="mt-0.5 shrink-0 text-gold-read"
+            />
             <span className="min-w-0 flex-1">
               <span className="block text-14 text-text">{entry.name}</span>
-              <span className="block text-12 text-faint">{labels.kinds[entry.kind]}</span>
+              <span className="block text-12 text-faint">{entry.kindLabel}</span>
             </span>
             {/*
               `tabular-nums` so a column of distances lines up on the decimal rather than

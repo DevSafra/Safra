@@ -275,16 +275,6 @@
     "distanceM": "{value} m",
     "showAllLandmarks": "Alle Orte anzeigen",
     "showFewerLandmarks": "Weniger anzeigen",
-    "kinds": {
-      "city_centre": "Stadtzentrum",
-      "airport": "Flughäfen",
-      "transit": "Verkehr",
-      "attraction": "Sehenswürdigkeiten",
-      "beach": "Strände",
-      "shopping": "Einkaufen",
-      "hospital": "Krankenhäuser",
-      "university": "Universitäten"
-    },
     "nearbyStays": "Unterkünfte in der Nähe",
     "nearbyStaysHint": "Preise pro Nacht, ab.",
     "nearbyCount": "{count} Unterkünfte hier",

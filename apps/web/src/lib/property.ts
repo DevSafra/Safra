@@ -40,16 +40,15 @@ const propertyDetailSchema = z.object({
     .array(
       z.object({
         slug: z.string(),
-        kind: z.enum([
-          'city_centre',
-          'airport',
-          'transit',
-          'attraction',
-          'beach',
-          'shopping',
-          'hospital',
-          'university',
-        ]),
+        /*
+          A free string, not an enum. Staff add kinds in the console, so a value this app was
+          built before is a normal Tuesday rather than a parse failure — and a `z.enum` here
+          would blank the whole section the first time somebody used the feature.
+        */
+        kind: z.string(),
+        kindName: translated,
+        /* SVG path data. See `LandmarkIcon` for why this cannot execute. */
+        iconPaths: z.array(z.string()).default([]),
         name: translated,
         distanceMetres: z.number(),
       }),
