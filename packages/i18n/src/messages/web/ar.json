@@ -119,7 +119,14 @@
     "pageNumber": "صفحة {number}",
     "resultsOnPage": "{count, plural, zero {لا نتائج} one {نتيجة واحدة على هذه الصفحة} two {نتيجتان على هذه الصفحة} few {# نتائج على هذه الصفحة} many {# نتيجة على هذه الصفحة} other {# نتيجة على هذه الصفحة}}",
     "starRating": "تصنيف النجوم",
-    "starRatingHotelsOnly": "تصنيف النجوم يخصّ الفنادق فقط، فاختياره يستبعد باقي أنواع الإقامات."
+    "starRatingHotelsOnly": "تصنيف النجوم يخصّ الفنادق فقط، فاختياره يستبعد باقي أنواع الإقامات.",
+    "nearTitle": "قريب من",
+    "nearAny": "أي مكان في المدينة",
+    "nearRadius": "ضمن",
+    "nearRadiusKm": "{value} كم",
+    "nearNeedsCity": "اختر مدينة أولاً لتظهر المعالم.",
+    "sortDistance": "الأقرب إلى المعلم",
+    "resultDistance": "على بعد {value} من {landmark}"
   },
   "attributes": {
     "sea": "بحر",
@@ -261,7 +268,28 @@
     "basketEmpty": "سلّة الحجز فارغة. أضف نوع غرفة أو أكثر من القائمة لترى التفاصيل والمجموع هنا.",
     "basketAccommodation": "الإقامة",
     "basketTooShort": "أقل مدة لهذه الغرفة {count, plural, one {ليلة واحدة} two {ليلتان} few {# ليالٍ} many {# ليلة} other {# ليلة}} — عدّل التواريخ لإضافتها.",
-    "basketLineAll": "كل المتاح من هذا النوع."
+    "basketLineAll": "كل المتاح من هذا النوع.",
+    "nearbyTitle": "ما حول العقار",
+    "nearbyIntro": "المسافات مقاسة من منطقة العقار التقريبية، لا من عنوانه الدقيق.",
+    "distanceKm": "{value} كم",
+    "distanceM": "{value} م",
+    "showAllLandmarks": "اعرض كل المعالم",
+    "showFewerLandmarks": "اعرض أقل",
+    "kinds": {
+      "city_centre": "وسط المدينة",
+      "airport": "المطارات",
+      "transit": "المواصلات",
+      "attraction": "معالم وأنشطة",
+      "beach": "الشواطئ",
+      "shopping": "التسوق",
+      "hospital": "المستشفيات",
+      "university": "الجامعات"
+    },
+    "nearbyStays": "إقامات قريبة",
+    "nearbyStaysHint": "الأسعار من، لليلة الواحدة.",
+    "nearbyCount": "{count} إقامات هنا",
+    "noPrice": "لا يوجد سعر معلن",
+    "markerLabel": "{name} — {price}"
   },
   "city": {
     "availableStays": "الإقامات المتاحة في {city}",

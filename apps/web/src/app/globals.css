@@ -1057,3 +1057,28 @@ body {
 .maplibregl-ctrl-attrib-inner {
   font-size: var(--text-11);
 }
+
+/*
+  The attribution sits ABOVE the price-pill overlay, always.
+
+  The pills are React elements in a layer over the canvas (see `map-price-markers.tsx`), and
+  a neighbour whose coordinate lands bottom-right drew straight over «© OpenStreetMap
+  contributors». ODbL requires that line to be legible, not merely present, and a map is not
+  allowed to hide it behind its own decoration — the same rule that pushed the listing sheet
+  up to `bottom-7`, found the same way: by measuring one rectangle against the other.
+
+  `z-index` on the control rather than a gap in the overlay, because a gap would clip any
+  pill that happened to fall near the bottom edge, and losing a listing is a worse answer
+  than a pill passing behind a label that already carries its own background.
+
+  TWO classes, not one. MapLibre's own sheet declares `.maplibregl-ctrl-bottom-right {
+  z-index: 2 }`, and Next collects a component's imported CSS AFTER this file — so a
+  single-class rule here loses the tie on source order and changes nothing. Measured, not
+  assumed: the first version shipped, read correctly in the built stylesheet, and the
+  attribution stayed covered. The same trap the map component's own header records about
+  `.maplibregl-map { position: relative }`.
+*/
+.maplibregl-map .maplibregl-ctrl-bottom-right,
+.maplibregl-map .maplibregl-ctrl-bottom-left {
+  z-index: 20;
+}

@@ -2,7 +2,11 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 
-import { TRIP_ATTRIBUTES } from '@safra/contracts';
+import {
+  DEFAULT_SEARCH_RADIUS_KM,
+  MAX_SEARCH_RADIUS_KM,
+  TRIP_ATTRIBUTES,
+} from '@safra/contracts';
 
 import { PropertyCard } from '@/components/property-card';
 import { SearchFilters } from '@/components/search-filters';
@@ -11,6 +15,7 @@ import { isLocale, type Locale } from '@/i18n/routing';
 import {
   getAmenities,
   getCities,
+  getLandmarks,
   getPropertyTypes,
   getPublicSettings,
 } from '@/lib/catalog';
@@ -88,7 +93,13 @@ function money(raw: string | undefined): number | undefined {
   return Math.min(Math.trunc(value), 1_000_000);
 }
 
-const SORTS = ['recommended', 'price_asc', 'price_desc', 'rating_desc'] as const;
+const SORTS = [
+  'recommended',
+  'price_asc',
+  'price_desc',
+  'rating_desc',
+  'distance_asc',
+] as const;
 
 type Sort = (typeof SORTS)[number];
 
@@ -162,8 +173,41 @@ export default async function SearchPage({
   */
   const bedrooms = whole(first(query['bedrooms']), 1, 10);
   const citySlug = first(query['citySlug']) || undefined;
+
+  /*
+    Fetched here rather than in the parallel block above, because it depends on the city the
+    reader chose. Reference data behind the same cache, so the extra round trip is a cache
+    read on all but the first request for a city.
+  */
+  const landmarks = await getLandmarks(citySlug);
+
+  /*
+    «قريب من». A landmark belongs to a city, so one named without a city is dropped rather
+    than honoured — the API would answer an empty page, and an empty page under a filter the
+    reader cannot see is worse than no filter at all.
+
+    The radius is CLAMPED here as well as validated at the API, for the reason the page-size
+    control is: the API answers an out-of-range value with a 400, and a crafted
+    `?withinKm=500` in a shared link would become an error page instead of a result list.
+  */
+  const nearLandmark = citySlug ? first(query['nearLandmark']) || undefined : undefined;
+  const withinKm = Math.min(
+    MAX_SEARCH_RADIUS_KM,
+    Math.max(0.5, Number(first(query['withinKm'])) || DEFAULT_SEARCH_RADIUS_KM),
+  );
+
   const sortParam = first(query['sort']);
-  const sort: Sort = isSort(sortParam) ? sortParam : 'recommended';
+  const requested: Sort = isSort(sortParam) ? sortParam : 'recommended';
+  /*
+    «Nearest first» with nothing to be near is unanswerable, and the contract refuses it with
+    a 400. That refusal is right for an API and wrong for a page: `?sort=distance_asc` with
+    no landmark is an ordinary stale link — somebody cleared the landmark, or shared the URL
+    from a different search — and it must degrade to a result list, not an error.
+
+    The same reasoning as «a page past the end renders an empty table, never a 400».
+  */
+  const sort: Sort =
+    requested === 'distance_asc' && !nearLandmark ? 'recommended' : requested;
 
   const propertyTypeCode = first(query['propertyTypeCode']) || undefined;
   /*
@@ -208,6 +252,7 @@ export default async function SearchPage({
   ].sort((a, b) => a - b);
 
   const freeCancellationOnly = first(query['freeCancellationOnly']) === 'true';
+
   const cursor = first(query['cursor']) || undefined;
 
   /*
@@ -233,6 +278,8 @@ export default async function SearchPage({
     minPrice: rangeOk ? minPrice : undefined,
     maxPrice: rangeOk ? maxPrice : undefined,
     freeCancellationOnly,
+    nearLandmark,
+    withinKm,
     sort,
     limit: PAGE_SIZE,
     cursor,
@@ -271,6 +318,15 @@ export default async function SearchPage({
     if (rangeOk && minPrice !== undefined) next.set('minPrice', String(minPrice));
     if (rangeOk && maxPrice !== undefined) next.set('maxPrice', String(maxPrice));
     if (freeCancellationOnly) next.set('freeCancellationOnly', 'true');
+    /*
+      Carried, or paging out of a «near the airport» search quietly returns the whole city —
+      the same failure the star filter's note above describes. The radius rides with it,
+      because a landmark without one silently widens to the default.
+    */
+    if (nearLandmark) {
+      next.set('nearLandmark', nearLandmark);
+      next.set('withinKm', String(withinKm));
+    }
 
     /*
       `cursor: null` means "back to the first page" — what changing the SORT must do. Keeping an
@@ -301,6 +357,14 @@ export default async function SearchPage({
     { value: 'price_asc', label: t('sortPriceAsc') },
     { value: 'price_desc', label: t('sortPriceDesc') },
     { value: 'rating_desc', label: t('sortRatingDesc') },
+    /*
+      Offered ONLY with a landmark to measure from. The contract refuses the combination, so
+      a select that showed it regardless would let a reader pick an option that answers 400 —
+      a control whose failure is a broken page rather than a different order.
+    */
+    ...(nearLandmark
+      ? [{ value: 'distance_asc' as const, label: t('sortDistance') }]
+      : []),
   ];
 
   /*
@@ -378,6 +442,7 @@ export default async function SearchPage({
             locale={locale}
             propertyTypes={propertyTypes}
             amenities={amenities}
+            landmarks={landmarks}
             carried={{
               citySlug,
               checkIn,
@@ -396,6 +461,8 @@ export default async function SearchPage({
               minPrice: rangeOk ? minPrice : undefined,
               maxPrice: rangeOk ? maxPrice : undefined,
               freeCancellationOnly,
+              nearLandmark,
+              withinKm,
             }}
           />
         </aside>

@@ -63,9 +63,35 @@ function sources(dir: string): string[] {
   return out;
 }
 
+/**
+ * Strips block comments before scanning.
+ *
+ * The sweep looks for CODE that can reach the sanitiser, and prose is not code. Documenting
+ * why the price markers are deliberately NOT `new Marker()` made this file fail on the
+ * explanation of the very rule it enforces — a sweep that cannot tell a call from a sentence
+ * about a call punishes writing the reason down.
+ *
+ * Conservative on purpose: only comments that START a line — optionally behind the `{` of a
+ * JSX comment — which is how every comment in these apps is written. A greedy stripper could
+ * swallow an opening sequence inside a string literal and take a real call out of range with
+ * it, and this sweep failing OPEN is the outcome that matters: it is the only thing holding a
+ * critical advisory's exemption to account.
+ *
+ * Mutation-tested after the change, by putting a real `new maplibre.Marker(...)` into the map
+ * component and confirming this still fails.
+ */
+function withoutComments(body: string): string {
+  return (
+    body
+      /* A JSX comment — `{/* … *\/}` — as well as a plain one. Both anchored to a line start. */
+      .replace(/^[ \t]*\{?\/\*[\s\S]*?\*\/\}?/gm, '')
+      .replace(/^[ \t]*\/\/.*$/gm, '')
+  );
+}
+
 const files = APPS.flatMap(sources).map((file) => ({
   file,
-  body: readFileSync(join(ROOT, file), 'utf8'),
+  body: withoutComments(readFileSync(join(ROOT, file), 'utf8')),
 }));
 
 describe('the MapLibre sanitiser stays out of reach', () => {
@@ -93,20 +119,44 @@ describe('the MapLibre sanitiser stays out of reach', () => {
 
   it('renders no popup, marker or HTML content through MapLibre', () => {
     /*
-      The other doors into `DOM.sanitize()`. None of them is used today and none is needed
-      by a map that draws one disc: the listing's area is a GeoJSON layer, which never goes
-      near HTML.
+      The other doors into `DOM.sanitize()`, and the reason the price markers are ordinary
+      React elements positioned from `map.project()` rather than MapLibre markers: a
+      neighbour's pill carries a PARTNER-SUPPLIED name, and routing that through a marker
+      would have walked partner text into the vulnerable path — through a feature that looks
+      purely cosmetic. The listing's own area stays a GeoJSON layer, which never goes near
+      HTML at all.
     */
     const reached: string[] = [];
 
-    for (const { file, body } of files) {
-      for (const call of ['.setHTML(', 'new Popup(', 'new Marker(', '.setDOMContent(']) {
-        if (body.includes(call)) reached.push(`${file} — ${call}`);
-      }
+    /*
+      ## Matched on the CONSTRUCTOR, not on a module named `maplibre`
 
-      /* `maplibregl.Popup` / `maplibre.Marker`, reached through the module object. */
-      for (const [whole] of body.matchAll(/\bmaplibre\w*\.(Popup|Marker)\b/g)) {
-        reached.push(`${file} — ${whole}`);
+      This used to look for `new Marker(` and for `maplibre*.Popup` / `maplibre*.Marker`, and
+      it had a hole big enough to drive the advisory through: `property-map.tsx` reaches the
+      library through an object it calls `built.library`, so
+
+          new built.library.Marker().setLngLat(...).addTo(map)
+
+      matched NEITHER pattern and swept clean. That is not a hypothetical alias — it is the
+      shape the file already uses for `built.library.NavigationControl`, so the first marker
+      anybody added would have been written that way and this test would have said nothing.
+
+      Found on 2026-09-23 by mutating the map component with a real marker and watching the
+      sweep pass. Any receiver now counts, because what makes the call dangerous is the
+      CONSTRUCTOR, not the name of the variable holding the module.
+    */
+    const doors = [
+      /* `new Marker(`, `new maplibre.Marker(`, `new built.library.Marker(` — any receiver. */
+      /\bnew\s+(?:[A-Za-z_$][\w$]*\s*\.\s*)*(Popup|Marker)\s*\(/g,
+      /* The two methods that hand MapLibre a string it will sanitise. */
+      /\.\s*(setHTML|setDOMContent)\s*\(/g,
+    ];
+
+    for (const { file, body } of files) {
+      for (const door of doors) {
+        for (const [whole] of body.matchAll(door)) {
+          reached.push(`${file} — ${whole.replace(/\s+/g, ' ').trim()}`);
+        }
       }
     }
 

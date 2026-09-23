@@ -124,6 +124,14 @@ export const searchResultItemSchema = z.object({
   unitId: z.string(),
   nightlyFrom: z.string(),
   stayTotal: z.string(),
+  /*
+    The PUBLIC coordinates and the distance from the searched landmark.
+    `.nullable()` rather than `.default()`: a listing without coordinates genuinely has none,
+    and a default would invent a place for it — the failure the zod-default note describes.
+  */
+  publicLatitude: z.string().nullable().default(null),
+  publicLongitude: z.string().nullable().default(null),
+  distanceMetres: z.number().nullable().default(null),
   currencyCode: z.string(),
   nights: z.number(),
   /**
@@ -204,6 +212,17 @@ export interface SearchParams {
   minPrice?: number | undefined;
   maxPrice?: number | undefined;
   freeCancellationOnly?: boolean | undefined;
+  /**
+   * «قريب من» — a landmark SLUG, and the radius around it.
+   *
+   * A slug rather than a coordinate pair, deliberately. A caller-supplied centre would make
+   * search a general proximity oracle: ask «within 0.1 km of X» for a moving X and the
+   * answers trace a listing's position far more finely than the rounding allows. A slug can
+   * only name a row staff published, so the set of centres is fixed and known — and the
+   * filter compares against the ROUNDED coordinate either way.
+   */
+  nearLandmark?: string | undefined;
+  withinKm?: number | undefined;
   sort?: string | undefined;
   limit?: number | undefined;
   cursor?: string | undefined;

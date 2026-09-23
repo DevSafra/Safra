@@ -224,6 +224,41 @@ export async function getAmenities(): Promise<Amenity[]> {
   return read('/amenities', z.array(amenitySchema), [], REFERENCE_TTL, [CATALOGUE_TAG]);
 }
 
+const landmarkSchema = z.object({
+  slug: z.string(),
+  kind: z.string(),
+  name: z.object({
+    ar: z.string().nullable(),
+    en: z.string().nullable(),
+    de: z.string().nullable(),
+  }),
+});
+
+export type Landmark = z.infer<typeof landmarkSchema>;
+
+/**
+ * The landmarks of one city, for the «قريب من» filter.
+ *
+ * Empty for no city, without a request: a landmark belongs to a city, and asking the API
+ * «which landmarks are in nowhere» is a round trip whose answer is already known.
+ *
+ * Reference data, so it shares `REFERENCE_TTL` and the catalogue tag — a landmark staff add
+ * reaches the filter on the same purge as a city or an amenity.
+ */
+export async function getLandmarks(citySlug: string | undefined): Promise<Landmark[]> {
+  if (!citySlug) return [];
+
+  const body = await read(
+    `/landmarks?citySlug=${encodeURIComponent(citySlug)}`,
+    z.object({ items: z.array(landmarkSchema) }),
+    { items: [] },
+    REFERENCE_TTL,
+    [CATALOGUE_TAG],
+  );
+
+  return body.items;
+}
+
 /**
  * Operational values the storefront displays; see P-005.
  *

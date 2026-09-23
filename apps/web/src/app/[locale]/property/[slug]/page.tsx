@@ -13,6 +13,7 @@ import { SaveButton } from '@/components/save-button';
 import { ShareButton } from '@/components/share-button';
 import { PropertyGallery } from '@/components/property-gallery';
 import { PropertyMap } from '@/components/property-map';
+import { NearbyLandmarks } from '@/components/nearby-landmarks';
 import { BookingSelectionProvider } from '@/components/booking-selection';
 import { CardSlider } from '@/components/card-slider';
 import { BookingSummaryCard } from '@/components/booking-summary-card';
@@ -833,9 +834,25 @@ export default async function PropertyPage({
                 */}
                 {property.latitude && property.longitude ? (
                   <PropertyMap
+                    slug={property.slug}
                     latitude={property.latitude}
                     longitude={property.longitude}
                     locale={locale}
+                    /*
+                      The neighbours' pills. The price FORMATTER is passed rather than the
+                      formatted strings, because the neighbours are fetched in the browser
+                      and only this page knows the locale's money rules — and «no amount is
+                      ever written without its currency» has to hold on a map marker too.
+
+                      No customer fee is applied, deliberately: these are «from» prices for
+                      OTHER listings, each with its own fee-bearing units, and a fee computed
+                      here would be this listing's arithmetic printed over somebody else's
+                      price. The label says «من», and the number is the advertised floor.
+                    */
+                    nearby={{
+                      hrefPrefix: `/${locale}/property/`,
+                      fallbackCurrency: DEFAULT_MONEY_CURRENCY,
+                    }}
                     labels={{
                       explore: t('map.show'),
                       region: t('map.region'),
@@ -882,6 +899,55 @@ export default async function PropertyPage({
                     }}
                   />
                 ) : null}
+
+                {/*
+                  «ما حول العقار» — inside the SAME card as the address and the map, because
+                  it is the third sentence of one answer to «where is this», not a new idea.
+                  A separate bordered box under the map would read as a fourth section.
+                */}
+                <NearbyLandmarks
+                  entries={property.landmarks.map((entry) => ({
+                    slug: entry.slug,
+                    kind: entry.kind,
+                    name: localisedText(entry.name, locale) ?? entry.slug,
+                    distanceMetres: entry.distanceMetres,
+                    /*
+                      Written out HERE, on the server, because the list is a client component
+                      and a formatter cannot cross that boundary. `Intl` also renders Arabic
+                      digits as ٠-٩ and picks the locale's decimal separator, which a
+                      hand-built «1.2» would not.
+                    */
+                    distanceLabel:
+                      entry.distanceMetres < 1000
+                        ? t('distanceM', {
+                            value: new Intl.NumberFormat(locale).format(
+                              entry.distanceMetres,
+                            ),
+                          })
+                        : t('distanceKm', {
+                            value: new Intl.NumberFormat(locale, {
+                              minimumFractionDigits: 1,
+                              maximumFractionDigits: 1,
+                            }).format(entry.distanceMetres / 1000),
+                          }),
+                  }))}
+                  labels={{
+                    title: t('nearbyTitle'),
+                    intro: t('nearbyIntro'),
+                    showAll: t('showAllLandmarks'),
+                    showFewer: t('showFewerLandmarks'),
+                    kinds: {
+                      city_centre: t('kinds.city_centre'),
+                      airport: t('kinds.airport'),
+                      transit: t('kinds.transit'),
+                      attraction: t('kinds.attraction'),
+                      beach: t('kinds.beach'),
+                      shopping: t('kinds.shopping'),
+                      hospital: t('kinds.hospital'),
+                      university: t('kinds.university'),
+                    },
+                  }}
+                />
               </div>
             </section>
 

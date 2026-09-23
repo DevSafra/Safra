@@ -119,7 +119,14 @@
     "pageNumber": "Seite {number}",
     "resultsOnPage": "{count, plural, =0 {Keine Ergebnisse} one {1 Ergebnis auf dieser Seite} other {# Ergebnisse auf dieser Seite}}",
     "starRating": "Sterne-Klassifizierung",
-    "starRatingHotelsOnly": "Eine Sterne-Klassifizierung gilt nur für Hotels; ihre Auswahl schließt alle anderen Unterkunftsarten aus."
+    "starRatingHotelsOnly": "Eine Sterne-Klassifizierung gilt nur für Hotels; ihre Auswahl schließt alle anderen Unterkunftsarten aus.",
+    "nearTitle": "In der Nähe von",
+    "nearAny": "Überall in der Stadt",
+    "nearRadius": "Innerhalb",
+    "nearRadiusKm": "{value} km",
+    "nearNeedsCity": "Wähle zuerst eine Stadt, um ihre Orte zu sehen.",
+    "sortDistance": "Am nächsten zum Ort",
+    "resultDistance": "{value} von {landmark}"
   },
   "attributes": {
     "sea": "Meer",
@@ -261,7 +268,28 @@
     "basketEmpty": "Ihre Auswahl ist leer. Fügen Sie einen oder mehrere Zimmertypen hinzu, um Details und Gesamtpreis hier zu sehen.",
     "basketAccommodation": "Unterkunft",
     "basketTooShort": "Dieses Zimmer erfordert mindestens {count, plural, one {1 Nacht} other {# Nächte}} — ändern Sie die Daten, um es hinzuzufügen.",
-    "basketLineAll": "Mehr dieses Typs gibt es nicht."
+    "basketLineAll": "Mehr dieses Typs gibt es nicht.",
+    "nearbyTitle": "In der Umgebung",
+    "nearbyIntro": "Entfernungen gelten ab dem ungefähren Gebiet der Unterkunft, nicht ab ihrer genauen Adresse.",
+    "distanceKm": "{value} km",
+    "distanceM": "{value} m",
+    "showAllLandmarks": "Alle Orte anzeigen",
+    "showFewerLandmarks": "Weniger anzeigen",
+    "kinds": {
+      "city_centre": "Stadtzentrum",
+      "airport": "Flughäfen",
+      "transit": "Verkehr",
+      "attraction": "Sehenswürdigkeiten",
+      "beach": "Strände",
+      "shopping": "Einkaufen",
+      "hospital": "Krankenhäuser",
+      "university": "Universitäten"
+    },
+    "nearbyStays": "Unterkünfte in der Nähe",
+    "nearbyStaysHint": "Preise pro Nacht, ab.",
+    "nearbyCount": "{count} Unterkünfte hier",
+    "noPrice": "Kein Preis angegeben",
+    "markerLabel": "{name} — {price}"
   },
   "city": {
     "availableStays": "Verfügbare Unterkünfte in {city}",

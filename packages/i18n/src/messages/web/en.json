@@ -119,7 +119,14 @@
     "pageNumber": "Page {number}",
     "resultsOnPage": "{count, plural, =0 {No results} one {1 result on this page} other {# results on this page}}",
     "starRating": "Star rating",
-    "starRatingHotelsOnly": "A star rating applies to hotels only, so choosing one excludes every other accommodation type."
+    "starRatingHotelsOnly": "A star rating applies to hotels only, so choosing one excludes every other accommodation type.",
+    "nearTitle": "Near",
+    "nearAny": "Anywhere in the city",
+    "nearRadius": "Within",
+    "nearRadiusKm": "{value} km",
+    "nearNeedsCity": "Choose a city first to see its landmarks.",
+    "sortDistance": "Closest to the landmark",
+    "resultDistance": "{value} from {landmark}"
   },
   "attributes": {
     "sea": "Sea",
@@ -261,7 +268,28 @@
     "basketEmpty": "Your basket is empty. Add one or more room types from the list to see the details and the total here.",
     "basketAccommodation": "Accommodation",
     "basketTooShort": "This room takes a minimum of {count, plural, one {1 night} other {# nights}} — change your dates to add it.",
-    "basketLineAll": "That is all of this type."
+    "basketLineAll": "That is all of this type.",
+    "nearbyTitle": "What's around",
+    "nearbyIntro": "Distances are measured from the property's approximate area, not its exact address.",
+    "distanceKm": "{value} km",
+    "distanceM": "{value} m",
+    "showAllLandmarks": "Show all places",
+    "showFewerLandmarks": "Show fewer",
+    "kinds": {
+      "city_centre": "City centre",
+      "airport": "Airports",
+      "transit": "Getting around",
+      "attraction": "Things to see",
+      "beach": "Beaches",
+      "shopping": "Shopping",
+      "hospital": "Hospitals",
+      "university": "Universities"
+    },
+    "nearbyStays": "Stays nearby",
+    "nearbyStaysHint": "Prices are per night, from.",
+    "nearbyCount": "{count} stays here",
+    "noPrice": "No price listed",
+    "markerLabel": "{name} — {price}"
   },
   "city": {
     "availableStays": "Available stays in {city}",

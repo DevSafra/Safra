@@ -207,6 +207,30 @@ export async function PropertyCard({
         ) : null}
 
         {/*
+          How far this is from the landmark the reader searched «near». Absent from every
+          other search, because there is no centre to measure from and a distance with no
+          stated origin is a number nobody can use.
+
+          Rounded to 100 m by the API for the same honesty reason the property page's list
+          is: the input is a coordinate good to about 100 m, so a sharper figure would claim
+          precision the data never had.
+        */}
+        {item.distanceMetres !== null ? (
+          <p className="mt-1 text-13 tabular-nums text-faint">
+            {item.distanceMetres < 1000
+              ? t('distanceM', {
+                  value: new Intl.NumberFormat(locale).format(item.distanceMetres),
+                })
+              : t('distanceKm', {
+                  value: new Intl.NumberFormat(locale, {
+                    minimumFractionDigits: 1,
+                    maximumFractionDigits: 1,
+                  }).format(item.distanceMetres / 1000),
+                })}
+          </p>
+        ) : null}
+
+        {/*
           A dotted rule between the facts and the money (Bashar, 2026-09-03, with the reference).
           The price is the one line on the card a person compares against every other card, and it
           was sharing an edgeless column with the type, the city and the review count. A dotted rule

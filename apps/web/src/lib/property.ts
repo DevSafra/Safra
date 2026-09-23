@@ -30,6 +30,31 @@ const propertyDetailSchema = z.object({
   latitude: z.string().nullable(),
   longitude: z.string().nullable(),
   exactLocationAfterBooking: z.boolean(),
+  /*
+    What the listing is near. `.default([])` is right here and wrong almost everywhere else:
+    the empty list is what the API genuinely sends for a listing with no coordinates or a
+    city with no landmarks yet, so the default restates the API rather than inventing a value
+    it never sent. The section renders nothing on an empty list.
+  */
+  landmarks: z
+    .array(
+      z.object({
+        slug: z.string(),
+        kind: z.enum([
+          'city_centre',
+          'airport',
+          'transit',
+          'attraction',
+          'beach',
+          'shopping',
+          'hospital',
+          'university',
+        ]),
+        name: translated,
+        distanceMetres: z.number(),
+      }),
+    )
+    .default([]),
   city: z.object({
     slug: z.string(),
     nameAr: z.string(),

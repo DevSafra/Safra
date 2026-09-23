@@ -5,7 +5,7 @@ import { StarRating } from '@safra/ui';
 
 import type { Locale } from '@/i18n/routing';
 import type { Amenity, PropertyType } from '@/lib/catalog';
-import { localisedName } from '@/lib/localise';
+import { localisedName, localisedText } from '@/lib/localise';
 import { dynamicMessage } from '@/lib/dynamic-message';
 
 /** The five values, written once — the same list the partner and console forms offer. */
@@ -57,12 +57,25 @@ export async function SearchFilters({
   locale,
   propertyTypes,
   amenities,
+  landmarks,
   carried,
   active,
 }: {
   locale: Locale;
   propertyTypes: PropertyType[];
   amenities: Amenity[];
+  /**
+   * The landmarks of the SELECTED city, empty when no city is chosen.
+   *
+   * City-scoped rather than global: «قريب من» offering the airports of three countries is a
+   * worse control than none, and the radius filter only means anything once the reader has
+   * narrowed to somewhere.
+   */
+  landmarks: {
+    slug: string;
+    kind: string;
+    name: { ar: string | null; en: string | null; de: string | null };
+  }[];
   /**
    * The criteria the results were fetched with, to be repeated as hidden fields.
    *
@@ -89,6 +102,8 @@ export async function SearchFilters({
     minPrice: number | undefined;
     maxPrice: number | undefined;
     freeCancellationOnly: boolean;
+    nearLandmark: string | undefined;
+    withinKm: number;
   };
 }) {
   const t = await getTranslations('search');
@@ -114,7 +129,8 @@ export async function SearchFilters({
     active.amenityCodes.length +
     (active.minPrice === undefined ? 0 : 1) +
     (active.maxPrice === undefined ? 0 : 1) +
-    (active.freeCancellationOnly ? 1 : 0);
+    (active.freeCancellationOnly ? 1 : 0) +
+    (active.nearLandmark ? 1 : 0);
 
   /* Clearing keeps the SEARCH and drops the filters — the dates are not a filter. */
   const cleared = new URLSearchParams({
@@ -176,6 +192,64 @@ export async function SearchFilters({
         {carried.citySlug ? (
           <input type="hidden" name="citySlug" value={carried.citySlug} />
         ) : null}
+
+        {/* ── Near a landmark ────────────────────────────────────────────── */}
+        {/*
+          Only where there is a city, because a landmark belongs to one. With no city the
+          panel SAYS so rather than hiding the control: a filter that silently disappears
+          reads as a missing feature, where one line explains what to do to get it.
+
+          A `<select>` rather than a list of radio buttons — eleven landmarks in Damascus and
+          three in Kasab is a range that a fixed column of options handles badly, and this is
+          a single choice out of a list a reader scans by name.
+        */}
+        {carried.citySlug ? (
+          landmarks.length > 0 ? (
+            <fieldset className="flex flex-col gap-2">
+              <legend className="mb-1 text-14 font-bold text-text">
+                {t('nearTitle')}
+              </legend>
+
+              <label className="grid gap-1 text-13 text-muted">
+                <span className="sr-only">{t('nearTitle')}</span>
+                <select
+                  name="nearLandmark"
+                  defaultValue={active.nearLandmark ?? ''}
+                  className="min-h-11 w-full cursor-pointer rounded-lg border border-line bg-field px-3 text-sm text-text"
+                >
+                  <option value="">{t('nearAny')}</option>
+                  {landmarks.map((mark) => (
+                    <option key={mark.slug} value={mark.slug}>
+                      {localisedText(mark.name, locale) || mark.slug}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="grid gap-1 text-13 text-muted">
+                {t('nearRadius')}
+                {/*
+                  The radii the contract accepts, and nothing else. A free number field would
+                  let somebody type 500 and meet a 400 from the API — the schema caps at
+                  MAX_SEARCH_RADIUS_KM, so the control offers what the server will take.
+                */}
+                <select
+                  name="withinKm"
+                  defaultValue={String(active.withinKm)}
+                  className="min-h-11 w-full cursor-pointer rounded-lg border border-line bg-field px-3 text-sm text-text"
+                >
+                  {[1, 2, 5, 10, 25, 50].map((km) => (
+                    <option key={km} value={String(km)}>
+                      {t('nearRadiusKm', { value: km })}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </fieldset>
+          ) : null
+        ) : (
+          <p className="text-13 text-faint">{t('nearNeedsCity')}</p>
+        )}
 
         {/* ── Price ──────────────────────────────────────────────────────── */}
         <fieldset className="flex flex-col gap-2">
