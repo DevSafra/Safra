@@ -1,6 +1,8 @@
 import createMiddleware from 'next-intl/middleware';
 import { NextResponse, type NextRequest } from 'next/server';
 
+import { addressesNoRoute } from '@/lib/routable-path';
+
 import { routing } from './i18n/routing';
 import {
   CUSTOMER_SESSION_COOKIE,
@@ -126,7 +128,9 @@ export default async function middleware(request: NextRequest) {
    * customer lands on a sign-in form that returns them where they were, instead of
    * on an account page that renders empty.
    */
-  const response = redirectOrContinue(request, rotated);
+  const response = addressesNoRoute(request.nextUrl.pathname)
+    ? NextResponse.rewrite(unroutable(request))
+    : redirectOrContinue(request, rotated);
 
   response.headers.set('content-security-policy', csp);
 
@@ -222,6 +226,22 @@ async function rotateIfStale(request: NextRequest): Promise<string | null | unde
   request.cookies.set(CUSTOMER_SESSION_COOKIE, encoded);
 
   return encoded;
+}
+
+/**
+ * Matches no route by construction, so Next answers its own 404 — the same 404 that
+ * `/ar/no-such-page` already gets, server-rendered in full rather than as an error shell.
+ *
+ * It CARRIES THE LOCALE. Rewritten to a bare `/__safra-unroutable` the request came back as a
+ * 307 to `/ar/__safra-unroutable`: a path with no locale segment is one the locale layer fixes
+ * rather than one it refuses, so the reader was redirected instead of told the page is not there.
+ * Taking the locale from the path they asked for also keeps the 404 in their own language.
+ */
+function unroutable(request: NextRequest): URL {
+  return new URL(
+    `/${localeOf(request.nextUrl.pathname)}/__safra-unroutable`,
+    request.url,
+  );
 }
 
 /**
