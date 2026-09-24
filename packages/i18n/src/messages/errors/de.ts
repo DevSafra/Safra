@@ -328,6 +328,7 @@ export const de = {
   'validation.slug_format':
     'Eine Kennung besteht aus lateinischen Kleinbuchstaben, Ziffern und Bindestrichen.',
   'validation.icon_path': 'Ein Icon-Pfad akzeptiert nur SVG-Pfadbefehle und Zahlen.',
+  'validation.bbox': 'Die Kartengrenzen sind ungültig.',
   'validation.end_before_start': 'Das Enddatum darf nicht vor dem Startdatum liegen.',
   'validation.range_too_long': 'Ein Zeitraum darf {maxDays} Tage nicht überschreiten.',
   'validation.amount_positive': 'Der Betrag muss größer als null sein.',

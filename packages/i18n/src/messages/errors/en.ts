@@ -291,6 +291,7 @@ export const en = {
   'validation.slug_format':
     'An identifier is lowercase Latin letters, digits and hyphens.',
   'validation.icon_path': 'An icon path accepts SVG path commands and numbers only.',
+  'validation.bbox': 'The map bounds are not valid.',
   'validation.end_before_start': 'End date must not be before the start date.',
   'validation.range_too_long': 'A calendar range may not exceed {maxDays} days.',
   'validation.amount_positive': 'Amount must be greater than zero.',

@@ -71,6 +71,13 @@ export interface SearchResultItem {
    * Null when the search named no landmark — there is no centre to measure from.
    */
   distanceMetres: number | null;
+  /**
+   * Metres from the city's centre, on every card, whether or not a landmark was chosen.
+   *
+   * Null where staff have not placed a `city_centre` landmark for that city, or where the
+   * listing has no coordinates — never a zero, which would read as «at the centre».
+   */
+  cityCentreMetres: number | null;
   cover: {
     fileKey: string;
     variantWidths: number[];
@@ -139,6 +146,22 @@ export class SearchService {
     const near = query.nearLandmark
       ? await this.resolveLandmark(query.nearLandmark, query.withinKm)
       : null;
+
+    /*
+      «قريب من مطار» — a KIND rather than a named place.
+
+      Resolved to the SET of matching landmarks in the searched city, because «near an airport»
+      is true of a listing near ANY of them. A city with two airports must not silently mean
+      whichever one the query happened to pick first.
+
+      Ignored when a specific landmark is named: «near Damascus airport» is the more precise
+      request, and widening somebody's filter because they also left a kind selected is the
+      quiet failure this codebase keeps refusing.
+    */
+    const nearKinds =
+      !query.nearLandmark && query.nearKind
+        ? await this.resolveKind(query.nearKind, query.citySlug, query.withinKm)
+        : [];
     const verdict = evaluateArrival(
       query.checkIn,
       now,
@@ -253,6 +276,49 @@ export class SearchService {
                                      AND ${near.longitude + near.deltaLon}::numeric
           AND ${distanceExpr} <= ${near.radiusMetres}::numeric`
       : sql``;
+
+    /*
+      «ابحث في هذه المنطقة» — the map's viewport.
+
+      Compared against the PUBLIC pair, like every other geographic predicate here, which is
+      what stops a caller-chosen box becoming a proximity oracle: a box finer than the ~100 m
+      rounding grid either contains the published point or does not, and that is exactly what
+      the published coordinate already says.
+
+      A plain BETWEEN on both axes, so `properties_public_coords_idx` serves it directly.
+    */
+    const box = query.bbox
+      ? (query.bbox.split(',').map(Number) as [number, number, number, number])
+      : null;
+
+    const boxFilter = box
+      ? sql`
+          AND p.public_latitude IS NOT NULL
+          AND p.public_latitude BETWEEN ${box[0]}::numeric AND ${box[2]}::numeric
+          AND p.public_longitude BETWEEN ${box[1]}::numeric AND ${box[3]}::numeric`
+      : sql``;
+
+    /*
+      «Near ANY of these» — one OR per landmark of the chosen kind, each a box plus a radius.
+
+      Written out rather than looped in SQL because the set is small (a city has one or two
+      airports) and each term must bind its own coordinates. A listing near two of them appears
+      ONCE: this is a filter, not a join, so it cannot multiply rows.
+    */
+    const kindFilter =
+      nearKinds.length > 0
+        ? sql`AND (${sql.join(
+            nearKinds.map(
+              (one) => sql`(
+                p.public_latitude BETWEEN ${one.latitude - one.deltaLat}::numeric
+                                      AND ${one.latitude + one.deltaLat}::numeric
+                AND p.public_longitude BETWEEN ${one.longitude - one.deltaLon}::numeric
+                                           AND ${one.longitude + one.deltaLon}::numeric
+              )`,
+            ),
+            sql` OR `,
+          )})`
+        : sql``;
 
     const tiebreak = sql`, c.property_id_sort ASC`;
 
@@ -425,10 +491,12 @@ export class SearchService {
                     )`
               : sql``
           }
-          -- The proximity filter, applied here for the same reason city and type are: it is a
-          -- predicate on the PROPERTY, and running it before pricing is the difference between
+          -- The proximity filters, applied here for the same reason city and type are: each is a
+          -- predicate on the PROPERTY, and running them before pricing is the difference between
           -- pricing the listings near a landmark and pricing every unit in the country.
           ${nearFilter}
+          ${kindFilter}
+          ${boxFilter}
 
           -- Anti-join 1: the calendar says no.
           --
@@ -595,6 +663,21 @@ export class SearchService {
           -- sharper figure would claim precision the data never had.
           CASE WHEN ${distanceExpr} IS NULL THEN NULL
                ELSE ROUND(${distanceExpr} / 100) * 100 END AS "distanceMetres",
+          /*
+            Metres from the city centre, from the PUBLIC pair and rounded to the same 100 m
+            step as every other published distance — it is the same promise, on a card instead
+            of a list, and a sharper figure here would undo the rounding one screen along.
+          */
+          CASE
+            WHEN centre.latitude IS NULL OR p.public_latitude IS NULL THEN NULL
+            ELSE ROUND(
+              (6371008.8 * 2 * asin(sqrt(
+                power(sin(radians(centre.latitude - p.public_latitude) / 2), 2)
+                + cos(radians(p.public_latitude)) * cos(radians(centre.latitude))
+                  * power(sin(radians(centre.longitude - p.public_longitude) / 2), 2)
+              ))) / 100
+            ) * 100
+          END AS "cityCentreMetres",
           -- Duplicated in snake_case purely to drive ORDER BY; stripped before
           -- the rows are returned. property_id_sort drives the cover subquery in the OUTER
           -- select instead, and is stripped with them.
@@ -609,6 +692,33 @@ export class SearchService {
         FROM bookable b
         JOIN properties p            ON p.id = b.property_id
         JOIN cities ci               ON ci.id = p.city_id
+        /*
+          The city's CENTRE, so a card can say «١٫٢ كم من وسط دمشق» without the reader having
+          chosen a landmark first. Location was invisible on a result card until they did.
+
+          The city_centre LANDMARK rather than cities.latitude, and the difference matters:
+          the property page measures to the landmark, and two screens quoting different
+          distances to «وسط دمشق» is the kind of disagreement nobody can explain. The two are
+          1.4 km apart for Damascus.
+
+          A LATERAL over a handful of rows per city, and landmarks_city_active_idx serves it.
+          LEFT, because a city whose centre staff have not placed yet simply has no figure —
+          not a missing card.
+
+          (No backticks in here: this sits inside a sql template literal and one would end it.
+          That is the sixth time this file has recorded the same trap.)
+        */
+        LEFT JOIN LATERAL (
+          SELECT lc.latitude, lc.longitude
+          FROM landmarks lc
+          JOIN landmark_kinds lk ON lk.id = lc.kind_id
+          WHERE lc.city_id = p.city_id
+            AND lk.code = 'city_centre'
+            AND lk.is_active AND lk.deleted_at IS NULL
+            AND lc.is_active AND lc.deleted_at IS NULL
+          ORDER BY lc.sort_order, lc.slug
+          LIMIT 1
+        ) centre ON TRUE
         -- The market has to be OPEN — the city's flag and its country's (Bashar, 2026-08-31).
         --
         -- Neither was checked, so deactivating a city or a country took it off the destinations
@@ -757,6 +867,54 @@ export class SearchService {
         scale,
       ),
     };
+  }
+
+  /**
+   * Every live landmark of one KIND, as points to be near.
+   *
+   * Scoped to the searched city when there is one. Without a city «near an airport» would mean
+   * every airport in three countries, which is not a filter anybody asked for — and the result
+   * would be a country-wide scan wearing a location predicate.
+   *
+   * An unknown kind answers an empty list, and the caller treats that as «no kind filter»
+   * rather than as an empty result: a kind staff retired should widen the search back to the
+   * city, not silently empty a page the reader is already looking at.
+   */
+  private async resolveKind(
+    code: string,
+    citySlug: string | undefined,
+    withinKm: number,
+  ): Promise<
+    { latitude: number; longitude: number; deltaLat: number; deltaLon: number }[]
+  > {
+    const rows = await this.db.execute<{ latitude: string; longitude: string }>(sql`
+      SELECT l.latitude, l.longitude
+      FROM landmarks l
+      JOIN landmark_kinds k ON k.id = l.kind_id
+      JOIN cities c ON c.id = l.city_id
+      WHERE k.code = ${code}
+        AND k.is_active AND k.deleted_at IS NULL
+        AND l.is_active AND l.deleted_at IS NULL
+        ${citySlug ? sql`AND c.slug = ${citySlug}` : sql``}
+      LIMIT 12
+    `);
+
+    const radiusMetres = withinKm * 1000;
+    const METRES_PER_DEGREE_LAT = 111_320;
+    const deltaLat = radiusMetres / METRES_PER_DEGREE_LAT;
+
+    return rows.rows
+      .map((row) => ({
+        latitude: Number(row.latitude),
+        longitude: Number(row.longitude),
+      }))
+      .filter((one) => Number.isFinite(one.latitude) && Number.isFinite(one.longitude))
+      .map((one) => ({
+        ...one,
+        deltaLat,
+        /* Longitude degrees shorten toward the poles; clamped because cos(90 deg) is 0. */
+        deltaLon: deltaLat / Math.max(0.01, Math.cos((one.latitude * Math.PI) / 180)),
+      }));
   }
 
   /**

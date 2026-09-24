@@ -126,6 +126,53 @@ export const searchQuerySchema = z
     nearLandmark: z.string().trim().min(1).max(80).optional(),
 
     /**
+     * «قريب من» by KIND rather than by name — «near any airport».
+     *
+     * A separate parameter from `nearLandmark`, not a replacement: «near Damascus airport» and
+     * «near an airport» are different questions, and a guest flying in tomorrow asks the second.
+     * Given both, the named landmark wins — it is the more specific request, and silently
+     * widening somebody's filter is the failure this codebase keeps refusing.
+     */
+    nearKind: z.string().trim().min(1).max(40).optional(),
+
+    /**
+     * The map's viewport, as `south,west,north,east` in decimal degrees — «ابحث في هذه المنطقة».
+     *
+     * ## Why this cannot become a proximity oracle
+     *
+     * A caller-chosen box is the shape that ought to worry us: send a one-metre box, walk it
+     * across the city, and the answers trace out a listing's position. It does not, because the
+     * filter compares `public_latitude`/`public_longitude` — the pair rounded to three decimals.
+     * A box smaller than that grid either contains the published point or does not, which is
+     * precisely what the published coordinate already states. There is nothing finer to learn.
+     *
+     * So no minimum span is imposed, unlike `withinKm`'s 0.5 km floor. That floor was a COST
+     * control on a radius that could be swept; a box is bounded by construction and the result
+     * limit bounds the work.
+     */
+    bbox: z
+      .string()
+      .trim()
+      .regex(/^-?\d{1,3}(\.\d{1,8})?(,-?\d{1,3}(\.\d{1,8})?){3}$/, ERROR.VALIDATION_BBOX)
+      .refine((value) => {
+        const [south, west, north, east] = value.split(',').map(Number) as [
+          number,
+          number,
+          number,
+          number,
+        ];
+        return (
+          Math.abs(south) <= 90 &&
+          Math.abs(north) <= 90 &&
+          Math.abs(west) <= 180 &&
+          Math.abs(east) <= 180 &&
+          south < north &&
+          west < east
+        );
+      }, ERROR.VALIDATION_BBOX)
+      .optional(),
+
+    /**
      * How far «near» reaches, in kilometres. Ignored unless `nearLandmark` is given.
      *
      * Capped rather than free: an uncapped radius is a whole-country scan wearing a

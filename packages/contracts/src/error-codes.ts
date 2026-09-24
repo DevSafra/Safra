@@ -419,6 +419,7 @@ export const ERROR = {
   VALIDATION_CODE_FORMAT: 'validation.code_format',
   VALIDATION_SLUG_FORMAT: 'validation.slug_format',
   VALIDATION_ICON_PATH: 'validation.icon_path',
+  VALIDATION_BBOX: 'validation.bbox',
   VALIDATION_LATITUDE_RANGE: 'validation.latitude_range',
   VALIDATION_LATITUDE_FORMAT: 'validation.latitude_format',
   VALIDATION_LONGITUDE_RANGE: 'validation.longitude_range',

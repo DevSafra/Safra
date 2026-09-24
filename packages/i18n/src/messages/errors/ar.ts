@@ -271,6 +271,7 @@ export const ar = {
   'validation.code_format': 'الرمز يتكوّن من حروف لاتينية صغيرة وأرقام وشرطة سفلية.',
   'validation.slug_format': 'المعرّف يتكوّن من حروف لاتينية صغيرة وأرقام وشرطات.',
   'validation.icon_path': 'مسار الأيقونة يقبل أوامر SVG وأرقاماً فقط.',
+  'validation.bbox': 'حدود الخريطة غير صالحة.',
   'validation.end_before_start': 'تاريخ النهاية لا يمكن أن يسبق تاريخ البداية.',
   'validation.range_too_long': 'لا يمكن أن تتجاوز المدة {maxDays} يوماً.',
   'validation.amount_positive': 'يجب أن يكون المبلغ أكبر من صفر.',
