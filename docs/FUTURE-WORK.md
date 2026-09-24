@@ -1432,6 +1432,7 @@ Bashar's instruction (2026-08-02): no product expansion until the must-haves hav
 | UK, US and UN sanctions lists             | EU-only is deliberate; revisit before US/UK payments                                                                                                                                                                                                                                   |
 | Emergency Mode (EC-009)                   | No operational need yet. The control is in the dashboard header, rendered DISABLED — in an emergency a button that looks armed and does nothing is worse than one visibly unavailable                                                                                                  |
 | Arabic for the remaining console screens  | `/staff`, `/audit`, `/settings`, partner and property detail, enrol-2fa, invitation are still English. Copy belongs in `apps/admin/src/lib/strings.ts`; the pattern is established                                                                                                     |
+| Walking and driving times to a landmark   | Deferred by Bashar 2026-09-24 («Not now»). Needs a routing engine — OSRM or Valhalla self-hosted over the same OSM extract, so the no-vendor position holds, but a service to run and keep current rather than a query. See O-web-15                                                   |
 | Design fidelity outside the dashboard     | The handoff (§4–§8) specifies far more than is built: the sticky 64px shell header, the light theme (§9.2), a search input on **every** admin table, partner contract upload (§8.1), the staff permission matrix (§8.2). Each is a separate piece of work; see the fidelity gaps below |
 
 ### Highest-risk item
@@ -2944,6 +2945,95 @@ not.
 first time it is audited, by design — that is the moment somebody decides whether the new code reads
 acceptably in an append-only log. It is a prompt, not a defect, and loosening the check would be the
 exemption decay the file exists to prevent.
+
+### O-web-15 — The landmark experience a guest actually meets
+
+**Built 2026-09-24**, from the guest-perspective review Bashar asked for after approving O-web-14.
+Landmarks existed and were correct; what was missing was every way a person could ARRIVE at one.
+Five pieces, all on the same rounded pair — nothing here reads `p.latitude`.
+
+| Piece                    | What a guest now gets                                                                                                                                             |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Landmark pages**       | `/{locale}/landmark/{slug}` — «إقامات قرب الجامع الأموي». A 307 to the search results with the filter applied; an unknown or archived slug is a 404               |
+| **`sitemap.xml`**        | It answered 404. 153 URLs now — nine cities and 41 landmarks across three locales                                                                                 |
+| **Kind filter**          | «أي نوع / وسط المدينة / المطارات / المواصلات / معالم وأنشطة / التسوق» — the WORDS come from `landmark_kinds`, so a kind staff adds appears with no deploy         |
+| **Map as search**        | «ابحث في هذه المنطقة» over the results map: pan, ask, and land on a `bbox=` URL with a narrower set, a chip that states the box, and a link to clear it           |
+| **Landmarks on the map** | The full-screen map draws the city's landmarks with their names and their staff-managed marks, so a reader can see what a listing is NEAR rather than read a list |
+| **City-centre distance** | «١٫٧ كم من وسط دمشق» on every card that has a location — the one piece of orientation a result list was missing                                                   |
+
+**The landmark page is a REDIRECT, not a second search.** The obvious build fetches stays near the
+landmark and renders them, which is a second ranking, a second set of filters, and a second place
+for the privacy rules to be got subtly wrong. It resolves the landmark and sends the reader to the
+search that already exists. It names no dates either — `/search` owns the today-plus-two fallback,
+and that is where the same-day cutoff and the city's timezone are decided.
+
+**The centre distance is measured to the `city_centre` LANDMARK, not to `cities.latitude`.** They
+are 1.4 km apart for Damascus, and two screens quoting different distances to «وسط دمشق» is the
+kind of disagreement nobody can debug from the outside.
+
+**Three traps, each costing a real failure:**
+
+- **`BBOX_PLACEHOLDER` was exported from a `'use client'` module.** Importing it into the Server
+  Component that builds the URL yields React's client REFERENCE STUB, not the string — which was
+  stringified into the query as `bbox=function(){throw Error("Attempted to call…")}`. Nothing warns:
+  the declared type is `string`, the build passes, the page renders, and the only symptom is a
+  filter that silently matches nothing. A constant shared across the boundary has to come from a
+  module neither side owns — it lives in `lib/basemap.ts` for that reason and no other.
+- **`moveend` fires on the opening `fitBounds`**, so «search this area» was offered before the
+  reader had moved anything. Armed after `once('idle', …)`.
+- **Server Components cannot pass FUNCTIONS to Client Components**, hit four times in this work —
+  a price formatter, an href builder, a pluraliser, a URL builder. Each is now data: a prefix, a
+  fallback currency, a pre-formatted label, a URL TEMPLATE.
+
+**The privacy guard was narrowed, precisely, and mutation-tested against the narrowing.** Drawing a
+landmark means publishing ITS position, and two Damascus landmarks sit within a rounding step of one
+fixture's true latitude by coincidence — so `location-privacy.integration.test.ts` flagged the
+mosque as if the payload had leaked the building. The walk now ACCOUNTS FOR values that match a
+coordinate the `landmarks` table actually holds, rather than skipping the `landmarks` subtree.
+The difference is the whole point: a leak planted INSIDE that subtree — every landmark carrying the
+listing's true latitude — still fails, and so does the classic one, the listing's own pair pointed
+at `p.latitude`. Both were run. A skip would have passed the first.
+
+**Why a landmark's coordinate is not an asymmetry.** A mosque, a station and an airport are
+published facts on every map in the world, and the distance already printed beside them implies the
+position. What stays rounded is the LISTING's pair — the only thing anybody is trying to find, and
+the only thing the model was ever protecting.
+
+**Deferred on Bashar's instruction (2026-09-24): «Not now».** Walking and driving times to a
+landmark, which is what the large platforms print. It needs a routing engine — self-hostable (OSRM
+or Valhalla over the same OSM extract, so the no-vendor position holds), but it is a service to run,
+feed and keep current rather than a query. The straight-line distance is honest in the meantime
+because it is labelled as one.
+
+### O-web-16 — FOUND, NOT FIXED: a percent-encoded apostrophe answers 500 on every dynamic public route
+
+**Found 2026-09-24** while probing crafted slugs against the new landmark page. Reported rather
+than fixed: it is pre-existing, it is not required for the map work to be correct, and §«Asked
+work, and gaps found beside it» puts that decision with Bashar.
+
+```
+GET /ar/landmark/has%27quote  -> 500
+GET /ar/property/has%27quote  -> 500
+GET /ar/city/has%27quote      -> 500
+GET /ar/city/has'quote        -> 404   (the same character, sent literally)
+```
+
+The standalone server logs `Failed to proxy http://localhost:3000/… [AggregateError] { code:
+'ECONNREFUSED' }` and answers 500. Only the PERCENT-ENCODED form does it; the literal apostrophe,
+a space, a `<`, `--` and Arabic all answer 404 correctly.
+
+**It is not an injection and not a leak.** The API answers that slug `404 landmark.not_found`, the
+query is parameterised, and nothing reaches the database differently. The cost is availability
+hygiene: a crawler or a scanner walking crafted URLs collects 500s on every public detail route,
+which is noise in error monitoring and a real signal in Search Console. `apps/web/next.config.*`
+declares no rewrite or proxy, so the behaviour is Next 15.5.25's own — probably its internal
+request re-parse on a segment it cannot round-trip.
+
+**What it would take:** reproduce against a bare Next 15.5.25 standalone app to confirm it is
+upstream, then either a version bump or a `middleware.ts` guard that answers 404 for a segment
+that fails to decode. Half a day including the upstream check. **Not started — awaiting a
+decision.** Admin and partner are unaffected on this path because both redirect to sign-in before
+a dynamic segment is resolved.
 
 ### O-ui-11 — Closed: the brand gold came back, and gold text got its own token
 
