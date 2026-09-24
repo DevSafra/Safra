@@ -3060,6 +3060,78 @@ proxy branch. Confirmed by reading both rather than by analogy.
 is malformed syntax and 400 was defensible, but every unroutable path in the app now gives the
 same answer, and «no such page» is the truthful one.
 
+### O-web-17 — OPEN: coordinate adoption, reviewed 2026-09-24, awaiting a decision on scope
+
+Bashar, approving the map system: «With only 67 of 2,017 listings currently mapped, the map
+experience is technically complete but not yet benefiting the majority of properties… review the
+current onboarding and partner workflow and identify ways to increase coordinate adoption.»
+
+**Measured, not recalled** (dev database, 2026-09-24):
+
+|           | listings | placed |          |
+| --------- | -------- | ------ | -------- |
+| published | 2,017    | 67     | **3.3%** |
+| draft     | 625      | 60     | 9.6%     |
+| rejected  | 62       | 62     | 100%     |
+
+And the number that reframes it: **1,950 of the 2,013 partners with a published listing have no
+placed listing at all.** This is not a long tail to chase, it is nearly the whole population.
+
+**Honest caveat on what the numbers can support.** This catalogue is SEEDED. The per-card warning
+below shipped on 2026-09-23, so no real partner has yet had the chance to act on it, and nothing
+here is evidence that partners ignore a prompt. The 3.3% describes a backlog, not a behaviour.
+
+#### What already exists, driven and confirmed in the code
+
+| Surface                   | State                                                                                                                                                                     |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Partner properties list   | **Built.** Each unplaced card carries «لا تظهر على الخريطة» and an «أضف الموقع» link into the editor (`properties/page.tsx:269`, copy at `partner/ar.ts:977`)             |
+| Partner editor, draft     | **Built.** `LocationPicker` centred on the listing's city, so a pin is placed rather than a decimal typed                                                                 |
+| Partner editor, published | **Built.** `PropertyLocationForm`, rendered only while the location is genuinely absent — the §8.1 set-when-null exception                                                |
+| Admin property detail     | **Built.** Shows the pair or «غير محدد»                                                                                                                                   |
+| Partner dashboard         | **Nothing.** No count, no task, no prompt — and it is the screen a partner lands on                                                                                       |
+| `submitForReview`         | **Nothing about location.** It already refuses a listing with no bookable unit (`PROPERTY_UNIT_REQUIRED`) — the readiness-gate precedent exists and location is not in it |
+| Admin properties registry | **Nothing.** No location column, no «unplaced» filter, so staff cannot see or chase the gap                                                                               |
+| Outreach                  | **Nothing.** No email, no job, no targeting query                                                                                                                         |
+| Any aggregate anywhere    | **Does not exist.** Nothing in any app can answer «how many of my listings are unplaced»                                                                                  |
+
+#### The options, ranked by leverage against friction
+
+1. **Require a location to submit for review.** Highest leverage per hour of work: every FUTURE
+   published listing is placed, by construction. The gate exists, the precedent exists, and the
+   partner is already in the editor with the picker centred on their city when they hit it.
+   Rounding to three decimals (~110 m) means it demands a neighbourhood, not an address. **~3 h.**
+2. **A dashboard task card — «N of your listings do not appear on the map».** The only lever that
+   reaches the EXISTING backlog, on the screen a partner actually arrives at. Needs the aggregate
+   that does not exist yet. **~½ day.**
+3. **Tell the partner what a guest sees.** The likely real objection is «I do not want my address
+   published», and SAFRA has a structural answer it never states: the published pair is rounded by
+   a generated column and the exact point is unreachable. Showing the rounded marker beside the
+   picker converts a privacy fear into a privacy feature. **~3 h, and probably the highest ratio of
+   adoption to effort.**
+4. **Start from a landmark.** «Near the Umayyad Mosque» as a starting pin — the landmark table now
+   carries 41 positions, so this is nearly free and turns an abstract map into a familiar one.
+   **~3 h.**
+5. **Staff visibility: a location column and an «unplaced» filter on الإعلانات, plus the pair on the
+   review queue.** Lets a reviewer refuse an unplaced listing and makes the metric watchable.
+   **~½ day.**
+6. **One-time outreach to the 1,950 partners.** The only lever that reaches somebody who does not
+   sign in. Arabic first, English beneath, through the one composing helper. Needs a decision on
+   cadence and a real send of that size. **~½ day plus an ops decision.**
+7. **Geocode the existing addresses** with a self-hosted Nominatim over the same OSM extract — no
+   vendor, no address leaves us. Could place a large fraction with zero partner effort, but a
+   geocode is a GUESS: it must be stored as provisional, shown to the partner as «we placed this
+   approximately», and never counted as verified. **2–3 days, and the only option with a quality
+   risk attached.**
+
+#### One correctness finding, reported not fixed
+
+`apps/partner/src/lib/api.ts:123` — `hasLocation: z.boolean().default(false)`. The `.default()`
+class again: if the API stops sending the field, every card claims «لا تظهر على الخريطة» and 2,017
+listings show a false warning at once. It fails in the safe direction, which is why it is low
+severity rather than none. One line to make it required, plus the parse-failure path that already
+exists. **~15 min, awaiting a decision with the rest.**
+
 ### O-ui-11 — Closed: the brand gold came back, and gold text got its own token
 
 **Bashar, 2026-09-03:** «why you changed the button colour and price colour? please undo that — I
