@@ -3143,6 +3143,130 @@ submitted anyway**, which answered `400 property.location_required`. The endpoin
   GUESS and would have to be stored as provisional and confirmed. It is the only option on this
   list carrying a quality risk.
 
+### O-test-3 — FOUND, NOT FIXED: `refund-owed-parity` still races the refund sweep
+
+**Found 2026-09-24** during an ordinary `pnpm verify`, which failed on
+`apps/api/src/admin/refund-owed-parity.integration.test.ts › drops out of the count and the list
+together` and passed on the very next run.
+
+**It is the documented sweep contention, not a new defect.** The run's own note named it: the
+scheduled workers were active and `system-refunds completed at 14:50:00.993Z` inside the window.
+Re-run with `pkill -STOP -f dist/worker.js` it passes, and the change under test that day touched
+contracts, listings and the two registries — nothing within reach of a refund.
+
+**What is left open.** The 2026-09-08 fix gave `unlockedJobRuns(db)` to the eight suites that DRIVE
+a sweep, which stops them contending for the advisory lock. This one does not drive a sweep and
+does not use the unlocked runner — it is a parity assertion over refund rows that the `system-refunds`
+worker MUTATES underneath it. Different mechanism, same symptom, and the existing fix does not
+reach it.
+
+**What it would take:** either the suite creates refunds the sweep cannot claim (a partner or a
+window it does not scan), or it asserts parity inside one transaction the worker cannot see. An
+hour, plus a run to confirm it under load. **Not started — reported rather than fixed, because it
+is pre-existing and nothing in the asked work depends on it.**
+
+**Do not "fix" it by pausing the workers in CI.** `safra-worker-locks-flake-the-suite` records what
+that costs: workers left stopped produced sixteen browser failures that all looked like real
+regressions and none were.
+
+### O-ops-3 — Data completeness: the audit, and the readiness model it produced
+
+**Built 2026-09-24**, on Bashar's instruction to move «from feature completeness toward data
+completeness and operational excellence», and specifically to look for places where platform data
+is technically valid but operationally incomplete.
+
+#### The audit, and what it is honestly worth
+
+Swept the live catalogue for every state the database accepts and a guest does not:
+
+|                       | published listings |       |
+| --------------------- | ------------------ | ----- |
+| no coordinates        | 1,950              | 96.7% |
+| no photograph         | 1,946              | 96.5% |
+| no Arabic description | 1,950              | 96.7% |
+| no bookable unit      | 468                | 23.2% |
+| no amenities          | 2,016              | 100%  |
+
+**These numbers describe the SEED, not partner behaviour, and must not be quoted as a business
+finding.** Checked rather than assumed: the four gaps collapse into five combinations across 2,017
+listings, with exactly **seven** complete on all of them. Real behaviour does not correlate like
+that; a generator does. The same applies to the partner sweep — 100% with no signed contract and
+99.9% never sanctions-screened trace to **M-2** (the feed is not activated) and to the partner
+contract upload that §8.1 lists as unbuilt, not to anything new.
+
+#### No guest-facing defect — which is itself the finding
+
+Every incomplete state was driven against the running system rather than reasoned about:
+
+- a published listing with **no bookable unit** answers 200, and its page says «لا توجد وحدات»;
+- it is **absent from search and from the city page** — the platform already excludes it;
+- a listing with **no photograph** renders no broken image, no empty `src`, no rendered `null`;
+  the single `undefined` in the HTML is React's RSC payload, not text anybody reads.
+
+So the data is handled correctly at every surface a guest touches. **What was missing is that
+nobody is TOLD**: the partner did not know their live listing was undiscoverable, staff could not
+see or count it, and no screen in either console could answer «how many of ours actually work».
+That is the gap this closes, and it is an operations gap rather than a data one.
+
+#### One definition, three readers
+
+`packages/contracts/src/readiness.ts` holds the checks, their order, and what each one COSTS:
+
+| Check         | Cost          | What it means                                                                                                           |
+| ------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `unit`        | **invisible** | SAFRA's search prices every result, so a listing with nothing to price never appears. Revenue is zero until it is fixed |
+| `location`    | reach         | Found by ordinary search, absent from the map, proximity search and every «near the airport» result                     |
+| `photograph`  | quality       | Found and bookable, and loses against the listing beside it                                                             |
+| `description` | quality       | Nothing to read                                                                                                         |
+
+Three levels rather than a score, because a percentage invites somebody to chase 100% and these
+are not equally urgent: a listing with no photograph still earns and one with no unit does not. The
+ORDER is load-bearing — both consoles render in it — and is asserted rather than assumed.
+
+#### What it replaced
+
+The coordinate indicators shipped earlier the same day were four bespoke answers waiting to happen.
+`hasLocation` on a partner card, `placed=yes|no` on the registry and an «unplaced» count on the
+dashboard each asked about ONE check. They are now one model:
+
+- the partner's listing card lists **every** gap, each stating what it costs rather than what is
+  absent — «لا يظهر في نتائج البحث» rather than «بلا وحدات»;
+- the dashboard gives the **breakdown**, not a single number, because one figure cannot say which
+  listings earn nothing;
+- العقارات's filter became `gap=any|unit|location|photograph|description`, replacing `placed`.
+  Two filters where one answers is the shape this codebase keeps removing — `gap=location` is the
+  old `placed=no`, and the other three were previously unaskable.
+
+An unrecognised check prints its KEY on every surface rather than being dropped, the same rule
+`label()` follows — a client behind the API must be visible, not silently under-reporting.
+
+#### Held to account
+
+| Held by                                      | What it proves                                                                                                                                  |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `readiness.test.ts` (14)                     | the contract — worst-first ordering, every check costed, exactly one `invisible`, and `worstCost` answering by severity rather than position    |
+| `listing-readiness.integration.test.ts` (15) | each filter, the COUNT following it, `gap=any` as an exact union rather than a sum, and that a row returned by a filter reports that gap itself |
+| `e2e/listing-readiness.spec.ts` (11)         | that it reached the screen — the column, a select driven by the contract, every filter, the pager carrying it, and a crafted value falling back |
+
+**Twelve mutations, every one caught.** Two survived the first pass and both were weak tests rather
+than sound code: `gap=any` collapsed to a single check passed a «less than the sum» assertion, now
+an exact union; and dropping the `status='ready'` check on photographs was **unreachable**, because
+all 517 fixture images are `ready` — so that test now PLANTS a `processing` image, with a control
+asserting the same listing reports no gap before the plant. A test whose fixture cannot reach the
+field it protects reports coverage it does not have.
+
+#### Still open
+
+- **Amenities** are missing on 100% of listings and are NOT a readiness check. Seed shape again,
+  and unlike the other four nothing was verified about what a guest loses without them. Worth
+  measuring before adding a fifth check that mostly produces noise.
+- **Partner-record completeness** was measured and deliberately not built: the two biggest gaps are
+  M-2 and the unbuilt contract upload, so a «your record is incomplete» panel would today accuse
+  every partner of something SAFRA has not built the means to fix.
+- **The gap filter is an OR across four predicates**, which no index can serve — a sequential scan
+  of `properties`. 3.9 ms over 2,704 rows; at 200,000 it is roughly a third of a second on a staff
+  registry, which is acceptable but should be measured against `safra_load` before launch.
+
 ### O-ui-11 — Closed: the brand gold came back, and gold text got its own token
 
 **Bashar, 2026-09-03:** «why you changed the button colour and price colour? please undo that — I
