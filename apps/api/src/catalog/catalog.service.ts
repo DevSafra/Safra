@@ -128,8 +128,12 @@ export class CatalogService {
       name_ar: string;
       name_en: string;
       name_de: string;
+      kind_name_ar: string;
+      kind_name_en: string;
+      kind_name_de: string;
     }>(sql`
-      SELECT l.slug, k.code AS kind, l.name_ar, l.name_en, l.name_de
+      SELECT l.slug, k.code AS kind, l.name_ar, l.name_en, l.name_de,
+             k.name_ar AS kind_name_ar, k.name_en AS kind_name_en, k.name_de AS kind_name_de
       FROM landmarks l
       JOIN cities c ON c.id = l.city_id
       JOIN landmark_kinds k ON k.id = l.kind_id
@@ -147,8 +151,66 @@ export class CatalogService {
     return rows.rows.map((r) => ({
       slug: r.slug,
       kind: r.kind,
+      /*
+        The kind's own WORDS, because staff add kinds in the console and no catalogue this app
+        ships can name one. Without it the «قريب من نوع» filter would offer raw codes.
+      */
+      kindName: { ar: r.kind_name_ar, en: r.kind_name_en, de: r.kind_name_de },
       name: { ar: r.name_ar, en: r.name_en, de: r.name_de },
     }));
+  }
+
+  /**
+   * One landmark by slug, for the page that leads into a search near it.
+   *
+   * Returns the CITY as well, because «near this» is only answerable inside one — the search
+   * filter is city-scoped and a landmark page that did not say which city would produce an
+   * unscoped query over three countries.
+   *
+   * Null for a slug nobody published, a retired landmark, or one whose kind staff deactivated:
+   * the page turns all three into a 404, which is the same answer for the same reason the
+   * property endpoint gives one.
+   */
+  async landmark(slug: string) {
+    const rows = await this.db.execute<{
+      slug: string;
+      kind: string;
+      name_ar: string;
+      name_en: string;
+      name_de: string;
+      kind_name_ar: string;
+      kind_name_en: string;
+      kind_name_de: string;
+      city_slug: string;
+    }>(sql`
+      SELECT l.slug, k.code AS kind, l.name_ar, l.name_en, l.name_de,
+             k.name_ar AS kind_name_ar, k.name_en AS kind_name_en, k.name_de AS kind_name_de,
+             c.slug AS city_slug
+      FROM landmarks l
+      JOIN landmark_kinds k ON k.id = l.kind_id
+      JOIN cities c ON c.id = l.city_id
+      WHERE l.slug = ${slug}
+        AND l.is_active AND l.deleted_at IS NULL
+        AND k.is_active AND k.deleted_at IS NULL
+        AND c.is_active AND c.deleted_at IS NULL
+      LIMIT 1
+    `);
+
+    const row = rows.rows[0];
+    if (!row) return null;
+
+    /*
+      The SAME shape the list endpoint answers with, `kindName` included. One schema describes
+      both on the reader's side, and a field only one of them sends is a parse failure on a page
+      nobody would think to re-test — it 404s rather than rendering wrong, which is quieter.
+    */
+    return {
+      slug: row.slug,
+      kind: row.kind,
+      kindName: { ar: row.kind_name_ar, en: row.kind_name_en, de: row.kind_name_de },
+      name: { ar: row.name_ar, en: row.name_en, de: row.name_de },
+      citySlug: row.city_slug,
+    };
   }
 
   async cities() {

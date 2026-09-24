@@ -528,6 +528,16 @@ export class PropertyDetailService {
             de: r['kind_name_de'],
           },
           iconPaths: Array.isArray(r['icon_paths']) ? r['icon_paths'] : [],
+          /*
+            The landmark's OWN coordinates, at full precision, so the map can draw it.
+
+            No asymmetry to explain: a mosque, a station and an airport are published facts on
+            every map in the world, and the distance beside them already implies the position.
+            What stays rounded is the LISTING's pair — the only thing here anybody is trying to
+            find, and the only thing the model protects.
+          */
+          latitude: Number(r['latitude']),
+          longitude: Number(r['longitude']),
           name: { ar: r['name_ar'], en: r['name_en'], de: r['name_de'] },
           distanceMetres: publicDistanceMetres(
             from.lat,

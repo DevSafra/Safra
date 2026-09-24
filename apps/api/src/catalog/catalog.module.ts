@@ -1,5 +1,9 @@
 import { Controller, Get, Module, Param, Query } from '@nestjs/common';
 
+import { ERROR } from '@safra/contracts';
+
+import { notFound } from '../common/errors/app-error.js';
+
 import { Public } from '../rbac/decorators.js';
 import { CatalogService } from './catalog.service.js';
 import { PropertyDetailService } from './property-detail.service.js';
@@ -95,6 +99,21 @@ class CatalogController {
   async landmarks(@Query('citySlug') citySlug?: string) {
     if (!citySlug) return { items: [] };
     return { items: await this.catalog.landmarks(citySlug) };
+  }
+
+  /**
+   * One landmark, for the page that leads into a search near it.
+   *
+   * A 404 for anything unpublished rather than an empty object, because this one HAS a reader:
+   * a person following a link, who should meet the site's not-found page rather than a blank
+   * screen that looks like a failure.
+   */
+  @Public()
+  @Get('landmarks/:slug')
+  async landmark(@Param('slug') slug: string) {
+    const found = await this.catalog.landmark(slug);
+    if (!found) throw notFound(ERROR.LANDMARK_NOT_FOUND);
+    return found;
   }
 
   /** The business kinds «انضم كشريك» offers. See the service for why these are rows. */
