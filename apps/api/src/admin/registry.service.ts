@@ -8,6 +8,10 @@ import {
   type OffsetPage,
   type PageQuery,
   offsetPage,
+  LISTING_READINESS_CHECKS,
+  LISTING_READINESS_STATUSES,
+  listingGaps,
+  type ListingReadinessCheck,
 } from '@safra/contracts';
 
 /**
@@ -19,6 +23,7 @@ import {
 const RECENT = 10;
 
 import { DATABASE } from '../database/database.module.js';
+import { imageIsPublished } from '../storage/image-visibility.js';
 import { notFound } from '../common/errors/app-error.js';
 import { scopeFilter } from '../rbac/scope.sql.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
@@ -173,8 +178,8 @@ export class RegistryService {
     limit: number;
     page: number;
     q?: string | undefined;
-    /** «على الخريطة» — `no` is the one staff need, to chase listings a guest cannot find. */
-    placed?: 'yes' | 'no' | undefined;
+    /** An operational shortfall to filter by, or `any` for every listing carrying one. */
+    gap?: 'any' | ListingReadinessCheck | undefined;
     actor?: AccessTokenClaims | undefined;
   }): Promise<OffsetPage<PropertyRow>> {
     /* The same omission as `partners` above, and the one the browser suite actually caught. */
@@ -194,17 +199,47 @@ export class RegistryService {
     }
 
     /*
-      Pushed into `conditions`, which is what `fromWhere` is built from — so the count and the list
-      are filtered by one predicate rather than two that can drift. A registry whose total says
-      «٢٠١٧ نتيجة» over a table that runs out at 67 is worse than showing no total at all.
+      The gap filters, pushed into `conditions` — which is what `fromWhere` is built from, so the
+      count and the list are filtered by ONE predicate rather than two that can drift. A registry
+      whose total says «٢٠١٧ نتيجة» over a table that runs out at 67 is worse than no total at all.
 
-      Both columns, because half a pair is not a location: a listing carrying a latitude and no
-      longitude cannot be drawn either, and `placed=yes` must not claim it can.
+      EXISTS rather than the LATERALs the SELECT uses: a predicate has to live in the WHERE for the
+      count to share it, and `EXISTS` stops at the first row where a `count(*) = 0` would read
+      every unit of every listing on the page.
+
+      `location` reads BOTH columns, because half a pair is not a location — a listing carrying a
+      latitude and no longitude cannot be drawn either.
     */
-    if (query.placed === 'no') {
-      conditions.push(sql`(pr.latitude IS NULL OR pr.longitude IS NULL)`);
-    } else if (query.placed === 'yes') {
-      conditions.push(sql`pr.latitude IS NOT NULL AND pr.longitude IS NOT NULL`);
+    const missing: Readonly<Record<ListingReadinessCheck, SQL>> = {
+      unit: sql`NOT EXISTS (SELECT 1 FROM units un
+                            WHERE un.property_id = pr.id AND un.deleted_at IS NULL)`,
+      location: sql`(pr.latitude IS NULL OR pr.longitude IS NULL)`,
+      photograph: sql`NOT EXISTS (SELECT 1 FROM property_images pi
+                                  WHERE pi.property_id = pr.id AND ${imageIsPublished('pi')})`,
+      description: sql`(pr.description_ar IS NULL OR btrim(pr.description_ar) = '')`,
+    };
+
+    /*
+      Readiness only describes a LIVE listing. A draft's gaps are its author's work in progress and
+      a rejected one is in front of nobody, so both the filter and the column stay silent about
+      them — `LISTING_READINESS_STATUSES` is the same list the partner dashboard counts over.
+    */
+    const live = sql`pr.status IN (${sql.join(
+      LISTING_READINESS_STATUSES.map((status) => sql`${status}`),
+      sql`, `,
+    )})`;
+
+    if (query.gap === 'any') {
+      conditions.push(live);
+      conditions.push(
+        sql`(${sql.join(
+          LISTING_READINESS_CHECKS.map((check) => missing[check]),
+          sql` OR `,
+        )})`,
+      );
+    } else if (query.gap) {
+      conditions.push(live);
+      conditions.push(missing[query.gap]);
     }
 
     const where =
@@ -216,6 +251,15 @@ export class RegistryService {
       LEFT JOIN property_types ty ON ty.id = pr.property_type_id
       LEFT JOIN cities ci         ON ci.id = pr.city_id
       LEFT JOIN partners pt       ON pt.id = pr.partner_id
+      LEFT JOIN LATERAL (
+        SELECT count(*)::int AS n FROM units un2
+        WHERE un2.property_id = pr.id AND un2.deleted_at IS NULL
+      ) un ON true
+      LEFT JOIN LATERAL (
+        SELECT pi.id FROM property_images pi
+        WHERE pi.property_id = pr.id AND ${imageIsPublished('pi')}
+        LIMIT 1
+      ) img ON true
       ${where}`;
 
     const [result, total] = await Promise.all([
@@ -224,6 +268,9 @@ export class RegistryService {
              pr.star_rating             AS star_rating,
              pr.status::text            AS status,
              (pr.latitude IS NOT NULL AND pr.longitude IS NOT NULL) AS has_location,
+             (pr.description_ar IS NOT NULL AND btrim(pr.description_ar) <> '') AS has_description,
+             coalesce(un.n, 0)::int AS unit_count,
+             (img.id IS NOT NULL) AS has_photograph,
              coalesce(ty.code, '—')     AS property_type,
              coalesce(ci.name_ar, '—')  AS city,
              coalesce(pt.display_name, '—') AS partner,
@@ -249,6 +296,18 @@ export class RegistryService {
         starRating: row.star_rating,
         status: row.status,
         hasLocation: row.has_location,
+        /*
+          One definition, shared with the partner portal — see `listingGaps`. Empty for a listing
+          no guest can reach: a draft's gaps belong to whoever is still writing it.
+        */
+        gaps: (LISTING_READINESS_STATUSES as readonly string[]).includes(row.status)
+          ? listingGaps({
+              unitCount: row.unit_count,
+              hasLocation: row.has_location,
+              hasPhotograph: row.has_photograph,
+              hasDescription: row.has_description,
+            })
+          : [],
       })),
       total,
       query,
@@ -616,6 +675,9 @@ interface PropertyRowSql extends Record<string, unknown> {
   partner_reference: string | null;
   status: string;
   has_location: boolean;
+  has_description: boolean;
+  unit_count: number;
+  has_photograph: boolean;
   created_at: string;
 }
 
@@ -632,6 +694,8 @@ export interface PropertyRow {
   readonly status: string;
   /** Whether a guest can find it on the map. Both columns, or neither counts. */
   readonly hasLocation: boolean;
+  /** What is operationally missing, in the order a reader should act on it. */
+  readonly gaps: readonly ListingReadinessCheck[];
 }
 
 interface CustomerRowSql extends Record<string, unknown> {

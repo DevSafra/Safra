@@ -7,7 +7,7 @@ import {
   type PropertyListItem,
 } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
-import { shortDate } from '@/lib/format';
+import { count, shortDate } from '@/lib/format';
 import { ConsolePanel, ConsoleShell, QueueState } from '@/components/console-shell';
 import { TablePagination } from '@/components/table-pagination';
 import {
@@ -17,7 +17,11 @@ import {
   StatusPill,
   type AdminColumn,
 } from '@/components/admin-table';
-import { usesStarRating } from '@safra/contracts';
+import {
+  LISTING_READINESS_CHECKS,
+  LISTING_READINESS_STATUSES,
+  usesStarRating,
+} from '@safra/contracts';
 import { StarRating } from '@safra/ui';
 import { TableToolbar } from '@/components/table-toolbar';
 import { PropertyTypes } from '@/components/property-types';
@@ -37,6 +41,8 @@ import { refuseSection } from '@/components/section-refusal';
 export const dynamic = 'force-dynamic';
 
 /** The design's `grid-template-columns`, verbatim. */
+const LIVE: readonly string[] = LISTING_READINESS_STATUSES;
+
 const TEMPLATE = '1fr 1.5fr .9fr .9fr 1.2fr .7fr .8fr 1fr';
 
 export default async function PropertiesPage({
@@ -58,20 +64,24 @@ export default async function PropertiesPage({
   const { q, page, size } = await listParamsFor('properties', searchParams);
 
   /*
-    «على الخريطة». Narrowed to the two values the API accepts rather than passed through: the
-    endpoint's schema is `.strict()` and would answer 400 to a typo, which on a registry means an
-    error page where the reader expected a table. Anything else is «all», which is the default.
+    «الاكتمال». Narrowed to the values the API accepts rather than passed through: the endpoint's
+    schema is `.strict()` and would answer 400 to a typo, which on a registry means an error page
+    where the reader expected a table. Anything else is «all», which is the default.
   */
-  const asked = (await searchParams)['placed'];
-  const placed = asked === 'yes' || asked === 'no' ? asked : undefined;
+  const asked = (await searchParams)['gap'];
+  const gap =
+    typeof asked === 'string' &&
+    (asked === 'any' || (LISTING_READINESS_CHECKS as readonly string[]).includes(asked))
+      ? asked
+      : undefined;
   /* The review queue's own parameters — two paged lists on one route. See /partners. */
   const queue = await listParamsFor('propertiesPending', searchParams);
 
   // Carried into every row link, so «رجوع» on the detail screen comes back here.
-  const back = returnQuery({ page, size, q, placed });
+  const back = returnQuery({ page, size, q, gap });
 
   const [registry, pending, types, counts] = await Promise.all([
-    getPropertyRegistry({ q, page, limit: size, placed }),
+    getPropertyRegistry({ q, page, limit: size, gap }),
     getPendingProperties({ page: queue.page, limit: queue.size }),
     /* §8.2's list. Small and bounded by the business — see the note on the panel below. */
     getPropertyTypes(),
@@ -97,15 +107,23 @@ export default async function PropertiesPage({
               the two can never disagree. A GET, so a filtered registry is a shareable URL.
             */}
             <label className="grid gap-1 text-12 text-muted">
-              {t.sections.properties.placedFilter}
+              {t.sections.properties.gapFilter}
               <select
-                name="placed"
-                defaultValue={placed ?? ''}
+                name="gap"
+                defaultValue={gap ?? ''}
                 className="min-h-10 cursor-pointer rounded-lg border border-line bg-field px-3 text-14 text-text"
               >
-                <option value="">{t.sections.properties.placedAll}</option>
-                <option value="no">{t.sections.properties.onMapNo}</option>
-                <option value="yes">{t.sections.properties.onMapYes}</option>
+                <option value="">{t.sections.properties.gapAll}</option>
+                <option value="any">{t.sections.properties.gapAny}</option>
+                {/*
+                  Driven by the CONTRACT, so a fifth check becomes a filter option the day it is
+                  added rather than the day somebody remembers this select exists.
+                */}
+                {LISTING_READINESS_CHECKS.map((check) => (
+                  <option key={check} value={check}>
+                    {t.sections.properties.gap[check] ?? check}
+                  </option>
+                ))}
               </select>
             </label>
           </TableToolbar>
@@ -131,7 +149,7 @@ export default async function PropertiesPage({
                 query={{
                   q,
                   /* Paging out of a filtered view is the quiet failure §Tables exists to prevent. */
-                  ...(placed ? { placed } : {}),
+                  ...(gap ? { gap } : {}),
                   ...(queue.page > 1 ? { queuePage: String(queue.page) } : {}),
                   queueSize: String(queue.size),
                 }}
@@ -282,15 +300,34 @@ const columns = (back: string): readonly AdminColumn<PropertyListItem>[] => [
     header: t.sections.properties.colOnMap,
     render: (row) => (
       /*
-        `data-on-map` so a sweep can find the CELLS and nothing else. The words also appear in the
-        filter's own `<option>` list, and a browser test written against the text matched fourteen
+        `data-gaps` so a sweep can find the CELLS and nothing else. The same words appear in the
+        filter's own `<option>` list, and a browser test written against the TEXT matched fourteen
         selects before it matched a row — which is how a passing assertion comes to mean nothing.
+
+        It carries every gap, space-separated, so a test can assert what a row claims rather than
+        parse a sentence — and an operator reads «لا يظهر في البحث · بلا صور» rather than a count.
       */
       <span
-        data-on-map={row.hasLocation ? 'yes' : 'no'}
-        className={row.hasLocation ? 'text-text2' : 'font-semibold text-warn-ink'}
+        data-gaps={row.gaps.join(' ') || (LIVE.includes(row.status) ? 'none' : 'n/a')}
+        className={row.gaps.length === 0 ? 'text-text2' : 'font-semibold text-warn-ink'}
       >
-        {row.hasLocation ? t.sections.properties.onMapYes : t.sections.properties.onMapNo}
+        {!LIVE.includes(row.status)
+          ? t.sections.properties.gapNotLive
+          : row.gaps.length === 0
+            ? t.sections.properties.onMapYes
+            : /*
+                The WORST gap, then how many more.
+                `gaps` arrives in `LISTING_READINESS_CHECKS` order, so the first is the most
+                serious — listing all four wrapped to five lines and made that row twice the
+                height of its neighbours, which breaks the scanning a registry exists for. The
+                full set is one click away on the row, and the filter answers «show me all of
+                the ones missing a photograph» directly.
+              */
+              `${t.sections.properties.gap[row.gaps[0]!] ?? row.gaps[0]}${
+                row.gaps.length > 1
+                  ? ` ${fill(t.sections.properties.gapMore, { n: count(row.gaps.length - 1) })}`
+                  : ''
+              }`}
       </span>
     ),
   },

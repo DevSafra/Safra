@@ -58,6 +58,7 @@ import {
   type GiftCardIssueInput,
   type PageQuery,
   type SetStaffScopeInput,
+  LISTING_READINESS_CHECKS,
 } from '@safra/contracts';
 
 import type { Request } from 'express';
@@ -107,13 +108,16 @@ const listQuerySchema = pageQuerySchema.extend({
 /**
  * The listing registry's page request.
  *
- * `placed` is an explicit three-state filter, not a boolean: absent means «all», and a boolean
- * would make «show me the unplaced ones» and «no filter» the same request on the wire. Only `no`
- * has a reader today — staff chasing the 97% — but `yes` costs one enum member and makes the
- * control a filter rather than a switch.
+ * `gap` names an operational shortfall to filter by, or `any` for every listing with one. Absent
+ * means no filter, which a boolean could not express — «show me the incomplete ones» and «show me
+ * everything» would be the same request on the wire.
+ *
+ * It REPLACED a narrower `placed=yes|no`, which asked the same question about one of the four
+ * checks. Two filters where one answers is the shape this codebase keeps removing: `gap=location`
+ * is the old `placed=no`, and the other three were previously unaskable.
  */
 const propertyQuerySchema = listQuerySchema.extend({
-  placed: z.enum(['yes', 'no']).optional(),
+  gap: z.enum(['any', ...LISTING_READINESS_CHECKS]).optional(),
 });
 
 const landmarkQuerySchema = listQuerySchema.extend({

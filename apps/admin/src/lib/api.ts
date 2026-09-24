@@ -1158,14 +1158,14 @@ function listQuery(params: {
   limit?: number | undefined;
   expiring?: boolean | undefined;
   attention?: string | undefined;
-  /** العقارات's «على الخريطة» filter. Absent means all, which is not the same as either value. */
-  placed?: 'yes' | 'no' | undefined;
+  /** العقارات's «الاكتمال» filter — a named gap, or `any`. Absent means no filter at all. */
+  gap?: string | undefined;
 }): string {
   const search = new URLSearchParams();
 
   if (params.q) search.set('q', params.q);
   if (params.status) search.set('status', params.status);
-  if (params.placed) search.set('placed', params.placed);
+  if (params.gap) search.set('gap', params.gap);
   /* Only sent when it is on: the API's schema coerces, and `expiring=false` would coerce to TRUE. */
   if (params.expiring) search.set('expiring', '1');
   /* EC-004 / EC-011. The API's enum refuses anything it does not know, so nothing is coerced. */
@@ -1274,12 +1274,20 @@ const propertyListItemSchema = z.object({
    * the problem, which is the one shape nobody would question.
    */
   hasLocation: z.boolean(),
+  /**
+   * What is operationally missing, named by the shared contract.
+   *
+   * `z.array(z.string())` rather than an enum of the known checks: a check added on the API must
+   * not turn this registry into a parse failure and an empty table. The column renders the key it
+   * has no word for, which is how a deployment skew gets noticed instead of hidden.
+   */
+  gaps: z.array(z.string()),
 });
 
 export type PropertyListItem = z.infer<typeof propertyListItemSchema>;
 
 export async function getPropertyRegistry(
-  params: ListParams & { readonly placed?: 'yes' | 'no' | undefined },
+  params: ListParams & { readonly gap?: string | undefined },
 ) {
   return staffFetch(
     `/admin/properties${listQuery(params)}`,

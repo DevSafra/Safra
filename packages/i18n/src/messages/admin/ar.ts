@@ -1264,11 +1264,29 @@ export const ar = {
         no way to see which, so nobody could chase them. «غير محدَّد» rather than an empty cell:
         an absence that looks like a rendering fault gets ignored, and this one is the point.
       */
-      colOnMap: 'على الخريطة',
-      onMapYes: 'محدَّد',
-      onMapNo: 'غير محدَّد',
-      placedFilter: 'الظهور على الخريطة',
-      placedAll: 'الكل',
+      colOnMap: 'الاكتمال',
+      onMapYes: 'مكتمل',
+      /*
+        SHORT tokens, not sentences — and deliberately different from the partner portal's words
+        for the same four checks.
+        
+        The partner reads «لا يظهر في نتائج البحث — أضف وحدة قابلة للحجز» because they are the
+        person who must act and the sentence is what persuades them to. An operator is SCANNING a
+        registry of eight columns: they already know what a missing unit costs, and a sentence
+        here wrapped every cell to two lines and cost the column its scannability.
+      */
+      gap: {
+        unit: 'بلا وحدات',
+        location: 'بلا موقع',
+        photograph: 'بلا صور',
+        description: 'بلا وصف',
+      } as Record<string, string>,
+      /* «+٣» after the worst gap. A registry row is scanned, not read. */
+      gapMore: '+{n}',
+      gapNotLive: '—',
+      gapFilter: 'الاكتمال',
+      gapAll: 'الكل',
+      gapAny: 'ينقصه شيء',
       /* تصنيف النجوم — the official classification, visible at every status (Bashar, 2026-09-04). */
       colStars: 'النجوم',
       starUnset: 'بلا تصنيف',

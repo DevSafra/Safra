@@ -100,14 +100,14 @@ export function returnQuery(params: {
   readonly q?: string | undefined;
   readonly status?: string | undefined;
   /**
-   * العقارات's «على الخريطة» filter, added 2026-09-24 — the SIXTH member.
+   * العقارات's «الاكتمال» filter, added 2026-09-24 — the SIXTH member.
    *
-   * Same reason as the one above it: a reviewer working through the unplaced listings opens
-   * one, and «رجوع» has to bring them back to the unplaced ones rather than to all 2,017.
-   * Added to the ALLOW-LIST rather than copied from the URL, which is what makes this helper
-   * a security boundary instead of a reflection of whatever a crafted link carried.
+   * Same reason as the one above it: a reviewer working through the listings missing a photograph
+   * opens one, and «رجوع» has to bring them back to that queue rather than to all 2,017. Added to
+   * the ALLOW-LIST rather than copied from the URL, which is what makes this helper a security
+   * boundary instead of a reflection of whatever a crafted link carried.
    */
-  readonly placed?: string | undefined;
+  readonly gap?: string | undefined;
   /**
    * سجل التدقيق's action filter, added 2026-08-24 — and the FIFTH member of an allow-list that
    * exists to stay short.
@@ -134,7 +134,7 @@ export function returnQuery(params: {
   if (params.q) query.set('q', params.q);
   if (params.status) query.set('status', params.status);
   if (params.action) query.set('action', params.action);
-  if (params.placed) query.set('placed', params.placed);
+  if (params.gap) query.set('gap', params.gap);
 
   const search = query.toString();
 
