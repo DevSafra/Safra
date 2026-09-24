@@ -244,6 +244,35 @@ export default async function PropertyPage({
     per-night «from» price carries the whole of it — which is exact for the one-night stay the
     figure is a floor for, and never understates a longer one.
   */
+  /**
+   * The landmarks, written out once for BOTH the map and the list.
+   *
+   * Computed here rather than in either component because a distance formatted twice is a
+   * distance that can disagree with itself, and because `Intl` cannot cross the Server/Client
+   * boundary — a formatter passed as a prop is a 500 at request time that typecheck and build
+   * both call fine.
+   */
+  const landmarkRows = property.landmarks.map((entry) => ({
+    slug: entry.slug,
+    kindLabel: localisedText(entry.kindName, locale) || entry.kind,
+    iconPaths: entry.iconPaths,
+    latitude: entry.latitude,
+    longitude: entry.longitude,
+    name: localisedText(entry.name, locale) || entry.slug,
+    distanceMetres: entry.distanceMetres,
+    distanceLabel:
+      entry.distanceMetres < 1000
+        ? t('distanceM', {
+            value: new Intl.NumberFormat(locale).format(entry.distanceMetres),
+          })
+        : t('distanceKm', {
+            value: new Intl.NumberFormat(locale, {
+              minimumFractionDigits: 1,
+              maximumFractionDigits: 1,
+            }).format(entry.distanceMetres / 1000),
+          }),
+  }));
+
   const nightly = formatMoney(
     cheapest
       ? priceWithCustomerFee(cheapest.basePrice, cheapest.currencyCode, property.fees)
@@ -853,6 +882,18 @@ export default async function PropertyPage({
                       hrefPrefix: `/${locale}/property/`,
                       fallbackCurrency: DEFAULT_MONEY_CURRENCY,
                     }}
+                    /*
+                      The same rows the list below renders, so the map and the words cannot
+                      disagree about which places matter or how far they are.
+                    */
+                    landmarks={landmarkRows.map((entry) => ({
+                      slug: entry.slug,
+                      name: entry.name,
+                      latitude: entry.latitude,
+                      longitude: entry.longitude,
+                      iconPaths: entry.iconPaths,
+                      distanceLabel: entry.distanceLabel,
+                    }))}
                     labels={{
                       explore: t('map.show'),
                       region: t('map.region'),
@@ -906,32 +947,7 @@ export default async function PropertyPage({
                   A separate bordered box under the map would read as a fourth section.
                 */}
                 <NearbyLandmarks
-                  entries={property.landmarks.map((entry) => ({
-                    slug: entry.slug,
-                    kindLabel: localisedText(entry.kindName, locale) || entry.kind,
-                    iconPaths: entry.iconPaths,
-                    name: localisedText(entry.name, locale) ?? entry.slug,
-                    distanceMetres: entry.distanceMetres,
-                    /*
-                      Written out HERE, on the server, because the list is a client component
-                      and a formatter cannot cross that boundary. `Intl` also renders Arabic
-                      digits as ٠-٩ and picks the locale's decimal separator, which a
-                      hand-built «1.2» would not.
-                    */
-                    distanceLabel:
-                      entry.distanceMetres < 1000
-                        ? t('distanceM', {
-                            value: new Intl.NumberFormat(locale).format(
-                              entry.distanceMetres,
-                            ),
-                          })
-                        : t('distanceKm', {
-                            value: new Intl.NumberFormat(locale, {
-                              minimumFractionDigits: 1,
-                              maximumFractionDigits: 1,
-                            }).format(entry.distanceMetres / 1000),
-                          }),
-                  }))}
+                  entries={landmarkRows}
                   labels={{
                     title: t('nearbyTitle'),
                     intro: t('nearbyIntro'),

@@ -10,6 +10,7 @@ import {
 
 import { PropertyCard } from '@/components/property-card';
 import { SearchFilters } from '@/components/search-filters';
+import { SearchMap } from '@/components/search-map';
 import { SearchForm } from '@/components/search-form';
 import { isLocale, type Locale } from '@/i18n/routing';
 import {
@@ -20,7 +21,8 @@ import {
   getPublicSettings,
 } from '@/lib/catalog';
 import { searchSafely } from '@/lib/api';
-import { localisedText } from '@/lib/localise';
+import { BBOX_PLACEHOLDER } from '@/lib/basemap';
+import { formatMoney, localisedName, localisedText } from '@/lib/localise';
 import { todayInDamascus } from '@/lib/settings';
 
 /**
@@ -192,10 +194,24 @@ export default async function SearchPage({
     `?withinKm=500` in a shared link would become an error page instead of a result list.
   */
   const nearLandmark = citySlug ? first(query['nearLandmark']) || undefined : undefined;
+  /* Same scoping rule as the named landmark: a kind is only answerable inside one city. */
+  const nearKind = citySlug ? first(query['nearKind']) || undefined : undefined;
   const withinKm = Math.min(
     MAX_SEARCH_RADIUS_KM,
     Math.max(0.5, Number(first(query['withinKm'])) || DEFAULT_SEARCH_RADIUS_KM),
   );
+
+  /*
+    «ابحث في هذه المنطقة». Validated by the CONTRACT rather than here — a malformed box is
+    refused at the API, and reflecting one into a link on our own page is the thing
+    `returnQuery`'s allow-list exists to prevent. The shape check is cheap insurance that a
+    crafted value never reaches an href.
+  */
+  const bboxParam = first(query['bbox']);
+  const bbox =
+    bboxParam && /^-?\d{1,3}(\.\d{1,8})?(,-?\d{1,3}(\.\d{1,8})?){3}$/.test(bboxParam)
+      ? bboxParam
+      : undefined;
 
   const sortParam = first(query['sort']);
   const requested: Sort = isSort(sortParam) ? sortParam : 'recommended';
@@ -280,7 +296,9 @@ export default async function SearchPage({
     maxPrice: rangeOk ? maxPrice : undefined,
     freeCancellationOnly,
     nearLandmark,
+    nearKind,
     withinKm,
+    bbox,
     sort,
     limit: PAGE_SIZE,
     cursor,
@@ -293,7 +311,9 @@ export default async function SearchPage({
    * clamping above, so a crafted `?whatever=…` is dropped rather than reflected — the rule
    * `returnQuery` states for the console, applied here.
    */
-  const link = (overrides: { sort?: Sort; cursor?: string | null } = {}) => {
+  const link = (
+    overrides: { sort?: Sort; cursor?: string | null; bbox?: string | null } = {},
+  ) => {
     const next = new URLSearchParams({
       checkIn,
       checkOut,
@@ -327,7 +347,19 @@ export default async function SearchPage({
     if (nearLandmark) {
       next.set('nearLandmark', nearLandmark);
       next.set('withinKm', String(withinKm));
+    } else if (nearKind) {
+      next.set('nearKind', nearKind);
+      next.set('withinKm', String(withinKm));
     }
+    /*
+      Carried, or paging out of a map search quietly returns the whole city.
+
+      `overrides.bbox` is how the map SETS one and how «أزل حدود المنطقة» clears it: `undefined`
+      means «keep what the page has», `null` means «drop it». The two have to be distinguishable
+      or the clear control could only ever be a no-op.
+    */
+    const nextBbox = overrides.bbox === undefined ? bbox : overrides.bbox;
+    if (nextBbox) next.set('bbox', nextBbox);
 
     /*
       `cursor: null` means "back to the first page" — what changing the SORT must do. Keeping an
@@ -456,6 +488,21 @@ export default async function SearchPage({
             propertyTypes={propertyTypes}
             amenities={amenities}
             landmarks={landmarks}
+            /*
+              The kinds actually PRESENT in this city, each named once. A kind with no landmark
+              here would be an option that empties the page.
+            */
+            landmarkKinds={[
+              ...new Map(
+                landmarks.map((one) => [
+                  one.kind,
+                  {
+                    code: one.kind,
+                    label: localisedText(one.kindName, locale) || one.kind,
+                  },
+                ]),
+              ).values(),
+            ]}
             carried={{
               citySlug,
               checkIn,
@@ -475,6 +522,7 @@ export default async function SearchPage({
               maxPrice: rangeOk ? maxPrice : undefined,
               freeCancellationOnly,
               nearLandmark,
+              nearKind,
               withinKm,
             }}
           />
@@ -501,6 +549,41 @@ export default async function SearchPage({
                 </a>
               ))}
             </nav>
+          </div>
+
+          {/*
+            The map, as a way to SEARCH rather than to confirm.
+
+            Under the heading and above the results, because it is a way of reading this list
+            rather than a filter on it — the panel on the left narrows what is in the set, and
+            this changes how the set is looked at.
+          */}
+          <div className="mt-4">
+            <SearchMap
+              hrefPrefix={`/${locale}/property/`}
+              bboxActive={bbox !== undefined}
+              bboxUrlTemplate={link({ bbox: BBOX_PLACEHOLDER, cursor: null })}
+              urlWithoutBbox={link({ bbox: null, cursor: null })}
+              /*
+                Only the results that can be PLACED. A listing whose partner has set no location
+                cannot go on a map, and inventing a position for it would be the one thing this
+                whole model refuses.
+              */
+              stays={results.items
+                .filter((item) => item.publicLatitude && item.publicLongitude)
+                .map((item) => ({
+                  slug: item.slug,
+                  name: localisedName(
+                    { nameAr: item.nameAr, nameEn: item.nameEn, nameDe: item.nameDe },
+                    locale,
+                  ),
+                  latitude: item.publicLatitude ?? '',
+                  longitude: item.publicLongitude ?? '',
+                  price: formatMoney(item.nightlyFrom, item.currencyCode, locale),
+                  /* One card per result here; co-location is the neighbours query's problem. */
+                  staysHere: 1,
+                }))}
+            />
           </div>
 
           {results.items.length > 0 ? (

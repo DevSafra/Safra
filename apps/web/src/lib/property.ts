@@ -49,6 +49,9 @@ const propertyDetailSchema = z.object({
         kindName: translated,
         /* SVG path data. See `LandmarkIcon` for why this cannot execute. */
         iconPaths: z.array(z.string()).default([]),
+        /* The landmark's own position — a published fact, unlike the listing's. */
+        latitude: z.number(),
+        longitude: z.number(),
         name: translated,
         distanceMetres: z.number(),
       }),

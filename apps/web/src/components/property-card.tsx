@@ -224,6 +224,26 @@ export async function PropertyCard({
           is: the input is a coordinate good to about 100 m, so a sharper figure would claim
           precision the data never had.
         */}
+        {/*
+          Location context on EVERY card, not only when a landmark is chosen.
+
+          A result card said nothing about where a place was until the reader used the «قريب من»
+          filter — so the one question a guest is answering while they scan («is this near
+          anything?») was the one the card would not answer. The distance to the city centre is
+          the honest default: it is the same figure the property page prints, measured to the
+          same curated landmark, so the two screens cannot disagree.
+
+          The chosen landmark wins when there is one. It is what the reader asked about.
+        */}
+        {item.distanceMetres === null && item.cityCentreMetres !== null ? (
+          <p className="mt-1 text-13 tabular-nums text-faint">
+            {t('fromCityCentre', {
+              value: formatMetres(item.cityCentreMetres, locale, t),
+              city,
+            })}
+          </p>
+        ) : null}
+
         {item.distanceMetres !== null && nearLandmarkName ? (
           <p className="mt-1 text-13 tabular-nums text-faint">
             {/*
@@ -236,17 +256,7 @@ export async function PropertyCard({
               is nothing true to say.
             */}
             {tsearch('resultDistance', {
-              value:
-                item.distanceMetres < 1000
-                  ? t('distanceM', {
-                      value: new Intl.NumberFormat(locale).format(item.distanceMetres),
-                    })
-                  : t('distanceKm', {
-                      value: new Intl.NumberFormat(locale, {
-                        minimumFractionDigits: 1,
-                        maximumFractionDigits: 1,
-                      }).format(item.distanceMetres / 1000),
-                    }),
+              value: formatMetres(item.distanceMetres, locale, t),
               landmark: nearLandmarkName,
             })}
           </p>
@@ -287,4 +297,28 @@ export async function PropertyCard({
       </div>
     </article>
   );
+}
+
+/**
+ * Metres under a kilometre, kilometres above it with one decimal.
+ *
+ * `Intl` rather than `toFixed`: the decimal separator differs per locale, and a hand-built
+ * «1.2» would be the one number on the card that did not follow the reader's conventions. The
+ * unit word comes from the catalogue, never from here.
+ */
+function formatMetres(
+  metres: number,
+  locale: Locale,
+  t: (key: 'distanceM' | 'distanceKm', values: { value: string }) => string,
+): string {
+  if (metres < 1000) {
+    return t('distanceM', { value: new Intl.NumberFormat(locale).format(metres) });
+  }
+
+  return t('distanceKm', {
+    value: new Intl.NumberFormat(locale, {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    }).format(metres / 1000),
+  });
 }

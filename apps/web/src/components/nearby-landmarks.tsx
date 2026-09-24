@@ -71,6 +71,33 @@ export function NearbyLandmarks({
   const shown = expanded ? entries : entries.slice(0, COLLAPSED_ROWS);
   const hidden = entries.length - shown.length;
 
+  /*
+    GROUPED by kind once the list is open, flat while it is collapsed.
+
+    Collapsed, the six nearest things ARE the answer and headings would be noise over them.
+    Open, a flat eleven-row list mixing a souq, a mosque, a station and a hospital makes the
+    reader scan all of it to find transport — which is the question they usually arrived with.
+    Booking.com tabs this; headings are the same idea without a second control.
+
+    A MAP rather than consecutive runs, and the difference is not stylistic: the API sorts the
+    list by DISTANCE, so two attractions with a station between them are not adjacent. Grouping
+    by adjacency would have produced «معالم وأنشطة» twice with a transport heading in the
+    middle — which reads as a rendering fault. Written that way first, and caught by checking
+    what the endpoint actually returns rather than what its SQL orders by.
+
+    Insertion order is preserved, so the kind whose NEAREST member is closest leads — the same
+    «nearest first» promise one level up, and rows inside each group stay in distance order.
+  */
+  const byKind = new Map<string, LandmarkEntry[]>();
+
+  for (const entry of shown) {
+    const rows = byKind.get(entry.kindLabel);
+    if (rows) rows.push(entry);
+    else byKind.set(entry.kindLabel, [entry]);
+  }
+
+  const groups = [...byKind].map(([label, rows]) => ({ label, rows }));
+
   return (
     <div className="border-t border-line p-5">
       <h3 className="font-display text-base text-text">{labels.title}</h3>
@@ -81,28 +108,24 @@ export function NearbyLandmarks({
         ribbon down a wide card, and the reader's eye has to travel the whole height to
         compare two distances.
       */}
-      <ul className="mt-4 grid gap-x-8 gap-y-3 sm:grid-cols-2">
-        {shown.map((entry) => (
-          <li key={entry.slug} className="flex items-start gap-2.5">
-            <LandmarkIcon
-              paths={entry.iconPaths}
-              className="mt-0.5 shrink-0 text-gold-read"
-            />
-            <span className="min-w-0 flex-1">
-              <span className="block text-14 text-text">{entry.name}</span>
-              <span className="block text-12 text-faint">{entry.kindLabel}</span>
-            </span>
-            {/*
-              `tabular-nums` so a column of distances lines up on the decimal rather than
-              shimmering — the craft floor's note about numerals in data shipping with a
-              browser default that belongs to no design system.
-            */}
-            <span className="shrink-0 text-13 tabular-nums text-muted">
-              {entry.distanceLabel}
-            </span>
-          </li>
-        ))}
-      </ul>
+      {expanded ? (
+        groups.map((group) => (
+          <div key={group.label} className="mt-4">
+            <h4 className="text-12 font-bold tracking-wide text-faint">{group.label}</h4>
+            <ul className="mt-1.5 grid gap-x-8 gap-y-3 sm:grid-cols-2">
+              {group.rows.map((entry) => (
+                <Row key={entry.slug} entry={entry} withKind={false} />
+              ))}
+            </ul>
+          </div>
+        ))
+      ) : (
+        <ul className="mt-4 grid gap-x-8 gap-y-3 sm:grid-cols-2">
+          {shown.map((entry) => (
+            <Row key={entry.slug} entry={entry} withKind />
+          ))}
+        </ul>
+      )}
 
       {hidden > 0 || expanded ? (
         <button
@@ -115,5 +138,40 @@ export function NearbyLandmarks({
         </button>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * One place and how far it is.
+ *
+ * `withKind` because the kind is said once per GROUP when the list is open and once per ROW
+ * when it is collapsed — printing it in both places would repeat every heading underneath
+ * itself.
+ */
+function Row({
+  entry,
+  withKind,
+}: {
+  readonly entry: LandmarkEntry;
+  readonly withKind: boolean;
+}) {
+  return (
+    <li className="flex items-start gap-2.5">
+      <LandmarkIcon paths={entry.iconPaths} className="mt-0.5 shrink-0 text-gold-read" />
+      <span className="min-w-0 flex-1">
+        <span className="block text-14 text-text">{entry.name}</span>
+        {withKind ? (
+          <span className="block text-12 text-faint">{entry.kindLabel}</span>
+        ) : null}
+      </span>
+      {/*
+        `tabular-nums` so a column of distances lines up on the decimal rather than shimmering
+        — the craft floor's note about numerals in data shipping with a browser default that
+        belongs to no design system.
+      */}
+      <span className="shrink-0 text-13 tabular-nums text-muted">
+        {entry.distanceLabel}
+      </span>
+    </li>
   );
 }

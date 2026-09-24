@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 
+import { LandmarkIcon } from './landmark-icon';
+
 export interface NearbyStay {
   readonly slug: string;
   readonly name: string;
@@ -185,6 +187,127 @@ export function MapPriceMarkers({
           </a>
         );
       })}
+    </div>
+  );
+}
+
+export interface MapLandmark {
+  readonly slug: string;
+  readonly name: string;
+  readonly latitude: number;
+  readonly longitude: number;
+  readonly iconPaths: readonly string[];
+  readonly distanceLabel: string;
+}
+
+/**
+ * The landmarks a listing is measured against, drawn ON the map.
+ *
+ * ## Why «800 م» was not enough
+ *
+ * The location card printed «الجامع الأموي — ٨٠٠ م» directly under a map that showed the area
+ * disc and nothing else. So the number had a magnitude and no DIRECTION, and 800 m toward the
+ * old city is a different stay from 800 m toward a motorway. The two halves of «where is this»
+ * were not talking to each other.
+ *
+ * ## Landmark coordinates are exact, and that is not a leak
+ *
+ * These are published facts — a mosque, a station, an airport — stored and drawn at full
+ * precision, exactly as the distance list already implies. The rounding protects a home; a
+ * landmark is not one. What stays rounded is the LISTING's own disc, which is the only thing on
+ * this map that anybody is trying to find.
+ *
+ * Positioned from `map.project()` like the price pills, and for the same reason: MapLibre v5's
+ * marker path runs through the sanitiser GHSA-jrc7-96c5-q579 bypasses, and a landmark's name is
+ * operator-supplied text.
+ */
+export function MapLandmarks({
+  map,
+  landmarks,
+}: {
+  readonly map: MapLibreMap | null;
+  readonly landmarks: readonly MapLandmark[];
+}) {
+  const [placed, setPlaced] = useState<
+    ReadonlyArray<{ mark: MapLandmark; x: number; y: number }>
+  >([]);
+
+  const reproject = useCallback(() => {
+    if (!map) return;
+
+    const canvas = map.getCanvas();
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+
+    setPlaced(
+      landmarks
+        .map((mark) => {
+          const point = map.project([mark.longitude, mark.latitude]);
+          return { mark, x: point.x, y: point.y };
+        })
+        .filter(({ x, y }) => x >= 0 && y >= 0 && x <= width && y <= height),
+    );
+  }, [map, landmarks]);
+
+  useEffect(() => {
+    if (!map) return;
+
+    reproject();
+    /*
+      `idle` as well as `move`, because the THUMBNAIL is inert and emits no `move` at all — so
+      its first projection has to be right, and one taken at `load` can be against a canvas
+      that has not been laid out yet. `idle` fires once the map has finished rendering, which
+      is the first moment the canvas reliably has its real size.
+
+      ## What the thumbnail can and cannot show, measured
+
+      MapLibre uses 512px tiles, so `PUBLIC_MAP_ZOOM` of 15 is ~2 m per CSS pixel — not the
+      ~4 the 256px-tile formula suggests. The thumbnail is a 256px strip, so its window is
+      about ±255 m of the listing, and a landmark 400 m away is outside it by arithmetic
+      rather than by any fault of this code.
+
+      Left in place on both maps regardless: a listing genuinely beside a souq or a station
+      will draw it, and the full-screen map — where a reader actually explores — shows them
+      all. Zooming the thumbnail out to fit them would take it below 15, where the basemap
+      stops drawing street names, which is the defect `PUBLIC_MAP_ZOOM` exists to prevent.
+    */
+    map.on('move', reproject);
+    map.on('resize', reproject);
+    map.on('idle', reproject);
+
+    return () => {
+      map.off('move', reproject);
+      map.off('resize', reproject);
+      map.off('idle', reproject);
+    };
+  }, [map, reproject]);
+
+  if (placed.length === 0) return null;
+
+  return (
+    /*
+      UNDER the price pills — `z-0` against their `z-10`. A landmark is the reference frame and
+      a listing is the thing being chosen, so where the two collide the price wins.
+    */
+    <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+      {placed.map(({ mark, x, y }) => (
+        <span
+          key={mark.slug}
+          style={{ transform: `translate(-50%, -50%) translate(${x}px, ${y}px)` }}
+          className="absolute top-0 left-0 flex flex-col items-center gap-0.5"
+        >
+          <span className="flex size-7 items-center justify-center rounded-full border border-line bg-card/95 text-text shadow-[var(--shadow-lift)]">
+            <LandmarkIcon paths={mark.iconPaths} size="1rem" />
+          </span>
+          {/*
+            The name under the mark, capped and with a scrim behind it. Without one it lands on
+            whatever the basemap drew there — a road name, a park — and both become unreadable.
+          */}
+          <span className="max-w-[7.5rem] truncate rounded bg-card/85 px-1 text-11 leading-tight font-bold text-text">
+            {mark.name}
+          </span>
+        </span>
+      ))}
     </div>
   );
 }

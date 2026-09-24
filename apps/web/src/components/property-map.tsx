@@ -11,7 +11,12 @@ import { formatMoney } from '@/lib/localise';
 import type { Locale } from '@/i18n/routing';
 
 import { PropertyMapCard, type PropertyMapCardData } from './property-map-card';
-import { MapPriceMarkers, type NearbyStay } from './map-price-markers';
+import {
+  MapLandmarks,
+  MapPriceMarkers,
+  type MapLandmark,
+  type NearbyStay,
+} from './map-price-markers';
 
 /*
   MapLibre's own stylesheet, ~10 KB gzipped. Imported statically rather than with the
@@ -122,6 +127,7 @@ export function PropertyMap({
   labels,
   card,
   nearby,
+  landmarks,
 }: {
   /** This listing, so the neighbours endpoint can anchor on it. */
   readonly slug: string;
@@ -133,6 +139,13 @@ export function PropertyMap({
   readonly card: PropertyMapCardData;
   /** Copy and link-building for the neighbours' price pills. */
   readonly nearby: NearbyConfig;
+  /**
+   * What the listing is measured against, drawn on both maps.
+   *
+   * Passed in rather than fetched: the property page already has them for the list below, and
+   * a second request for data sitting one component away is a request nobody should pay for.
+   */
+  readonly landmarks: readonly MapLandmark[];
 }) {
   const thumbnail = useRef<HTMLDivElement | null>(null);
   const full = useRef<HTMLDivElement | null>(null);
@@ -170,6 +183,11 @@ export function PropertyMap({
    */
   const [stays, setStays] = useState<readonly NearbyStay[]>([]);
   const [fullMap, setFullMap] = useState<MapLibreMap | null>(null);
+  /*
+    The THUMBNAIL's instance too, so the landmarks are on the picture a reader meets first.
+    The card said «الجامع الأموي — ٨٠٠ م» directly under a map that did not show the mosque.
+  */
+  const [thumbMap, setThumbMap] = useState<MapLibreMap | null>(null);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -374,7 +392,10 @@ export function PropertyMap({
 
         dispose = built.dispose;
         built.instance.on('load', () => {
-          if (!cancelled) setDrawn(true);
+          if (!cancelled) {
+            setDrawn(true);
+            setThumbMap(built.instance);
+          }
         });
       } catch {
         /*
@@ -387,6 +408,7 @@ export function PropertyMap({
 
     return () => {
       cancelled = true;
+      setThumbMap(null);
       dispose?.();
     };
   }, [near, mount]);
@@ -550,6 +572,12 @@ export function PropertyMap({
         <div aria-hidden className="absolute inset-0 animate-pulse bg-field" />
       ) : null}
 
+      {/*
+        The landmarks on the THUMBNAIL, which is the map most readers ever see. Without them
+        the picture showed a disc and the list under it named places it did not draw.
+      */}
+      <MapLandmarks map={thumbMap} landmarks={landmarks} />
+
       <button
         type="button"
         onClick={(event) => {
@@ -595,6 +623,9 @@ export function PropertyMap({
             MapLibre v5's marker path runs through the sanitiser that GHSA-jrc7-96c5-q579
             bypasses. See the note at the head of `map-price-markers.tsx`.
           */}
+          {/* Under the pills — a landmark is the reference frame, a listing is the choice. */}
+          <MapLandmarks map={fullMap} landmarks={landmarks} />
+
           <MapPriceMarkers map={fullMap} stays={stays} hrefPrefix={nearby.hrefPrefix} />
 
           {/*

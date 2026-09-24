@@ -58,6 +58,7 @@ export async function SearchFilters({
   propertyTypes,
   amenities,
   landmarks,
+  landmarkKinds,
   carried,
   active,
 }: {
@@ -76,6 +77,14 @@ export async function SearchFilters({
     kind: string;
     name: { ar: string | null; en: string | null; de: string | null };
   }[];
+  /**
+   * The KINDS present in this city, with the words to show for them.
+   *
+   * Derived from the landmarks rather than fetched separately: a kind with no landmark here
+   * would be an option that empties the page, and the endpoint that lists kinds is the
+   * console's rather than the storefront's.
+   */
+  landmarkKinds: { code: string; label: string }[];
   /**
    * The criteria the results were fetched with, to be repeated as hidden fields.
    *
@@ -103,6 +112,7 @@ export async function SearchFilters({
     maxPrice: number | undefined;
     freeCancellationOnly: boolean;
     nearLandmark: string | undefined;
+    nearKind: string | undefined;
     withinKm: number;
   };
 }) {
@@ -130,7 +140,7 @@ export async function SearchFilters({
     (active.minPrice === undefined ? 0 : 1) +
     (active.maxPrice === undefined ? 0 : 1) +
     (active.freeCancellationOnly ? 1 : 0) +
-    (active.nearLandmark ? 1 : 0);
+    (active.nearLandmark || active.nearKind ? 1 : 0);
 
   /* Clearing keeps the SEARCH and drops the filters — the dates are not a filter. */
   const cleared = new URLSearchParams({
@@ -225,6 +235,35 @@ export async function SearchFilters({
                   ))}
                 </select>
               </label>
+
+              {/*
+                «أو قريب من نوع» — a KIND rather than one named place.
+
+                «near Damascus airport» and «near an airport» are different questions, and a
+                guest flying in tomorrow asks the second. Offered beneath the named list rather
+                than mixed into it, because one is a place and the other is a category of place
+                — a single select holding both would read as one list with odd entries in it.
+
+                The named landmark wins where both are set, and the API enforces that; the word
+                «أو» is what says so on the screen.
+              */}
+              {landmarkKinds.length > 0 ? (
+                <label className="grid gap-1 text-13 text-muted">
+                  {t('nearKind')}
+                  <select
+                    name="nearKind"
+                    defaultValue={active.nearKind ?? ''}
+                    className="min-h-11 w-full cursor-pointer rounded-lg border border-line bg-field px-3 text-sm text-text"
+                  >
+                    <option value="">{t('nearKindAny')}</option>
+                    {landmarkKinds.map((kind) => (
+                      <option key={kind.code} value={kind.code}>
+                        {kind.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
 
               <label className="grid gap-1 text-13 text-muted">
                 {t('nearRadius')}
