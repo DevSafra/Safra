@@ -120,7 +120,15 @@ const propertySchema = z.object({
    * location is MISSING rather than being shown nothing — the cautious direction for a
    * prompt whose whole job is to be noticed.
    */
-  hasLocation: z.boolean().default(false),
+  /**
+   * Whether a guest can find this listing on the map.
+   *
+   * REQUIRED, not `.default(false)`. The default it replaces would answer «not on the map» for
+   * every listing the moment the API stopped sending the field — 2,017 false warnings, each one
+   * indistinguishable from the real thing this card exists to report. It fails in the safe
+   * direction, which is why it survived; «safe direction» is not the same as «detectable».
+   */
+  hasLocation: z.boolean(),
   /** The CHEAPEST unit's nightly rate — the "from" price. See the note on `listOwn`. */
   fromPrice: z.string().nullable(),
   currencyCode: z.string().nullable(),
@@ -286,6 +294,14 @@ const dashboardSchema = z.object({
     open: z.number(),
     furthestStage: z.enum(['recorded', 'warned', 'fined', 'suspension']).nullable(),
   }),
+  /**
+   * How many live listings a guest cannot find on the map, of how many there are.
+   *
+   * REQUIRED, both of them. A `.default(0)` would report perfect coverage to a partner with
+   * eleven unplaced listings the moment the field stopped arriving — the one failure mode this
+   * card cannot have, because its whole purpose is to say something is missing.
+   */
+  listings: z.object({ total: z.number(), unplaced: z.number() }),
   /**
    * What the platform has TOLD this partner — the in-app half of every enforcement notice.
    *
@@ -601,6 +617,24 @@ const referenceSchema = z.object({
   ),
   propertyTypes: z.array(z.object({ code: z.string(), nameAr: z.string() })),
   policies: z.array(z.object({ code: z.string(), nameAr: z.string() })),
+  /**
+   * The landmarks of each city, so the picker can offer «قرب الجامع الأموي» as a starting point.
+   *
+   * Keyed by city slug because the FORM's city can change after the page is rendered — a partner
+   * who picks a different city must get that city's landmarks, and a payload scoped to the saved
+   * city would silently offer Damascus mosques to somebody listing in Aleppo.
+   */
+  landmarks: z.record(
+    z.string(),
+    z.array(
+      z.object({
+        slug: z.string(),
+        name: z.string(),
+        latitude: z.number(),
+        longitude: z.number(),
+      }),
+    ),
+  ),
 });
 
 export type PropertyFormReference = z.infer<typeof referenceSchema>;
@@ -616,8 +650,24 @@ export async function getPropertyFormReference(): Promise<
   PropertyFormReference | 'failed'
 > {
   try {
+    /**
+     * Reference reads, CACHED for five minutes.
+     *
+     * This was `cache: 'no-store'` and cost three requests a form. Adding the landmarks took it to
+     * twelve — one per city — and the API's default throttle is 120 a minute against a single
+     * caller, which the partner SERVER is: every partner in the country shares its address. Ten
+     * people opening the form in the same minute would have started refusing each other's
+     * catalogue reads, and the symptom would have been an empty city select with no error.
+     *
+     * Five minutes matches `REFERENCE_TTL` on the customer app, which reads the same endpoints for
+     * the same reason. The cost is that a city or landmark staff add takes up to five minutes to
+     * appear in this form — reference data nobody watches a screen to confirm, and the console's
+     * own registry is authoritative in the meantime.
+     */
     const read = async (path: string): Promise<unknown> => {
-      const response = await fetch(`${API_URL}/api/v1${path}`, { cache: 'no-store' });
+      const response = await fetch(`${API_URL}/api/v1${path}`, {
+        next: { revalidate: 300 },
+      });
 
       return response.json();
     };
@@ -629,6 +679,60 @@ export async function getPropertyFormReference(): Promise<
     ]);
 
     /*
+      One read per city, in PARALLEL, and the set is bounded by the business rather than by usage:
+      nine cities, which `geo-bounds.integration.test.ts` already fails if they outgrow a screen.
+      A partner opens this form occasionally, so nine small catalogue reads beside the three above
+      is the same order of cost, and the alternative — a landmark endpoint that answers for every
+      city at once — would be API surface added for one caller.
+    */
+    const slugs = Array.isArray(cities)
+      ? (cities as { slug?: unknown }[])
+          .map((city) => city.slug)
+          .filter((slug): slug is string => typeof slug === 'string')
+      : [];
+
+    const lists = await Promise.all(
+      slugs.map(async (slug) => {
+        const body = (await read(`/landmarks?citySlug=${encodeURIComponent(slug)}`)) as {
+          items?: unknown;
+        };
+
+        return [slug, Array.isArray(body.items) ? body.items : []] as const;
+      }),
+    );
+
+    /*
+      Flattened to what the picker takes — a name already resolved and numbers, not strings. The
+      picker is a shared component and must not learn about SAFRA's three-language name objects.
+    */
+    const landmarks = Object.fromEntries(
+      lists.map(([slug, items]) => [
+        slug,
+        (
+          items as {
+            slug?: unknown;
+            name?: { ar?: unknown };
+            latitude?: unknown;
+            longitude?: unknown;
+          }[]
+        )
+          .map((one) => ({
+            slug: one.slug,
+            name: one.name?.ar,
+            latitude: Number(one.latitude),
+            longitude: Number(one.longitude),
+          }))
+          .filter(
+            (one) =>
+              typeof one.slug === 'string' &&
+              typeof one.name === 'string' &&
+              Number.isFinite(one.latitude) &&
+              Number.isFinite(one.longitude),
+          ),
+      ]),
+    );
+
+    /*
       `.safeParse` over each list rather than a cast. These are three separate endpoints and the
       form's selects are only as good as their contents — a shape change in any of them should
       empty the form loudly rather than render options with undefined values.
@@ -637,6 +741,7 @@ export async function getPropertyFormReference(): Promise<
       cities: Array.isArray(cities) ? cities : [],
       propertyTypes: Array.isArray(types) ? types : [],
       policies: Array.isArray(policies) ? policies : [],
+      landmarks,
     });
 
     return parsed.success ? parsed.data : 'failed';

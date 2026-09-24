@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type * as MapLibre from 'maplibre-gl';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 
+import { guestAreaData, type GuestArea } from './guest-area.js';
+
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 export interface LocationPickerCopy {
@@ -14,7 +16,28 @@ export interface LocationPickerCopy {
   readonly clear: string;
   readonly coordinates: string;
   readonly unavailable: string;
+  /**
+   * What the guest-facing area is called, and what it promises.
+   *
+   * Optional, because the console's landmark picker has nothing to reassure anybody about — a
+   * landmark's position is a published fact stored exactly. Both are required together by
+   * `guestArea` below: a shaded circle with no sentence beside it is a mystery, not a promise.
+   */
+  readonly guestArea?: string;
+  readonly guestAreaHelp?: string;
+  /** The heading over the landmark shortcuts. Absent when no landmarks are passed. */
+  readonly startFrom?: string;
 }
+
+/** A place a partner recognises, to open the map somewhere other than a grey rectangle. */
+export interface LocationPickerLandmark {
+  readonly slug: string;
+  readonly name: string;
+  readonly latitude: number;
+  readonly longitude: number;
+}
+
+const GUEST_SOURCE = 'safra-guest-area';
 
 /**
  * A map somebody pans under a fixed pin, to say where a thing is.
@@ -71,6 +94,8 @@ export function LocationPicker({
   fallbackLongitude,
   copy,
   onChange,
+  guestArea = false,
+  landmarks,
 }: {
   /**
    * Where the self-hosted basemap lives, PASSED IN rather than read from the environment.
@@ -88,6 +113,33 @@ export function LocationPicker({
   readonly fallbackLongitude: string | null;
   readonly copy: LocationPickerCopy;
   readonly onChange: (next: { latitude: string; longitude: string }) => void;
+  /**
+   * Draw the area a GUEST will see, around the rounded point.
+   *
+   * ## Why this is the feature and not decoration
+   *
+   * The reason 97% of listings are unplaced is very unlikely to be that partners could not work
+   * the form — it is that «put my building on a public map» sounds like publishing an address.
+   * SAFRA's answer has been true since the generated columns landed and has never once been shown
+   * to the person it protects: the published pair is ROUNDED, and the exact one is unreachable
+   * from any public query.
+   *
+   * So this draws it. The circle is centred on the rounded point, not the real one, and its radius
+   * is the furthest the real point can be from it — which makes the picture a statement of the
+   * guarantee rather than an illustration of it.
+   *
+   * Off by default: a landmark has nothing to hide and its position is stored exactly.
+   */
+  readonly guestArea?: boolean;
+  /**
+   * Places to jump to, offered as shortcuts before the partner starts panning.
+   *
+   * «near the Umayyad Mosque» is how somebody describes where their guest house is; a city centred
+   * at zoom 12 is not. Choosing one MOVES the map and sets nothing — the partner still has to place
+   * their own building, and a shortcut that silently claimed the listing sits on a mosque would be
+   * worse than no shortcut.
+   */
+  readonly landmarks?: readonly LocationPickerLandmark[];
 }) {
   const container = useRef<HTMLDivElement | null>(null);
   const instance = useRef<MapLibreMap | null>(null);
@@ -123,10 +175,10 @@ export function LocationPicker({
     keystroke elsewhere in the form. The ref keeps `publish` stable while still calling the
     current handler.
   */
-  const latest = useRef(onChange);
+  const latest = useRef({ onChange, latitude, longitude });
   useEffect(() => {
-    latest.current = onChange;
-  }, [onChange]);
+    latest.current = { onChange, latitude, longitude };
+  }, [onChange, latitude, longitude]);
 
   /** Reads the centre back out and hands it up, at the precision a building needs. */
   const publish = useCallback(() => {
@@ -138,10 +190,55 @@ export function LocationPicker({
       Six decimals is about 0.1 m — more than a building needs and less than a float64
       argues about. The PUBLIC value is rounded to three by the database on the way out.
     */
-    latest.current({
+    latest.current.onChange({
       latitude: centre.lat.toFixed(6),
       longitude: centre.lng.toFixed(6),
     });
+  }, []);
+
+  /*
+    Redraw the circle whenever the pair changes — and ONLY the circle.
+
+    Separate from the effect that builds the map, because that one must run exactly once: listing
+    the coordinates as its dependencies would tear the map down and rebuild it at the opening
+    centre every time the partner finished a pan, which is the single behaviour that makes a
+    picker unusable. `setData` moves the polygon without touching anything else.
+  */
+  useEffect(() => {
+    const map = instance.current;
+
+    if (!guestArea || !map) return;
+
+    const source = map.getSource(GUEST_SOURCE) as
+      { setData: (data: GuestArea) => void } | undefined;
+
+    source?.setData(guestAreaData(latitude, longitude));
+  }, [guestArea, latitude, longitude]);
+
+  /**
+   * Move the map to a place the partner recognises. It sets nothing.
+   *
+   * `flyTo` is the honest animation here: the reader needs to understand that the map TRAVELLED
+   * rather than that a different map appeared, and a cut between two city blocks is disorienting
+   * in a way a 700 ms flight is not. Under `prefers-reduced-motion` it jumps instead — the
+   * information is the destination, and nobody needs the journey to get it.
+   */
+  const goTo = useCallback((landmark: LocationPickerLandmark) => {
+    const map = instance.current;
+
+    if (!map) return;
+
+    const reduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+    const view = {
+      center: [landmark.longitude, landmark.latitude] as [number, number],
+      zoom: 15,
+    };
+
+    if (reduced) map.jumpTo(view);
+    else map.flyTo({ ...view, duration: 700, essential: true });
   }, []);
 
   useEffect(() => {
@@ -206,6 +303,45 @@ export function LocationPicker({
           'top-right',
         );
 
+        /*
+          The guest area, as a SOURCE and two LAYERS rather than an overlay element.
+
+          A circle drawn in HTML would have to be re-sized from `map.project()` on every frame of
+          every pan; a polygon in metres is correct at every zoom for free. It is also the one
+          shape on this map that must not drift — the whole claim is «this is exactly what a guest
+          sees», and a circle that lagged the pin by a frame would undermine it.
+
+          Layers, not a `Marker`: the CVE exemption in `package.json` forbids MapLibre's marker and
+          popup paths, and `map-sanitiser-reach.test.ts` fails the build if one appears here.
+        */
+        if (guestArea) {
+          map.on('load', () => {
+            if (map.getSource(GUEST_SOURCE)) return;
+
+            map.addSource(GUEST_SOURCE, {
+              type: 'geojson',
+              data: guestAreaData(latest.current.latitude, latest.current.longitude),
+            });
+            map.addLayer({
+              id: `${GUEST_SOURCE}-fill`,
+              type: 'fill',
+              source: GUEST_SOURCE,
+              paint: { 'fill-color': '#c9a227', 'fill-opacity': 0.18 },
+            });
+            map.addLayer({
+              id: `${GUEST_SOURCE}-line`,
+              type: 'line',
+              source: GUEST_SOURCE,
+              paint: {
+                'line-color': '#c9a227',
+                'line-width': 2,
+                'line-opacity': 0.9,
+                'line-dasharray': [2, 2],
+              },
+            });
+          });
+        }
+
         map.on('error', (event: { error?: unknown }) => {
           const message = event.error instanceof Error ? event.error.message : '';
           if (/style|source|sprite/i.test(message)) setFailed(true);
@@ -243,7 +379,7 @@ export function LocationPicker({
       so this list is genuinely complete — the map is built once and survives every later
       render. No lint suppression, because there is nothing to suppress.
     */
-  }, [publish, basemapUrl]);
+  }, [publish, basemapUrl, guestArea]);
 
   if (!basemapUrl || failed) {
     return (
@@ -268,6 +404,33 @@ export function LocationPicker({
         ) : null}
       </div>
       <p className="mt-1 text-12 text-faint">{copy.help}</p>
+
+      {/*
+        Shortcuts to somewhere recognisable, ABOVE the map rather than below it.
+
+        A partner who has never used a map control meets the hard part first otherwise: a city at
+        zoom 12 is a grey rectangle, and «pan until you find your street» is the instruction that
+        produced 3% coverage. «قرب الجامع الأموي» is how the same person would describe the place
+        out loud.
+      */}
+      {landmarks && landmarks.length > 0 && copy.startFrom ? (
+        <div className="mt-3">
+          <p className="text-12 text-faint">{copy.startFrom}</p>
+          <ul className="mt-1.5 flex flex-wrap gap-1.5">
+            {landmarks.map((landmark) => (
+              <li key={landmark.slug}>
+                <button
+                  type="button"
+                  onClick={() => goTo(landmark)}
+                  className="inline-flex min-h-10 cursor-pointer items-center rounded-full border border-line bg-card px-3 text-12 text-muted transition-colors hover:border-gold hover:text-text active:scale-[0.98] lg:min-h-0 lg:py-1.5"
+                >
+                  {landmark.name}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <div className="relative mt-3 overflow-hidden rounded-lg border border-line">
         <div ref={container} className="h-64 w-full sm:h-72" />
@@ -294,6 +457,21 @@ export function LocationPicker({
         {placed ? `${latitude}, ${longitude}` : ''}
       </p>
       {!placed ? <p className="mt-2 text-12 text-warn-ink">{copy.missing}</p> : null}
+
+      {/*
+        The circle needs its sentence or it is just a shape. Shown only once something is placed,
+        because there is nothing to promise about a location that does not exist yet.
+      */}
+      {guestArea && placed && copy.guestArea && copy.guestAreaHelp ? (
+        <p className="mt-2 flex flex-wrap items-baseline gap-x-1.5 text-12">
+          <span
+            aria-hidden="true"
+            className="inline-block h-2.5 w-2.5 rounded-full border border-dashed border-gold bg-gold/15"
+          />
+          <span className="font-bold text-text">{copy.guestArea}</span>
+          <span className="text-faint">{copy.guestAreaHelp}</span>
+        </p>
+      ) : null}
 
       <button
         type="button"

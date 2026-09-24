@@ -499,6 +499,12 @@ export const ar = {
     /* ── الإشعارات: what SAFRA has told this partner (Bashar, 2026-08-24) ── */
     noticesTitle: 'إشعارات حسابك',
     noticesEmpty: 'لا إشعارات على حسابك.',
+    mapGapTitle: 'الظهور على الخريطة',
+    mapGapSome: '{unplaced} من {total} من إعلاناتك لا تظهر على الخريطة.',
+    mapGapWhy:
+      'الضيوف يبحثون بالقرب من المعالم والمطارات، والإعلان بلا موقع لا يظهر في هذه النتائج.',
+    mapGapAction: 'حدّد المواقع',
+    mapGapDone: 'كل إعلاناتك تظهر على الخريطة.',
     /*
       One sentence per event, and each is a LINK to the page that holds the detail.
 
@@ -763,6 +769,17 @@ export const ar = {
     locationClear: 'إزالة التحديد',
     locationCoordinates: 'الإحداثيات',
     locationUnavailable: 'الخريطة غير متاحة الآن. يمكنك الحفظ والعودة لاحقاً.',
+    locationGuestArea: 'ما يراه الضيف',
+    /*
+      The RADIUS in words, not only the shape.
+
+      The circle is about 72 m across at three decimals, which at the zoom somebody opens a
+      city at is a few pixels behind the pin — the reassurance was invisible exactly when it
+      needed reading. A number says the same thing at every zoom.
+    */
+    locationGuestAreaHelp:
+      'يظهر عقارك للضيوف داخل دائرة نصف قطرها نحو {metres} متر، ولا يُنشر موقعه الدقيق قبل تأكيد الحجز.',
+    locationStartFrom: 'ابدأ من مكان تعرفه',
     save: 'حفظ التعديلات',
     saving: 'جارٍ الحفظ…',
     saved: 'حُفظت التعديلات.',
@@ -863,6 +880,8 @@ export const ar = {
     submitPending: 'العقار قيد المراجعة لدى فريق سفرة.',
     submitPublished: 'العقار منشور.',
     submitNeedsUnit: 'أضف وحدة واحدة على الأقل قبل الإرسال للمراجعة.',
+    submitNeedsLocation:
+      'حدّد موقع العقار على الخريطة أولاً. يظهر للضيوف موقع تقريبي فقط، لا العنوان.',
     unitSave: 'حفظ الوحدة',
     unitSaving: 'جارٍ الحفظ…',
     unitSaved: 'حُفظت الوحدة.',

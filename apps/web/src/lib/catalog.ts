@@ -240,6 +240,9 @@ const landmarkSchema = z.object({
     en: z.string().nullable(),
     de: z.string().nullable(),
   }),
+  /* The landmark's own position — a published fact, and what the map draws it at. */
+  latitude: z.number(),
+  longitude: z.number(),
   name: z.object({
     ar: z.string().nullable(),
     en: z.string().nullable(),

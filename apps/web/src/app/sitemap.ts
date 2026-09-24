@@ -21,10 +21,12 @@ import { routing } from '@/i18n/routing';
  * ## No coordinates, no prices, no availability
  *
  * A sitemap is a list of URLs and nothing else. Worth saying because a crawlable document is
- * exactly where bulk data gets published by accident, and because the guarantee here is
- * structural rather than remembered: `getLandmarks` and `getCities` carry slugs and names, no
- * coordinate reaches this file at all, and the only listing data in the output is the absence
- * of any.
+ * exactly where bulk data gets published by accident — and `getLandmarks` DOES carry positions
+ * since the partner's map picker needed them, so the guarantee here is about what is WRITTEN
+ * rather than about what is in scope. Only `slug` is read below, and only to build a path.
+ *
+ * Those positions are landmarks' own, never a listing's: a mosque and an airport are published
+ * facts, and no property coordinate is reachable from this file at all.
  */
 export const revalidate = 3600;
 

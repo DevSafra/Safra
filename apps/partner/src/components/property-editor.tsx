@@ -2,14 +2,15 @@
 
 import { useState } from 'react';
 
-import { LocationPicker } from '@safra/ui';
+import { LocationPicker, guestRadiusMetres } from '@safra/ui';
 import { basemapBase } from '@safra/session';
 import { useRouter } from 'next/navigation';
 
 import type { PartnerPropertyDetail, PropertyFormReference } from '@/lib/api';
 import { codeOfResponse, refusalFor } from '@/lib/refusal';
 import { STAR_VALUES } from '@/lib/stars';
-import { t, tripAttribute } from '@/lib/strings';
+import { count } from '@/lib/format';
+import { fill, t, tripAttribute } from '@/lib/strings';
 import { PROPERTY_HEADLINE_MAX, TRIP_ATTRIBUTES, usesStarRating } from '@safra/contracts';
 
 /**
@@ -479,7 +480,32 @@ export function PropertyEditor({
           clear: t.editProperty.locationClear,
           coordinates: t.editProperty.locationCoordinates,
           unavailable: t.editProperty.locationUnavailable,
+          guestArea: t.editProperty.locationGuestArea,
+          /*
+            The radius, as a NUMBER in the sentence. The circle alone is a few pixels at the
+            zoom a city opens at, so the promise it makes was unreadable exactly when it
+            mattered. Filled here rather than in the picker because `fill` and the Arabic
+            digits belong to the app, and a shared component must not learn either.
+          */
+          guestAreaHelp: fill(t.editProperty.locationGuestAreaHelp, {
+            metres: count(
+              Math.round(
+                guestRadiusMetres(
+                  Number(form.latitude) || Number(city?.latitude) || 33.5138,
+                ),
+              ),
+            ),
+          }),
+          startFrom: t.editProperty.locationStartFrom,
         }}
+        /*
+          The circle, and the sentence beside it. This is the one screen where SAFRA's rounding is
+          worth SHOWING rather than stating: a partner deciding whether to place their building is
+          weighing «will my address be published», and the answer has been no since the generated
+          columns landed.
+        */
+        guestArea
+        landmarks={reference.landmarks[form.citySlug] ?? []}
       />
 
       <button

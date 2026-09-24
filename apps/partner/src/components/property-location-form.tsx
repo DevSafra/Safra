@@ -4,9 +4,14 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { codeOfResponse, refusalFor } from '@/lib/refusal';
-import { t } from '@/lib/strings';
+import { count } from '@/lib/format';
+import { fill, t } from '@/lib/strings';
 
-import { LocationPicker } from '@safra/ui';
+import {
+  LocationPicker,
+  guestRadiusMetres,
+  type LocationPickerLandmark,
+} from '@safra/ui';
 import { basemapBase } from '@safra/session';
 
 /**
@@ -49,10 +54,19 @@ const BASEMAP = basemapBase({
 export function PropertyLocationForm({
   reference,
   cityLatitude,
+  landmarks,
   cityLongitude,
 }: {
   readonly reference: string;
   readonly cityLatitude: string | null;
+  /**
+   * The city's landmarks, for the «ابدأ من مكان تعرفه» shortcuts.
+   *
+   * This form matters MORE for them than the draft editor does: its reader is being asked to place
+   * a listing that has been live for months, and «قرب الجامع الأموي» is how that person describes
+   * where it is. A city at zoom 12 is the grey rectangle that produced 3% coverage.
+   */
+  readonly landmarks: readonly LocationPickerLandmark[];
   readonly cityLongitude: string | null;
 }) {
   const router = useRouter();
@@ -114,6 +128,16 @@ export function PropertyLocationForm({
           setLongitude(next.longitude);
           setMessage(null);
         }}
+        /*
+          The circle matters MORE here than on the draft form.
+
+          This panel is the only route the 97% of already-published listings have, and its reader
+          is a partner being asked to add a location to something that has been live for months.
+          «Why would I now publish where my building is» is the reasonable question, and the
+          shaded area is the answer — shown rather than asserted.
+        */
+        guestArea
+        landmarks={landmarks}
         copy={{
           heading: t.editProperty.locationHeading,
           help: t.editProperty.locationHelp,
@@ -122,6 +146,17 @@ export function PropertyLocationForm({
           clear: t.editProperty.locationClear,
           coordinates: t.editProperty.locationCoordinates,
           unavailable: t.editProperty.locationUnavailable,
+          guestArea: t.editProperty.locationGuestArea,
+          /*
+            The radius, as a NUMBER in the sentence. The circle alone is a few pixels at the
+            zoom a city opens at, so the promise it makes was unreadable exactly when it
+            mattered. Filled here rather than in the picker because `fill` and the Arabic
+            digits belong to the app, and a shared component must not learn either.
+          */
+          guestAreaHelp: fill(t.editProperty.locationGuestAreaHelp, {
+            metres: count(Math.round(guestRadiusMetres(Number(cityLatitude) || 33.5138))),
+          }),
+          startFrom: t.editProperty.locationStartFrom,
         }}
       />
 

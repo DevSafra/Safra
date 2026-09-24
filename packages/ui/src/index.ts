@@ -31,4 +31,11 @@ export {
 } from './image-slider.js';
 export { ConfirmDialog, useConfirm, type ConfirmRequest } from './confirm-dialog.js';
 export { Modal } from './modal.js';
-export { LocationPicker, type LocationPickerCopy } from './location-picker.js';
+/* The guest-area radius, so a caller can put the NUMBER in its own sentence — see below. */
+export { guestRadiusMetres } from './guest-area.js';
+
+export {
+  LocationPicker,
+  type LocationPickerCopy,
+  type LocationPickerLandmark,
+} from './location-picker.js';

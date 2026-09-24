@@ -131,8 +131,11 @@ export class CatalogService {
       kind_name_ar: string;
       kind_name_en: string;
       kind_name_de: string;
+      latitude: string;
+      longitude: string;
     }>(sql`
       SELECT l.slug, k.code AS kind, l.name_ar, l.name_en, l.name_de,
+             l.latitude, l.longitude,
              k.name_ar AS kind_name_ar, k.name_en AS kind_name_en, k.name_de AS kind_name_de
       FROM landmarks l
       JOIN cities c ON c.id = l.city_id
@@ -156,6 +159,19 @@ export class CatalogService {
         ships can name one. Without it the «قريب من نوع» filter would offer raw codes.
       */
       kindName: { ar: r.kind_name_ar, en: r.kind_name_en, de: r.kind_name_de },
+      /*
+        The landmark's own position, at full precision.
+
+        No asymmetry with the location-privacy model, and worth saying because this is a LIST: a
+        mosque, a station and an airport are published facts on every map in the world, and the
+        property detail has returned exactly these numbers per landmark since the map shipped.
+        What stays rounded is the LISTING's pair — the only thing anybody is trying to find.
+
+        The partner's location picker is what needed them here: «ابدأ من الجامع الأموي» cannot
+        centre a map on a landmark whose position the endpoint declines to state.
+      */
+      latitude: Number(r.latitude),
+      longitude: Number(r.longitude),
       name: { ar: r.name_ar, en: r.name_en, de: r.name_de },
     }));
   }
@@ -181,9 +197,12 @@ export class CatalogService {
       kind_name_ar: string;
       kind_name_en: string;
       kind_name_de: string;
+      latitude: string;
+      longitude: string;
       city_slug: string;
     }>(sql`
       SELECT l.slug, k.code AS kind, l.name_ar, l.name_en, l.name_de,
+             l.latitude, l.longitude,
              k.name_ar AS kind_name_ar, k.name_en AS kind_name_en, k.name_de AS kind_name_de,
              c.slug AS city_slug
       FROM landmarks l
@@ -208,6 +227,8 @@ export class CatalogService {
       slug: row.slug,
       kind: row.kind,
       kindName: { ar: row.kind_name_ar, en: row.kind_name_en, de: row.kind_name_de },
+      latitude: Number(row.latitude),
+      longitude: Number(row.longitude),
       name: { ar: row.name_ar, en: row.name_en, de: row.name_de },
       citySlug: row.city_slug,
     };

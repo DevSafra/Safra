@@ -118,6 +118,16 @@ export default async function EditPropertyPage({
                 reference={property.reference}
                 cityLatitude={city?.latitude ?? null}
                 cityLongitude={city?.longitude ?? null}
+                /*
+                  The listing's OWN city — this form never changes it, unlike the draft editor
+                  where the partner can. A published listing's city is frozen by §8.1, so there is
+                  one correct set of landmarks and no state to keep in step.
+                */
+                landmarks={
+                  formReference === 'failed'
+                    ? []
+                    : (formReference.landmarks[property.citySlug] ?? [])
+                }
               />
             ) : null}
           </>
@@ -168,6 +178,7 @@ export default async function EditPropertyPage({
           reference={property.reference}
           status={property.status}
           unitCount={property.units.length}
+          hasLocation={Boolean(property.latitude && property.longitude)}
         />
       </div>
     </Shell>
