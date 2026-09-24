@@ -395,4 +395,41 @@ describeIfDb('CatalogService', () => {
     expect(city, `${target.slug} must be listed`).toBeDefined();
     expect(city!.cover, `${target.slug} cover`).toBeNull();
   });
+  /**
+   * Two endpoints, ONE schema on the reader's side — so they have to answer the same shape.
+   *
+   * `/landmarks` and `/landmarks/:slug` both parse through `landmarkSchema` in
+   * `apps/web/src/lib/catalog.ts`. The single one omitted `kindName`, which the list sends, and
+   * the consequence was not a wrong field: `read()` returns its fallback on a parse failure, so
+   * `getLandmark()` answered null and EVERY landmark page 404'd. The API logged 200 for every
+   * request. Nothing in three locales of copy or a type signature could see it.
+   *
+   * Asserted as «the same KEYS», not «has kindName». The next field added to one of them is the
+   * same defect, and a test naming today's field would not be there to catch it.
+   */
+  it('answers one landmark with the same keys it answers a list of them with', async () => {
+    const [first] = await db
+      .execute<{ slug: string }>(
+        sql`SELECT c.slug FROM cities c
+            JOIN landmarks l ON l.city_id = c.id AND l.is_active AND l.deleted_at IS NULL
+            LIMIT 1`,
+      )
+      .then((r) => r.rows);
+
+    expect(first, 'the fixture must hold a city with a landmark').toBeDefined();
+
+    const [inList] = await catalog.landmarks(first!.slug);
+    expect(inList, `${first!.slug} must list a landmark`).toBeDefined();
+
+    const one = await catalog.landmark(String(inList!.slug));
+    expect(one, `${String(inList!.slug)} must resolve on its own`).not.toBeNull();
+
+    /* `citySlug` is the one addition the single answer is ENTITLED to: the list is already scoped. */
+    expect(
+      Object.keys(inList!)
+        .sort()
+        .filter((key) => !Object.keys(one!).includes(key)),
+      'keys the list sends that the single answer drops',
+    ).toEqual([]);
+  });
 });

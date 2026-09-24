@@ -180,6 +180,26 @@ describeIfDb('location privacy', () => {
     /* Closer than a quarter of the rounding step could not have come from the public pair. */
     const tooClose = 0.25 * 10 ** -PUBLIC_COORDINATE_DECIMALS;
 
+    /*
+      A LANDMARK's own position is a published fact and is stored exactly — a mosque, a
+      station, an airport. Two of them sit within a rounding step of this listing's true
+      latitude by coincidence, and the walk below flagged them as if the payload had leaked
+      the building.
+
+      They are ACCOUNTED FOR rather than skipped, and the difference matters. Skipping the
+      `landmarks` subtree would mean a real leak placed there went unnoticed; matching against
+      the coordinates the landmarks table actually holds says «this number is explained by a
+      public row», and anything else in that subtree still fails.
+    */
+    const published = await db.execute<{ latitude: string; longitude: string }>(
+      sql`SELECT latitude, longitude FROM landmarks WHERE deleted_at IS NULL`,
+    );
+    const explained = new Set<number>();
+    for (const row of published.rows) {
+      explained.add(Number(row.latitude));
+      explained.add(Number(row.longitude));
+    }
+
     const offenders: string[] = [];
     const walk = (node: unknown, path: string) => {
       if (node === null || node === undefined) return;
@@ -194,6 +214,8 @@ describeIfDb('location privacy', () => {
 
       const asNumber = Number(node);
       if (!Number.isFinite(asNumber)) return;
+      /* A landmark's own coordinate, which every map in the world already publishes. */
+      if (explained.has(asNumber)) return;
       if (
         Math.abs(asNumber - trueLat) < tooClose ||
         Math.abs(asNumber - trueLon) < tooClose
