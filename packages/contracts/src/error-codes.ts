@@ -551,6 +551,7 @@ export const ERROR = {
   PARTNER_INVITATION_INVALID: 'partner.invitation_invalid',
   PARTNER_SANCTIONS_SCREENING_REQUIRED: 'partner.sanctions_screening_required',
   PROPERTY_UNIT_REQUIRED: 'property.unit_required',
+  PROPERTY_LOCATION_REQUIRED: 'property.location_required',
   PROPERTY_NOT_STRUCTURALLY_EDITABLE: 'property.not_structurally_editable',
   PROPERTY_NOT_SUBMITTABLE: 'property.not_submittable',
   PROPERTY_NOT_REVIEWABLE: 'property.not_reviewable',

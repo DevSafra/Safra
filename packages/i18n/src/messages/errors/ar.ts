@@ -349,6 +349,8 @@ export const ar = {
   'partner.not_verified': 'لم يتم التحقق من هذا الشريك بعد. تحقق منه قبل نشر عقاراته.',
   'partner.sanctions_screening_required': 'يجب تسجيل فحص العقوبات قبل التحقق من الشريك.',
   'property.unit_required': 'أضف وحدة واحدة على الأقل قبل الإرسال للمراجعة.',
+  'property.location_required':
+    'حدّد موقع العقار على الخريطة قبل الإرسال للمراجعة. يظهر للضيوف موقع تقريبي فقط.',
   'property.not_structurally_editable':
     'لا يمكن تعديل بنية عقار منشور. تواصل مع دعم سفرة لطلب التغيير.',
   'property.not_submittable': 'يمكن إرسال المسودة أو العقار المرفوض للمراجعة فقط.',

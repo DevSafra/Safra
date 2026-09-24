@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { useConfirm } from '@safra/ui';
+import { ERROR } from '@safra/contracts';
+import { errorMessage } from '@safra/i18n';
 
 import { codeOfResponse, refusalFor } from '@/lib/refusal';
 import { t } from '@/lib/strings';
@@ -39,11 +41,20 @@ export function SubmitForReview({
   reference,
   status,
   unitCount,
+  hasLocation,
 }: {
   readonly reference: string;
   readonly status: string;
   /** Zero is a real, common state — 991 listings had it. It disables, it does not hide. */
   readonly unitCount: number;
+  /**
+   * Whether the listing has been placed on the map.
+   *
+   * Same treatment as `unitCount`, and for the same reason: 97% of the catalogue is unplaced, so
+   * this is the COMMON state rather than an edge one. It disables the button and says why, rather
+   * than hiding a step the partner then cannot find.
+   */
+  readonly hasLocation: boolean;
 }) {
   const router = useRouter();
   const { ask, dialog } = useConfirm();
@@ -82,9 +93,11 @@ export function SubmitForReview({
           `refusalFor` first, so «الحساب موقوف» is said as itself rather than falling to this
           screen's generic sentence — the rule `refusal-coverage.test.ts` holds every write to.
         */
+        const code = await codeOfResponse(response);
+
         setMessage({
           kind: 'bad',
-          text: refusalFor(await codeOfResponse(response)) ?? t.editProperty.submitFailed,
+          text: refusalFor(code) ?? readinessRefusal(code) ?? t.editProperty.submitFailed,
         });
         setBusy(false);
 
@@ -136,9 +149,22 @@ export function SubmitForReview({
             </p>
           ) : null}
 
+          {/*
+            Both blockers are shown TOGETHER, never one at a time. A form that reveals its second
+            requirement only after the first is met makes somebody return twice, and this one is
+            worse than most: fixing the unit and coming back to «now place it on the map» reads as
+            the rules having changed. The sentence also answers the objection rather than repeating
+            the demand — a guest sees an approximate position, never the address.
+          */}
+          {!hasLocation ? (
+            <p className="text-13 leading-relaxed text-warn">
+              {t.editProperty.submitNeedsLocation}
+            </p>
+          ) : null}
+
           <button
             type="button"
-            disabled={busy || unitCount === 0}
+            disabled={busy || unitCount === 0 || !hasLocation}
             onClick={() => void submit()}
             className="min-h-10 w-fit cursor-pointer rounded-lg border border-gold px-4 py-1.5 text-13 font-bold text-gold-read disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
           >
@@ -156,4 +182,27 @@ export function SubmitForReview({
       {dialog}
     </section>
   );
+}
+
+/**
+ * The two readiness rules, said as themselves rather than as «تعذّر الإرسال».
+ *
+ * The button is disabled while either is unmet, so this is the STALE path: a listing placed in
+ * another tab and cleared, a form left open across a change, a replayed submit. Rare — and
+ * precisely why it must not answer with a generic failure. The screen knows why, the API said why,
+ * and «something went wrong» would send somebody to support over a sentence they have already read
+ * two inches above the button.
+ *
+ * `errorMessage(code, 'ar')` rather than the response's own `message`: the API's English prose
+ * travels for logs and is never displayed, which `no-raw-error-messages.test.ts` holds everywhere.
+ */
+function readinessRefusal(code: unknown): string | null {
+  if (
+    code === ERROR.PROPERTY_LOCATION_REQUIRED ||
+    code === ERROR.PROPERTY_UNIT_REQUIRED
+  ) {
+    return errorMessage(code, 'ar');
+  }
+
+  return null;
 }

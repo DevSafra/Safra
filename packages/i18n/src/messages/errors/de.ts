@@ -435,6 +435,8 @@ export const de = {
     'Vor der Verifizierung eines Partners muss die Sanktionsprüfung erfasst sein.',
   'property.unit_required':
     'Bitte mindestens eine Einheit hinzufügen, bevor Sie zur Prüfung einreichen.',
+  'property.location_required':
+    'Setzen Sie die Unterkunft auf der Karte, bevor Sie sie zur Prüfung einreichen. Gäste sehen immer nur eine ungefähre Position.',
   'property.not_structurally_editable':
     'Ein veröffentlichtes Objekt kann strukturell nicht bearbeitet werden. Bitte wenden Sie sich an den SAFRA-Support.',
   'property.not_submittable':

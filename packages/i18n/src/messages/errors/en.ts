@@ -386,6 +386,8 @@ export const en = {
   'partner.sanctions_screening_required':
     'Sanctions screening must be recorded before a partner can be verified.',
   'property.unit_required': 'Add at least one unit before submitting for review.',
+  'property.location_required':
+    'Place the property on the map before submitting for review. Guests only ever see an approximate position.',
   'property.not_structurally_editable':
     'A published listing cannot be edited structurally. Contact SAFRA support to request a change.',
   'property.not_submittable':

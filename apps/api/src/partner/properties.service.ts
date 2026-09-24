@@ -959,6 +959,32 @@ export class PropertiesService {
       throw badRequest(ERROR.PROPERTY_UNIT_REQUIRED);
     }
 
+    /*
+      A listing with no coordinates cannot be found on a map, and submission is the last moment
+      anybody is looking at it before it goes live.
+
+      ## Why the gate is HERE and not at creation
+
+      `propertyCreateSchema` leaves the pair optional on purpose: a draft is a work in progress and
+      demanding a map pin before a name would be a worse form, not a better one. Submission is the
+      point where the partner declares the listing finished, and it is the only point at which
+      SAFRA can still ask for something without a support ticket — §8.1 freezes the address the
+      moment this succeeds.
+
+      ## Why it is proportionate to ask
+
+      The picker opens centred on the listing's own city, so this is a pin dragged rather than a
+      figure looked up — which was the actual cause of 3% coverage, not reluctance. And the
+      published pair is rounded to three decimals by a generated column, so what is being asked
+      for is a NEIGHBOURHOOD, not an address. The error says both of those things.
+
+      It reads the raw column deliberately: this asks whether the partner has placed the listing,
+      which is a question about the pair they set, not about what a guest is shown.
+    */
+    if (!property.latitude || !property.longitude) {
+      throw badRequest(ERROR.PROPERTY_LOCATION_REQUIRED);
+    }
+
     await this.db.transaction(async (tx) => {
       await tx
         .update(schema.properties)
