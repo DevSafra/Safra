@@ -3060,77 +3060,88 @@ proxy branch. Confirmed by reading both rather than by analogy.
 is malformed syntax and 400 was defensible, but every unroutable path in the app now gives the
 same answer, and «no such page» is the truthful one.
 
-### O-web-17 — OPEN: coordinate adoption, reviewed 2026-09-24, awaiting a decision on scope
+### O-web-17 — Coordinate adoption: reviewed, and the four in-app levers built
 
-Bashar, approving the map system: «With only 67 of 2,017 listings currently mapped, the map
-experience is technically complete but not yet benefiting the majority of properties… review the
-current onboarding and partner workflow and identify ways to increase coordinate adoption.»
+**Reviewed and built 2026-09-24.** Bashar: «With only 67 of 2,017 listings currently mapped, the
+map experience is technically complete but not yet benefiting the majority of properties.»
 
-**Measured, not recalled** (dev database, 2026-09-24):
+**Measured, not recalled:** published 67/2,017 (**3.3%**), draft 60/625 (9.6%) — and the number
+that reframes it, **1,950 of the 2,013 partners with a published listing have none placed.** Not a
+long tail to chase, nearly the whole population.
 
-|           | listings | placed |          |
-| --------- | -------- | ------ | -------- |
-| published | 2,017    | 67     | **3.3%** |
-| draft     | 625      | 60     | 9.6%     |
-| rejected  | 62       | 62     | 100%     |
+**Honest caveat.** This catalogue is SEEDED and the per-card warning shipped 2026-09-23, so nothing
+here is evidence that partners ignore a prompt. 3.3% describes a backlog, not a behaviour.
 
-And the number that reframes it: **1,950 of the 2,013 partners with a published listing have no
-placed listing at all.** This is not a long tail to chase, it is nearly the whole population.
+#### What was already there, and what was missing
 
-**Honest caveat on what the numbers can support.** This catalogue is SEEDED. The per-card warning
-below shipped on 2026-09-23, so no real partner has yet had the chance to act on it, and nothing
-here is evidence that partners ignore a prompt. The 3.3% describes a backlog, not a behaviour.
+Already built: the per-card «لا تظهر على الخريطة» warning on الإعلانات, the picker in both editors,
+and the coordinates on the console's property detail. **Missing entirely:** anything on the partner
+dashboard, any location check at submission, any staff column or filter, and any aggregate
+anywhere that could answer «how many of mine are unplaced».
 
-#### What already exists, driven and confirmed in the code
+#### The four levers, all approved and built
 
-| Surface                   | State                                                                                                                                                                     |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Partner properties list   | **Built.** Each unplaced card carries «لا تظهر على الخريطة» and an «أضف الموقع» link into the editor (`properties/page.tsx:269`, copy at `partner/ar.ts:977`)             |
-| Partner editor, draft     | **Built.** `LocationPicker` centred on the listing's city, so a pin is placed rather than a decimal typed                                                                 |
-| Partner editor, published | **Built.** `PropertyLocationForm`, rendered only while the location is genuinely absent — the §8.1 set-when-null exception                                                |
-| Admin property detail     | **Built.** Shows the pair or «غير محدد»                                                                                                                                   |
-| Partner dashboard         | **Nothing.** No count, no task, no prompt — and it is the screen a partner lands on                                                                                       |
-| `submitForReview`         | **Nothing about location.** It already refuses a listing with no bookable unit (`PROPERTY_UNIT_REQUIRED`) — the readiness-gate precedent exists and location is not in it |
-| Admin properties registry | **Nothing.** No location column, no «unplaced» filter, so staff cannot see or chase the gap                                                                               |
-| Outreach                  | **Nothing.** No email, no job, no targeting query                                                                                                                         |
-| Any aggregate anywhere    | **Does not exist.** Nothing in any app can answer «how many of my listings are unplaced»                                                                                  |
+| Lever                     | What it does                                                                                                                                                                                                          |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **The submission gate**   | `submitForReview` now refuses a listing with no coordinates, beside the «at least one bookable unit» rule that was already there. Every FUTURE published listing is placed by construction                            |
+| **What a guest sees**     | The picker draws the ROUNDED area as a dashed circle and says its radius — «دائرة نصف قطرها نحو ٧٢ متر». The claim is derived from `PUBLIC_COORDINATE_DECIMALS`, so a change to the rounding moves the circle with it |
+| **Start from a landmark** | Chips above the map — «وسط مدينة اللاذقية · مطار باسل الأسد الدولي · مرفأ اللاذقية…». Choosing one MOVES the map and sets nothing                                                                                     |
+| **The dashboard card**    | «١ من ٢ من إعلاناتك لا تظهر على الخريطة», why it costs them, and a link. The finished state is shown rather than hidden                                                                                               |
+| **Staff visibility**      | «على الخريطة» on العقارات with a «محدَّد / غير محدَّد» filter, carried by the pager and the back link                                                                                                                 |
 
-#### The options, ranked by leverage against friction
+**The gate is proportionate, and the error says why.** The picker opens on the listing's own city,
+so this is a pin dragged rather than a figure looked up — and three decimals means what is being
+asked for is a NEIGHBOURHOOD. «حدّد موقع العقار على الخريطة قبل الإرسال للمراجعة. يظهر للضيوف موقع
+تقريبي فقط.»
 
-1. **Require a location to submit for review.** Highest leverage per hour of work: every FUTURE
-   published listing is placed, by construction. The gate exists, the precedent exists, and the
-   partner is already in the editor with the picker centred on their city when they hit it.
-   Rounding to three decimals (~110 m) means it demands a neighbourhood, not an address. **~3 h.**
-2. **A dashboard task card — «N of your listings do not appear on the map».** The only lever that
-   reaches the EXISTING backlog, on the screen a partner actually arrives at. Needs the aggregate
-   that does not exist yet. **~½ day.**
-3. **Tell the partner what a guest sees.** The likely real objection is «I do not want my address
-   published», and SAFRA has a structural answer it never states: the published pair is rounded by
-   a generated column and the exact point is unreachable. Showing the rounded marker beside the
-   picker converts a privacy fear into a privacy feature. **~3 h, and probably the highest ratio of
-   adoption to effort.**
-4. **Start from a landmark.** «Near the Umayyad Mosque» as a starting pin — the landmark table now
-   carries 41 positions, so this is nearly free and turns an abstract map into a familiar one.
-   **~3 h.**
-5. **Staff visibility: a location column and an «unplaced» filter on الإعلانات, plus the pair on the
-   review queue.** Lets a reviewer refuse an unplaced listing and makes the metric watchable.
-   **~½ day.**
-6. **One-time outreach to the 1,950 partners.** The only lever that reaches somebody who does not
-   sign in. Arabic first, English beneath, through the one composing helper. Needs a decision on
-   cadence and a real send of that size. **~½ day plus an ops decision.**
-7. **Geocode the existing addresses** with a self-hosted Nominatim over the same OSM extract — no
-   vendor, no address leaves us. Could place a large fraction with zero partner effort, but a
-   geocode is a GUESS: it must be stored as provisional, shown to the partner as «we placed this
-   approximately», and never counted as verified. **2–3 days, and the only option with a quality
-   risk attached.**
+**The circle is the lever I ranked first and nobody asked for.** The likely real objection is «I do
+not want my address published», and SAFRA has had a structural answer since the generated columns
+landed that it never once showed the person it protects. Stating the radius in words was needed
+too: at the zoom a city opens at, a 72 m circle is a few pixels behind the pin — the reassurance
+was invisible exactly when it needed reading, which only a screenshot showed.
 
-#### One correctness finding, reported not fixed
+#### Three things found while building, all fixed
 
-`apps/partner/src/lib/api.ts:123` — `hasLocation: z.boolean().default(false)`. The `.default()`
-class again: if the API stops sending the field, every card claims «لا تظهر على الخريطة» and 2,017
-listings show a false warning at once. It fails in the safe direction, which is why it is low
-severity rather than none. One line to make it required, plus the parse-failure path that already
-exists. **~15 min, awaiting a decision with the rest.**
+- **The public landmark list carried no coordinates**, so «start from a landmark» had nothing to
+  centre on. Added — a landmark's position is a published fact and the property payload has
+  returned exactly these numbers per landmark since the map shipped. The sitemap's comment claiming
+  «no coordinate reaches this file» was corrected rather than left to rot.
+- **`hasLocation: z.boolean().default(false)`** in the partner client. The `.default()` class again:
+  had the API stopped sending it, all 2,017 cards would have shown a false warning at once. Now
+  required.
+- **The partner reference went from 3 API reads to 12** — one per city — against a 120-a-minute
+  throttle whose caller is the partner SERVER, an address every partner in the country shares. Ten
+  people opening the form in one minute would have started refusing each other's catalogue reads,
+  and the symptom would have been an empty city select with no error. The reference reads are now
+  cached for five minutes, matching `REFERENCE_TTL` on the customer app.
+
+#### Held to account
+
+| Held by                                      | What it proves                                                                                                                                            |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `submit-readiness.integration.test.ts` (6)   | the gate, its opposite control, the unit rule still firing, the ORDER of the two, and both halves of a half-pair                                          |
+| `guest-area.test.ts` (16)                    | that the circle is a CLAIM — centred on the rounded point, radius the cell's half-diagonal, and the true position inside it wherever in the cell it falls |
+| `property-placement.integration.test.ts` (7) | the filter, and that the COUNT follows it — the defect that prints «٢٠١٧ نتيجة» over 67 rows                                                              |
+| `e2e/property-placement.spec.ts` (7)         | that the column, the select, the pager and the crafted-value fallback all reached the screen                                                              |
+
+Thirteen mutations across the four, every one watched to fail. Two survived on the first pass and
+both were real gaps in the assertions rather than in the code — a registry test that never checked
+the victim ARRIVED in the other half, and an ordering test whose mutation script had silently
+matched nothing. The second is the reason this codebase's rule says to confirm the file changed.
+
+**Driven, not inferred:** signed into the partner portal, read the dashboard card, opened the
+picker, clicked a landmark chip, placed a listing, watched the circle and its sentence appear, met
+the disabled submit button with its reason — and then **stripped the `disabled` attribute and
+submitted anyway**, which answered `400 property.location_required`. The endpoint is the control.
+
+#### Deferred, by decision
+
+- **Outreach to the 1,950 partners** — «Not yet, build the in-app work first» (Bashar, 2026-09-24).
+  A send of that size lands better once a partner who clicks through meets a finished flow.
+- **Geocoding the existing addresses** — «Not now» (Bashar, 2026-09-24). Self-hosted Nominatim over
+  the same OSM extract would place a large fraction with no partner effort, but a geocode is a
+  GUESS and would have to be stored as provisional and confirmed. It is the only option on this
+  list carrying a quality risk.
 
 ### O-ui-11 — Closed: the brand gold came back, and gold text got its own token
 
