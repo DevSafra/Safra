@@ -13,6 +13,7 @@ export * from './timezone-catalogue.js';
 export * from './geo.js';
 export * from './landmark.js';
 export * from './location.js';
+export * from './readiness.js';
 export * from './gift-card.js';
 export * from './catalogue.js';
 export * from './customer-fee.js';
