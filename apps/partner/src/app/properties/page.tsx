@@ -266,17 +266,37 @@ function Card({ property }: { readonly property: PartnerProperty }) {
           database column. It links straight into the editor, because a prompt that tells
           somebody about a gap and then makes them find the form is half a feature.
         */}
-        {!property.hasLocation ? (
-          <p className="mt-3 flex items-center gap-1.5 text-12 text-warn-ink">
-            <PinOffIcon />
-            <span>{t.properties.noLocation}</span>
+        {/*
+          EVERY gap, not only the map one.
+
+          This card warned about coordinates and nothing else, which quietly implied the rest was
+          fine — a listing with no bookable unit is absent from search entirely and said so
+          nowhere. Each line states what the gap COSTS rather than what is missing, because
+          «بلا صور» is a fact the partner already knows and «تُحجز أكثر» is a reason to act.
+
+          A check this build has no sentence for prints its KEY. Never hidden: an unrecognised gap
+          is a deployment skew, and the raw `unit` is how it gets noticed — the same reasoning
+          `label()` follows, which is what surfaced forty-three missing translations.
+        */}
+        {property.gaps.length > 0 ? (
+          <div className="mt-3 grid gap-1">
+            {property.gaps.map((gap) => (
+              <p
+                key={gap}
+                data-gap={gap}
+                className="flex items-center gap-1.5 text-12 text-warn-ink"
+              >
+                <GapMark />
+                <span>{t.properties.gap[gap] ?? gap}</span>
+              </p>
+            ))}
             <Link
               href={`/properties/${property.reference}`}
-              className="cursor-pointer font-bold underline underline-offset-2"
+              className="w-fit cursor-pointer text-12 font-bold text-gold-read underline underline-offset-2"
             >
-              {t.properties.addLocation}
+              {t.properties.fix}
             </Link>
-          </p>
+          </div>
         ) : null}
 
         <div className="mt-auto pt-3.5">
@@ -333,25 +353,30 @@ function StatusPill({ status }: { readonly status: string }) {
   );
 }
 
-/** A pin with a stroke through it — «this has no place on the map yet». */
-function PinOffIcon() {
+/**
+ * The mark beside a gap. One shape for all four, deliberately.
+ *
+ * It replaces a crossed-out PIN, which was right while the only gap was a missing location and
+ * became wrong the moment the card grew three more: a pin beside «بلا صور» reads as a map problem.
+ * A neutral mark carries the tone and lets the SENTENCE carry the meaning.
+ */
+function GapMark() {
   return (
     <svg
       viewBox="0 0 24 24"
-      width="1rem"
-      height="1rem"
+      width="0.875rem"
+      height="0.875rem"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.6}
+      strokeWidth={1.8}
       strokeLinecap="round"
-      strokeLinejoin="round"
       aria-hidden="true"
       focusable="false"
       className="shrink-0"
     >
-      <path d="M12 21s7-6.5 7-11a7 7 0 0 0-11.9-5" />
-      <path d="M5.3 7.2A7 7 0 0 0 5 10c0 4.5 7 11 7 11" />
-      <path d="M3 3l18 18" />
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7.5v5.5" />
+      <path d="M12 16.5h.01" />
     </svg>
   );
 }

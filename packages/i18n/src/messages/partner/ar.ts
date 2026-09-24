@@ -499,12 +499,16 @@ export const ar = {
     /* ── الإشعارات: what SAFRA has told this partner (Bashar, 2026-08-24) ── */
     noticesTitle: 'إشعارات حسابك',
     noticesEmpty: 'لا إشعارات على حسابك.',
-    mapGapTitle: 'الظهور على الخريطة',
-    mapGapSome: '{unplaced} من {total} من إعلاناتك لا تظهر على الخريطة.',
-    mapGapWhy:
-      'الضيوف يبحثون بالقرب من المعالم والمطارات، والإعلان بلا موقع لا يظهر في هذه النتائج.',
-    mapGapAction: 'حدّد المواقع',
-    mapGapDone: 'كل إعلاناتك تظهر على الخريطة.',
+    readinessTitle: 'اكتمال الإعلانات',
+    readinessSome: '{incomplete} من {total} من إعلاناتك ينقصها شيء.',
+    readinessDone: 'كل إعلاناتك مكتملة.',
+    readinessAction: 'أكمِل الإعلانات',
+    readinessGap: {
+      unit: '{n} لا تظهر في نتائج البحث',
+      location: '{n} لا تظهر على الخريطة',
+      photograph: '{n} بلا صور',
+      description: '{n} بلا وصف بالعربية',
+    } as Record<string, string>,
     /*
       One sentence per event, and each is a LINK to the page that holds the detail.
 
@@ -994,6 +998,17 @@ export const ar = {
       الخريطة» — rather than the field is what makes it worth acting on.
     */
     noLocation: 'لا تظهر على الخريطة',
+    /*
+      What each gap COSTS, not what is absent. «لا يوجد وصف» states a fact somebody already
+      knows; «الضيوف لا يجدون هذا الإعلان في البحث» is the reason to act on it.
+    */
+    gap: {
+      unit: 'لا يظهر في نتائج البحث — أضف وحدة قابلة للحجز',
+      location: 'لا تظهر على الخريطة',
+      photograph: 'بلا صور — الإعلانات المصوّرة تُحجز أكثر',
+      description: 'بلا وصف بالعربية',
+    } as Record<string, string>,
+    fix: 'أكمِل',
     addLocation: 'حدّد الموقع',
     from: 'من',
     edit: 'تعديل',

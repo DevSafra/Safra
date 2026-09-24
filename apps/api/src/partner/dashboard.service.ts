@@ -7,9 +7,12 @@ import {
   CONFIRMATION_WINDOW_SETTING,
   FIRST_VIOLATION_FINE_SETTING,
   PERMISSIONS as P,
+  listingGaps,
+  type ListingReadinessCheck,
 } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
+import { imageIsPublished } from '../storage/image-visibility.js';
 import { MoneySettingsService } from '../settings/money-settings.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { requirePartnerId } from '../rbac/ownership.js';
@@ -87,7 +90,7 @@ export class PartnerDashboardService {
     const calendar = await this.calendar(partnerId);
     const alerts = await this.alerts(partnerId);
     const violations = await this.violationSummary(partnerId);
-    const listings = await this.listingCompleteness(partnerId);
+    const listings = await this.listingReadiness(partnerId);
     const notices = await this.notices(partnerId, money);
     const payout = money ? await this.payoutLine(partnerId) : null;
 
@@ -491,47 +494,79 @@ export class PartnerDashboardService {
    * the dashboard would keep telling a partner they owe something they do not.
    */
   /**
-   * How many of this partner's listings a guest cannot find on the map.
+   * What is operationally missing across this partner's LIVE listings.
    *
-   * ## Why the dashboard and not only the listings page
+   * ## Why a breakdown and not a score
    *
-   * The card on الإعلانات already says «لا تظهر على الخريطة» per listing, and a partner with
-   * fourteen listings has to open that page and scroll to learn that eleven of them are missing.
-   * The dashboard is where somebody ARRIVES; a figure here is the difference between a fact that
-   * is available and a fact that is noticed.
+   * It began as one number — «how many are not on the map» — and a single figure cannot say which
+   * of them earns nothing. A listing with no bookable unit is absent from search entirely; one
+   * with no photograph competes badly and still sells. Rolling those into «3 incomplete» would
+   * flatten the only distinction that decides what somebody should do first.
    *
-   * ## What counts, and what deliberately does not
+   * ## Published and pending only
    *
-   * Published and pending listings. A DRAFT is a work in progress and its location is asked for at
-   * submission now, so counting drafts would tell a partner they have a problem at the exact moment
-   * they are still working on it. Archived and suspended listings are not on the map at all, so a
-   * coordinate would change nothing for them.
+   * A DRAFT is a work in progress, and `submitForReview` already holds it to a standard before it
+   * can go live. Counting drafts would tell a partner they have a problem at the exact moment they
+   * are still working on it.
    *
-   * It reads `latitude`, not `public_latitude`: the question is «have you placed this», which is
-   * about the pair the partner sets, and a listing is either placed or it is not.
+   * ## Computed from the same helper the listing cards use
    *
-   * ## Both numbers, never just the gap
-   *
-   * «٣ من ١٤» is actionable and «٣» is an accusation. The total is what turns the figure into
-   * progress a partner can finish, and it is the same reason `violationSummary` returns a stage
-   * rather than a bare count.
+   * Not a second set of predicates in SQL. A count that disagreed with the cards it summarises is
+   * the failure this shares its definition to avoid — the partner would close every gap the cards
+   * show and the dashboard would still accuse them of one.
    */
-  private async listingCompleteness(partnerId: string) {
-    const result = await this.db.execute<{ total: string; unplaced: string }>(sql`
-      SELECT count(*) AS total,
-             count(*) FILTER (WHERE p.latitude IS NULL OR p.longitude IS NULL) AS unplaced
+  private async listingReadiness(partnerId: string) {
+    const rows = await this.db.execute<{
+      unit_count: number;
+      has_location: boolean;
+      has_photograph: boolean;
+      has_description: boolean;
+    }>(sql`
+      SELECT coalesce(u.unit_count, 0)::int AS unit_count,
+             (p.public_latitude IS NOT NULL AND p.public_longitude IS NOT NULL) AS has_location,
+             (img.id IS NOT NULL) AS has_photograph,
+             (p.description_ar IS NOT NULL AND btrim(p.description_ar) <> '') AS has_description
       FROM properties p
+      LEFT JOIN LATERAL (
+        SELECT count(*)::int AS unit_count FROM units un
+        WHERE un.property_id = p.id AND un.deleted_at IS NULL
+      ) u ON true
+      LEFT JOIN LATERAL (
+        SELECT pi.id FROM property_images pi
+        WHERE pi.property_id = p.id AND ${imageIsPublished('pi')}
+        LIMIT 1
+      ) img ON true
       WHERE p.partner_id = ${partnerId}
         AND p.deleted_at IS NULL
         AND p.status IN ('published', 'pending_review')
     `);
 
-    const row = result.rows[0];
-
-    return {
-      total: Number(row?.total ?? 0),
-      unplaced: Number(row?.unplaced ?? 0),
+    const counts: Record<ListingReadinessCheck, number> = {
+      unit: 0,
+      location: 0,
+      photograph: 0,
+      description: 0,
     };
+
+    let incomplete = 0;
+
+    for (const row of rows.rows) {
+      const gaps = listingGaps({
+        unitCount: row.unit_count,
+        hasLocation: row.has_location,
+        hasPhotograph: row.has_photograph,
+        hasDescription: row.has_description,
+      });
+
+      if (gaps.length > 0) incomplete += 1;
+      for (const gap of gaps) counts[gap] += 1;
+    }
+
+    /*
+      The TOTAL travels with the gaps, because «3» is an accusation and «3 من ١٤» is progress
+      somebody can finish — the same reason `violationSummary` returns a stage rather than a count.
+    */
+    return { total: rows.rows.length, incomplete, counts };
   }
 
   /**

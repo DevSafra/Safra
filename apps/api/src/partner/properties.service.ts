@@ -8,6 +8,7 @@ import { schema } from '@safra/db';
 import {
   ERROR,
   PERMISSIONS as P,
+  listingGaps,
   usesStarRating,
   type PropertyCreateInput,
   type PropertyUpdateInput,
@@ -415,6 +416,7 @@ export class PropertiesService {
       cover_widths: number[] | null;
       unit_count: number;
       has_location: boolean;
+      has_description: boolean;
       from_price: string | null;
       currency_code: string | null;
       created_at: string;
@@ -444,6 +446,9 @@ export class PropertiesService {
              -- latitude is a blank string has a raw value and no location, and saying
              -- otherwise here would tell a partner the job was done.
              (pr.public_latitude IS NOT NULL AND pr.public_longitude IS NOT NULL) AS has_location,
+             -- Arabic, the default locale: the one language a reader is guaranteed to meet. A
+             -- listing described only in German is still undescribed to almost every visitor.
+             (pr.description_ar IS NOT NULL AND btrim(pr.description_ar) <> '') AS has_description,
              u.from_price::text AS from_price,
              u.currency_code,
              to_char(pr.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at
@@ -495,6 +500,17 @@ export class PropertiesService {
       coverWidths: row.cover_widths ?? [],
       unitCount: row.unit_count,
       hasLocation: row.has_location,
+      /*
+        What is operationally missing, computed from ONE definition the three apps share.
+        `coverKey` is the photograph test: the LATERAL above already restricts it to images that
+        finished processing, so a pending render correctly does not count as a picture.
+      */
+      gaps: listingGaps({
+        unitCount: row.unit_count,
+        hasLocation: row.has_location,
+        hasPhotograph: row.cover_key !== null,
+        hasDescription: row.has_description,
+      }),
       fromPrice: row.from_price,
       currencyCode: row.currency_code,
       createdAt: row.created_at,

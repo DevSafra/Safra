@@ -15,6 +15,7 @@ import { Ltr } from '@/components/ltr';
 import { amount, count } from '@/lib/format';
 import { fill, plural, t, violationKind } from '@/lib/strings';
 import { ltrIsolate } from '@safra/i18n';
+import { LISTING_READINESS_CHECKS } from '@safra/contracts';
 import { durationParts } from '@safra/contracts';
 import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 
@@ -107,7 +108,7 @@ export default async function DashboardPage() {
                 should meet the notice before the record it refers to.
               */}
               <Notices notices={dashboard.notices} />
-              <MapGap listings={dashboard.listings} />
+              <Readiness listings={dashboard.listings} />
               <Alerts alerts={dashboard.alerts} payout={dashboard.payout} />
             </div>
           </div>
@@ -118,64 +119,92 @@ export default async function DashboardPage() {
 }
 
 /**
- * «٣ من ١٤ من إعلاناتك لا تظهر على الخريطة» — the gap, where somebody will see it.
+ * «٣ من ١٤ من إعلاناتك ينقصها شيء» — and which thing, where somebody will see it.
  *
  * ## Why it is on the dashboard at all
  *
- * 67 of 2,017 published listings carried coordinates. الإعلانات has said «لا تظهر على الخريطة» on
- * each unplaced card since 2026-09-23, and that is the right place to FIX one — but a partner with
- * fourteen listings has to open that page and scroll to learn how many are missing. This is the
- * screen they arrive on, so this is where the figure belongs.
+ * الإعلانات says what each card is missing, and that is the right place to FIX one — but a partner
+ * with fourteen listings has to open that page and scroll to learn how many. This is the screen
+ * they arrive on, so this is where the figure belongs.
  *
- * ## It says why, and it links
+ * ## It began as one number and that was not enough
  *
- * «Three of your listings are not on the map» is a fact nobody can act on without knowing what it
- * costs them: guests search near landmarks and airports, and an unplaced listing is absent from
- * those results entirely. A prompt that names a gap and then makes somebody find the form is half
- * a feature — the same sentence the listings card already earned.
+ * The first version counted listings not on the map. A single figure cannot say which of them
+ * earns NOTHING: a listing with no bookable unit never appears in search, and one with no
+ * photograph competes badly and still sells. The breakdown keeps the distinction that decides what
+ * to do first, and `LISTING_READINESS_CHECKS` fixes the order so the costliest is read first.
+ *
+ * ## A gap this build has no sentence for prints its key
+ *
+ * Never hidden. An unrecognised check means the API is ahead of this app, and the raw `unit` is
+ * how that gets noticed rather than silently under-reported — the same rule `label()` follows.
  *
  * ## The finished state is shown, not hidden
  *
- * A partner who has placed everything sees so. A card that vanished on completion would leave them
- * unable to tell «all done» from «this feature is gone», and the panel beside it — الإشعارات —
- * already states its own empty case for the same reason.
+ * A partner with nothing missing sees so. A card that vanished on completion would leave them
+ * unable to tell «all done» from «this feature is gone».
  */
-function MapGap({ listings }: { readonly listings: PartnerDashboard['listings'] }) {
-  /* Nothing live to place. A partner with no published listing is told nothing about placing them. */
+function Readiness({ listings }: { readonly listings: PartnerDashboard['listings'] }) {
+  /* Nothing live. A partner with no published listing is told nothing about completing them. */
   if (listings.total === 0) return null;
 
-  const done = listings.unplaced === 0;
+  const done = listings.incomplete === 0;
 
   return (
     <section
-      data-map-gap={listings.unplaced}
+      data-readiness={listings.incomplete}
       className="rounded-card border border-gold/15 bg-card p-5"
     >
       <h2 className="mb-3 text-16 font-extrabold text-gold-read">
-        {t.dashboard.mapGapTitle}
+        {t.dashboard.readinessTitle}
       </h2>
 
       {done ? (
-        <p className="text-14 text-faint">{t.dashboard.mapGapDone}</p>
+        <p className="text-14 text-faint">{t.dashboard.readinessDone}</p>
       ) : (
         <>
           <p className="flex flex-wrap items-baseline gap-2 text-14 text-text">
             <span className="text-warn" aria-hidden="true">
               ●
             </span>
-            {fill(t.dashboard.mapGapSome, {
-              unplaced: count(listings.unplaced),
+            {fill(t.dashboard.readinessSome, {
+              incomplete: count(listings.incomplete),
               total: count(listings.total),
             })}
           </p>
-          <p className="mt-1.5 text-13 leading-relaxed text-muted">
-            {t.dashboard.mapGapWhy}
-          </p>
+
+          <ul className="mt-2 grid gap-1 text-13 text-muted">
+            {LISTING_READINESS_CHECKS.filter(
+              (check) => (listings.counts[check] ?? 0) > 0,
+            ).map((check) => (
+              <li key={check} data-readiness-gap={check}>
+                {fill(t.dashboard.readinessGap[check] ?? `${check}: {n}`, {
+                  n: count(listings.counts[check] ?? 0),
+                })}
+              </li>
+            ))}
+            {/*
+              And any check the API reports that this build has no words for. Listed AFTER the
+              known ones so the familiar reading order is undisturbed, and never dropped.
+            */}
+            {Object.keys(listings.counts)
+              .filter(
+                (check) =>
+                  !(LISTING_READINESS_CHECKS as readonly string[]).includes(check) &&
+                  (listings.counts[check] ?? 0) > 0,
+              )
+              .map((check) => (
+                <li key={check} data-readiness-gap={check}>
+                  {check}: {count(listings.counts[check] ?? 0)}
+                </li>
+              ))}
+          </ul>
+
           <Link
             href="/properties"
             className="mt-3 inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-gold px-4 text-13 font-bold text-gold-read transition-colors hover:bg-gold/10 lg:min-h-0 lg:py-1.5"
           >
-            {t.dashboard.mapGapAction}
+            {t.dashboard.readinessAction}
           </Link>
         </>
       )}

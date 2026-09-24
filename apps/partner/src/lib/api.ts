@@ -129,6 +129,15 @@ const propertySchema = z.object({
    * direction, which is why it survived; «safe direction» is not the same as «detectable».
    */
   hasLocation: z.boolean(),
+  /**
+   * What is operationally missing, named by the shared contract rather than re-derived here.
+   *
+   * REQUIRED and unbounded by an enum on purpose: `z.enum(LISTING_READINESS_CHECKS)` would make a
+   * check added on the API a parse failure that empties this whole page, and a listing card is a
+   * worse place to discover a deployment skew than a log. An unknown code renders as its key, the
+   * same way `label()` does — which is how forty-three missing translations were found.
+   */
+  gaps: z.array(z.string()),
   /** The CHEAPEST unit's nightly rate — the "from" price. See the note on `listOwn`. */
   fromPrice: z.string().nullable(),
   currencyCode: z.string().nullable(),
@@ -301,7 +310,17 @@ const dashboardSchema = z.object({
    * eleven unplaced listings the moment the field stopped arriving — the one failure mode this
    * card cannot have, because its whole purpose is to say something is missing.
    */
-  listings: z.object({ total: z.number(), unplaced: z.number() }),
+  /**
+   * What is operationally missing across this partner's live listings.
+   *
+   * `counts` is a record rather than named fields so a check added on the API arrives without a
+   * client change; the card renders the ones it has words for and says the key for any it does not.
+   */
+  listings: z.object({
+    total: z.number(),
+    incomplete: z.number(),
+    counts: z.record(z.string(), z.number()),
+  }),
   /**
    * What the platform has TOLD this partner — the in-app half of every enforcement notice.
    *
