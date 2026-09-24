@@ -107,12 +107,79 @@ export default async function DashboardPage() {
                 should meet the notice before the record it refers to.
               */}
               <Notices notices={dashboard.notices} />
+              <MapGap listings={dashboard.listings} />
               <Alerts alerts={dashboard.alerts} payout={dashboard.payout} />
             </div>
           </div>
         </div>
       )}
     </Shell>
+  );
+}
+
+/**
+ * «٣ من ١٤ من إعلاناتك لا تظهر على الخريطة» — the gap, where somebody will see it.
+ *
+ * ## Why it is on the dashboard at all
+ *
+ * 67 of 2,017 published listings carried coordinates. الإعلانات has said «لا تظهر على الخريطة» on
+ * each unplaced card since 2026-09-23, and that is the right place to FIX one — but a partner with
+ * fourteen listings has to open that page and scroll to learn how many are missing. This is the
+ * screen they arrive on, so this is where the figure belongs.
+ *
+ * ## It says why, and it links
+ *
+ * «Three of your listings are not on the map» is a fact nobody can act on without knowing what it
+ * costs them: guests search near landmarks and airports, and an unplaced listing is absent from
+ * those results entirely. A prompt that names a gap and then makes somebody find the form is half
+ * a feature — the same sentence the listings card already earned.
+ *
+ * ## The finished state is shown, not hidden
+ *
+ * A partner who has placed everything sees so. A card that vanished on completion would leave them
+ * unable to tell «all done» from «this feature is gone», and the panel beside it — الإشعارات —
+ * already states its own empty case for the same reason.
+ */
+function MapGap({ listings }: { readonly listings: PartnerDashboard['listings'] }) {
+  /* Nothing live to place. A partner with no published listing is told nothing about placing them. */
+  if (listings.total === 0) return null;
+
+  const done = listings.unplaced === 0;
+
+  return (
+    <section
+      data-map-gap={listings.unplaced}
+      className="rounded-card border border-gold/15 bg-card p-5"
+    >
+      <h2 className="mb-3 text-16 font-extrabold text-gold-read">
+        {t.dashboard.mapGapTitle}
+      </h2>
+
+      {done ? (
+        <p className="text-14 text-faint">{t.dashboard.mapGapDone}</p>
+      ) : (
+        <>
+          <p className="flex flex-wrap items-baseline gap-2 text-14 text-text">
+            <span className="text-warn" aria-hidden="true">
+              ●
+            </span>
+            {fill(t.dashboard.mapGapSome, {
+              unplaced: count(listings.unplaced),
+              total: count(listings.total),
+            })}
+          </p>
+          <p className="mt-1.5 text-13 leading-relaxed text-muted">
+            {t.dashboard.mapGapWhy}
+          </p>
+          <Link
+            href="/properties"
+            className="mt-3 inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-gold px-4 text-13 font-bold text-gold-read transition-colors hover:bg-gold/10 lg:min-h-0 lg:py-1.5"
+          >
+            {t.dashboard.mapGapAction}
+          </Link>
+        </>
+      )}
+    </section>
   );
 }
 

@@ -87,6 +87,7 @@ export class PartnerDashboardService {
     const calendar = await this.calendar(partnerId);
     const alerts = await this.alerts(partnerId);
     const violations = await this.violationSummary(partnerId);
+    const listings = await this.listingCompleteness(partnerId);
     const notices = await this.notices(partnerId, money);
     const payout = money ? await this.payoutLine(partnerId) : null;
 
@@ -96,6 +97,7 @@ export class PartnerDashboardService {
       calendar,
       alerts,
       violations,
+      listings,
       notices,
       payout,
       rules: await this.rules(),
@@ -488,6 +490,50 @@ export class PartnerDashboardService {
    * Waived violations are excluded. A fine that was reversed is not a live alert, and leaving it on
    * the dashboard would keep telling a partner they owe something they do not.
    */
+  /**
+   * How many of this partner's listings a guest cannot find on the map.
+   *
+   * ## Why the dashboard and not only the listings page
+   *
+   * The card on الإعلانات already says «لا تظهر على الخريطة» per listing, and a partner with
+   * fourteen listings has to open that page and scroll to learn that eleven of them are missing.
+   * The dashboard is where somebody ARRIVES; a figure here is the difference between a fact that
+   * is available and a fact that is noticed.
+   *
+   * ## What counts, and what deliberately does not
+   *
+   * Published and pending listings. A DRAFT is a work in progress and its location is asked for at
+   * submission now, so counting drafts would tell a partner they have a problem at the exact moment
+   * they are still working on it. Archived and suspended listings are not on the map at all, so a
+   * coordinate would change nothing for them.
+   *
+   * It reads `latitude`, not `public_latitude`: the question is «have you placed this», which is
+   * about the pair the partner sets, and a listing is either placed or it is not.
+   *
+   * ## Both numbers, never just the gap
+   *
+   * «٣ من ١٤» is actionable and «٣» is an accusation. The total is what turns the figure into
+   * progress a partner can finish, and it is the same reason `violationSummary` returns a stage
+   * rather than a bare count.
+   */
+  private async listingCompleteness(partnerId: string) {
+    const result = await this.db.execute<{ total: string; unplaced: string }>(sql`
+      SELECT count(*) AS total,
+             count(*) FILTER (WHERE p.latitude IS NULL OR p.longitude IS NULL) AS unplaced
+      FROM properties p
+      WHERE p.partner_id = ${partnerId}
+        AND p.deleted_at IS NULL
+        AND p.status IN ('published', 'pending_review')
+    `);
+
+    const row = result.rows[0];
+
+    return {
+      total: Number(row?.total ?? 0),
+      unplaced: Number(row?.unplaced ?? 0),
+    };
+  }
+
   /**
    * How many violations are OPEN, and the furthest any of them has been taken.
    *
