@@ -104,6 +104,18 @@ const listQuerySchema = pageQuerySchema.extend({
  * `.strict()` for the reason `listQuerySchema` records: a typo'd filter must be refused rather
  * than ignored, because ignoring it shows more rows than the caller asked for and says nothing.
  */
+/**
+ * The listing registry's page request.
+ *
+ * `placed` is an explicit three-state filter, not a boolean: absent means «all», and a boolean
+ * would make «show me the unplaced ones» and «no filter» the same request on the wire. Only `no`
+ * has a reader today — staff chasing the 97% — but `yes` costs one enum member and makes the
+ * control a filter rather than a switch.
+ */
+const propertyQuerySchema = listQuerySchema.extend({
+  placed: z.enum(['yes', 'no']).optional(),
+});
+
 const landmarkQuerySchema = listQuerySchema.extend({
   citySlug: z.string().trim().min(1).max(80).optional(),
   kindCode: z.string().trim().min(1).max(40).optional(),
@@ -351,7 +363,8 @@ export class RegistriesController {
   @RequirePermissions(P.PROPERTY_READ)
   async listProperties(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Query(new ZodValidationPipe(listQuerySchema)) query: z.infer<typeof listQuerySchema>,
+    @Query(new ZodValidationPipe(propertyQuerySchema))
+    query: z.infer<typeof propertyQuerySchema>,
   ) {
     return this.registry.properties({ ...query, actor: user });
   }

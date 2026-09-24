@@ -37,7 +37,7 @@ import { refuseSection } from '@/components/section-refusal';
 export const dynamic = 'force-dynamic';
 
 /** The design's `grid-template-columns`, verbatim. */
-const TEMPLATE = '1fr 1.5fr .9fr .9fr 1.2fr .7fr 1fr';
+const TEMPLATE = '1fr 1.5fr .9fr .9fr 1.2fr .7fr .8fr 1fr';
 
 export default async function PropertiesPage({
   searchParams,
@@ -56,14 +56,22 @@ export default async function PropertiesPage({
   if (refused) return refused;
 
   const { q, page, size } = await listParamsFor('properties', searchParams);
+
+  /*
+    «على الخريطة». Narrowed to the two values the API accepts rather than passed through: the
+    endpoint's schema is `.strict()` and would answer 400 to a typo, which on a registry means an
+    error page where the reader expected a table. Anything else is «all», which is the default.
+  */
+  const asked = (await searchParams)['placed'];
+  const placed = asked === 'yes' || asked === 'no' ? asked : undefined;
   /* The review queue's own parameters — two paged lists on one route. See /partners. */
   const queue = await listParamsFor('propertiesPending', searchParams);
 
   // Carried into every row link, so «رجوع» on the detail screen comes back here.
-  const back = returnQuery({ page, size, q });
+  const back = returnQuery({ page, size, q, placed });
 
   const [registry, pending, types, counts] = await Promise.all([
-    getPropertyRegistry({ q, page, limit: size }),
+    getPropertyRegistry({ q, page, limit: size, placed }),
     getPendingProperties({ page: queue.page, limit: queue.size }),
     /* §8.2's list. Small and bounded by the business — see the note on the panel below. */
     getPropertyTypes(),
@@ -83,7 +91,24 @@ export default async function PropertiesPage({
             query={q}
             size={size}
             placeholder={t.sections.properties.searchPlaceholder}
-          />
+          >
+            {/*
+              Inside the toolbar's own form, so choosing a value and searching are one submit and
+              the two can never disagree. A GET, so a filtered registry is a shareable URL.
+            */}
+            <label className="grid gap-1 text-12 text-muted">
+              {t.sections.properties.placedFilter}
+              <select
+                name="placed"
+                defaultValue={placed ?? ''}
+                className="min-h-10 cursor-pointer rounded-lg border border-line bg-field px-3 text-14 text-text"
+              >
+                <option value="">{t.sections.properties.placedAll}</option>
+                <option value="no">{t.sections.properties.onMapNo}</option>
+                <option value="yes">{t.sections.properties.onMapYes}</option>
+              </select>
+            </label>
+          </TableToolbar>
 
           {registry === 'unauthenticated' ? (
             <p className="text-14 text-muted">{t.dashboard.sessionExpired}</p>
@@ -105,6 +130,8 @@ export default async function PropertiesPage({
                 /* The queue's place, as hidden fields — same reasoning as /partners (2026-08-25). */
                 query={{
                   q,
+                  /* Paging out of a filtered view is the quiet failure §Tables exists to prevent. */
+                  ...(placed ? { placed } : {}),
                   ...(queue.page > 1 ? { queuePage: String(queue.page) } : {}),
                   queueSize: String(queue.size),
                 }}
@@ -241,6 +268,30 @@ const columns = (back: string): readonly AdminColumn<PropertyListItem>[] => [
     header: t.sections.properties.colProperty,
     render: (row) => (
       <span className="block truncate font-semibold text-text">{row.nameAr}</span>
+    ),
+  },
+  {
+    /*
+      «على الخريطة» — whether a guest can find this listing at all.
+
+      A word, not an icon and not an empty cell. 97% of the registry reads «غير محدَّد», so this
+      column is mostly one value repeated, and an absence rendered as blank would be read as a
+      column that has not loaded rather than as the finding it is.
+    */
+    key: 'onMap',
+    header: t.sections.properties.colOnMap,
+    render: (row) => (
+      /*
+        `data-on-map` so a sweep can find the CELLS and nothing else. The words also appear in the
+        filter's own `<option>` list, and a browser test written against the text matched fourteen
+        selects before it matched a row — which is how a passing assertion comes to mean nothing.
+      */
+      <span
+        data-on-map={row.hasLocation ? 'yes' : 'no'}
+        className={row.hasLocation ? 'text-text2' : 'font-semibold text-warn-ink'}
+      >
+        {row.hasLocation ? t.sections.properties.onMapYes : t.sections.properties.onMapNo}
+      </span>
     ),
   },
   {

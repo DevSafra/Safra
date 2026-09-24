@@ -1257,6 +1257,18 @@ export const ar = {
       searchPlaceholder: 'بحث عن عقار…',
       colProperty: 'العقار',
       colPartner: 'الشريك',
+      /*
+        «على الخريطة» — whether a guest can find the listing at all.
+
+        67 of 2,017 published listings carried coordinates, and until this column the console had
+        no way to see which, so nobody could chase them. «غير محدَّد» rather than an empty cell:
+        an absence that looks like a rendering fault gets ignored, and this one is the point.
+      */
+      colOnMap: 'على الخريطة',
+      onMapYes: 'محدَّد',
+      onMapNo: 'غير محدَّد',
+      placedFilter: 'الظهور على الخريطة',
+      placedAll: 'الكل',
       /* تصنيف النجوم — the official classification, visible at every status (Bashar, 2026-09-04). */
       colStars: 'النجوم',
       starUnset: 'بلا تصنيف',

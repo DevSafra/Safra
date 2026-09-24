@@ -173,6 +173,8 @@ export class RegistryService {
     limit: number;
     page: number;
     q?: string | undefined;
+    /** «على الخريطة» — `no` is the one staff need, to chase listings a guest cannot find. */
+    placed?: 'yes' | 'no' | undefined;
     actor?: AccessTokenClaims | undefined;
   }): Promise<OffsetPage<PropertyRow>> {
     /* The same omission as `partners` above, and the one the browser suite actually caught. */
@@ -191,6 +193,20 @@ export class RegistryService {
       );
     }
 
+    /*
+      Pushed into `conditions`, which is what `fromWhere` is built from — so the count and the list
+      are filtered by one predicate rather than two that can drift. A registry whose total says
+      «٢٠١٧ نتيجة» over a table that runs out at 67 is worse than showing no total at all.
+
+      Both columns, because half a pair is not a location: a listing carrying a latitude and no
+      longitude cannot be drawn either, and `placed=yes` must not claim it can.
+    */
+    if (query.placed === 'no') {
+      conditions.push(sql`(pr.latitude IS NULL OR pr.longitude IS NULL)`);
+    } else if (query.placed === 'yes') {
+      conditions.push(sql`pr.latitude IS NOT NULL AND pr.longitude IS NOT NULL`);
+    }
+
     const where =
       conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
 
@@ -207,6 +223,7 @@ export class RegistryService {
       SELECT pr.id, pr.reference, pr.name_ar, pr.name_en,
              pr.star_rating             AS star_rating,
              pr.status::text            AS status,
+             (pr.latitude IS NOT NULL AND pr.longitude IS NOT NULL) AS has_location,
              coalesce(ty.code, '—')     AS property_type,
              coalesce(ci.name_ar, '—')  AS city,
              coalesce(pt.display_name, '—') AS partner,
@@ -231,6 +248,7 @@ export class RegistryService {
         partnerReference: row.partner_reference,
         starRating: row.star_rating,
         status: row.status,
+        hasLocation: row.has_location,
       })),
       total,
       query,
@@ -597,6 +615,7 @@ interface PropertyRowSql extends Record<string, unknown> {
   partner: string;
   partner_reference: string | null;
   status: string;
+  has_location: boolean;
   created_at: string;
 }
 
@@ -611,6 +630,8 @@ export interface PropertyRow {
   readonly partner: string;
   readonly partnerReference: string | null;
   readonly status: string;
+  /** Whether a guest can find it on the map. Both columns, or neither counts. */
+  readonly hasLocation: boolean;
 }
 
 interface CustomerRowSql extends Record<string, unknown> {

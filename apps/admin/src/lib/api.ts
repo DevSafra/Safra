@@ -1158,11 +1158,14 @@ function listQuery(params: {
   limit?: number | undefined;
   expiring?: boolean | undefined;
   attention?: string | undefined;
+  /** العقارات's «على الخريطة» filter. Absent means all, which is not the same as either value. */
+  placed?: 'yes' | 'no' | undefined;
 }): string {
   const search = new URLSearchParams();
 
   if (params.q) search.set('q', params.q);
   if (params.status) search.set('status', params.status);
+  if (params.placed) search.set('placed', params.placed);
   /* Only sent when it is on: the API's schema coerces, and `expiring=false` would coerce to TRUE. */
   if (params.expiring) search.set('expiring', '1');
   /* EC-004 / EC-011. The API's enum refuses anything it does not know, so nothing is coerced. */
@@ -1263,11 +1266,21 @@ const propertyListItemSchema = z.object({
   partner: z.string(),
   partnerReference: z.string().nullable(),
   status: z.string(),
+  /**
+   * Whether a guest can find this listing on the map.
+   *
+   * REQUIRED, not `.default(false)`. A default would answer «none of them are placed» to a reader
+   * whose whole task is deciding which listings to chase — the failure would look exactly like
+   * the problem, which is the one shape nobody would question.
+   */
+  hasLocation: z.boolean(),
 });
 
 export type PropertyListItem = z.infer<typeof propertyListItemSchema>;
 
-export async function getPropertyRegistry(params: ListParams) {
+export async function getPropertyRegistry(
+  params: ListParams & { readonly placed?: 'yes' | 'no' | undefined },
+) {
   return staffFetch(
     `/admin/properties${listQuery(params)}`,
     offsetPage(propertyListItemSchema),
