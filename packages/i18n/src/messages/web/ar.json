@@ -126,7 +126,16 @@
     "nearRadiusKm": "{value} كم",
     "nearNeedsCity": "اختر مدينة أولاً لتظهر المعالم.",
     "sortDistance": "الأقرب إلى المعلم",
-    "resultDistance": "على بعد {value} من {landmark}"
+    "resultDistance": "على بعد {value} من {landmark}",
+    "mapShow": "اعرض على الخريطة",
+    "mapTitle": "الإقامات على الخريطة",
+    "mapClose": "إغلاق",
+    "mapSearchArea": "ابحث في هذه المنطقة",
+    "mapAreaActive": "النتائج محصورة بمنطقة الخريطة",
+    "mapAreaClear": "أزل حدود المنطقة",
+    "mapEmpty": "لا إقامات في هذه المنطقة.",
+    "nearKind": "أو قريب من نوع",
+    "nearKindAny": "أي نوع"
   },
   "attributes": {
     "sea": "بحر",
@@ -279,7 +288,8 @@
     "nearbyStaysHint": "الأسعار من، لليلة الواحدة.",
     "nearbyCount": "{count} إقامات هنا",
     "noPrice": "لا يوجد سعر معلن",
-    "markerLabel": "{name} — {price}"
+    "markerLabel": "{name} — {price}",
+    "fromCityCentre": "{value} من وسط {city}"
   },
   "city": {
     "availableStays": "الإقامات المتاحة في {city}",

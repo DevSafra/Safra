@@ -227,6 +227,19 @@ export async function getAmenities(): Promise<Amenity[]> {
 const landmarkSchema = z.object({
   slug: z.string(),
   kind: z.string(),
+  /*
+    The kind's own words — staff add kinds, so no shipped catalogue can name one.
+
+    REQUIRED, deliberately. A `.default({ar: null, …})` here would be the shape that invents a
+    plausible value for a field the API stopped sending: every kind would quietly render as its
+    raw code and nothing would look broken. Both endpoints that produce this send it, so an
+    absent one is a defect and the parse should say so.
+  */
+  kindName: z.object({
+    ar: z.string().nullable(),
+    en: z.string().nullable(),
+    de: z.string().nullable(),
+  }),
   name: z.object({
     ar: z.string().nullable(),
     en: z.string().nullable(),
@@ -245,6 +258,24 @@ export type Landmark = z.infer<typeof landmarkSchema>;
  * Reference data, so it shares `REFERENCE_TTL` and the catalogue tag — a landmark staff add
  * reaches the filter on the same purge as a city or an amenity.
  */
+/**
+ * One landmark by slug, for the page that leads into a search near it.
+ *
+ * `null` for anything the API will not serve, so the page can answer 404 without knowing why —
+ * an unknown slug, a retired landmark and a deactivated kind are the same answer to a reader.
+ */
+export async function getLandmark(
+  slug: string,
+): Promise<(Landmark & { citySlug: string }) | null> {
+  return read(
+    `/landmarks/${encodeURIComponent(slug)}`,
+    landmarkSchema.extend({ citySlug: z.string() }).nullable(),
+    null,
+    REFERENCE_TTL,
+    [CATALOGUE_TAG],
+  );
+}
+
 export async function getLandmarks(citySlug: string | undefined): Promise<Landmark[]> {
   if (!citySlug) return [];
 

@@ -126,7 +126,16 @@
     "nearRadiusKm": "{value} km",
     "nearNeedsCity": "Wähle zuerst eine Stadt, um ihre Orte zu sehen.",
     "sortDistance": "Am nächsten zum Ort",
-    "resultDistance": "{value} von {landmark}"
+    "resultDistance": "{value} von {landmark}",
+    "mapShow": "Auf der Karte zeigen",
+    "mapTitle": "Unterkünfte auf der Karte",
+    "mapClose": "Schließen",
+    "mapSearchArea": "In diesem Bereich suchen",
+    "mapAreaActive": "Ergebnisse auf den Kartenbereich begrenzt",
+    "mapAreaClear": "Bereich aufheben",
+    "mapEmpty": "Keine Unterkünfte in diesem Bereich.",
+    "nearKind": "Oder in der Nähe einer Art von Ort",
+    "nearKindAny": "Beliebige Art"
   },
   "attributes": {
     "sea": "Meer",
@@ -279,7 +288,8 @@
     "nearbyStaysHint": "Preise pro Nacht, ab.",
     "nearbyCount": "{count} Unterkünfte hier",
     "noPrice": "Kein Preis angegeben",
-    "markerLabel": "{name} — {price}"
+    "markerLabel": "{name} — {price}",
+    "fromCityCentre": "{value} vom Zentrum {city}"
   },
   "city": {
     "availableStays": "Verfügbare Unterkünfte in {city}",

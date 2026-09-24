@@ -126,7 +126,16 @@
     "nearRadiusKm": "{value} km",
     "nearNeedsCity": "Choose a city first to see its landmarks.",
     "sortDistance": "Closest to the landmark",
-    "resultDistance": "{value} from {landmark}"
+    "resultDistance": "{value} from {landmark}",
+    "mapShow": "Show on map",
+    "mapTitle": "Stays on the map",
+    "mapClose": "Close",
+    "mapSearchArea": "Search this area",
+    "mapAreaActive": "Results limited to the map area",
+    "mapAreaClear": "Clear the area",
+    "mapEmpty": "No stays in this area.",
+    "nearKind": "Or near a kind of place",
+    "nearKindAny": "Any kind"
   },
   "attributes": {
     "sea": "Sea",
@@ -279,7 +288,8 @@
     "nearbyStaysHint": "Prices are per night, from.",
     "nearbyCount": "{count} stays here",
     "noPrice": "No price listed",
-    "markerLabel": "{name} — {price}"
+    "markerLabel": "{name} — {price}",
+    "fromCityCentre": "{value} from {city} centre"
   },
   "city": {
     "availableStays": "Available stays in {city}",

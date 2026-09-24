@@ -132,6 +132,8 @@ export const searchResultItemSchema = z.object({
   publicLatitude: z.string().nullable().default(null),
   publicLongitude: z.string().nullable().default(null),
   distanceMetres: z.number().nullable().default(null),
+  /* Metres from the city centre, on every card. Null where staff have placed no centre. */
+  cityCentreMetres: z.number().nullable().default(null),
   currencyCode: z.string(),
   nights: z.number(),
   /**
@@ -223,6 +225,15 @@ export interface SearchParams {
    */
   nearLandmark?: string | undefined;
   withinKm?: number | undefined;
+  /**
+   * The map's viewport, `south,west,north,east` — «ابحث في هذه المنطقة».
+   *
+   * Compared against the ROUNDED pair like every other geographic filter, so a box finer than
+   * the ~100 m grid learns nothing the published coordinate does not already state.
+   */
+  bbox?: string | undefined;
+  /** «near any airport» — a landmark KIND rather than one named place. */
+  nearKind?: string | undefined;
   sort?: string | undefined;
   limit?: number | undefined;
   cursor?: string | undefined;
