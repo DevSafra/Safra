@@ -3005,35 +3005,60 @@ or Valhalla over the same OSM extract, so the no-vendor position holds), but it 
 feed and keep current rather than a query. The straight-line distance is honest in the meantime
 because it is labelled as one.
 
-### O-web-16 — FOUND, NOT FIXED: a percent-encoded apostrophe answers 500 on every dynamic public route
+### O-web-16 — Closed: a crafted URL answers 404 on every public route
 
-**Found 2026-09-24** while probing crafted slugs against the new landmark page. Reported rather
-than fixed: it is pre-existing, it is not required for the map work to be correct, and §«Asked
-work, and gaps found beside it» puts that decision with Bashar.
+**Found and closed 2026-09-24**, on Bashar's instruction: «Any public route returning a 500 for
+encoded characters should be treated as a correctness issue even if it is not a security issue.»
 
-```
-GET /ar/landmark/has%27quote  -> 500
-GET /ar/property/has%27quote  -> 500
-GET /ar/city/has%27quote      -> 500
-GET /ar/city/has'quote        -> 404   (the same character, sent literally)
-```
+**The fault.** Three characters — `%27`, `%5E`, `%7C`, an apostrophe, a caret and a pipe — answered
+**500** on every dynamic public route, in all three locales. The other 33 of 36 swept answered 404
+correctly, which is why it survived: three members of a class nobody would think to check.
 
-The standalone server logs `Failed to proxy http://localhost:3000/… [AggregateError] { code:
-'ECONNREFUSED' }` and answers 500. Only the PERCENT-ENCODED form does it; the literal apostrophe,
-a space, a `<`, `--` and Arabic all answer 404 correctly.
+**The cause, traced rather than guessed.** Not our query and not the API, which answers
+`404 landmark.not_found` for exactly that slug through a bound parameter. The MIDDLEWARE's locale
+rewrite was the trigger. Next's `getRelativeURL` decides a rewrite is internal by comparing
+origins; with those three characters it stopped matching, so `resolveRoutes` returned a
+`parsedUrl` that still carried a protocol, `router-server` took the branch
+`if (finished && parsedUrl.protocol)` and PROXIED the request to `localhost` — while the server
+listens on `127.0.0.1`. `Failed to proxy … ECONNREFUSED`, and «Internal Server Error» to the
+reader. Query strings were never affected; a path with a dot in it, which the matcher excludes
+from the middleware, answered 404 throughout — which is what located the middleware as the trigger.
 
-**It is not an injection and not a leak.** The API answers that slug `404 landmark.not_found`, the
-query is parameterised, and nothing reaches the database differently. The cost is availability
-hygiene: a crawler or a scanner walking crafted URLs collects 500s on every public detail route,
-which is noise in error monitoring and a real signal in Search Console. `apps/web/next.config.*`
-declares no rewrite or proxy, so the behaviour is Next 15.5.25's own — probably its internal
-request re-parse on a segment it cannot round-trip.
+**The fix is a routing statement, not a patch.** Every identifier SAFRA puts in a path is RFC 3986
+**unreserved** — `[A-Za-z0-9._~-]`. Checked against the database rather than assumed: of 2,705
+property slugs, every city and landmark slug and every booking reference, **none** contains
+anything else. So `addressesNoRoute` in `apps/web/src/lib/routable-path.ts` answers 404 for a
+segment that decodes to anything outside that set, before the rewrite happens. It is an ALLOW-LIST
+on purpose: a deny-list of the three that break goes stale the moment Next changes its mind about
+a fourth.
 
-**What it would take:** reproduce against a bare Next 15.5.25 standalone app to confirm it is
-upstream, then either a version bump or a `middleware.ts` guard that answers 404 for a segment
-that fails to decode. Half a day including the upstream check. **Not started — awaiting a
-decision.** Admin and partner are unaffected on this path because both redirect to sign-in before
-a dynamic segment is resolved.
+It tests what a segment MEANS, not how it is spelt — `/ar/city/dam%61scus` still resolves to
+Damascus, which a guard built on the raw string would have broken. The 404 carries the locale, so
+the reader gets «الصفحة غير موجودة» with the site's chrome and the CSP header, byte-identical to
+the page `/ar/no-such-page` already produced.
+
+**What is held to account:**
+
+| Held by                                       | What it proves                                                                                                                                                  |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/lib/routable-path.test.ts` (22) | the predicate — each of the three by NAME, every family, malformed sequences, and twelve real paths that must still be served                                   |
+| `e2e/encoded-paths.spec.ts` (11)              | that it is WIRED — real requests, 3 locales × 3 families × 6 shapes, plus the paths that must still resolve and a crafted query string that must not be touched |
+
+Both mutation-tested. Four mutations of the predicate — widening the alphabet, serving a malformed
+sequence, switching the guard off, refusing everything — each went red. And the browser spec was
+run against a build with the guard UNWIRED: 9 of 11 failed, while the two «must still work» tests
+stayed green, which is the shape that proves the spec measures the guard rather than the app.
+
+**Swept afterwards and clean:** booking, review, account/bookings, account/invoices,
+account/support, every locale, and the root before any locale — 404 or a redirect everywhere, no 500. A `//double-slash` answers 308 to our own origin, and `//evil.example.com` and
+`/%2F%2Fevil.example.com` both normalise onto `localhost:3000` rather than off-site.
+
+**Admin and partner were never affected**: neither middleware rewrites, so neither can reach the
+proxy branch. Confirmed by reading both rather than by analogy.
+
+**One behaviour change worth stating:** `a%25b` used to answer 400 and now answers 404. A bare `%`
+is malformed syntax and 400 was defensible, but every unroutable path in the app now gives the
+same answer, and «no such page» is the truthful one.
 
 ### O-ui-11 — Closed: the brand gold came back, and gold text got its own token
 
