@@ -3169,6 +3169,70 @@ is pre-existing and nothing in the asked work depends on it.**
 that costs: workers left stopped produced sixteen browser failures that all looked like real
 regressions and none were.
 
+### O-ops-4 — Completion: the gap links went nowhere, and one gap could not be closed
+
+**Built 2026-09-25**, on Bashar's instruction to «help partners complete listings rather than
+adding additional map functionality».
+
+#### Two defects, both found by following a link rather than reading one
+
+**1. Every gap link was a 404.** الإعلانات told a partner «لا تظهر على الخريطة» and linked to
+`/properties/{reference}` to fix it — **a route the portal does not have**. It has
+`/properties/[reference]/edit`, `/images` and `/calendar`, and nothing at the parent. The one
+control that existed to close a gap answered «هذه الصفحة غير موجودة».
+
+It shipped twice a day apart, because the second version was written by generalising the first.
+Nothing could see it: TypeScript does not know which paths Next serves, `pnpm verify` renders no
+pages, and the browser suite clicked the card rather than the link inside it.
+
+**2. One gap could not be closed at all.** «بلا وصف بالعربية» is reported on published listings,
+and §8.1 freezes the description — so the platform named a shortfall the partner was forbidden to
+fix, and pointed them at a page with no description field. Worse than silence: it teaches a reader
+that the indicators are noise.
+
+#### What was done
+
+|                                        |                                                                                                                                                                                                                                                                                                                                                            |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Each gap leads to its own screen**   | `unit` and `location` to the editor at `#units` / `#location`, `photograph` to الصور, `description` to `#description`. The gap IS the link now, rather than a line of text with one generic link under it                                                                                                                                                  |
+| **The description became completable** | The second narrow §8.1 exception, identical in shape and argument to the coordinate one Bashar approved on 2026-09-24. WRITING into an empty language contradicts nothing SAFRA verified; CHANGING existing copy is a different claim and stays refused — per LANGUAGE, so a new Arabic description cannot smuggle a rewritten English one past the freeze |
+| **`PropertyDescriptionForm`**          | Its own form, not a field in the locked one. `PropertyEditor` submits every structural field it holds, so reusing it would offer controls the API refuses — the «work is done and then discarded» failure                                                                                                                                                  |
+
+#### What holds it shut now
+
+| Held by                                              | What it proves                                                                                                                                                                       |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `tools/page-links/page-links.test.ts`                | every `href`, `router.push` and `redirect` LITERAL in the three apps resolves to a real page                                                                                         |
+| `apps/partner/src/lib/fix-href.test.ts` (9)          | every destination the helper can produce resolves against the REAL route tree, including the fallback — and that `/properties/{reference}`, the path that shipped, resolves to false |
+| `properties-description-gap.integration.test.ts` (9) | writing, whitespace, changing, clearing, the empty patch, the smuggling case and the ordinary freeze                                                                                 |
+
+**The sweep was blind to its own defect at first**, which is the part worth recording. The first
+version matched `href=` only; reinstating the dead link left it GREEN, because these destinations
+come from a helper and no literal ever reaches the attribute. Broadening it to every path literal
+was tried next and swept up two hundred API paths — `staffFetch('/admin/bookings')` is a backend
+route, not a screen, and telling them apart needs a per-app prefix list, which is the kind of
+heuristic that decays into an exemption nobody maintains. **So the arrangement is split and
+written down in both files: the sweep holds the literals, and every link-building helper carries
+its own test.** Any new one needs the same.
+
+Fourteen mutations across the three, all caught. One survived twice and was a real gap in the
+assertions: the «writes something» clause is load-bearing only for `{ description: {} }` — a patch
+naming the field and writing nothing — because every other clearing attempt is already refused by
+the stored value being non-blank.
+
+**Driven end to end:** followed all four links as a signed-in partner (200, right anchor on each),
+wrote the first description for a published listing, watched the panel remove itself and the gap
+stop being reported, confirmed the form is not offered again, and then **PATCHed a rewrite by
+hand** — `409 property.not_structurally_editable`. The endpoint is the control.
+
+#### Offered, not built — it changes what partners are ALLOWED to do
+
+`submitForReview` refuses a listing with no unit and no coordinates. Adding **a photograph and an
+Arabic description** to that gate would stop either gap ever being created again, and both are
+uploadable before submission. It is the strongest lever for the coverage targets — and it is a
+policy change rather than help, so it is Bashar's call rather than one to take quietly. Roughly
+three hours including the tests, mirroring the location gate exactly.
+
 ### O-ops-3 — Data completeness: the audit, and the readiness model it produced
 
 **Built 2026-09-24**, on Bashar's instruction to move «from feature completeness toward data
