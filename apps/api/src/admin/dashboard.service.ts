@@ -5,6 +5,7 @@ import { sql, type SQL } from 'drizzle-orm';
 import type { Database } from '@safra/db';
 
 import { DATABASE } from '../database/database.module.js';
+import { imageIsPublished } from '../storage/image-visibility.js';
 import { scopeFilter } from '../rbac/scope.sql.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
@@ -39,6 +40,9 @@ const RECENT_AUDIT = 4;
  * depend on agreeing about.
  */
 export type DashboardCounterName =
+  /** The live catalogue and how much of it is operationally incomplete — O-ops-3's backlog. */
+  | 'listings_live'
+  | 'listings_incomplete'
   | 'bookings_today'
   | 'bookings_yesterday'
   | 'pending_confirmation'
@@ -147,6 +151,39 @@ export class DashboardService {
     const inScope = (alias: string): SQL => scopeFilter(actor, `${alias}.city_id`);
 
     const rows = await this.db.execute<{ metric: string; value: string }>(sql`
+      /*
+        The completeness of what is LIVE — the backlog O-ops-3 measured, as a standing figure.
+
+        Deliberately a KPI and not a row on «يحتاج انتباهك الآن». That panel is for things that
+        should be ZERO and whose presence is a defect; this is a standing condition of a catalogue
+        somebody is working through, and parking 2,010 there permanently would teach an operator to
+        stop reading the panel. A measure belongs beside the other measures.
+
+        The SAME four predicates the registry filters by and the partner's card reports from --
+        listingGaps in SQL form. A figure that disagreed with the list it links to is the defect
+        this shares one definition to avoid, and listing-readiness.integration.test.ts holds the
+        two to each other.
+
+        (No backticks in here: this is inside a sql template literal and one would terminate it.)
+      */
+      SELECT 'listings_live' AS metric, COUNT(*)::text AS value
+        FROM properties p
+        WHERE p.status IN ('published', 'pending_review') AND p.deleted_at IS NULL
+          AND ${inScope('p')}
+      UNION ALL
+      SELECT 'listings_incomplete', COUNT(*)::text
+        FROM properties p
+        WHERE p.status IN ('published', 'pending_review') AND p.deleted_at IS NULL
+          AND ${inScope('p')}
+          AND (
+               NOT EXISTS (SELECT 1 FROM units u
+                           WHERE u.property_id = p.id AND u.deleted_at IS NULL)
+            OR p.latitude IS NULL OR p.longitude IS NULL
+            OR NOT EXISTS (SELECT 1 FROM property_images i
+                           WHERE i.property_id = p.id AND ${imageIsPublished('i')})
+            OR p.description_ar IS NULL OR btrim(p.description_ar) = ''
+          )
+      UNION ALL
       SELECT 'bookings_today' AS metric, COUNT(*)::text AS value
         FROM bookings b WHERE b.created_at::date = current_date AND b.deleted_at IS NULL
           AND ${inScope('b')}

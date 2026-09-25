@@ -188,6 +188,28 @@ function Overview({
         aria-label={t.admin.kpiRow}
         className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3"
       >
+        {/*
+          How much of the live catalogue actually works, and a way into the rest.
+
+          A MEASURE, not an alarm: «يحتاج انتباهك الآن» is for things that should be zero, and a
+          standing backlog parked there permanently teaches an operator to stop reading the panel.
+          The figure counted is complete rather than incomplete because that is the number that
+          should GROW — a dashboard whose good news only ever goes down is one nobody opens.
+
+          It links to the same filter it counts, so «which ones» is one press away rather than a
+          registry somebody has to remember has a control.
+        */}
+        <Kpi
+          label={t.admin.kpiListingsComplete}
+          value={
+            counters.listings_live > 0
+              ? `${count(Math.round((100 * (counters.listings_live - counters.listings_incomplete)) / counters.listings_live))}٪`
+              : t.admin.noData
+          }
+          valueClass={counters.listings_incomplete > 0 ? 'text-warn-ink' : 'text-ok'}
+          sub={`${count(counters.listings_incomplete)} ${t.admin.kpiListingsIncompleteSub}`}
+          href="/properties?gap=any"
+        />
         <Kpi
           label={t.admin.kpiBookingsToday}
           value={count(counters.bookings_today)}
@@ -588,20 +610,43 @@ function Kpi({
   value,
   sub,
   valueClass = 'text-text',
+  href,
 }: {
   label: string;
   value: string;
   /** Optional since 2026-09-14: the revenue tile's second line was the same figure in SYP. */
   sub?: string;
   valueClass?: string;
+  /**
+   * Where the figure's own rows are, when the card has somewhere to send a reader.
+   *
+   * Optional: most KPIs are a number and nothing else. One that names a WORKING SET — «how many
+   * listings are incomplete» — is a question whose next step is «show me», and making somebody
+   * find the registry and remember it has a filter is the half-feature this codebase keeps
+   * removing.
+   */
+  href?: string;
 }) {
-  return (
-    <div className="rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-4">
+  const body = (
+    <>
       <p className="text-13 text-faint">{label}</p>
       <p className={`mt-1.5 text-2xl font-extrabold ${valueClass}`}>{value}</p>
       {/* A tile with nothing more to say leaves no empty line where a figure used to be. */}
       {sub ? <p className="mt-1 text-14 text-muted">{sub}</p> : null}
-    </div>
+    </>
+  );
+
+  const shell = 'rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-4';
+
+  return href ? (
+    <Link
+      href={href}
+      className={`${shell} block cursor-pointer transition-colors hover:border-[rgba(var(--goldA),0.4)]`}
+    >
+      {body}
+    </Link>
+  ) : (
+    <div className={shell}>{body}</div>
   );
 }
 

@@ -179,6 +179,12 @@ export const ar = {
     title: 'لوحة الإدارة',
     emergencyMode: '⚠ وضع الطوارئ',
     kpiRow: 'مؤشرات اليوم',
+    /*
+      The COMPLETE share, not the incomplete one — a dashboard figure that only ever falls is
+      one nobody opens. The sub-line carries the count somebody actually works through.
+    */
+    kpiListingsComplete: 'اكتمال الإعلانات',
+    kpiListingsIncompleteSub: 'إعلان ينقصه شيء',
     kpiBookingsToday: 'حجوزات اليوم',
     kpiBookingsTodaySub: 'عن أمس',
     kpiPending: 'قيد التأكيد',

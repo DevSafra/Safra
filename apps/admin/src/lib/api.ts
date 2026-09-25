@@ -1082,6 +1082,9 @@ export async function getStaffMember(userId: string) {
  */
 const dashboardSchema = z.object({
   counters: z.object({
+    /* The live catalogue and how much of it is operationally incomplete — see the KPI. */
+    listings_live: z.number(),
+    listings_incomplete: z.number(),
     bookings_today: z.number(),
     bookings_yesterday: z.number(),
     pending_confirmation: z.number(),
