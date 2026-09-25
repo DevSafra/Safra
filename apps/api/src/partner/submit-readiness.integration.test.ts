@@ -89,8 +89,17 @@ describeIfDb('submitting a listing for review', () => {
     await harness.close();
   });
 
-  /** A draft, with or without a unit, with or without a place on the map. */
-  async function aDraft(options: { unit: boolean; placed: boolean }) {
+  /** A draft, carrying exactly the requirements a case needs and no others. */
+  async function aDraft(options: {
+    unit: boolean;
+    placed: boolean;
+    photograph?: boolean;
+    described?: boolean;
+  }) {
+    /* Default to PRESENT, so a case naming one missing requirement tests only that one. */
+    const photograph = options.photograph ?? true;
+    const described = options.described ?? true;
+
     const rows = await db.execute<{ reference: string }>(sql`
       WITH ref AS (
         SELECT (SELECT id FROM cities WHERE deleted_at IS NULL LIMIT 1) AS city_id,
@@ -100,10 +109,12 @@ describeIfDb('submitting a listing for review', () => {
       ), pr AS (
         INSERT INTO properties (partner_id, city_id, property_type_id, cancellation_policy_id,
                                 slug, name_ar, name_en, name_de, address,
+                                description_ar,
                                 latitude, longitude, status)
         SELECT ${partnerId}, ref.city_id, ref.type_id, ref.policy_id,
                'submit-test-' || gen_random_uuid(),
                'بيت الإرسال', 'Submit House', 'Einreichhaus', 'شارع الاختبار ١٢',
+               ${described ? 'وصف عربي كامل.' : null},
                ${options.placed ? '33.5123' : null}, ${options.placed ? '36.2988' : null},
                'draft'
         FROM ref
@@ -116,6 +127,15 @@ describeIfDb('submitting a listing for review', () => {
         SELECT pr.id, 'غرفة', 'Room', 'Zimmer', 2, 75000, ref.currency_id, 1
         FROM pr, ref
         WHERE ${options.unit}
+        RETURNING id
+      ), img AS (
+        -- From pr's RETURNING, for the reason the unit insert above gives.
+        INSERT INTO property_images (property_id, file_key, width, height, variant_widths,
+                                     is_cover, sort_order, status)
+        SELECT pr.id, 'submit-test/' || pr.id || '.jpg', 1600, 1200, ARRAY[400, 800, 1600],
+               true, 0, 'ready'
+        FROM pr
+        WHERE ${photograph}
         RETURNING id
       )
       SELECT reference FROM pr
@@ -146,6 +166,7 @@ describeIfDb('submitting a listing for review', () => {
    * keep passing after the rule was deleted.
    */
   it('accepts the same listing once it has been placed', async () => {
+    /* The fixture carries a photograph and a description by default — see `aDraft`. */
     const reference = await aDraft({ unit: true, placed: true });
     const result = await service.submitForReview(partner(), reference);
 
@@ -166,6 +187,97 @@ describeIfDb('submitting a listing for review', () => {
     expect(
       codeOf(await service.submitForReview(partner(), neither).catch((e: unknown) => e)),
     ).toBe(ERROR.PROPERTY_UNIT_REQUIRED);
+  });
+
+  it('refuses a listing with no photograph', async () => {
+    const reference = await aDraft({ unit: true, placed: true, photograph: false });
+
+    expect(
+      codeOf(
+        await service.submitForReview(partner(), reference).catch((e: unknown) => e),
+      ),
+    ).toBe(ERROR.PROPERTY_PHOTOGRAPH_REQUIRED);
+  });
+
+  /**
+   * A photograph still PROCESSING is not a photograph.
+   *
+   * `imageIsPublished` restricts to `status = 'ready'`, and the gate must honour it — otherwise a
+   * partner uploads, submits within the render window, and a listing reaches review with nothing
+   * to show. Planted rather than looked for: the fixture's image is ready by construction.
+   */
+  it('refuses a listing whose only photograph has not finished processing', async () => {
+    const reference = await aDraft({ unit: true, placed: true });
+
+    await db.execute(sql`
+      UPDATE property_images SET status = 'processing'
+      WHERE property_id = (SELECT id FROM properties WHERE reference = ${reference})
+    `);
+
+    expect(
+      codeOf(
+        await service.submitForReview(partner(), reference).catch((e: unknown) => e),
+      ),
+    ).toBe(ERROR.PROPERTY_PHOTOGRAPH_REQUIRED);
+  });
+
+  it('refuses a listing with no Arabic description', async () => {
+    const reference = await aDraft({ unit: true, placed: true, described: false });
+
+    expect(
+      codeOf(
+        await service.submitForReview(partner(), reference).catch((e: unknown) => e),
+      ),
+    ).toBe(ERROR.PROPERTY_DESCRIPTION_REQUIRED);
+  });
+
+  it('treats a description of only whitespace as none', async () => {
+    const reference = await aDraft({ unit: true, placed: true });
+
+    await db.execute(
+      sql`UPDATE properties SET description_ar = '   ' WHERE reference = ${reference}`,
+    );
+
+    expect(
+      codeOf(
+        await service.submitForReview(partner(), reference).catch((e: unknown) => e),
+      ),
+    ).toBe(ERROR.PROPERTY_DESCRIPTION_REQUIRED);
+  });
+
+  /**
+   * The ORDER, across all four.
+   *
+   * A listing missing everything is refused for the UNIT — the check `LISTING_READINESS_CHECKS`
+   * puts first because it is the only one that makes a listing unreachable. The screen shows all
+   * four at once regardless, so whichever the API names the reader has seen every one; this pins
+   * the order so the two consoles and the gate cannot start disagreeing about what matters most.
+   */
+  it('names the worst missing requirement when several are', async () => {
+    const reference = await aDraft({
+      unit: false,
+      placed: false,
+      photograph: false,
+      described: false,
+    });
+
+    expect(
+      codeOf(
+        await service.submitForReview(partner(), reference).catch((e: unknown) => e),
+      ),
+    ).toBe(ERROR.PROPERTY_UNIT_REQUIRED);
+  });
+
+  it('accepts a listing that meets all four', async () => {
+    const reference = await aDraft({
+      unit: true,
+      placed: true,
+      photograph: true,
+      described: true,
+    });
+    const result = await service.submitForReview(partner(), reference);
+
+    expect(result.status).toBe('pending_review');
   });
 
   /**

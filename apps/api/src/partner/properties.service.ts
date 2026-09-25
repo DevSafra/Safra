@@ -8,6 +8,7 @@ import { schema } from '@safra/db';
 import {
   ERROR,
   PERMISSIONS as P,
+  LISTING_READINESS_ERROR,
   listingGaps,
   usesStarRating,
   type PropertyCreateInput,
@@ -305,6 +306,16 @@ export class PropertiesService {
       ORDER BY un.created_at
     `);
 
+    /*
+      The same four checks the card and the console use, computed HERE so the edit screen and the
+      submit gate cannot disagree. A panel listing three requirements over an endpoint enforcing
+      four is the drift this shares one definition to avoid.
+    */
+    const photograph = await this.db.execute<{ present: boolean }>(sql`
+      SELECT EXISTS (SELECT 1 FROM property_images pi
+                     WHERE pi.property_id = ${row.id} AND ${imageIsPublished('pi')}) AS present
+    `);
+
     return {
       reference: row.reference,
       slug: row.slug,
@@ -334,6 +345,13 @@ export class PropertiesService {
       cancellationPolicyCode: row.cancellation_policy_code,
       /* Why a rejected listing was rejected — the one thing that makes the form worth reopening. */
       reviewNotes: row.status === 'rejected' ? row.review_notes : null,
+      /* What is still missing, in the order a reader should act on it. */
+      gaps: listingGaps({
+        unitCount: units.rows.length,
+        hasLocation: Boolean(row.latitude) && Boolean(row.longitude),
+        hasPhotograph: Boolean(photograph.rows[0]?.present),
+        hasDescription: (row.description_ar ?? '').trim() !== '',
+      }),
       isStructurallyEditable: STRUCTURALLY_EDITABLE.includes(
         row.status as (typeof STRUCTURALLY_EDITABLE)[number],
       ),
@@ -1006,44 +1024,53 @@ export class PropertiesService {
       throw conflict(ERROR.PROPERTY_NOT_SUBMITTABLE);
     }
 
-    // A listing with no bookable unit cannot be reviewed meaningfully.
-    const units = await this.db.query.units.findMany({
-      where: and(
-        eq(schema.units.propertyId, property.id),
-        isNull(schema.units.deletedAt),
-      ),
-      columns: { id: true },
+    /*
+      ## What a listing must have before SAFRA will look at it
+
+      Bashar, 2026-09-25: a bookable unit, a location on the map, at least one approved
+      photograph and an Arabic description. «The objective is not to punish partners. The
+      objective is to prevent new incomplete listings from entering the review workflow.»
+
+      ## Why it walks `listingGaps` rather than four `if`s
+
+      These are the SAME four checks الإعلانات reports and the console filters by. Written out
+      again here they would be a second definition free to drift, and the drift would be silent:
+      a partner closing every gap the card shows, submitting, and being refused for a fifth
+      condition nobody told them about. One function, one order, one answer.
+
+      The ORDER is `LISTING_READINESS_CHECKS` — worst first — so a listing missing several is
+      refused for the one that matters most. The screen shows all of them at once regardless, so
+      whichever the API names, the reader has already been told about every one.
+
+      ## Submission is the last moment this can be asked for free
+
+      §8.1 freezes the structural fields the instant this succeeds. A listing that goes through
+      incomplete can afterwards only be fixed through the two narrow completion exceptions, and
+      everything outside them needs a support ticket — which is the operational follow-up this
+      exists to remove.
+    */
+    const facts = await this.db.execute<{
+      unit_count: number;
+      has_photograph: boolean;
+    }>(sql`
+      SELECT (SELECT count(*)::int FROM units un
+              WHERE un.property_id = ${property.id} AND un.deleted_at IS NULL) AS unit_count,
+             EXISTS (SELECT 1 FROM property_images pi
+                     WHERE pi.property_id = ${property.id}
+                       AND ${imageIsPublished('pi')}) AS has_photograph
+    `);
+
+    const row = facts.rows[0];
+
+    const gaps = listingGaps({
+      unitCount: Number(row?.unit_count ?? 0),
+      /* The RAW pair: this asks whether the partner has placed it, not what a guest is shown. */
+      hasLocation: Boolean(property.latitude) && Boolean(property.longitude),
+      hasPhotograph: Boolean(row?.has_photograph),
+      hasDescription: (property.descriptionAr ?? '').trim() !== '',
     });
 
-    if (units.length === 0) {
-      throw badRequest(ERROR.PROPERTY_UNIT_REQUIRED);
-    }
-
-    /*
-      A listing with no coordinates cannot be found on a map, and submission is the last moment
-      anybody is looking at it before it goes live.
-
-      ## Why the gate is HERE and not at creation
-
-      `propertyCreateSchema` leaves the pair optional on purpose: a draft is a work in progress and
-      demanding a map pin before a name would be a worse form, not a better one. Submission is the
-      point where the partner declares the listing finished, and it is the only point at which
-      SAFRA can still ask for something without a support ticket — §8.1 freezes the address the
-      moment this succeeds.
-
-      ## Why it is proportionate to ask
-
-      The picker opens centred on the listing's own city, so this is a pin dragged rather than a
-      figure looked up — which was the actual cause of 3% coverage, not reluctance. And the
-      published pair is rounded to three decimals by a generated column, so what is being asked
-      for is a NEIGHBOURHOOD, not an address. The error says both of those things.
-
-      It reads the raw column deliberately: this asks whether the partner has placed the listing,
-      which is a question about the pair they set, not about what a guest is shown.
-    */
-    if (!property.latitude || !property.longitude) {
-      throw badRequest(ERROR.PROPERTY_LOCATION_REQUIRED);
-    }
+    if (gaps[0]) throw badRequest(LISTING_READINESS_ERROR[gaps[0]]);
 
     await this.db.transaction(async (tx) => {
       await tx

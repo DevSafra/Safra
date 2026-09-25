@@ -435,6 +435,10 @@ export const de = {
     'Vor der Verifizierung eines Partners muss die Sanktionsprüfung erfasst sein.',
   'property.unit_required':
     'Bitte mindestens eine Einheit hinzufügen, bevor Sie zur Prüfung einreichen.',
+  'property.photograph_required':
+    'Fügen Sie mindestens ein Foto hinzu, bevor Sie zur Prüfung einreichen. Inserate mit Bildern werden häufiger gebucht.',
+  'property.description_required':
+    'Fügen Sie eine arabische Beschreibung hinzu, bevor Sie zur Prüfung einreichen. Gäste lesen sie vor der Buchung.',
   'property.location_required':
     'Setzen Sie die Unterkunft auf der Karte, bevor Sie sie zur Prüfung einreichen. Gäste sehen immer nur eine ungefähre Position.',
   'property.not_structurally_editable':

@@ -349,6 +349,10 @@ export const ar = {
   'partner.not_verified': 'لم يتم التحقق من هذا الشريك بعد. تحقق منه قبل نشر عقاراته.',
   'partner.sanctions_screening_required': 'يجب تسجيل فحص العقوبات قبل التحقق من الشريك.',
   'property.unit_required': 'أضف وحدة واحدة على الأقل قبل الإرسال للمراجعة.',
+  'property.photograph_required':
+    'أضف صورة واحدة على الأقل قبل الإرسال للمراجعة. الإعلانات المصوّرة تُحجز أكثر.',
+  'property.description_required':
+    'أضف وصفًا بالعربية قبل الإرسال للمراجعة. الضيوف يقرأون الوصف قبل الحجز.',
   'property.location_required':
     'حدّد موقع العقار على الخريطة قبل الإرسال للمراجعة. يظهر للضيوف موقع تقريبي فقط.',
   'property.not_structurally_editable':

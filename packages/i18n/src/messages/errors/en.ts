@@ -386,6 +386,10 @@ export const en = {
   'partner.sanctions_screening_required':
     'Sanctions screening must be recorded before a partner can be verified.',
   'property.unit_required': 'Add at least one unit before submitting for review.',
+  'property.photograph_required':
+    'Add at least one photograph before submitting for review. Listings with pictures get booked more.',
+  'property.description_required':
+    'Add an Arabic description before submitting for review. Guests read it before booking.',
   'property.location_required':
     'Place the property on the map before submitting for review. Guests only ever see an approximate position.',
   'property.not_structurally_editable':

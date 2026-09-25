@@ -552,6 +552,8 @@ export const ERROR = {
   PARTNER_SANCTIONS_SCREENING_REQUIRED: 'partner.sanctions_screening_required',
   PROPERTY_UNIT_REQUIRED: 'property.unit_required',
   PROPERTY_LOCATION_REQUIRED: 'property.location_required',
+  PROPERTY_PHOTOGRAPH_REQUIRED: 'property.photograph_required',
+  PROPERTY_DESCRIPTION_REQUIRED: 'property.description_required',
   PROPERTY_NOT_STRUCTURALLY_EDITABLE: 'property.not_structurally_editable',
   PROPERTY_NOT_SUBMITTABLE: 'property.not_submittable',
   PROPERTY_NOT_REVIEWABLE: 'property.not_reviewable',

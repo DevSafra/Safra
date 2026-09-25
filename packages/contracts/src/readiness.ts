@@ -1,3 +1,5 @@
+import { ERROR } from './error-codes.js';
+
 /**
  * What makes a PUBLISHED listing operationally complete, as opposed to merely valid.
  *
@@ -74,6 +76,23 @@ export const LISTING_READINESS_COST: Readonly<
   location: 'reach',
   photograph: 'quality',
   description: 'quality',
+};
+
+/**
+ * What a listing is REFUSED with when a check is unmet at submission.
+ *
+ * A map rather than four `if`s, for the reason `LISTING_READINESS_CHECKS` is a list: the gate
+ * walks the checks in order and names the first, so a fifth check added to the contract is
+ * enforced the day it is added rather than the day somebody remembers to extend a chain. A check
+ * with no code here fails to compile, which is the point.
+ */
+export const LISTING_READINESS_ERROR: Readonly<
+  Record<ListingReadinessCheck, (typeof ERROR)[keyof typeof ERROR]>
+> = {
+  unit: ERROR.PROPERTY_UNIT_REQUIRED,
+  location: ERROR.PROPERTY_LOCATION_REQUIRED,
+  photograph: ERROR.PROPERTY_PHOTOGRAPH_REQUIRED,
+  description: ERROR.PROPERTY_DESCRIPTION_REQUIRED,
 };
 
 /** What is known about a listing, in the terms the checks are written in. */
