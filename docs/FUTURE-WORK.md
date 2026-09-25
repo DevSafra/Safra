@@ -3160,6 +3160,15 @@ does not use the unlocked runner — it is a parity assertion over refund rows t
 worker MUTATES underneath it. Different mechanism, same symptom, and the existing fix does not
 reach it.
 
+**Two things ruled OUT on 2026-09-25**, which narrow it usefully:
+
+- `safra-payout.integration.test.ts` **already runs at `repeatable read`**, so raising the
+  isolation level is not the fix — a stable snapshot does not prevent whatever this is.
+- It does not reproduce in isolation: **six consecutive runs of that file alone, with the workers
+  active, were all green.** It needs the full `verify` run's concurrency — many suites in parallel
+  against one database plus seven workers — which is why it surfaces roughly once a day and never
+  when somebody goes looking.
+
 **A SECOND file in the same family, 2026-09-25:** `safra-payout.integration.test.ts › reverses
 once however many times it is asked` failed one `verify` and passed the next, and passed with the
 workers paused. Same mechanism, same diagnosis, same fix needed — which is the argument for fixing
@@ -3173,6 +3182,45 @@ is pre-existing and nothing in the asked work depends on it.**
 **Do not "fix" it by pausing the workers in CI.** `safra-worker-locks-flake-the-suite` records what
 that costs: workers left stopped produced sixteen browser failures that all looked like real
 regressions and none were.
+
+### O-ops-7 — Readiness where the conversation happens, and two things measurement ruled out
+
+**Built 2026-09-25**, continuing «existing-listing completeness, operational visibility, partner
+self-service, reducing manual intervention by the SAFRA team».
+
+#### Ruled out by measurement, before building anything
+
+- **Photo coverage is not blocked by a defect.** The whole loop was driven on a published listing
+  stripped of its photographs: the gap appears on الإعلانات, the link lands on الصور, an upload
+  succeeds, and the gap **closes on its own** without anybody being told to refresh. 1,946 listings
+  lack a photograph and not one of them is blocked by the platform. Nothing to fix; nothing built.
+- **The sweep flake is not an isolation problem** — see O-test-3, updated with what six clean runs
+  and an already-`repeatable read` harness rule out.
+
+#### Built: the partner's record says what their listings are missing
+
+الشركاء → a partner's record lists their listings with a reference and a status. A support agent
+**with that partner on the phone** had to open العقارات in another tab and search for each listing
+to find out whether it works. It now reads «بلا موقع · بلا صور · بلا وصف» beside the row.
+
+Nothing new is computed — the same `listingGaps` the registry filters by, the dashboard counts and
+the partner's own card reports. That is now **four surfaces** answering one question, which is
+exactly why the parity test matters: a support agent reading one while the partner reads another
+is how a disagreement becomes an argument.
+
+#### Held to account
+
+`listing-readiness.integration.test.ts` now asserts the partner RECORD and the registry return the
+same gaps for the same listing. Four mutations of the record's own query, all caught.
+
+Getting there needed the fixture planted twice, and both rounds were the same lesson:
+
+- The row the test picks had **no image to mark as processing** and **no half-coordinate pair**, so
+  «counts a processing render as a photograph» and «reads one column of two» both passed. The test
+  now deletes the images and inserts one `processing`, and sets a latitude with a null longitude.
+- A test whose fixture cannot reach the field it protects reports coverage it does not have — and
+  on this model, where four predicates are OR-ed and the seed's gaps are correlated, that failure
+  mode is the default rather than the exception.
 
 ### O-ops-6 — The backlog became a number somebody sees every day
 
