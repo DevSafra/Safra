@@ -8,6 +8,7 @@ import {
 } from '@safra/contracts';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
+import { DashboardService } from './dashboard.service.js';
 import { RegistryService } from './registry.service.js';
 
 /**
@@ -237,6 +238,108 @@ describeIfDb('the listing registry, filtered by what is missing', () => {
         ).toContain(item.status);
       }
     }
+  });
+
+  /**
+   * The dashboard's figure and the registry's filter must be the same number.
+   *
+   * The KPI links straight to `?gap=any`, so a reader presses it expecting the rows behind the
+   * count they just read. Two SQL expressions of one rule — one in `dashboard.service.ts`, one in
+   * `registry.service.ts` — is exactly the drift `fromWhere` exists to prevent elsewhere, and
+   * nothing but this holds them together.
+   */
+  it('agrees with the dashboard KPI about how many listings are incomplete', async () => {
+    /*
+      PLANTED, because the ambient fixture cannot discriminate.
+
+      The seed's gaps are almost perfectly correlated — only seven listings are complete on all
+      four — so a listing missing a photograph is missing three other things too, and dropping the
+      photograph predicate from the KPI changed its count by zero. Two mutations passed against
+      this test before these rows existed.
+
+      So four listings are made complete except for ONE thing each — one per check: the OR then has exactly one
+      true term apiece, and every predicate becomes individually load-bearing. Each was added
+      because a mutation survived without it.
+    */
+    const victims = await db
+      .execute<{ id: string }>(
+        sql`SELECT p.id FROM properties p
+            WHERE p.deleted_at IS NULL AND p.status = 'published'
+              AND EXISTS (SELECT 1 FROM units u
+                          WHERE u.property_id = p.id AND u.deleted_at IS NULL)
+            ORDER BY p.id LIMIT 4`,
+      )
+      .then((r) => r.rows);
+
+    expect(victims.length, 'the fixture must hold four live listings with units').toBe(4);
+
+    const [noPhoto, blankWords, noUnit, noPlace] = victims as [
+      { id: string },
+      { id: string },
+      { id: string },
+      { id: string },
+    ];
+
+    /* Complete but for a photograph. */
+    await db.execute(sql`
+      UPDATE properties SET latitude = '33.5', longitude = '36.3', description_ar = 'وصف'
+      WHERE id = ${noPhoto.id}
+    `);
+    await db.execute(
+      sql`UPDATE property_images SET deleted_at = now() WHERE property_id = ${noPhoto.id}`,
+    );
+
+    /* Complete but for a description of pure whitespace, which is not a description. */
+    await db.execute(sql`
+      UPDATE properties SET latitude = '33.5', longitude = '36.3', description_ar = '   '
+      WHERE id = ${blankWords.id}
+    `);
+    await db.execute(sql`
+      INSERT INTO property_images (property_id, file_key, width, height, variant_widths,
+                                   is_cover, sort_order, status)
+      SELECT ${blankWords.id}, 'parity/' || ${blankWords.id} || '.jpg', 1600, 1200,
+             ARRAY[400, 800, 1600], false, 99, 'ready'
+    `);
+
+    /* Complete but for a bookable unit — the check that makes a listing unreachable. */
+    await db.execute(sql`
+      UPDATE properties SET latitude = '33.5', longitude = '36.3', description_ar = 'وصف'
+      WHERE id = ${noUnit.id}
+    `);
+    await db.execute(
+      sql`UPDATE units SET deleted_at = now() WHERE property_id = ${noUnit.id}`,
+    );
+    await db.execute(sql`
+      INSERT INTO property_images (property_id, file_key, width, height, variant_widths,
+                                   is_cover, sort_order, status)
+      SELECT ${noUnit.id}, 'parity-unit/' || ${noUnit.id} || '.jpg', 1600, 1200,
+             ARRAY[400, 800, 1600], false, 98, 'ready'
+    `);
+
+    /* Complete but for a place on the map. One row per check, and no check left free. */
+    await db.execute(sql`
+      UPDATE properties SET latitude = NULL, longitude = NULL, description_ar = 'وصف'
+      WHERE id = ${noPlace.id}
+    `);
+    await db.execute(sql`
+      INSERT INTO property_images (property_id, file_key, width, height, variant_widths,
+                                   is_cover, sort_order, status)
+      SELECT ${noPlace.id}, 'parity-place/' || ${noPlace.id} || '.jpg', 1600, 1200,
+             ARRAY[400, 800, 1600], false, 97, 'ready'
+    `);
+
+    const dashboard = new DashboardService(db);
+    const overview = await dashboard.overview();
+    const registry = await new RegistryService(db).properties({
+      limit: 1,
+      page: 1,
+      gap: 'any',
+    });
+
+    expect(
+      overview.counters.listings_incomplete,
+      'the KPI and the list it links to must report the same backlog',
+    ).toBe(registry.total);
   });
 
   /**

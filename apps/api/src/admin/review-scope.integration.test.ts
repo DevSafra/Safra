@@ -7,6 +7,7 @@ import { createRollbackDatabase, type Database } from '@safra/db';
 import { SettingsService } from '../settings/settings.service.js';
 import type { MailService } from '../mail/mail.service.js';
 import type { Env } from '../config/env.js';
+import { DashboardService } from './dashboard.service.js';
 import { ReviewService } from './review.service.js';
 import { codeOf } from '../common/errors/app-error.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
@@ -163,6 +164,80 @@ describeIfDb('the verification screens honour a city scope', () => {
     `);
 
     expect(page.total).toBe(Number(actual.rows[0]!.n));
+  });
+
+  /**
+   * The readiness KPI counts only the reader's own cities.
+   *
+   * This is O-sec-13's shape, and O-sec-13 is why it is here: the attention badges took no actor,
+   * so a city-scoped operator read «١٢ عقاراً بانتظار المراجعة» over a list that showed three. A
+   * count is not a row, which is what makes it easy to leave unscoped — and «the numbers do not
+   * match the list» is how somebody discovers the two are answering different questions.
+   *
+   * The new KPI links STRAIGHT to `/properties?gap=any`, so the two are one press apart and a
+   * mismatch is immediately visible to the person least able to explain it.
+   */
+  it('counts incomplete listings only within a scoped member’s cities', async () => {
+    const mine = await db.execute<{ n: string }>(sql`
+      SELECT count(*)::text AS n FROM properties p
+       WHERE p.status IN ('published', 'pending_review') AND p.deleted_at IS NULL
+         AND p.city_id = ${cityA}::uuid
+         AND (
+              NOT EXISTS (SELECT 1 FROM units u
+                          WHERE u.property_id = p.id AND u.deleted_at IS NULL)
+           OR p.latitude IS NULL OR p.longitude IS NULL
+           OR NOT EXISTS (SELECT 1 FROM property_images i
+                          WHERE i.property_id = p.id AND i.deleted_at IS NULL
+                            AND i.status = 'ready')
+           OR p.description_ar IS NULL OR btrim(p.description_ar) = ''
+         )
+    `);
+
+    const live = await db.execute<{ n: string }>(sql`
+      SELECT count(*)::text AS n FROM properties p
+       WHERE p.status IN ('published', 'pending_review') AND p.deleted_at IS NULL
+         AND p.city_id = ${cityA}::uuid
+    `);
+
+    const scoped = await new DashboardService(db).overview(scopedTo(cityA));
+
+    expect(scoped.counters.listings_incomplete).toBe(Number(mine.rows[0]!.n));
+
+    /*
+      The DENOMINATOR too. The card divides one by the other, so a scoped numerator over an
+      unscoped total is a percentage about nothing: a member seeing one city with everything
+      complete would read «١٠٠٪» over a country that is 3% complete, or the reverse. Both halves
+      or neither.
+    */
+    expect(scoped.counters.listings_live).toBe(Number(live.rows[0]!.n));
+  });
+
+  /**
+   * And the control: unscoped sees more than scoped.
+   *
+   * Without it the assertion above passes against a counter that returns zero to everybody, which
+   * is «withheld» and «absent» being indistinguishable — the failure this codebase names by name.
+   */
+  it('shows an unscoped member more incomplete listings than a scoped one', async () => {
+    const dashboard = new DashboardService(db);
+    const everything = await dashboard.overview();
+    const elsewhere = await dashboard.overview(scopedTo(cityB));
+    const here = await dashboard.overview(scopedTo(cityA));
+
+    /*
+      Scoped to city B, not city A. The cities are taken alphabetically and the seed puts 2,010 of
+      the 2,017 live listings in the FIRST of them, so «unscoped sees more than city A» compares
+      2,011 with 2,010 — an assertion that passed while proving almost nothing, and that would
+      have kept passing had the scope been dropped from one of the two counters.
+
+      City B is the honest comparison, and the second assertion is the opposite control it needs:
+      without it this passes against a counter that returns zero to everybody, which is «withheld»
+      and «absent» being indistinguishable.
+    */
+    expect(everything.counters.listings_incomplete).toBeGreaterThan(
+      elsewhere.counters.listings_incomplete,
+    );
+    expect(here.counters.listings_incomplete).toBeGreaterThan(0);
   });
 
   /**
