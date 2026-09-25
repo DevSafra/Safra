@@ -1825,7 +1825,23 @@ async function build(db: Seeder): Promise<void> {
         step is skipped and says so, because inventing one would produce rows whose images 404 —
         which is the same blank page with a more confusing cause.
       */
-      if (borrowedImages.length > 0 && (property.status ?? 'published') === 'published') {
+      /*
+        DRAFTS get them too, since 2026-09-25.
+
+        `submitForReview` now requires at least one approved photograph, so a draft without one
+        cannot be submitted — and `property-submission.spec.ts`, whose whole subject is «partner
+        submits, SAFRA reviews», timed out waiting for a button the gate correctly kept disabled.
+        A draft a partner is about to submit realistically HAS photographs; they are uploaded
+        before the listing goes for review, not after.
+
+        The archived and suspended ones stay bare: nothing submits them and nothing renders them.
+      */
+      const photographed = ['published', 'draft', 'pending_review', 'rejected'];
+
+      if (
+        borrowedImages.length > 0 &&
+        photographed.includes(property.status ?? 'published')
+      ) {
         await db.insert(schema.propertyImages).values(
           borrowedImages.map((image, index) => ({
             propertyId: row.id,
