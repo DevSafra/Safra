@@ -18,10 +18,13 @@ import {
   type SanctionsPolicy,
   type SeenSection,
   type PartnerCommissionInput,
+  LISTING_READINESS_STATUSES,
+  listingGaps,
 } from '@safra/contracts';
 
 import { actorName } from '../common/actor-name.sql.js';
 import { AuditService } from '../common/audit/audit.service.js';
+import { imageIsPublished } from '../storage/image-visibility.js';
 import { SanctionsService } from '../sanctions/sanctions.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { MailService } from '../mail/mail.service.js';
@@ -817,12 +820,37 @@ export class ReviewService {
       name_ar: string;
       name_en: string | null;
       status: string;
+      unit_count: number;
+      has_location: boolean;
+      has_photograph: boolean;
+      has_description: boolean;
     }>(sql`
-      SELECT reference, name_ar, name_en, status::text AS status
-      FROM properties
-      WHERE partner_id = (SELECT id FROM partners WHERE reference = ${reference})
-        AND deleted_at IS NULL
-      ORDER BY created_at DESC
+      SELECT p.reference, p.name_ar, p.name_en, p.status::text AS status,
+             /*
+               The four readiness facts, so an agent WITH THE PARTNER ON THE PHONE can say what is
+               missing without opening العقارات in another tab and searching for them. The same
+               four the registry filters by and the partner's own card reports -- one definition,
+               resolved by listingGaps below.
+
+               (No backticks in here: this is inside a sql template literal.)
+             */
+             coalesce(u.n, 0)::int AS unit_count,
+             (p.latitude IS NOT NULL AND p.longitude IS NOT NULL) AS has_location,
+             (img.id IS NOT NULL) AS has_photograph,
+             (p.description_ar IS NOT NULL AND btrim(p.description_ar) <> '') AS has_description
+      FROM properties p
+      LEFT JOIN LATERAL (
+        SELECT count(*)::int AS n FROM units un
+        WHERE un.property_id = p.id AND un.deleted_at IS NULL
+      ) u ON true
+      LEFT JOIN LATERAL (
+        SELECT pi.id FROM property_images pi
+        WHERE pi.property_id = p.id AND ${imageIsPublished('pi')}
+        LIMIT 1
+      ) img ON true
+      WHERE p.partner_id = (SELECT id FROM partners WHERE reference = ${reference})
+        AND p.deleted_at IS NULL
+      ORDER BY p.created_at DESC
       LIMIT 50
     `);
 
@@ -956,6 +984,19 @@ export class ReviewService {
         nameAr: row.name_ar,
         nameEn: row.name_en,
         status: row.status,
+        /*
+          Empty for a listing no guest can reach. A draft's gaps belong to whoever is still
+          writing it, and telling an agent about them would put a queue of non-problems in front
+          of the one conversation they are having.
+        */
+        gaps: (LISTING_READINESS_STATUSES as readonly string[]).includes(row.status)
+          ? listingGaps({
+              unitCount: row.unit_count,
+              hasLocation: row.has_location,
+              hasPhotograph: row.has_photograph,
+              hasDescription: row.has_description,
+            })
+          : [],
       })),
     };
   }

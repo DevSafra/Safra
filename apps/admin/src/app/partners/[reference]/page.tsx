@@ -317,9 +317,29 @@ export default async function PartnerPage({
                 className="flex items-center justify-between gap-3 rounded-lg border border-line bg-card px-4 py-3"
               >
                 <span className="text-text">{property.nameEn ?? property.nameAr}</span>
-                <span className="text-sm text-muted">
-                  <Ltr>{property.reference}</Ltr> ·{' '}
-                  {label(t.enums.propertyStatus, property.status)}
+                <span className="flex flex-wrap items-center justify-end gap-x-2 text-sm text-muted">
+                  <span>
+                    <Ltr>{property.reference}</Ltr> ·{' '}
+                    {label(t.enums.propertyStatus, property.status)}
+                  </span>
+                  {/*
+                    What this listing is missing, where a support agent is ALREADY looking.
+
+                    They open a partner's record to have a conversation with them; the alternative
+                    was opening العقارات in another tab and searching for each listing to find out
+                    whether it works. Nothing new is computed — the same `listingGaps` the registry
+                    filters by and the partner's own card reports from.
+                  */}
+                  {property.gaps.length > 0 ? (
+                    <span
+                      data-partner-listing-gaps={property.gaps.join(' ')}
+                      className="font-semibold text-warn-ink"
+                    >
+                      {property.gaps
+                        .map((gap) => t.sections.properties.gap[gap] ?? gap)
+                        .join(' · ')}
+                    </span>
+                  ) : null}
                 </span>
               </li>
             ))}

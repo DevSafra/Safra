@@ -339,6 +339,8 @@ const partnerDetailSchema = z.object({
       nameAr: z.string(),
       nameEn: z.string().nullable(),
       status: z.string(),
+      /* What is operationally missing, so an agent need not open العقارات in another tab. */
+      gaps: z.array(z.string()),
     }),
   ),
 });
