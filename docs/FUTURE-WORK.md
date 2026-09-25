@@ -3169,6 +3169,55 @@ is pre-existing and nothing in the asked work depends on it.**
 that costs: workers left stopped produced sixteen browser failures that all looked like real
 regressions and none were.
 
+### O-ops-5 — The submission gate now asks for all four, and says so with links
+
+**Built 2026-09-25**, on Bashar's instruction: «require at least one bookable unit, a location
+selected on the map, at least one approved property photograph and an Arabic description… The
+objective is not to punish partners. The objective is to prevent new incomplete listings from
+entering the review workflow.»
+
+#### It walks the readiness checks rather than four `if`s
+
+The gate refuses on `listingGaps` — **the same function** الإعلانات reports from and العقارات
+filters by. Written out again it would be a second definition free to drift, and the drift would be
+silent in the cruellest way: a partner closes every gap their card shows, submits, and is refused
+for a condition no screen ever mentioned. One function, one order, one answer.
+
+`LISTING_READINESS_ERROR` maps each check to its refusal, so the gate names the FIRST gap in
+worst-first order and a fifth check added to the contract is enforced the day it is added. A check
+with no code there fails to compile.
+
+#### The panel says everything at once, and every line is a link
+
+|                                   |                                                                                                                                                                                          |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **All four, never one at a time** | Revealing them in sequence makes somebody return four times and reads as the rules changing under them. Whichever the API names, the reader has already seen every one                   |
+| **Each is a LINK**                | Through the same `fixHref` الإعلانات uses — `#units`, `#location`, الصور, `#description`. A requirement stated without a way to meet it is the half-feature this codebase keeps removing |
+| **The button is disabled**        | A courtesy. The endpoint is the control, and a tampered submit meets the identical rule                                                                                                  |
+
+`SubmitForReview` takes `gaps` rather than the two flags it had. Those would have needed a third
+and a fourth adding by hand; it now renders whatever the API says is missing, so a requirement
+added later appears here the day it is enforced.
+
+#### Held to account
+
+`submit-readiness.integration.test.ts` (12): each of the four refused on its own, a photograph
+still PROCESSING refused (planted — the fixture's image is ready by construction), whitespace
+treated as no description, the worst-first ORDER when several are missing, and a listing meeting
+all four accepted. Five mutations, all caught — including one that named the last gap rather than
+the worst, and one that let a pending render count as a photograph.
+
+**Driven:** created an empty draft, opened it, read all four requirements as links, followed each
+one (200, right anchor), confirmed the button disabled — and then **POSTed the submit by hand**:
+`400 property.unit_required`, the worst gap first.
+
+#### What this does and does not fix
+
+It stops NEW incomplete listings entering review. It does nothing for the 1,950 already published,
+which remain the readiness indicators' job — and the two narrow §8.1 completion exceptions are
+what let a partner close those without support. Coverage on the existing catalogue moves through
+O-ops-3 and O-ops-4, not through this.
+
 ### O-ops-4 — Completion: the gap links went nowhere, and one gap could not be closed
 
 **Built 2026-09-25**, on Bashar's instruction to «help partners complete listings rather than
