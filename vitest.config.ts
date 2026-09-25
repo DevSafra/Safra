@@ -121,6 +121,10 @@ export default defineConfig({
       // the SOURCE and the route tree, because a missing handler answers 404 and is invisible to
       // the type checker — which is how a finished control came to report a generic failure.
       'tools/client-routes/*.test.ts',
+      // And the check that every internal LINK a person can press has a page behind it. The
+      // sibling of the one above: `/properties/{reference}` was linked from every gap on
+      // الإعلانات and no such route exists, so the one control that closed the gap 404'd.
+      'tools/page-links/*.test.ts',
     ],
     environment: 'node',
     // Security-relevant paths must stay covered as the codebase grows.
