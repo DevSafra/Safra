@@ -891,9 +891,17 @@ export const ar = {
     /* Why the control is absent, said rather than left to be inferred from a missing button. */
     submitPending: 'العقار قيد المراجعة لدى فريق سفرة.',
     submitPublished: 'العقار منشور.',
-    submitNeedsUnit: 'أضف وحدة واحدة على الأقل قبل الإرسال للمراجعة.',
-    submitNeedsLocation:
-      'حدّد موقع العقار على الخريطة أولاً. يظهر للضيوف موقع تقريبي فقط، لا العنوان.',
+    /*
+      What is still missing, said as a REQUIREMENT rather than as a complaint. Each one is a link
+      on the panel, so the sentence finishes at the screen that closes it.
+    */
+    submitNeeds: {
+      unit: 'أضف وحدة واحدة على الأقل',
+      location: 'حدّد الموقع على الخريطة',
+      photograph: 'أضف صورة واحدة على الأقل',
+      description: 'أضف وصفًا بالعربية',
+    } as Record<string, string>,
+    submitNeedsTitle: 'قبل الإرسال للمراجعة، أكمِل:',
     unitSave: 'حفظ الوحدة',
     unitSaving: 'جارٍ الحفظ…',
     unitSaved: 'حُفظت الوحدة.',

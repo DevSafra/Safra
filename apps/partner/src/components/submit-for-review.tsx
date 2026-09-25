@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -7,6 +8,7 @@ import { useConfirm } from '@safra/ui';
 import { ERROR } from '@safra/contracts';
 import { errorMessage } from '@safra/i18n';
 
+import { fixHref } from '@/lib/fix-href';
 import { codeOfResponse, refusalFor } from '@/lib/refusal';
 import { t } from '@/lib/strings';
 
@@ -40,21 +42,19 @@ import { t } from '@/lib/strings';
 export function SubmitForReview({
   reference,
   status,
-  unitCount,
-  hasLocation,
+  gaps,
 }: {
   readonly reference: string;
   readonly status: string;
-  /** Zero is a real, common state — 991 listings had it. It disables, it does not hide. */
-  readonly unitCount: number;
   /**
-   * Whether the listing has been placed on the map.
+   * What is still missing, from the shared readiness model.
    *
-   * Same treatment as `unitCount`, and for the same reason: 97% of the catalogue is unplaced, so
-   * this is the COMMON state rather than an edge one. It disables the button and says why, rather
-   * than hiding a step the partner then cannot find.
+   * It replaced `unitCount` and `hasLocation` — two flags for two of the four requirements, which
+   * would have needed a third and a fourth adding by hand. The panel now renders whatever the API
+   * says is missing, so a fifth check enforced at submission appears here the day it is enforced
+   * rather than leaving a partner refused for something no screen mentioned.
    */
-  readonly hasLocation: boolean;
+  readonly gaps: readonly string[];
 }) {
   const router = useRouter();
   const { ask, dialog } = useConfirm();
@@ -143,28 +143,39 @@ export function SubmitForReview({
             {t.editProperty.submitHint}
           </p>
 
-          {unitCount === 0 ? (
-            <p className="text-13 leading-relaxed text-warn">
-              {t.editProperty.submitNeedsUnit}
-            </p>
-          ) : null}
+          {gaps.length > 0 ? (
+            <div className="grid gap-1.5">
+              <p className="text-13 font-bold text-warn">
+                {t.editProperty.submitNeedsTitle}
+              </p>
+              {/*
+                EVERY unmet requirement at once, each a LINK to the screen that closes it.
 
-          {/*
-            Both blockers are shown TOGETHER, never one at a time. A form that reveals its second
-            requirement only after the first is met makes somebody return twice, and this one is
-            worse than most: fixing the unit and coming back to «now place it on the map» reads as
-            the rules having changed. The sentence also answers the objection rather than repeating
-            the demand — a guest sees an approximate position, never the address.
-          */}
-          {!hasLocation ? (
-            <p className="text-13 leading-relaxed text-warn">
-              {t.editProperty.submitNeedsLocation}
-            </p>
+                Two things this fixes. Revealing them one at a time makes somebody return four
+                times and reads as the rules changing under them — so whichever one the API names,
+                the reader has already seen all of them. And a requirement stated without a way to
+                meet it is the half-feature this codebase keeps removing: the link is what finishes
+                the sentence, and `fixHref` is the same map الإعلانات uses.
+              */}
+              <ul className="grid gap-1">
+                {gaps.map((gap) => (
+                  <li key={gap}>
+                    <Link
+                      href={fixHref(gap, reference)}
+                      data-submit-gap={gap}
+                      className="inline-flex min-h-10 items-center text-13 leading-relaxed text-warn-ink underline-offset-2 transition-colors hover:text-text hover:underline lg:min-h-0"
+                    >
+                      {t.editProperty.submitNeeds[gap] ?? gap}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ) : null}
 
           <button
             type="button"
-            disabled={busy || unitCount === 0 || !hasLocation}
+            disabled={busy || gaps.length > 0}
             onClick={() => void submit()}
             className="min-h-10 w-fit cursor-pointer rounded-lg border border-gold px-4 py-1.5 text-13 font-bold text-gold-read disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
           >

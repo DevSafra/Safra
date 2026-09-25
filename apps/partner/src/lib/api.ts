@@ -839,6 +839,14 @@ const partnerPropertySchema = z.object({
   propertyTypeCode: z.string(),
   cancellationPolicyCode: z.string(),
   reviewNotes: z.string().nullable(),
+  /**
+   * What is still missing, from the shared readiness model.
+   *
+   * REQUIRED, and `z.string()` rather than an enum of today's checks: a fifth check enforced at
+   * submission must reach this panel rather than failing the parse and blanking the screen a
+   * partner needs in order to comply with it.
+   */
+  gaps: z.array(z.string()),
   isStructurallyEditable: z.boolean(),
   units: z.array(
     z.object({

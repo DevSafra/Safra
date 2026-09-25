@@ -291,7 +291,7 @@ function Card({ property }: { readonly property: PartnerProperty }) {
                 <Link
                   href={fixHref(gap, property.reference)}
                   data-gap={gap}
-                  className="flex items-center gap-1.5 text-12 text-warn-ink underline-offset-2 transition-colors hover:text-text hover:underline"
+                  className="flex min-h-10 items-center gap-1.5 text-12 text-warn-ink underline-offset-2 transition-colors hover:text-text hover:underline lg:min-h-0"
                 >
                   <GapMark />
                   <span>{t.properties.gap[gap] ?? gap}</span>

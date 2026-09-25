@@ -197,8 +197,7 @@ export default async function EditPropertyPage({
         <SubmitForReview
           reference={property.reference}
           status={property.status}
-          unitCount={property.units.length}
-          hasLocation={Boolean(property.latitude && property.longitude)}
+          gaps={property.gaps}
         />
       </div>
     </Shell>
