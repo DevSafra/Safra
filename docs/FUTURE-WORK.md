@@ -3160,6 +3160,11 @@ does not use the unlocked runner — it is a parity assertion over refund rows t
 worker MUTATES underneath it. Different mechanism, same symptom, and the existing fix does not
 reach it.
 
+**A SECOND file in the same family, 2026-09-25:** `safra-payout.integration.test.ts › reverses
+once however many times it is asked` failed one `verify` and passed the next, and passed with the
+workers paused. Same mechanism, same diagnosis, same fix needed — which is the argument for fixing
+the mechanism rather than the file.
+
 **What it would take:** either the suite creates refunds the sweep cannot claim (a partner or a
 window it does not scan), or it asserts parity inside one transaction the worker cannot see. An
 hour, plus a run to confirm it under load. **Not started — reported rather than fixed, because it
@@ -3168,6 +3173,59 @@ is pre-existing and nothing in the asked work depends on it.**
 **Do not "fix" it by pausing the workers in CI.** `safra-worker-locks-flake-the-suite` records what
 that costs: workers left stopped produced sixteen browser failures that all looked like real
 regressions and none were.
+
+### O-ops-6 — The backlog became a number somebody sees every day
+
+**Built 2026-09-25**, on Bashar's instruction that the next objective is «reducing the backlog of
+incomplete published listings through the readiness indicators, partner guidance and operational
+follow-up workflows rather than introducing more blockers».
+
+#### What the measurement ruled OUT first
+
+Before building follow-up tooling, the backlog's shape was measured: **2,010 partners, exactly one
+incomplete listing each, maximum 1.** A per-partner rollup — «these twelve partners account for
+four hundred of them» — would have been the obvious operational tool and it would have shown a
+column of ones. Not built, on that evidence. (The flatness is the generator's, so it says nothing
+about the real distribution either — which is itself the reason not to build on it.)
+
+#### What was built instead
+
+A KPI on the console dashboard: **«اكتمال الإعلانات — ٠٪ — ٢٬٠١٠ إعلان ينقصه شيء»**, linking
+straight to `/properties?gap=any`.
+
+- **A measure, not an alarm.** It was nearly added to «يحتاج انتباهك الآن», which is wrong: that
+  panel is for things that should be ZERO and whose presence is a defect. A standing backlog parked
+  there permanently teaches an operator to stop reading the panel.
+- **The COMPLETE share is the headline**, with the incomplete count beneath. A dashboard figure
+  that only ever falls is one nobody opens; this one should grow, and the number somebody works
+  through is the sub-line.
+- **It links.** `Kpi` learned an optional `href`. A figure naming a working set is a question whose
+  next step is «show me», and making somebody find the registry and remember it has a filter is the
+  half-feature this codebase keeps removing.
+
+#### What holds it
+
+`listing-readiness.integration.test.ts` now asserts the **KPI and the registry report the same
+number** — two SQL expressions of one rule, in two services, with nothing else holding them
+together. `review-scope.integration.test.ts` asserts both halves are CITY-SCOPED.
+
+Seven mutations, all caught. Getting there took three rounds and every round was a fixture problem
+rather than a code one:
+
+- **Four predicates each needed a row that is complete BUT FOR that one.** The seed's gaps are
+  almost perfectly correlated, so dropping the photograph predicate changed the count by zero and
+  the mutation passed. Four rows are now planted, one per check, and each exists because a mutation
+  survived without it.
+- **The scope control compared the wrong cities.** Cities are taken alphabetically and the seed
+  puts 2,010 of 2,017 live listings in the first of them, so «unscoped sees more than city A»
+  compared 2,011 with 2,010 — an assertion that passed while proving almost nothing.
+- **The DENOMINATOR was unscoped and untested.** The card divides one counter by the other, so a
+  scoped numerator over a national total is a percentage about nothing: a member whose own city is
+  complete would read «١٠٠٪» over a country that is 3% complete. Both halves are asserted now.
+
+One round also produced a RED BASELINE — a replacement that prettier had reformatted out from
+under it — and every mutation then «failed» for that reason. Caught by asserting the unmutated run
+is green before believing any of them, which is now how these scripts start.
 
 ### O-ops-5 — The submission gate now asks for all four, and says so with links
 
