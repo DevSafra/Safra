@@ -9,6 +9,8 @@ import {
 import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { DashboardService } from './dashboard.service.js';
+import { ReviewService } from './review.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { RegistryService } from './registry.service.js';
 
 /**
@@ -340,6 +342,88 @@ describeIfDb('the listing registry, filtered by what is missing', () => {
       overview.counters.listings_incomplete,
       'the KPI and the list it links to must report the same backlog',
     ).toBe(registry.total);
+  });
+
+  /**
+   * The partner's RECORD agrees with the registry about the same listing.
+   *
+   * Three surfaces now answer «what is this listing missing» — الإعلانات, the partner portal's own
+   * card, and a partner's record in the console — and a support agent reads the third while
+   * talking to the person who reads the second. One of them saying «بلا صور» while another does
+   * not is the drift that makes an agent look wrong to a partner, and the two queries are written
+   * independently in two services with nothing else holding them together.
+   */
+  it('tells a partner’s record the same thing it tells the registry', async () => {
+    const [owner] = await db
+      .execute<{ partner_reference: string; property_reference: string }>(
+        sql`SELECT pa.reference AS partner_reference, p.reference AS property_reference
+            FROM properties p
+            JOIN partners pa ON pa.id = p.partner_id
+            WHERE p.deleted_at IS NULL AND pa.deleted_at IS NULL
+              AND p.status IN ('published', 'pending_review')
+            ORDER BY p.id LIMIT 1`,
+      )
+      .then((r) => r.rows);
+
+    expect(owner, 'the fixture must hold a live listing with a partner').toBeDefined();
+
+    /*
+      PLANTED, because the ambient row cannot discriminate.
+
+      Two mutations of the record's own query — counting a still-processing render as a photograph,
+      and treating a whitespace description as written — passed against whatever listing this
+      picked, because its gaps were already set by other predicates. These two states make both
+      predicates load-bearing for THIS row, so the comparison below can see them disagree.
+    */
+    await db.execute(sql`
+      UPDATE properties
+         SET description_ar = '   ',
+             /* HALF a pair: latitude alone is not a location, and a guard reading one column
+                would call it placed. */
+             latitude = '33.5', longitude = NULL
+       WHERE reference = ${owner!.property_reference}
+    `);
+    /* Every existing image removed, then ONE that has not finished processing. */
+    await db.execute(sql`
+      DELETE FROM property_images
+       WHERE property_id = (SELECT id FROM properties
+                            WHERE reference = ${owner!.property_reference})
+    `);
+    await db.execute(sql`
+      INSERT INTO property_images (property_id, file_key, width, height, variant_widths,
+                                   is_cover, sort_order, status)
+      SELECT id, 'parity-record/' || id || '.jpg', 1600, 1200, ARRAY[400, 800, 1600],
+             false, 1, 'processing'
+        FROM properties WHERE reference = ${owner!.property_reference}
+    `);
+
+    const fromRegistry = await registry.properties({
+      limit: 25,
+      page: 1,
+      q: owner!.property_reference,
+    });
+    const listed = fromRegistry.items.find(
+      (one) => one.reference === owner!.property_reference,
+    );
+
+    expect(listed, 'the registry must return the listing').toBeDefined();
+
+    /* Constructed the way `review-scope.integration.test.ts` does — only `partnerDetail` is used. */
+    const record = await new ReviewService(
+      db,
+      {} as never,
+      {} as never,
+      new SettingsService(db),
+      { send: () => Promise.resolve() } as never,
+      { PARTNER_URL: 'https://partner.example' } as never,
+    ).partnerDetail(owner!.partner_reference);
+
+    const onRecord = record.properties.find(
+      (one) => one.reference === owner!.property_reference,
+    );
+
+    expect(onRecord, 'the partner record must list it').toBeDefined();
+    expect([...onRecord!.gaps].sort()).toEqual([...listed!.gaps].sort());
   });
 
   /**
