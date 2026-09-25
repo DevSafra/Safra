@@ -773,6 +773,14 @@ export const ar = {
     locationClear: 'إزالة التحديد',
     locationCoordinates: 'الإحداثيات',
     locationUnavailable: 'الخريطة غير متاحة الآن. يمكنك الحفظ والعودة لاحقاً.',
+    /*
+      The panel a published listing gets when it has no description. Says WHY it is worth
+      writing and that it can only be added once — the freeze is real and the reader should
+      know before they type, not after the API refuses their second attempt.
+    */
+    descriptionGapHeading: 'أضف وصفًا بالعربية',
+    descriptionGapHelp:
+      'الضيوف يقرأون الوصف قبل الحجز، والإعلان بلا وصف يخسر أمام غيره. يمكن إضافة الوصف مرة واحدة لأن بيانات الإعلان المنشور مثبّتة.',
     locationGuestArea: 'ما يراه الضيف',
     /*
       The RADIUS in words, not only the shape.
@@ -1008,7 +1016,6 @@ export const ar = {
       photograph: 'بلا صور — الإعلانات المصوّرة تُحجز أكثر',
       description: 'بلا وصف بالعربية',
     } as Record<string, string>,
-    fix: 'أكمِل',
     addLocation: 'حدّد الموقع',
     from: 'من',
     edit: 'تعديل',

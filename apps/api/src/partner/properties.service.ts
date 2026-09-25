@@ -744,7 +744,51 @@ export class PropertiesService {
     const settingNotClearing =
       (input.latitude ?? null) !== null && (input.longitude ?? null) !== null;
 
-    const completingTheGap = onlyCoordinates && unplaced && settingNotClearing;
+    /*
+      ## The same exception, for a description a listing has never had
+
+      Bashar approved the coordinate version on 2026-09-24 — «allowing published listings that
+      currently have no coordinates to add coordinates later without forcing a support workflow».
+      An empty description is the identical shape, and the identical argument holds:
+
+      - WRITING a description that is currently empty contradicts nothing SAFRA verified. §8.1
+        freezes the address, the city and the classification — what an inspector CHECKED. Marketing
+        copy is not among them, and a listing that had no words now has some.
+      - CHANGING one that exists is a different claim about the same place, and stays refused.
+
+      It was found by following the link: `/edit#description` on a published listing landed on a
+      page with no description field, because `PropertyEditor` does not render for a frozen
+      listing — and the API would have refused the save anyway. Reporting «بلا وصف بالعربية» as a
+      gap while forbidding the partner to close it is worse than not reporting it.
+
+      Narrow by construction, per language: allowed only for the languages currently EMPTY, and
+      only when the patch carries nothing else. A partner cannot rewrite an existing English
+      description by sending it alongside a new Arabic one.
+    */
+    const onlyDescription =
+      structural.length > 0 && structural.every((key) => key === 'description');
+
+    const blank = (value: string | null | undefined) => (value ?? '').trim() === '';
+
+    const stored: Record<string, string | null> = {
+      ar: property.descriptionAr,
+      en: property.descriptionEn,
+      de: property.descriptionDe,
+    };
+
+    const writesOnlyIntoGaps =
+      input.description !== undefined &&
+      Object.entries(input.description).every(
+        ([language, value]) =>
+          value === undefined ||
+          (blank(stored[language]) && !blank(value as string | null)),
+      ) &&
+      Object.values(input.description).some((value) => !blank(value));
+
+    const completingTheDescription = onlyDescription && writesOnlyIntoGaps;
+
+    const completingTheGap =
+      (onlyCoordinates && unplaced && settingNotClearing) || completingTheDescription;
 
     if (
       structural.length > 0 &&
@@ -1265,8 +1309,9 @@ export class PropertiesService {
         isNull(schema.properties.deletedAt),
       ),
       /*
-        The coordinates too, because `update` has to know whether this listing has a location
-        BEFORE deciding whether setting one is a completion or a change — see the note there.
+        The coordinates AND the descriptions, because `update` has to know what this listing
+        already has BEFORE deciding whether writing something is a completion or a change — see
+        the note there. Both gaps are completable on a published listing; neither is editable.
       */
       columns: {
         id: true,
@@ -1275,6 +1320,9 @@ export class PropertiesService {
         starRating: true,
         latitude: true,
         longitude: true,
+        descriptionAr: true,
+        descriptionEn: true,
+        descriptionDe: true,
       },
       /*
         The TYPE, because the star classification is a hotel classification and `update` has to
