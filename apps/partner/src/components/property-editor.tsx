@@ -393,12 +393,15 @@ export function PropertyEditor({
         />
       </div>
 
-      <Area
-        label={t.editProperty.descriptionAr}
-        value={form.descriptionAr}
-        onChange={set('descriptionAr')}
-        dir="rtl"
-      />
+      {/* Reached from «بلا وصف بالعربية» on الإعلانات. */}
+      <div id="description" className="scroll-mt-24">
+        <Area
+          label={t.editProperty.descriptionAr}
+          value={form.descriptionAr}
+          onChange={set('descriptionAr')}
+          dir="rtl"
+        />
+      </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Area
@@ -459,54 +462,57 @@ export function PropertyEditor({
         offers was dark for 97% of the catalogue. A partner cannot look up a latitude; they
         can find their own building on a map in seconds.
       */}
-      <LocationPicker
-        basemapUrl={BASEMAP}
-        latitude={form.latitude}
-        longitude={form.longitude}
-        fallbackLatitude={city?.latitude ?? null}
-        fallbackLongitude={city?.longitude ?? null}
-        onChange={(next) =>
-          setForm((current) => ({
-            ...current,
-            latitude: next.latitude,
-            longitude: next.longitude,
-          }))
-        }
-        copy={{
-          heading: t.editProperty.locationHeading,
-          help: t.editProperty.locationHelp,
-          missing: t.editProperty.locationMissing,
-          set: t.editProperty.locationSet,
-          clear: t.editProperty.locationClear,
-          coordinates: t.editProperty.locationCoordinates,
-          unavailable: t.editProperty.locationUnavailable,
-          guestArea: t.editProperty.locationGuestArea,
-          /*
+      {/* Reached from «لا تظهر على الخريطة» on الإعلانات — see `fixHref` there. */}
+      <div id="location" className="scroll-mt-24">
+        <LocationPicker
+          basemapUrl={BASEMAP}
+          latitude={form.latitude}
+          longitude={form.longitude}
+          fallbackLatitude={city?.latitude ?? null}
+          fallbackLongitude={city?.longitude ?? null}
+          onChange={(next) =>
+            setForm((current) => ({
+              ...current,
+              latitude: next.latitude,
+              longitude: next.longitude,
+            }))
+          }
+          copy={{
+            heading: t.editProperty.locationHeading,
+            help: t.editProperty.locationHelp,
+            missing: t.editProperty.locationMissing,
+            set: t.editProperty.locationSet,
+            clear: t.editProperty.locationClear,
+            coordinates: t.editProperty.locationCoordinates,
+            unavailable: t.editProperty.locationUnavailable,
+            guestArea: t.editProperty.locationGuestArea,
+            /*
             The radius, as a NUMBER in the sentence. The circle alone is a few pixels at the
             zoom a city opens at, so the promise it makes was unreadable exactly when it
             mattered. Filled here rather than in the picker because `fill` and the Arabic
             digits belong to the app, and a shared component must not learn either.
           */
-          guestAreaHelp: fill(t.editProperty.locationGuestAreaHelp, {
-            metres: count(
-              Math.round(
-                guestRadiusMetres(
-                  Number(form.latitude) || Number(city?.latitude) || 33.5138,
+            guestAreaHelp: fill(t.editProperty.locationGuestAreaHelp, {
+              metres: count(
+                Math.round(
+                  guestRadiusMetres(
+                    Number(form.latitude) || Number(city?.latitude) || 33.5138,
+                  ),
                 ),
               ),
-            ),
-          }),
-          startFrom: t.editProperty.locationStartFrom,
-        }}
-        /*
+            }),
+            startFrom: t.editProperty.locationStartFrom,
+          }}
+          /*
           The circle, and the sentence beside it. This is the one screen where SAFRA's rounding is
           worth SHOWING rather than stating: a partner deciding whether to place their building is
           weighing «will my address be published», and the answer has been no since the generated
           columns landed.
         */
-        guestArea
-        landmarks={reference.landmarks[form.citySlug] ?? []}
-      />
+          guestArea
+          landmarks={reference.landmarks[form.citySlug] ?? []}
+        />
+      </div>
 
       <button
         type="submit"

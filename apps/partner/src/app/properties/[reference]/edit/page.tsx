@@ -11,6 +11,7 @@ import {
 } from '@/lib/api';
 import { PropertyAmenities } from '@/components/property-amenities';
 import { PropertyEditor } from '@/components/property-editor';
+import { PropertyDescriptionForm } from '@/components/property-description-form';
 import { PropertyLocationForm } from '@/components/property-location-form';
 import { SubmitForReview } from '@/components/submit-for-review';
 import { UnitEditor } from '@/components/unit-editor';
@@ -115,6 +116,7 @@ export default async function EditPropertyPage({
             */}
             {!property.latitude || !property.longitude ? (
               <PropertyLocationForm
+                /* Reached from «لا تظهر على الخريطة» on الإعلانات. */
                 reference={property.reference}
                 cityLatitude={city?.latitude ?? null}
                 cityLongitude={city?.longitude ?? null}
@@ -129,6 +131,18 @@ export default async function EditPropertyPage({
                     : (formReference.landmarks[property.citySlug] ?? [])
                 }
               />
+            ) : null}
+
+            {/*
+              And the description, for the same reason and under the same narrow rule.
+
+              Rendered only while it is genuinely EMPTY, so the panel disappears the moment it is
+              written and the partner is never offered a control the API will refuse — the same
+              arrangement the location form above has. Arabic only: it is the default locale and
+              the one a reader is guaranteed to meet, and it is the language الإعلانات reports on.
+            */}
+            {!property.description.ar?.trim() ? (
+              <PropertyDescriptionForm reference={property.reference} />
             ) : null}
           </>
         )}
@@ -150,7 +164,13 @@ export default async function EditPropertyPage({
           }
         />
 
-        <section className="grid gap-2">
+        {/*
+          `id="units"` so «بلا وحدات» on الإعلانات lands HERE rather than at the top of a long
+          form. `scroll-mt-24` keeps the heading clear of the shell header — the same pairing
+          `rowAnchor` uses on the console, and for the same reason: a fragment that scrolls
+          somewhere and marks nothing leaves the reader hunting anyway.
+        */}
+        <section id="units" className="grid gap-2 scroll-mt-24">
           <h3 className="text-14 font-bold text-text">{t.editProperty.units}</h3>
           <UnitEditor
             reference={property.reference}

@@ -15,6 +15,7 @@ import { StarRating, statusTone } from '@safra/ui';
 
 import { TONES } from '@/lib/tones';
 
+import { fixHref } from '@/lib/fix-href';
 import { amount } from '@/lib/format';
 import { coverUrl } from '@/lib/media';
 import { fill, propertyStatus, propertyType, t, tripAttribute } from '@/lib/strings';
@@ -279,24 +280,25 @@ function Card({ property }: { readonly property: PartnerProperty }) {
           `label()` follows, which is what surfaced forty-three missing translations.
         */}
         {property.gaps.length > 0 ? (
-          <div className="mt-3 grid gap-1">
+          <ul className="mt-3 grid gap-1">
             {property.gaps.map((gap) => (
-              <p
-                key={gap}
-                data-gap={gap}
-                className="flex items-center gap-1.5 text-12 text-warn-ink"
-              >
-                <GapMark />
-                <span>{t.properties.gap[gap] ?? gap}</span>
-              </p>
+              <li key={gap}>
+                {/*
+                  The gap is the LINK, not a line of text with a link under it. A prompt that
+                  names a problem and then asks the reader to find the form is half a feature —
+                  and the one link this replaced pointed at a route that did not exist.
+                */}
+                <Link
+                  href={fixHref(gap, property.reference)}
+                  data-gap={gap}
+                  className="flex items-center gap-1.5 text-12 text-warn-ink underline-offset-2 transition-colors hover:text-text hover:underline"
+                >
+                  <GapMark />
+                  <span>{t.properties.gap[gap] ?? gap}</span>
+                </Link>
+              </li>
             ))}
-            <Link
-              href={`/properties/${property.reference}`}
-              className="w-fit cursor-pointer text-12 font-bold text-gold-read underline underline-offset-2"
-            >
-              {t.properties.fix}
-            </Link>
-          </div>
+          </ul>
         ) : null}
 
         <div className="mt-auto pt-3.5">

@@ -116,7 +116,10 @@ export function PropertyLocationForm({
   }
 
   return (
-    <section className="grid gap-3 rounded-card border border-line bg-card p-4">
+    <section
+      id="location"
+      className="grid gap-3 scroll-mt-24 rounded-card border border-line bg-card p-4"
+    >
       <LocationPicker
         basemapUrl={BASEMAP}
         latitude={latitude}
