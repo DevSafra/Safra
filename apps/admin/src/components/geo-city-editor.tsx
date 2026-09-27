@@ -263,8 +263,14 @@ function CityForm({
   }
 
   return (
-    <Modal title={`${c.editCity} — ${city.nameAr}`} onClose={onClose} width="max-w-3xl">
+    <Modal
+      labelledBy="safra-geo-city-title"
+      title={`${c.editCity} — ${city.nameAr}`}
+      onClose={onClose}
+      width="max-w-3xl"
+    >
       <Panel
+        headingId="safra-geo-city-title"
         heading={`${c.editCity} — ${city.nameAr}`}
         marker={city.slug}
         attribute="data-city-form"

@@ -402,11 +402,13 @@ function EditCategory({
   return (
     /* A popup, like every other edit on this screen and on المدن — Bashar, 2026-08-30. */
     <Modal
+      labelledBy="safra-city-category-title"
       title={`${c.editTitle} — ${category.nameAr}`}
       onClose={onClose}
       width="max-w-3xl"
     >
       <Panel
+        headingId="safra-city-category-title"
         heading={`${c.editTitle} — ${category.nameAr}`}
         marker={category.code}
         attribute="data-category-form"

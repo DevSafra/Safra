@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useRef,
   useState,
   type ReactNode,
@@ -52,7 +53,33 @@ export function Modal({
   placement = 'center',
   closeHandleRef,
 }: {
-  /** The accessible name. Rendered as the heading unless the caller draws its own. */
+  /**
+   * The accessible name, AND the visible heading on a centred box.
+   *
+   * ## It used to be the accessible name only, and the docblock said otherwise
+   *
+   * This line read «Rendered as the heading unless the caller draws its own» and the component
+   * rendered it nowhere — `title` became an `aria-label` and nothing else. So every caller that
+   * trusted the sentence got a popup with no heading: the customer site's language picker opened
+   * as a white box containing a list and a close button and nothing saying what it was (Bashar's
+   * screenshot, 2026-09-27), and so did the landmark and landmark-kind editors in the console.
+   *
+   * A comment describing an intention rather than the code is the failure this codebase keeps
+   * rediscovering. The code now does what the sentence said.
+   *
+   * ## «unless the caller draws its own» is `labelledBy`
+   *
+   * That is the whole contract: a caller with its own heading points `labelledBy` at it, and this
+   * draws nothing. `ConfirmDialog` already worked that way; the three geography editors drew their
+   * own heading AND passed a duplicate `title`, so they were announcing the same words twice — they
+   * now point at theirs.
+   *
+   * ## A SHEET never gets one
+   *
+   * A sheet drops from the bar it belongs to and that bar stays visible above it — see `placement`.
+   * A heading inside it repeats the control the reader has just pressed, which is noise rather than
+   * orientation. The phone menu is the one sheet today and is deliberately unchanged.
+   */
   readonly title: string;
   readonly onClose: () => void;
   readonly children: ReactNode;
@@ -220,6 +247,15 @@ export function Modal({
   }, [close, initialFocus]);
 
   const sheet = placement === 'sheet';
+  /*
+    A centred box draws its own heading; a sheet and a caller with its own do not. `useId` rather
+    than a literal, because two dialogs can be mounted at once — the phone menu holds the language
+    picker inside it — and two elements under one id make `aria-labelledby` point at whichever the
+    browser found first.
+  */
+  const generatedId = useId();
+  const ownHeading = !sheet && !labelledBy;
+  const headingId = `safra-modal-title-${generatedId}`;
 
   const shell = (
     /*
@@ -238,7 +274,11 @@ export function Modal({
         ref={frame}
         role={role ?? 'dialog'}
         aria-modal="true"
-        {...(labelledBy ? { 'aria-labelledby': labelledBy } : { 'aria-label': title })}
+        {...(labelledBy
+          ? { 'aria-labelledby': labelledBy }
+          : ownHeading
+            ? { 'aria-labelledby': headingId }
+            : { 'aria-label': title })}
         {...(describedBy ? { 'aria-describedby': describedBy } : {})}
         tabIndex={-1}
         /* Clicks inside must not reach the backdrop's handler. */
@@ -274,24 +314,64 @@ export function Modal({
               : 'translate-y-1 scale-[0.96] opacity-0'
         }`}
       >
+        {/*
+          The heading the `title` docblock has always promised.
+
+          `<h2>`, not a styled `<p>`: a dialog's name is a heading in the document's outline, and a
+          screen reader user navigating by heading is how somebody finds their way back to the top
+          of a long one. It carries the accessible name too — `aria-labelledby` points at it — so
+          the name a person HEARS and the words they SEE are one string rather than two that can
+          drift.
+        */}
+        {ownHeading ? (
+          <h2 id={headingId} className="text-16 font-bold text-text">
+            {title}
+          </h2>
+        ) : null}
         {children}
       </div>
     </div>
   );
 
   /**
-   * A sheet is portalled to `<body>`; a centred box is not.
+   * EVERY popup is portalled to `<body>`, centred boxes included.
+   *
+   * ## The sheet's reason, which was always the weaker one
    *
    * `z-index` only orders siblings within a stacking context, and this shell renders wherever its
    * caller does. The phone menu's opener lives INSIDE `<header>`, which is `position: sticky` with
-   * a `z-index` and therefore its own context — so the backdrop, a descendant of that header, sat
-   * above the hamburger no matter what the header's own `z-index` was raised to. The button was
-   * dimmed under its own overlay and could not be clicked. A portal is the fix for that, not a
-   * larger number.
+   * a `z-index` and therefore its own context — so the backdrop sat above the hamburger no matter
+   * what the header's `z-index` was raised to. The button was dimmed under its own overlay and
+   * could not be clicked. A portal is the fix for that, not a larger number.
    *
-   * The centred placement deliberately stays where it is rendered. Nothing depends on it escaping,
-   * and moving every dialog in three apps to `<body>` would change what `footer [role="dialog"]`
-   * and its like select — real coverage, retargeted for a problem those dialogs do not have.
+   * ## The centred box used to stay put, and that was a bug waiting on a scroll
+   *
+   * This read «The centred placement deliberately stays where it is rendered. Nothing depends on
+   * it escaping, and moving every dialog in three apps to `<body>` would change what
+   * `footer [role="dialog"]` and its like select — real coverage, retargeted for a problem those
+   * dialogs do not have.»
+   *
+   * **Both halves were wrong.** No selector in this repository scopes a dialog by an ancestor —
+   * the only `footer [role="dialog"]` in the tree was that sentence. And the problem was not one
+   * those dialogs do not have:
+   *
+   * The customer header is `sticky`, and once the page scrolls it gains
+   * `backdrop-filter: blur(18px)` — the translucent bar Bashar asked for on 2026-09-03. **A
+   * `backdrop-filter` other than `none` makes an element a containing block for `position: fixed`
+   * descendants.** So the language picker's backdrop, `fixed inset-0`, resolved against the HEADER
+   * rather than the viewport: measured at 1440×900 it collapsed from 1440×900 to **1440×84**, and
+   * the panel landed at `y = -10`, hanging out of the top of the bar.
+   *
+   * At the top of the page there is no blur and it was correct, which is why it looked like a
+   * different bug and why Bashar's report named the scroll: «When I scroll and click on navbar on
+   * language the bug appear».
+   *
+   * ## Why the fix is here and not on the header
+   *
+   * The blur is the design. And the general fact is that ANY `transform`, `filter`,
+   * `backdrop-filter`, `will-change` or `contain` on ANY ancestor does this — so a dialog whose
+   * position depends on where it was rendered is a defect waiting for somebody to style a parent.
+   * A popup belongs to the viewport; escaping to `<body>` is how it says so.
    */
-  return sheet ? createPortal(shell, document.body) : shell;
+  return createPortal(shell, document.body);
 }

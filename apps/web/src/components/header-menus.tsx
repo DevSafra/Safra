@@ -130,6 +130,15 @@ function LanguageMenu({
         onClick={() => setOpen(true)}
       />
 
+      {/*
+        `Modal` draws «اختر اللغة» at the top of the box.
+
+        It did not, and the popup opened as a white rectangle holding a list and a close button
+        with nothing saying what it was — Bashar screenshotted exactly that on 2026-09-27. The
+        `title` was being passed all along and `Modal` used it only as an `aria-label`, so the
+        heading existed for a screen reader and for nobody looking at the screen. Fixed in the
+        shell rather than here, because three other popups had the same hole.
+      */}
       {open ? (
         <Modal
           title={labels.chooseLanguage}

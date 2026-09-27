@@ -257,12 +257,21 @@ export function CheckboxField({
  */
 export function Panel({
   heading,
+  headingId,
   marker,
   attribute = 'data-geo-form',
   bare,
   children,
 }: {
   readonly heading: string;
+  /**
+   * An id for the heading, so a `Modal` wrapping this panel can point its name at it.
+   *
+   * Without it the three geography editors passed the same string to `Modal`'s `title` AND to
+   * `heading` here — one announced as the dialog's accessible name and one read again as its
+   * contents. Now the heading IS the name, and `Modal` draws nothing of its own.
+   */
+  readonly headingId?: string | undefined;
   readonly marker: string;
   /** Which `data-*` a browser test finds this by. */
   readonly attribute?: string | undefined;
@@ -276,7 +285,12 @@ export function Panel({
         bare ? '' : 'mb-3 rounded-card border border-line bg-field p-4'
       }`}
     >
-      <p className="text-13 font-bold text-gold-read">{heading}</p>
+      <p
+        {...(headingId ? { id: headingId } : {})}
+        className="text-13 font-bold text-gold-read"
+      >
+        {heading}
+      </p>
       {children}
     </div>
   );

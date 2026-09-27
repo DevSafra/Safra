@@ -222,11 +222,13 @@ function CountryForm({
       the backdrop, the focus trap and the scroll lock.
     */
     <Modal
+      labelledBy="safra-geo-country-title"
       title={`${c.editCountry} — ${country.nameAr}`}
       onClose={onClose}
       width="max-w-3xl"
     >
       <Panel
+        headingId="safra-geo-country-title"
         heading={`${c.editCountry} — ${country.nameAr}`}
         marker={country.code}
         attribute="data-country-form"
