@@ -917,10 +917,54 @@ async function seedFixturePhotographs(): Promise<
   return written;
 }
 
+/**
+ * This script DELETES, so it runs against a local database or it does not run.
+ *
+ * ## Why the guard is here and not somewhere else
+ *
+ * `PARTNER_TOTP_SECRET`'s note said the fixture secret «authenticates nothing outside a local
+ * `safra` database: `db:reset-dev` refuses a non-local connection string, and this script only
+ * ever runs beside it». The second half was an assumption rather than a fact — they are separate
+ * scripts, `pnpm db:testbed` reads `DATABASE_URL` on its own, and nothing stopped it running
+ * anywhere.
+ *
+ * That mattered less while every delete here was scoped to the fixture partners by email. It stopped
+ * being true on 2026-09-27: clearing SAFRA's own treasury so `e2e/safra-treasury.spec.ts` can claim
+ * a period is necessarily UNSCOPED — SAFRA's treasury belongs to no partner — and those are
+ * financial records with ledger entries behind them. A misdirected `DATABASE_URL` would have
+ * destroyed them irreversibly.
+ *
+ * Same shape and same reasoning as `bootstrap-media.ts`, which refuses to apply a public-read
+ * policy to a non-local endpoint.
+ */
+function refuseANonLocalDatabase(url: string): void {
+  /*
+    A URL that will not parse is refused rather than allowed through. «I could not tell» is not a
+    reason to delete anything, and every real development connection string parses.
+  */
+  let host: string;
+
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    throw new Error('Refusing to seed: DATABASE_URL is not a URL this script can check.');
+  }
+
+  if (!['localhost', '127.0.0.1', '::1', '0.0.0.0', 'db', 'postgres'].includes(host)) {
+    throw new Error(
+      `Refusing to seed a non-local database (${host}). ` +
+        'This script deletes fixtures, every SAFRA payout and their ledger entries, and it is ' +
+        'only ever meant for a developer machine.',
+    );
+  }
+}
+
 async function main(): Promise<void> {
   const databaseUrl = process.env['DATABASE_URL'];
 
   if (!databaseUrl) throw new Error('DATABASE_URL is required.');
+
+  refuseANonLocalDatabase(databaseUrl);
 
   const db = createDatabase(databaseUrl, 2);
 
