@@ -91,6 +91,29 @@ deleting it; the reason something was blocked is often the reason it comes back.
 
 ## 1. Where the project stands
 
+> ### Backlog-closure pass, 2026-09-27
+>
+> Bashar asked for «ruthless closure of the existing backlog and existing findings» before starting
+> the next major area. Every open item in this register was read and classified. **Fifteen closed**,
+> two narrowed to what actually remains, one new finding recorded.
+>
+> |                   |                                                                                                                                                                               |
+> | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+> | `pnpm verify`     | 290 files, **4,308 tests**, 0 failed, **0 skipped**                                                                                                                           |
+> | `pnpm e2e:run`    | **555 passed, 0 failed, 1 skipped** — was 8 skips of budget, now 1                                                                                                            |
+> | Closed this pass  | M-11 · 202 · 220 · 236 · O-web-1 · O-web-16 · O-staff-2 · O-staff-3 · O-test-4 · O-e2e-5 · O-emp-2 · O-media-2 · half of O-ops-1 · half of O-partner-1 · the four drift-skips |
+> | Narrowed          | `O-emp-1` (not an engineering gap) · `O-e2e-3` (both directions measured)                                                                                                     |
+> | New, needs Bashar | `O-web-18` — a partner cannot complete sign-in on the customer site                                                                                                           |
+>
+> **Three of the closures were items the register described wrongly**, and that is the durable
+> lesson of the pass: `O-e2e-5` and `O-staff-3` had been FIXED weeks earlier and never closed;
+> `O-test-4`'s recorded cause was wrong and the real one was a documented trap; `O-emp-1`'s five
+> paths turned out to be four refusals and a data fix. **A register entry is a claim about a past
+> state.** Read the code before believing one.
+>
+> **Nothing that remains open is blocked on engineering alone** except the four test-infrastructure
+> items in §5 — and every one of those is bounded, named, and blocks nothing.
+
 > ### Engineering-complete, confirmed by Bashar on 2026-09-04
 >
 > **All three applications: engineering complete.** Super Admin Console, Partner Portal, Customer
