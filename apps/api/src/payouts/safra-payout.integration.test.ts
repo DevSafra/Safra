@@ -227,6 +227,71 @@ describeIfDb('SafraPayoutService', () => {
       );
     });
 
+    /**
+     * M-11's regression guard: opening a period must not time out.
+     *
+     * ## What M-11 was
+     *
+     * `POST /admin/safra-payouts` answered **500** when opening a period with ordinary traffic in
+     * it. `accruedIn` hit the 15-second read timeout, measured by hand at **16.2 s** against
+     * 254,631 ledger entries on 2026-09-23. The operator met «حدث خطأ ما.» — the generic fallback,
+     * because a 500 carries no code a screen can explain — so the one refusal a person could not
+     * act on was also the only one that was not a sentence.
+     *
+     * ## Why it is closed rather than fixed
+     *
+     * It does not reproduce. Measured again on 2026-09-27 against **261,176** entries — MORE rows
+     * than when it was recorded — the same statement runs in **143 ms** over the whole history and
+     * 59 ms over a month, on a hash join rather than the nested loop the note predicted. No line of
+     * the query changed in between, so the plan flipped for a reason outside it: statistics, or the
+     * stale ANALYZE a freshly reseeded testbed carries until something touches the table.
+     *
+     * That is exactly why this exists instead of a note saying «seems fine now». A plan that
+     * flipped once can flip back, and the failure mode is a 500 on a treasury screen rather than a
+     * red test — so the guard has to be a test.
+     *
+     * ## It goes through `open`, not through the statement
+     *
+     * `accruedIn` is private, and a test that pasted its SQL would be timing its own COPY — the
+     * «fixture that cannot reach the field it protects» failure, which would stay green while the
+     * service's own query went slow. `open` is also what the operator presses: the overlap check,
+     * then `accruedIn`, then the insert. The 500 was the whole of that call, not one statement
+     * inside it.
+     *
+     * ## The bound
+     *
+     * Five seconds: a third of the read timeout and ~35× the measured time. Loose enough that a
+     * slow machine, a cold cache or a parallel suite cannot fail it, tight enough that the
+     * 16-second plan cannot pass. A tighter assertion would buy precision this does not need and
+     * flakiness it cannot afford.
+     *
+     * The test's OWN timeout is raised to twenty seconds, above both the bound and the fifteen the
+     * database allows a read. They are otherwise the same five seconds, and vitest's fires first:
+     * the regression then reports «Test timed out in 5000ms» and the measured figure — the one
+     * thing somebody reading a failed run needs — is never printed. Above the read timeout, a
+     * genuinely hung query still fails, with the database's own error rather than a stopwatch.
+     */
+    it('opens a period without approaching the read timeout', async () => {
+      /*
+        The WHOLE history, which is the widest window an operator can ask for and the one the
+        16-second measurement used. A narrow window would not exercise the join that was slow.
+      */
+      const period = await periodWithRevenue();
+
+      expect(period.from, 'the fixture must hold revenue to accrue').toBeTruthy();
+
+      const started = Date.now();
+
+      await service.open(actor, { periodStart: period.from, periodEnd: period.to });
+
+      const took = Date.now() - started;
+
+      expect(
+        took,
+        `opening over the whole ledger took ${took} ms; M-11 was a 15-second read timeout`,
+      ).toBeLessThan(5_000);
+    }, 20_000);
+
     /* Every stream is named, so a total is explicable rather than merely correct. */
     it('breaks the total down by revenue account', async () => {
       const summary = await service.revenueSummary();
