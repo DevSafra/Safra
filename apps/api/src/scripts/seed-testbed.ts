@@ -1,4 +1,4 @@
-import { usesStarRating } from '@safra/contracts';
+import { PARTNER_EMPLOYEE_PERMISSIONS, usesStarRating } from '@safra/contracts';
 import { eq, sql } from 'drizzle-orm';
 
 import { createDatabase, schema, type Database, type Transaction } from '@safra/db';
@@ -8,7 +8,10 @@ import { PasswordService } from '../common/crypto/password.service.js';
 import type { Env } from '../config/env.js';
 import { describeError } from '../common/errors/safe-error.js';
 import { assertCascadeIsComplete } from './testbed-cascade.js';
+import { AuditService } from '../common/audit/audit.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
+import { PayoutService } from '../payouts/payout.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 
 /**
  * A small, hand-built dataset you can actually test against — three شركاء, one customer, and
@@ -967,6 +970,106 @@ function encryptedPartnerSecret(): string {
  * Keyed on email. See the note above about why these are never deleted: an account that has signed
  * in is pinned by the append-only audit log, and its history is worth more than a clean insert.
  */
+/**
+ * The partner's own staff — a role, and enough people to need a second page.
+ *
+ * ## Why the seed has to write these
+ *
+ * It did not, and it DELETED them: `partner_employees` was cleared in the cascade and nothing put
+ * any back, so a freshly seeded database had zero. Two integration suites —
+ * `properties-location-gap` and `properties-description-gap` — find their fixture by joining a
+ * published listing to an ACTIVE employee, so they passed only on a machine where the browser
+ * suite had run first and left invitations behind. On 2026-09-27 a reseed without a browser run
+ * turned seventeen of their assertions red, with «no published listing with an owning user to
+ * test against» — a fixture problem wearing a product failure's clothes.
+ *
+ * That is blocker 241 exactly: `db:testbed` did not restore everything the suite consumes.
+ *
+ * ## Twenty-two on the first partner, and that number is load-bearing
+ *
+ * لوحة الشريك pages its employee list at twenty, so «عرض المزيد» only exists above that — and
+ * `partner-employees.spec.ts` › «pages to a second page that is not the first one again» had
+ * skipped since it was written, because the fixture partner had four. `O-emp-2` recorded the fix
+ * as «seed a partner with enough employees once, as a fixture the suite owns rather than something
+ * a test writes», and this is that: an invitation a spec creates is a real employment no run can
+ * tidy up, so a spec that made twenty per run would grow the fixture without bound.
+ *
+ * The other partners get two each: enough to prove the list is per-partner and not enough to make
+ * every screen in the portal a wall of names.
+ *
+ * ## They hold a ROLE, not a permission list
+ *
+ * `partner_employees.role_id` is NOT NULL and the role carries the permissions, so a fixture that
+ * wrote employments without one would not insert at all. The role is given the full employee
+ * catalogue — `PARTNER_EMPLOYEE_PERMISSIONS`, never a hand-typed subset, because a subset here
+ * would drift from the boundary that list defines and the drift would show up as a screen a
+ * fixture employee cannot open for no stated reason.
+ */
+async function employees(
+  db: Seeder,
+  partnerId: string,
+  spec: PartnerSpec,
+  passwordHash: string,
+): Promise<void> {
+  const [role] = await db
+    .insert(schema.partnerEmployeeRoles)
+    .values({
+      partnerId,
+      name: 'موظف استقبال',
+      permissions: [...PARTNER_EMPLOYEE_PERMISSIONS],
+    })
+    .returning();
+
+  if (!role) throw new Error(`Could not create an employee role for ${spec.email}`);
+
+  /* The first partner is the one the browser suite signs in as, so it is the one that pages. */
+  const count = spec.email === PARTNERS[0]?.email ? 22 : 2;
+  const slug = spec.email.split('@')[0] ?? 'partner';
+
+  for (let index = 1; index <= count; index += 1) {
+    const user = await upsertUser(db, {
+      email: `employee-${slug}-${index}@safra.test`,
+      phone: `+9639360${String(index).padStart(5, '0')}`,
+      passwordHash,
+      role: 'customer',
+    });
+
+    /*
+      The ROLE column is set on `users` too, and only after the employment exists.
+
+      `attachOwningIds` resolves an employee through a join that needs the employment to be live;
+      an account marked `partner_employee` with no employment behind it carries no permissions and
+      no partner id, which is `O-emp-1`. Writing the employment first means that state never
+      exists, even for the width of this loop.
+    */
+    await db.insert(schema.partnerEmployees).values({
+      partnerId,
+      userId: user.id,
+      roleId: role.id,
+      fullName: `${EMPLOYEE_NAMES[index % EMPLOYEE_NAMES.length]} ${index}`,
+      status: 'active',
+    });
+
+    await db.execute(
+      sql`UPDATE users SET role = 'partner_employee' WHERE id = ${user.id}`,
+    );
+  }
+
+  console.log(`  ${count} employees for ${spec.displayName}`);
+}
+
+/** Arabic given names, so a roster of twenty-two reads as people rather than as rows. */
+const EMPLOYEE_NAMES = [
+  'سامر',
+  'رنا',
+  'فادي',
+  'ميساء',
+  'باسل',
+  'هبة',
+  'وسيم',
+  'نور',
+] as const;
+
 async function upsertUser(
   db: Seeder,
   values: {
@@ -1272,6 +1375,37 @@ async function build(db: Seeder): Promise<void> {
     WHERE partner_id IN (
       SELECT pa.id FROM partners pa JOIN users u ON u.id = pa.user_id
       WHERE lower(u.email) IN (${emailList}))`);
+
+  /*
+    SAFRA'S OWN TREASURY, which nothing cleared and which the browser suite consumes.
+
+    `safra_payouts` claims a PERIOD, and a period once claimed cannot be claimed again —
+    `e2e/safra-treasury.spec.ts` walks backwards from today looking for an unclaimed day and skips
+    when it runs out. Twenty-six payouts and 151 accounts had accumulated here, so the lifecycle
+    test — create, verify, activate, open, release, pay — had stopped running at all, and every
+    green run since carried no evidence about the one workflow that moves SAFRA's own money.
+
+    The same accumulation made nine assertions in `safra-payout.integration.test.ts` fail with a
+    period-overlap conflict until that file learnt to clear both tables inside its own rollback.
+    This is that fix, at the fixture rather than in each suite.
+
+    THE LEDGER GROUPS GO WITH THEM. A paid payout posts a balanced group, and `revenueSummary`
+    derives «transferred» from those entries — so deleting the payouts and keeping the entries
+    would leave the books describing transfers with no payout behind them, which is a fixture
+    asserting something the product cannot produce. Entries first: the payout rows are what name
+    the groups.
+
+    Everything, not only the testbed partners' — SAFRA's treasury belongs to no partner, and every
+    row in it is debris from a browser or integration run on a developer's machine.
+  */
+  await db.execute(sql`ALTER TABLE ledger_entries DISABLE TRIGGER USER`);
+  await db.execute(sql`
+    DELETE FROM ledger_entries
+    WHERE entry_group_id IN (
+      SELECT entry_group_id FROM safra_payouts WHERE entry_group_id IS NOT NULL)`);
+  await db.execute(sql`ALTER TABLE ledger_entries ENABLE TRIGGER USER`);
+  await db.execute(sql`DELETE FROM safra_payouts`);
+  await db.execute(sql`DELETE FROM safra_payout_accounts`);
 
   /*
     The ledger and the wallet movements were cleared at the TOP of this cascade — see the note
@@ -1667,6 +1801,8 @@ async function build(db: Seeder): Promise<void> {
 
     if (!partner) throw new Error(`Could not create partner for ${spec.email}`);
 
+    await employees(db, partner.id, spec, passwordHash);
+
     for (const property of spec.properties) {
       const propertyCity = cityBySlug.get(property.citySlug);
       // No fallback: an unknown code must FAIL, not quietly become whichever type is first.
@@ -1842,19 +1978,45 @@ async function build(db: Seeder): Promise<void> {
         borrowedImages.length > 0 &&
         photographed.includes(property.status ?? 'published')
       ) {
+        /*
+          NINE on the gallery listing, three everywhere else.
+
+          `PropertyGallery` shows a hero, two stacked tiles and a strip of five, and it draws
+          «عرض كل الصور» on the last tile ONLY when something is behind it — `beyond > 0`, which
+          needs a tenth photograph to hide. With three, the control correctly never appears.
+
+          `public-reviews.spec.ts` › «opens every photograph in the shared previewer» reached for
+          that control and skipped, saying «This listing has no photographs» about a listing with
+          three of them. The skip was honest about stopping and WRONG about why, which is worse
+          than either: a reader of the run would go looking for a lost fixture. And the defect the
+          test exists for is exactly the many-photograph case — a listing with fourteen published
+          eleven that nobody could reach.
+
+          The three OBJECTS are reused rather than nine being generated. Several rows sharing a
+          photograph is meaningless in a testbed and is what makes this repeatable without an
+          object-store round trip; the previewer's position counter is what those tests move
+          through, and it counts rows.
+        */
+        const wanted =
+          property.slug === 'qasr-al-sharq-apartments' ? 9 : borrowedImages.length;
+
         await db.insert(schema.propertyImages).values(
-          borrowedImages.map((image, index) => ({
-            propertyId: row.id,
-            fileKey: image.fileKey,
-            altAr: property.nameAr,
-            altEn: property.nameEn,
-            altDe: property.nameEn,
-            width: image.width,
-            height: image.height,
-            variantWidths: image.variantWidths,
-            isCover: index === 0,
-            sortOrder: index + 1,
-          })),
+          Array.from({ length: wanted }, (_, index) => {
+            const image = borrowedImages[index % borrowedImages.length]!;
+
+            return {
+              propertyId: row.id,
+              fileKey: image.fileKey,
+              altAr: property.nameAr,
+              altEn: property.nameEn,
+              altDe: property.nameEn,
+              width: image.width,
+              height: image.height,
+              variantWidths: image.variantWidths,
+              isCover: index === 0,
+              sortOrder: index + 1,
+            };
+          }),
         );
       }
 
@@ -2068,6 +2230,11 @@ async function build(db: Seeder): Promise<void> {
     madeUnits,
     passwordHash,
   });
+  /*
+    AFTER `bulk`, because it accrues what the completed bookings have earned and `bulk` writes most
+    of them. Before `report`, so the self-check can hold it to account.
+  */
+  await accruePayouts(db);
   await report(db);
 }
 
@@ -2870,6 +3037,55 @@ async function report(db: Seeder): Promise<void> {
 }
 
 /**
+ * Accrues the payouts the testbed's completed bookings have earned.
+ *
+ * ## Why the seed does this rather than a spec
+ *
+ * Blocker 202. `db:testbed` created no payouts, because accrual is an HOURLY job — so a freshly
+ * reset testbed had none until that job next fired, and `payout-accounts.spec.ts` said so in its
+ * own failure message. **Two specs failed and four more skipped as the shadow of those failures.**
+ *
+ * No spec can fix it for itself: `POST /admin/payouts/accrue` exists but has no reachable surface
+ * (finding 203), and a browser session is not an API token, so calling it from a spec answers 401 —
+ * tried and measured. A test that waited for the hourly job would be a test that passes at ten past
+ * and fails at five past.
+ *
+ * ## It calls the SERVICE, never a copy of its SQL
+ *
+ * The accrual carries real rules — a dispute withholds, a payable with no `partner_payable` credit
+ * behind it is withheld and counted, an existing `accruing` period is reused rather than duplicated
+ * — and a second copy here would drift from them silently. The fixture would then describe a
+ * payout the product would never produce, which is the exact failure `selfCheck` exists to catch.
+ *
+ * It is idempotent by construction: the unique index on `partner_payout_items.booking_id` means a
+ * booking already attached cannot be attached twice, so running the seed twice is a no-op here.
+ */
+async function accruePayouts(db: Seeder): Promise<void> {
+  /*
+    `as Database`, the same cast `LedgerService` takes above and for the same reason: the whole seed
+    runs inside ONE transaction so that a failure leaves the previous fixtures intact, and a
+    `Transaction` does not satisfy the `Database` type although it carries every method used here.
+    `accrue` opens a transaction of its own, which against a transaction is a SAVEPOINT — correct
+    semantics for this caller, since a failed seed must roll the accrual back with everything else.
+  */
+  const payouts = new PayoutService(
+    db as Database,
+    new AuditService(db as Database),
+    new LedgerService(db as Database),
+    new SettingsService(db as Database),
+  );
+
+  const result = await payouts.accrue();
+
+  console.log(
+    `  ${result.attached} bookings accrued into ${result.payouts} payout periods` +
+      (result.withheldUnsupported > 0
+        ? ` (${result.withheldUnsupported} withheld: the books do not support the payable)`
+        : ''),
+  );
+}
+
+/**
  * What the seed CLAIMS, checked against what it wrote.
  *
  * ## Why this exists
@@ -2970,6 +3186,27 @@ async function selfCheck(db: Seeder): Promise<void> {
   for (const slug of NAMED_BY_SPECS) {
     if (!present.has(slug))
       problems.push(`${slug} is named by a browser spec and was not seeded`);
+  }
+
+  /*
+    AT LEAST ONE PAYOUT — blocker 202, and the assertion that stops it coming back.
+
+    Two browser specs read a payout and four more skip in their shadow. They passed for as long as
+    some earlier run had left one behind, which is the drift that hid this for weeks: the fixture
+    was not producing them, an accident was. Asserting it here means a seed that stops accruing
+    fails where the cause is, rather than as a browser failure with no visible relationship to it.
+
+    A COUNT rather than a named reference: which partner accrues depends on which bookings
+    completed, and pinning one would be a fixture asserting something the product does not promise.
+  */
+  const payouts = await db.execute<{ n: number }>(sql`
+    SELECT count(*)::int AS n FROM partner_payouts WHERE deleted_at IS NULL
+  `);
+
+  if ((payouts.rows[0]?.n ?? 0) === 0) {
+    problems.push(
+      'no partner payout accrued, so every payout screen and spec has nothing to read',
+    );
   }
 
   /* A published listing with no unit cannot be booked, so it is not a usable fixture either. */

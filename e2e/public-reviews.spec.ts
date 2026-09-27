@@ -102,10 +102,32 @@ test.describe('reviews on a property page', () => {
   test('opens every photograph in the shared previewer', async ({ page }) => {
     await page.goto(`/ar/property/${GALLERY_SLUG}`);
 
-    const viewAll = page.getByRole('button', { name: /عرض كل الصور/ });
+    /*
+      By TEXT, not by role name — and this is the whole reason the test never ran.
 
-    /* Narrower than «no button»: a listing with no photographs is the only honest reason to skip. */
-    test.skip((await viewAll.count()) === 0, 'This listing has no photographs.');
+      The overlay is a `<span>` inside a tile `<button>` that carries its own `aria-label`
+      («افتح الصورة ٨»). An `aria-label` REPLACES the accessible name, so
+      `getByRole('button', { name: /عرض كل الصور/ })` matched nothing on any listing, with any
+      number of photographs. The skip beneath it could therefore never be false: it reported «This
+      listing has no photographs» about a listing with three, and would have reported it about one
+      with a hundred.
+
+      Two defects in one line, and only the second is visible: the reason was wrong, AND the
+      condition was unreachable. A skip that can never be false is a test that has been deleted
+      without anybody deciding to delete it.
+    */
+    const viewAll = page.getByText(/عرض كل الصور/).first();
+
+    /*
+      The control is drawn on the last strip tile only when something is behind it — a hero, two
+      stacked tiles and a strip of five, so it takes a TENTH photograph to hide. `db:testbed` seeds
+      nine on this listing for exactly this test, so the one honest reason left to skip is a fixture
+      that did not get them.
+    */
+    test.skip(
+      (await viewAll.count()) === 0,
+      'This listing has fewer than nine photographs, so there is nothing for the control to hide.',
+    );
 
     await viewAll.click();
 
