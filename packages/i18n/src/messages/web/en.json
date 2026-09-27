@@ -18,7 +18,11 @@
     "closeDialog": "Close",
     "breadcrumb": "Breadcrumb",
     "themeToLight": "Switch to light mode",
-    "themeToDark": "Switch to dark mode"
+    "themeToDark": "Switch to dark mode",
+    "cities": "Cities",
+    "medicalTourism": "Medical tourism",
+    "groups": "Groups",
+    "contact": "Contact"
   },
   "home": {
     "heroCountries": "Syria · Jordan · Lebanon",
@@ -834,5 +838,35 @@
     "stars": "{count, plural, one {# star} other {# stars}}",
     "unrated": "Not rated",
     "filterAny": "Any rating"
+  },
+  "cities": {
+    "title": "Cities",
+    "subtitle": "Every destination SAFRA has stays in, in one place.",
+    "empty": "No cities are published yet."
+  },
+  "medicalTourism": {
+    "title": "Medical tourism",
+    "body": "A section for stays that accompany a course of treatment — close to the hospitals and clinics. It is not open yet, and we would rather say so than promise something we have not verified where people’s health is concerned.",
+    "browse": "Browse stays",
+    "cities": "Browse cities"
+  },
+  "groups": {
+    "title": "Groups",
+    "body": "Group trips that SAFRA puts together itself — a destination, dates and accommodation arranged in advance. There is no open trip right now.",
+    "browse": "Browse stays",
+    "cities": "Browse cities"
+  },
+  "contact": {
+    "title": "Contact us",
+    "subtitle": "We answer on bookings, payment and complaints. If you have a booking with us, a support ticket is the fastest route — it reaches the SAFRA team with your booking attached.",
+    "email": "Email",
+    "phone": "Telephone",
+    "address": "Address",
+    "addressValue": "Damascus, Syrian Arab Republic",
+    "hours": "Opening hours",
+    "hoursValue": "Sunday to Thursday · 9:00 — 17:00",
+    "supportTitle": "Have a booking? Open a support ticket",
+    "supportBody": "A support ticket reaches the SAFRA team with your booking reference attached, so you do not have to explain it from the start. It is the fastest and the most precise channel.",
+    "supportAction": "Open a support ticket"
   }
 }

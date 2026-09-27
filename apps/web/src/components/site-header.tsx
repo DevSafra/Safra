@@ -132,9 +132,26 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
   */
   const session = await getSession();
 
+  /*
+    The six destinations, in the order Bashar wrote them (2026-09-27):
+    «الرئيسية + سياحة علاجية + الإقامات + المدن + جروبات + تواصل معنا».
+
+    His order is kept exactly, including سياحة علاجية sitting second — ahead of الإقامات, which is
+    what most people came to do. That is his call to make about what the business leads with, and
+    reordering it to what a search engine would want would be substituting my judgement for his on
+    the one thing here that is a business decision rather than a mechanic.
+
+    Two of them are placeholders today and one carries invented contact details; each page says so
+    in its own docblock, and `docs/FUTURE-WORK.md` carries what has to close before launch. The
+    pages exist rather than the links 404ing, which `tools/page-links` would fail the build for.
+  */
   const links = [
     { href: `/${locale}`, label: t('home') },
+    { href: `/${locale}/medical-tourism`, label: t('medicalTourism') },
     { href: `/${locale}/search`, label: t('stays') },
+    { href: `/${locale}/city`, label: t('cities') },
+    { href: `/${locale}/groups`, label: t('groups') },
+    { href: `/${locale}/contact`, label: t('contact') },
   ];
 
   return (
@@ -192,9 +209,18 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
         </Link>
 
         {/*
-          Visible at EVERY width. It was `hidden … sm:flex`, which took the site's two primary
-          destinations away from every phone with nothing in their place — a visitor could reach
-          الإقامات only by editing the URL. The header already wraps, and two links need no drawer.
+          `lg`, not `md`, since the menu grew from two items to six (Bashar, 2026-09-27).
+
+          It was `md:flex` and that was right for two links. Measured at 768 with six: «سياحة
+          علاجية» and «تواصل معنا» wrapped INSIDE themselves onto two lines each, the wordmark
+          wrapped with them, and «تواصل معنا» overlapped the language control — a 97px header of
+          broken rows. Nothing scrolled sideways, which is why the page-level check passed and only
+          looking at it found this.
+          
+          The three widths this changes are 768–1023, and they lose nothing: every one of the six
+          is in the phone menu, which is the same list in a different arrangement and is what those
+          widths already used for «سجّل كشريك». At 1024 all six sit on one 85px row with the brand,
+          the language picker and both account controls — measured, not assumed.
         */}
         {/*
           Beside the wordmark, at the reading START — the right of an Arabic page (Bashar,
@@ -207,7 +233,20 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
         <HeaderNav
           links={links}
           label={t('home')}
-          className="me-auto ms-3 hidden items-center gap-1 md:flex"
+          className="me-auto ms-3 hidden items-center gap-0.5 lg:flex xl:gap-1"
+          /*
+            Tighter between `lg` and `xl`, and the original from `xl`.
+
+            Six Arabic labels, the wordmark, the language picker and both account controls do not
+            fit a 1024px row at `px-3`: «سياحة علاجية» and «تواصل معنا» each broke onto a second
+            line, which is the one failure a page-overflow check cannot see. 8px of horizontal
+            padding buys the ~70px those two needed, and it is spent only where it is needed —
+            from 1280 the row has room and gets its breathing space back.
+
+            The 40px touch floor is untouched at every width. It is the thing that must not be
+            traded for a layout, and `px` is not what provides it.
+          */
+          linkClassName="min-h-10 px-2 sm:min-h-11 xl:px-3"
         />
 
         {/*
@@ -231,7 +270,7 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
         */}
         <Link
           href={`/${locale}/partners/join`}
-          className="hidden min-h-10 items-center rounded-lg px-3 py-2 text-14 font-semibold text-muted transition-colors hover:bg-gold/10 hover:text-text sm:h-11 lg:inline-flex"
+          className="hidden min-h-10 items-center rounded-lg px-3 py-2 text-14 font-semibold text-muted transition-colors hover:bg-gold/10 hover:text-text sm:h-11 xl:inline-flex"
         >
           {home('partnersCta')}
         </Link>

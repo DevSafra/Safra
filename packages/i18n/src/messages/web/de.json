@@ -18,7 +18,11 @@
     "closeDialog": "Schließen",
     "breadcrumb": "Brotkrümelnavigation",
     "themeToLight": "Zum hellen Design wechseln",
-    "themeToDark": "Zum dunklen Design wechseln"
+    "themeToDark": "Zum dunklen Design wechseln",
+    "cities": "Städte",
+    "medicalTourism": "Medizintourismus",
+    "groups": "Gruppen",
+    "contact": "Kontakt"
   },
   "home": {
     "heroCountries": "Syrien · Jordanien · Libanon",
@@ -834,5 +838,35 @@
     "stars": "{count, plural, one {# Stern} other {# Sterne}}",
     "unrated": "Nicht klassifiziert",
     "filterAny": "Alle Klassifizierungen"
+  },
+  "cities": {
+    "title": "Städte",
+    "subtitle": "Alle Reiseziele, an denen SAFRA Unterkünfte hat, an einem Ort.",
+    "empty": "Es sind noch keine Städte veröffentlicht."
+  },
+  "medicalTourism": {
+    "title": "Medizintourismus",
+    "body": "Ein Bereich für Unterkünfte, die eine Behandlung begleiten — in der Nähe der Kliniken und Zentren. Er ist noch nicht eröffnet, und wo es um die Gesundheit von Menschen geht, sagen wir das lieber, als etwas zu versprechen, das wir nicht geprüft haben.",
+    "browse": "Unterkünfte ansehen",
+    "cities": "Städte ansehen"
+  },
+  "groups": {
+    "title": "Gruppen",
+    "body": "Gruppenreisen, die SAFRA selbst zusammenstellt — Ziel, Termine und Unterkunft im Voraus arrangiert. Zurzeit ist keine Reise offen.",
+    "browse": "Unterkünfte ansehen",
+    "cities": "Städte ansehen"
+  },
+  "contact": {
+    "title": "Kontakt",
+    "subtitle": "Wir antworten zu Buchungen, Zahlung und Beschwerden. Wenn Sie eine Buchung bei uns haben, ist ein Support-Ticket der schnellste Weg — es erreicht das SAFRA-Team mitsamt Ihrer Buchung.",
+    "email": "E-Mail",
+    "phone": "Telefon",
+    "address": "Adresse",
+    "addressValue": "Damaskus, Arabische Republik Syrien",
+    "hours": "Öffnungszeiten",
+    "hoursValue": "Sonntag bis Donnerstag · 9:00 — 17:00",
+    "supportTitle": "Sie haben eine Buchung? Öffnen Sie ein Support-Ticket",
+    "supportBody": "Ein Support-Ticket erreicht das SAFRA-Team mit Ihrer Buchungsnummer, Sie müssen also nicht von vorn erklären. Das ist der schnellste und genaueste Kanal.",
+    "supportAction": "Support-Ticket öffnen"
   }
 }
