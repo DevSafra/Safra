@@ -142,6 +142,155 @@ test.describe('public routes', () => {
  * Invisible to `pnpm verify` by construction: every page still returned 200 the whole time. Only a
  * browser sees the console error and the lost client-side routing, which is why it lives here.
  */
+/**
+ * The six destinations Bashar asked for, in his order, each reaching a real page.
+ *
+ * «الرئيسية + سياحة علاجية + الإقامات + المدن + جروبات + تواصل معنا» (2026-09-27).
+ *
+ * ## Why this is not covered by the crawl above
+ *
+ * That test follows every link and refuses a 4xx — so it would catch one of these pointing at a
+ * route that does not exist, and it is what makes the build fail if somebody adds a seventh item
+ * with no page behind it. What it cannot see is an item DISAPPEARING: a nav with five links whose
+ * five pages all answer 200 is a passing crawl and a broken instruction.
+ *
+ * The ORDER is asserted too, and deliberately. سياحة علاجية sits second, ahead of الإقامات, which
+ * is not where a search engine would put it — it is where he put it, and that is a business
+ * decision about what SAFRA leads with. An assertion is how it survives somebody later
+ * «improving» it.
+ *
+ * ## Read from the markup, not from the catalogue
+ *
+ * The labels are written out rather than imported from `web/ar.json`. A test that reads the same
+ * constant the component renders passes whatever that constant says — including after somebody
+ * renames جروبات to something else — which is exactly the change this exists to notice.
+ */
+test('the navbar carries the six destinations, in order', async ({ page }) => {
+  await page.goto('/ar');
+
+  const items = await page
+    .locator('header nav a')
+    .evaluateAll((links) => links.map((link) => (link.textContent ?? '').trim()));
+
+  expect(items).toStrictEqual([
+    'الرئيسية',
+    'سياحة علاجية',
+    'الإقامات',
+    'المدن',
+    'جروبات',
+    'تواصل معنا',
+  ]);
+
+  /*
+    And the same six on a phone, where they live in the drawer rather than on the bar. The bar is
+    `hidden` below `lg`, so a reader on a telephone reaches them only through the menu — a set that
+    is complete on a desktop and short on a phone is the failure this second half catches.
+  */
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await page
+    .getByRole('button', { name: /القائمة|افتح/ })
+    .first()
+    .click();
+
+  const inDrawer = await page
+    .locator('a')
+    .evaluateAll((links) => links.map((link) => (link.textContent ?? '').trim()));
+
+  for (const label of [
+    'الرئيسية',
+    'سياحة علاجية',
+    'الإقامات',
+    'المدن',
+    'جروبات',
+    'تواصل معنا',
+  ]) {
+    expect(inDrawer, `«${label}» is reachable on a phone`).toContain(label);
+  }
+});
+
+/**
+ * A popup opened from the STICKY header covers the viewport, not the header.
+ *
+ * ## The bug
+ *
+ * Bashar, 2026-09-27: «When I scroll and click on navbar on language the bug appear». At the top of
+ * the page the language picker was centred correctly; once the page had scrolled it hung out of the
+ * top of the bar.
+ *
+ * The header gains `backdrop-filter: blur(18px)` when it sticks — the translucent bar he asked for
+ * on 2026-09-03 — and **a `backdrop-filter` other than `none` makes an element a containing block
+ * for `position: fixed` descendants.** So the popup's `fixed inset-0` backdrop resolved against the
+ * header instead of the viewport: measured at 1440×900 it was **1440×84**, and the panel sat at
+ * `y = -10`.
+ *
+ * ## Why it is asserted here rather than in a unit test
+ *
+ * There is nothing to unit-test. The markup was correct, the classes were correct, and
+ * `position: fixed` did exactly what the specification says — against the wrong box. Only a real
+ * layout answers it, and only while SCROLLED, which is the state no screenshot of the top of the
+ * page contains.
+ *
+ * ## It asserts the containing block, not the pixel
+ *
+ * A backdrop the size of the viewport is the whole claim: it is what makes the popup centred, what
+ * makes the scrim cover the page, and what makes a click outside close it. Comparing it to
+ * `innerHeight` says that in one number, and it would catch any ancestor growing a `transform`,
+ * `filter` or `contain` in future — the same fault with a different cause.
+ */
+test('a popup opened from the stuck header still covers the viewport', async ({
+  page,
+}) => {
+  await page.goto('/ar');
+
+  /* Past the sentinel, so the header is stuck and blurred. */
+  await page.evaluate(() => window.scrollTo(0, 900));
+  await expect(page.locator('header[data-stuck]')).toBeVisible();
+
+  await page.locator('header [data-menu="language"]').first().click();
+
+  const dialog = page.locator('[role="dialog"]');
+
+  await expect(dialog).toBeVisible();
+
+  const measured = await page.evaluate(() => {
+    const panel = document.querySelector('[role="dialog"]');
+    const backdrop = panel?.parentElement;
+    const box = backdrop?.getBoundingClientRect();
+
+    return {
+      backdropHeight: Math.round(box?.height ?? 0),
+      panelTop: Math.round(panel?.getBoundingClientRect().top ?? 0),
+      viewportHeight: window.innerHeight,
+      /* The header must still be COVERED, or the nav is clickable under a modal. */
+      overNav: (() => {
+        const link = document.querySelector('header nav a');
+        const rect = link?.getBoundingClientRect();
+
+        if (!rect) return null;
+
+        const hit = document.elementFromPoint(
+          rect.x + rect.width / 2,
+          rect.y + rect.height / 2,
+        );
+
+        return hit?.closest('header') ? 'header' : 'overlay';
+      })(),
+    };
+  });
+
+  expect(
+    measured.backdropHeight,
+    'the backdrop resolved against the header instead of the viewport',
+  ).toBe(measured.viewportHeight);
+
+  expect(measured.panelTop, 'the panel is inside the viewport').toBeGreaterThan(0);
+
+  expect(measured.overNav, 'a modal that leaves the navbar clickable is not modal').toBe(
+    'overlay',
+  );
+});
+
 test('navigates on the client, without falling back to a full page load', async ({
   page,
 }) => {

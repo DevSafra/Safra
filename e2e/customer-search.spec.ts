@@ -93,8 +93,22 @@ test('the results can be paged past the first screenful', async ({ page }) => {
     one page cost nothing. What matters is that the RESULTS are the first page's again.
   */
   await page.locator('a[rel="prev"]').click();
-  await page.waitForLoadState('networkidle');
-  expect(await slugs()).toStrictEqual(first);
+
+  /*
+    Polled on the RESULTS, not on the network.
+
+    This waited for `networkidle`, and that stopped settling on 2026-09-27 when the header grew
+    from two destinations to six: Next prefetches the routes a link points at, and six of them keep
+    a request in flight past the 500ms of quiet `networkidle` is defined as. The test then timed
+    out at a moment when the page was correct and finished — a wait that fails on a working build
+    is worse than no wait, because it sends whoever reads the run looking at paging.
+
+    `expect.poll` retries the assertion itself, so it ends the instant the first page's results are
+    back and cannot be held open by traffic that has nothing to do with them.
+  */
+  await expect
+    .poll(slugs, { message: 'السابق returns to the first page’s results' })
+    .toStrictEqual(first);
 });
 
 /**

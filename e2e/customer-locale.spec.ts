@@ -333,14 +333,23 @@ test.describe('a Latin-valued field on an Arabic page', () => {
       ).toHaveCount(1);
     }
 
+    /*
+      Each BAR opens its own picker, and the picker is then addressed as the dialog.
+
+      The list used to be scoped to the bar, which worked while a popup rendered wherever its
+      opener did. Every popup portals to `<body>` since 2026-09-27 — see the note on the next test
+      — so what is still worth asserting is that BOTH bars open one and that its anchors carry
+      `hreflang`. The loop is what proves «both bars»; the dialog is what proves the anchors.
+    */
     for (const bar of ['header', 'footer']) {
       await page.locator(`${bar} [data-menu="language"]`).click();
 
-      const german = page.locator(bar).getByRole('link', { name: 'Deutsch' });
+      const german = page.getByRole('dialog').getByRole('link', { name: 'Deutsch' });
 
       await expect(german, bar).toHaveAttribute('hreflang', 'de');
 
       await page.keyboard.press('Escape');
+      await expect(page.getByRole('dialog'), bar).toHaveCount(0);
     }
   });
 
@@ -353,8 +362,21 @@ test.describe('a Latin-valued field on an Arabic page', () => {
   test('keeps the page when the language changes', async ({ page }) => {
     await page.goto('/ar/city/damascus');
 
+    /*
+      The LIST is addressed as the dialog, not as part of the footer.
+
+      It used to be `page.locator('footer').getByRole(…)`, and that worked because the popup
+      rendered wherever its opener did. Since 2026-09-27 every popup portals to `<body>`: a
+      `backdrop-filter` on the sticky header made it a containing block for `position: fixed`, so a
+      popup opened from the bar was trapped inside it once the page scrolled. The picker is no
+      longer a descendant of the control that opened it, and scoping it by one was always
+      describing where it happened to live rather than what it is.
+
+      Unambiguous even though there are two pickers: only one dialog can be open at a time — the
+      shell traps focus and locks the page behind it.
+    */
     await page.locator('footer [data-menu="language"]').click();
-    await page.locator('footer').getByRole('link', { name: 'English' }).click();
+    await page.getByRole('dialog').getByRole('link', { name: 'English' }).click();
 
     await expect.poll(() => new URL(page.url()).pathname).toBe('/en/city/damascus');
   });
@@ -397,7 +419,7 @@ test.describe('a Latin-valued field on an Arabic page', () => {
       expect(light, 'the default is white').toBe('rgb(245, 246, 250)');
 
       await page.locator('footer [data-menu="language"]').click();
-      await page.locator('footer').getByRole('link', { name: 'English' }).click();
+      await page.getByRole('dialog').getByRole('link', { name: 'English' }).click();
       await page.waitForURL('**/en');
 
       expect(await background(), 'the language change did not repaint the site').toBe(
@@ -417,7 +439,18 @@ test.describe('a Latin-valued field on an Arabic page', () => {
         document.cookie = 'safra-theme-web=dark; Path=/; Max-Age=3600; SameSite=Lax';
         localStorage.setItem('safra-theme-web', 'dark');
       });
-      await page.reload({ waitUntil: 'networkidle' });
+      /*
+        `domcontentloaded`, not `networkidle`.
+
+        The theme is applied PRE-PAINT by an inline script in the head, so it is already correct the
+        moment the document parses — waiting for the network adds nothing to this assertion. What it
+        added on 2026-09-27 was a failure: the header grew from two destinations to six, Next
+        prefetches what a link points at, and six of them keep a request in flight past the 500ms of
+        quiet `networkidle` is defined as. Three tests in this file wait this way and one of them
+        timed out; all three are changed, because the other two are the same test on the same page
+        and were failing by luck rather than by design.
+      */
+      await page.reload({ waitUntil: 'domcontentloaded' });
 
       const dark = await page.evaluate(
         () => getComputedStyle(document.body).backgroundColor,
@@ -426,7 +459,7 @@ test.describe('a Latin-valued field on an Arabic page', () => {
       expect(dark).not.toBe('rgb(245, 246, 250)');
 
       await page.locator('footer [data-menu="language"]').click();
-      await page.locator('footer').getByRole('link', { name: 'English' }).click();
+      await page.getByRole('dialog').getByRole('link', { name: 'English' }).click();
       await page.waitForURL('**/en');
 
       expect(
@@ -449,7 +482,7 @@ test.describe('a Latin-valued field on an Arabic page', () => {
     test('keeps a stored theme a static payload could not carry', async ({ page }) => {
       await page.goto('/ar');
       await page.evaluate(() => localStorage.setItem('safra-theme-web', 'dark'));
-      await page.reload({ waitUntil: 'networkidle' });
+      await page.reload({ waitUntil: 'domcontentloaded' });
 
       const background = () =>
         page.evaluate(() => getComputedStyle(document.body).backgroundColor);
@@ -463,7 +496,7 @@ test.describe('a Latin-valued field on an Arabic page', () => {
       /* Every hop, because the bug was reported as specific to some of them. */
       for (const language of ['English', 'Deutsch', 'العربية']) {
         await page.locator('footer [data-menu="language"]').click();
-        await page.locator('footer').getByRole('link', { name: language }).click();
+        await page.getByRole('dialog').getByRole('link', { name: language }).click();
         await page.waitForTimeout(900);
 
         expect(await background(), `${language} lost the stored theme`).toBe(dark);
@@ -490,7 +523,7 @@ test.describe('a Latin-valued field on an Arabic page', () => {
         await page.goto(from);
 
         await page.locator('footer [data-menu="language"]').click();
-        await page.locator('footer').getByRole('link', { name: 'English' }).click();
+        await page.getByRole('dialog').getByRole('link', { name: 'English' }).click();
         await page.waitForURL(`**${to}`);
 
         const landed = await page.evaluate(() => location.pathname + location.search);
@@ -525,13 +558,13 @@ test.describe('a Latin-valued field on an Arabic page', () => {
         document.cookie = 'safra-theme-admin=dark; Path=/; Max-Age=3600; SameSite=Lax';
         document.cookie = 'safra-theme-partner=dark; Path=/; Max-Age=3600; SameSite=Lax';
       });
-      await page.reload({ waitUntil: 'networkidle' });
+      await page.reload({ waitUntil: 'domcontentloaded' });
 
       expect(await background(), 'another app cannot repaint this one').toBe(light);
 
       /* And the language change, which is where it was noticed. */
       await page.locator('footer [data-menu="language"]').click();
-      await page.locator('footer').getByRole('link', { name: 'English' }).click();
+      await page.getByRole('dialog').getByRole('link', { name: 'English' }).click();
       await page.waitForURL('**/en');
 
       expect(await background(), 'still not repainted after a locale change').toBe(light);
