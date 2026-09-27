@@ -426,11 +426,21 @@ export default async function SearchPage({
       <SearchForm
         locale={locale}
         cities={cities}
+        propertyTypes={propertyTypes}
         minDate={results.firstBookableDate ?? todayInDamascus()}
         attributes={TRIP_ATTRIBUTES.map((code) => ({ code, label: ta(code) }))}
         attributesLabel={t('attributes')}
         defaults={{
           citySlug,
+          /*
+            The value the PAGE parsed, so the bar and the sidebar cannot disagree.
+
+            Both controls carry `propertyTypeCode`, in two separate forms. Passing the active value
+            here means the bar shows what the sidebar's radio shows; without it the bar would read
+            «كل الأنواع» over a filtered result set, and submitting the bar would silently clear a
+            filter the reader had set.
+          */
+          propertyTypeCode,
           checkIn,
           checkOut,
           adults,

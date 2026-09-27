@@ -6,7 +6,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { PropertyCard } from '@/components/property-card';
 import { SearchForm } from '@/components/search-form';
 import { isLocale, routing, type Locale } from '@/i18n/routing';
-import { getCities, getCity } from '@/lib/catalog';
+import { getCities, getCity, getPropertyTypes } from '@/lib/catalog';
 import { localisedDescription, localisedName, localisedText } from '@/lib/localise';
 import { imageUrl as cityImageUrl } from '@/lib/property';
 import { searchSafely } from '@/lib/api';
@@ -90,7 +90,7 @@ export default async function CityPage({
   const tnav = await getTranslations('nav');
   const ts = await getTranslations('search');
 
-  const cities = await getCities();
+  const [cities, propertyTypes] = await Promise.all([getCities(), getPropertyTypes()]);
   const checkIn = todayInDamascus();
   const checkOut = addDays(checkIn, 2);
 
@@ -237,6 +237,7 @@ export default async function CityPage({
         <SearchForm
           locale={locale}
           cities={cities}
+          propertyTypes={propertyTypes}
           minDate={checkIn}
           defaults={{ citySlug: slug, checkIn, checkOut, adults: 2 }}
         />

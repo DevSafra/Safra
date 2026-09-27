@@ -3,11 +3,20 @@ import { getTranslations } from 'next-intl/server';
 import type { Locale } from '@/i18n/routing';
 import { DateRangeField } from '@/components/date-range-field';
 import { GuestsField } from '@/components/guests-field';
-import { GuestsIcon, PinIcon } from '@/components/icons';
+import { GuestsIcon, PinIcon, StayIcon } from '@/components/icons';
+import { dynamicMessage } from '@/lib/dynamic-message';
 import { localisedName } from '@/lib/localise';
 
 interface City {
   slug: string;
+  nameAr: string;
+  nameEn: string;
+  nameDe: string;
+}
+
+/** The shape `getPropertyTypes` returns, narrowed to what this bar renders. */
+interface PropertyType {
+  code: string;
   nameAr: string;
   nameEn: string;
   nameDe: string;
@@ -35,6 +44,24 @@ interface City {
  *
  * Three groups, not six columns: where you are going, when, and who is coming. That grouping is
  * the actual borrowing; the row of boxes was what made a six-field form look like a spreadsheet.
+ *
+ * ## نوع العقار joins the FIRST group rather than becoming a fourth (Bashar, 2026-09-27)
+ *
+ * He asked for it on the landing page's bar. It goes beside the destination, behind the same
+ * divider the dates and the occupancy already use, because «where, and what kind of place» is one
+ * question — and a fourth segment would undo the paragraph above it, which is the whole reason the
+ * bar stopped being a row of boxes.
+ *
+ * It is not in the approved prototype: that bar has الوجهة, الوصول, المغادرة and الضيوف, and the
+ * type is a filter in the results sidebar. The prototype's grid is `auto-fit minmax(170px, 1fr)`,
+ * so it was built to take another field; this is an addition to the brief at its author's request,
+ * recorded here so nobody later reads it as drift.
+ *
+ * **Nothing new was needed behind it.** `searchQuerySchema` has taken `propertyTypeCode` since the
+ * search contract was written and the results sidebar already filters on it, so this puts an
+ * existing capability where somebody starts rather than where they end up. The same name means the
+ * two controls agree on `/search`: the bar's selection is the sidebar's checked radio, because both
+ * read the value the page parsed.
  *
  * ## The dates and the occupancy are booking.com's popovers (Bashar, 2026-09-02, two screenshots)
  *
@@ -108,6 +135,7 @@ function nextDay(date: string): string {
 export async function SearchForm({
   locale,
   cities,
+  propertyTypes = [],
   attributes = [],
   attributesLabel = '',
   defaults,
@@ -115,6 +143,14 @@ export async function SearchForm({
 }: {
   locale: Locale;
   cities: City[];
+  /**
+   * The live accommodation types, for نوع العقار.
+   *
+   * Optional and defaulted to an empty list, which renders NO field at all — a select whose only
+   * option is «كل الأنواع» is a control that cannot do anything, and the catalogue read is allowed
+   * to fail without taking the search bar with it.
+   */
+  propertyTypes?: readonly PropertyType[];
   /** The trip attributes offered as tags, already translated by the caller. */
   attributes?: readonly { code: string; label: string }[];
   /** «صفات الرحلة:» — the row's own label. */
@@ -124,6 +160,7 @@ export async function SearchForm({
     children?: number | undefined;
     infants?: number | undefined;
     citySlug?: string | undefined;
+    propertyTypeCode?: string | undefined;
     checkIn?: string | undefined;
     checkOut?: string | undefined;
     adults?: number | undefined;
@@ -132,6 +169,13 @@ export async function SearchForm({
   minDate: string;
 }) {
   const t = await getTranslations('search');
+  /*
+    The type NAMES come from their own namespace, the way the results sidebar reads them —
+    `dynamicMessage` falls back to the catalogue row's own translated name for a code this build has
+    no words for, rather than printing the code. A type added in the console must not surface here
+    as `boutique_hotel`.
+  */
+  const tt = await getTranslations('propertyTypes');
 
   return (
     <form
@@ -140,8 +184,21 @@ export async function SearchForm({
       /* The prototype's panel: the card colour under a gold hairline, 18px, 12px of padding. */
       className="rounded-[18px] border border-gold/30 bg-card p-3 shadow-sm"
     >
-      <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-[1.1fr_1.35fr_1.75fr_auto]">
-        {/* ── Where ─────────────────────────────────────────────────────── */}
+      {/*
+        The FIRST column widens when it holds two fields.
+
+        The other two collapse to a single trigger once their popover mounts, so they need the room
+        they have; this one never collapses and now carries two selects. Measured at 1440 and 1024
+        before the ratio was chosen — at the old `1.1fr` the city names truncated to «دمش…».
+      */}
+      <div
+        className={`grid gap-1.5 sm:grid-cols-2 ${
+          propertyTypes.length > 0
+            ? 'lg:grid-cols-[1fr_1fr_1.25fr_1.6fr_auto]'
+            : 'lg:grid-cols-[1.1fr_1.35fr_1.75fr_auto]'
+        }`}
+      >
+        {/* ── Where, and what kind ──────────────────────────────────────── */}
         <Segment icon={<PinIcon />}>
           <Field label={t('destinationOptional')} htmlFor="q-city">
             <select
@@ -158,7 +215,40 @@ export async function SearchForm({
               ))}
             </select>
           </Field>
+
+          {/*
+            نوع العقار, beside the destination (Bashar, 2026-09-27).
+
+            A native select, like the destination it shares a segment with and for the same reason:
+            this form works before any script has loaded, and a control that only exists after
+            hydration is a control some readers never get. The results sidebar renders the same
+            value as radios — that is the right shape for a permanent panel with counts beside each
+            option, and the wrong one for a bar where it has to fit in a segment.
+
+            «كل الأنواع» is the empty value, so choosing it is a real way BACK to an unfiltered
+            search rather than a placeholder nobody can re-select.
+          */}
         </Segment>
+
+        {propertyTypes.length > 0 ? (
+          <Segment icon={<StayIcon />}>
+            <Field label={t('propertyType')} htmlFor="q-type">
+              <select
+                id="q-type"
+                name="propertyTypeCode"
+                defaultValue={defaults?.propertyTypeCode ?? ''}
+                className="w-full cursor-pointer truncate bg-transparent text-text focus:outline-none"
+              >
+                <option value="">{t('anyPropertyType')}</option>
+                {propertyTypes.map((type) => (
+                  <option key={type.code} value={type.code}>
+                    {dynamicMessage(tt, type.code, localisedName(type, locale))}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </Segment>
+        ) : null}
 
         {/*
           ── When ────────────────────────────────────────────────────────

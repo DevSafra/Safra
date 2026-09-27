@@ -258,6 +258,7 @@ export default async function HomePage({
             <SearchForm
               locale={locale}
               cities={cities}
+              propertyTypes={propertyTypes}
               minDate={recommended.checkIn}
               attributes={TRIP_FEATURES.map((code) => ({ code, label: ta(code) }))}
               attributesLabel={t('attributesLabel')}

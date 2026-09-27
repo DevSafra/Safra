@@ -266,6 +266,65 @@ test('the bedrooms requirement reaches the search and survives its links', async
 });
 
 /**
+ * نوع العقار on the bar reaches the search, and the two controls on `/search` agree.
+ *
+ * Bashar asked for it on the landing page (2026-09-27). Nothing new went in behind it —
+ * `searchQuerySchema` has taken `propertyTypeCode` since the contract was written and the results
+ * sidebar already filtered on it — so what needed proving is the wiring, and the half that is easy
+ * to get wrong is the SECOND one.
+ *
+ * On `/search` the value now has two controls: the bar's select and the sidebar's radio, in two
+ * separate forms. If the bar did not receive the active value it would read «كل الأنواع» over a
+ * filtered result set, and pressing search would silently clear a filter the reader had set — a
+ * control that undoes another control on the same screen, which is worse than not having it.
+ */
+test('نوع العقار reaches the search, and the bar and the sidebar agree', async ({
+  page,
+}) => {
+  await page.goto('/ar');
+
+  const field = page.locator('#q-type');
+
+  await expect(field, 'the bar offers the type').toBeVisible();
+  await expect(field).toHaveAttribute('name', 'propertyTypeCode');
+
+  /* «كل الأنواع» is the first option and it is EMPTY — a real way back, not a placeholder. */
+  await expect(field.locator('option').first()).toHaveAttribute('value', '');
+
+  await field.selectOption('hotel');
+  await page.getByRole('button', { name: /ابحث عن إقامة/ }).click();
+  await page.waitForURL('**/search**');
+
+  expect(new URL(page.url()).searchParams.get('propertyTypeCode')).toBe('hotel');
+
+  /* The bar keeps the choice… */
+  await expect(page.locator('#q-type')).toHaveValue('hotel');
+
+  /* …and the sidebar's radio is the SAME value, not «كل الأنواع» beside a filtered list. */
+  await expect(
+    page.locator('input[name="propertyTypeCode"][value="hotel"]').first(),
+  ).toBeChecked();
+});
+
+/**
+ * An empty choice is «any», so an ordinary search is untouched by the field existing.
+ *
+ * The regression half, and the same one the bedrooms field carries: a default of anything but the
+ * empty value, or a predicate applied when it is empty, would narrow every search on the site —
+ * which shows up as «fewer results than yesterday» rather than as a failure.
+ */
+test('choosing no type leaves the search as wide as it was', async ({ page }) => {
+  await page.goto(SEARCH);
+
+  const unfiltered = await page.locator('article').count();
+
+  await page.goto(`${SEARCH}&propertyTypeCode=`);
+
+  expect(await page.locator('article').count()).toBe(unfiltered);
+  expect(unfiltered).toBeGreaterThan(0);
+});
+
+/**
  * And zero means «any», so an ordinary search is untouched by the field existing.
  *
  * The regression half: a default of anything but zero, or a predicate applied when it is zero,
