@@ -1564,30 +1564,53 @@ nobody has restored is not a backup.
 
 ---
 
-### M-11 — `SafraPayoutService.accruedIn` times out at testbed scale
+### M-11 — Closed: `accruedIn` does not time out, and a test now says so
 
-**Status:** open · **Owner:** Backend · **Found 2026-09-23**, incidentally, while running the
-e2e suite for the map work. **Not caused by it** — the query reads `ledger_entries`, `refunds` and
-`bookings` and touches no table that change modified.
+**Status:** CLOSED 2026-09-27 · **Owner:** Backend · **Found 2026-09-23**, incidentally, while
+running the e2e suite for the map work. **Not caused by it** — the query reads `ledger_entries`,
+`refunds` and `bookings` and touches no table that change modified.
 
-`POST /api/v1/admin/safra-payouts` answers **500** when opening a payout period over a window with
-ordinary traffic in it. The cause is a 15-second query read timeout in `accruedIn`, measured at
-**16.2 s** running the exact statement by hand against 254,631 ledger entries.
+**What was recorded.** `POST /api/v1/admin/safra-payouts` answered **500** when opening a payout
+period over a window with ordinary traffic in it. The cause was given as a 15-second query read
+timeout in `accruedIn`, measured at **16.2 s** running the exact statement by hand against 254,631
+ledger entries, and diagnosed as a plan problem — a nested loop where a hash join was wanted.
 
-It is a PLAN problem rather than a missing index. Both subqueries are fast alone — the `xfer`
-DISTINCT over `safra_payout` returns 21 rows in a bitmap index scan, and the `refunded` aggregate
-runs in 45 ms — so the cost appears only when they are joined into the outer aggregate. Likely a
-nested loop the planner chooses over a hash join; `EXPLAIN (ANALYZE)` on the combined statement is
-the starting point.
+**It does not reproduce.** Measured again on 2026-09-27 with `EXPLAIN (ANALYZE)` against **261,176**
+entries — MORE rows than when it was recorded — the same statement runs in **143.5 ms** over the
+whole history and **59.5 ms** over a single month, on a **Hash Left Join** rather than the predicted
+nested loop. Not one line of the query changed in between, so the plan flipped for a reason outside
+it: statistics, most likely the stale `ANALYZE` a freshly reseeded testbed carries until something
+touches the table. That makes the original measurement believable and the diagnosis right, and it
+makes the defect a planner state rather than a property of the code.
 
-**Why it matters beyond a red test.** §3 sets an API p95 of 200 ms, and this is a staff action on
-the treasury screen that fails outright rather than degrading. The operator sees «حدث خطأ ما.» —
-the generic fallback, because a 500 carries no code the screen can explain — so the one refusal a
-person cannot act on is also the only one that is not a sentence.
+**What the green e2e runs did NOT prove.** `e2e/safra-treasury.spec.ts` › «the whole lifecycle» is
+**skipped**, not passed: it loops backwards through dates and calls
+`test.skip(openStatus !== 201, 'Every recent day is already claimed…')` once every candidate period
+is taken, which is the state the shared testbed is in. So every green run since carried no evidence
+either way. What it does prove is narrower and still useful — the loop asserts that every refusal
+of ≥400 reads as a sentence, and it reached the skip, so no 500 occurred on the way there.
 
-**How it shows:** `e2e/safra-treasury.spec.ts` › «the whole lifecycle». The spec loops backwards
-through dates until a period opens; it asserts every refusal reads as a sentence, and a 500 does
-not. 531 of 532 e2e tests pass around it.
+**What closes it.** A regression guard rather than a note, because a plan that flipped once can flip
+back and the failure mode is a 500 on the treasury screen rather than a red test:
+`safra-payout.integration.test.ts` › «opens a period without approaching the read timeout» times
+`service.open()` over the whole ledger and fails above **5 seconds** — a third of the read timeout,
+~35× the measured time, loose enough that a slow machine or a parallel suite cannot fail it and
+tight enough that the 16-second plan cannot pass.
+
+It goes through `open` rather than through the statement on purpose: `accruedIn` is private, and a
+test holding its own copy of the SQL would stay green while the service's query went slow. `open` is
+also what the operator presses — the overlap check, then `accruedIn`, then the insert — and the 500
+was the whole of that call. The test's own timeout is raised to 20 seconds, above both the bound and
+the database's read timeout, so the assertion prints the measured figure instead of vitest reporting
+its own 5-second cutoff first.
+
+**Watched to fail.** A `pg_sleep(6)` planted inside `accruedIn`'s `WHERE` produced
+«opening over the whole ledger took 6209 ms; M-11 was a 15-second read timeout: expected 6209 to be
+less than 5000», and the service file was `diff`ed back to byte-identical afterwards.
+
+**If it returns**, the first thing to run is `ANALYZE ledger_entries; ANALYZE refunds;` and re-read
+the plan — and then the fix is an index or a rewrite rather than a retry, because a staff action on
+the treasury must degrade rather than fail (§3, API p95 200 ms).
 
 ## 5. Should-have before production
 
@@ -5466,32 +5489,57 @@ movements that ran at once, and the historical replay had nothing else to sort b
 its balance and was clamped to it, leaving its withdrawable part at zero. `wallet_restriction_backfill`
 records the count.
 
-### O-e2e-5 — `partner-calendars.spec.ts` names a date, and the calendar moved past it
+### O-e2e-5 — Closed: the spec takes its day from the calendar, not from a literal
 
-**Status:** open · **Severity:** Medium · **Owner:** engineering · **Recorded:** 2026-09-01
+**Status:** CLOSED 2026-09-27 · **Owner:** engineering · **Recorded:** 2026-09-01 ·
+**Fixed:** 2026-09-04, and recorded as open here for twenty-three days after it was fixed
 
-`e2e/partner-calendars.spec.ts:45` looks for `[data-day="2026-08-22"]`, a date written into the
-spec. The dashboard shows the CURRENT month, so the assertion held while it was August and started
-failing on 1 September for every run, on every machine, with no code change — the shape O-e2e-3
-describes, arriving from the calendar rather than from accumulated rows.
+`e2e/partner-calendars.spec.ts:45` looked for `[data-day="2026-08-22"]`, a date written into the
+spec. The dashboard renders the CURRENT month, so it passed for the weeks it was written in and
+failed every day from 1 September, on every machine, with no code change.
 
-It is the only red in the suite besides `customer-gifts` (O-e2e-3): **382 passed, 2 failed, 4
-skipped** on 2026-09-01. Both failures predate today's work and neither touches it.
+**It was fixed on 2026-09-04** by commit `34d7ab4` («stop four specs failing for reasons that are
+not defects»), which took the day from the rendered grid — `cells.nth(count / 2)`, the middle of
+whatever month is showing, avoiding the first and last cells whose own edge cases other assertions
+cover. The literal survives only in the comments that explain what it did.
 
-**The work:** derive the day under test from the run's own clock — a booking the spec creates, or
-the first day the month actually renders — rather than a literal. **To unblock:** nothing external.
+**What this entry is now a record of** is not the defect but the register drifting from the code: it
+described the current state for three weeks after that state changed. `grep` for the literal is what
+closed it, and «verify the register against the code» is the standing answer — a register entry is a
+claim about a past state, never a reading of the present one.
 
-### O-test-4 — `support.integration.test.ts` fails once in a while under the parallel runner
+### O-test-4 — Closed: the fixture asserted an order it had never established
 
-**Status:** open · **Severity:** Low · **Owner:** engineering · **Recorded:** 2026-09-01
+**Status:** CLOSED 2026-09-27 · **Owner:** engineering · **Recorded:** 2026-09-01
 
-«shows a staff reply that is not internal» read `customer` where it expected `staff`, once, in a full
-`pnpm verify`; the same file passed alone and the next full run was 235/235, 3,599 tests green. It
-touches nothing the wallet work of that day changed.
+`support.integration.test.ts` › «shows a staff reply that is not internal» read `customer` where it
+expected `staff`, once, in a full `pnpm verify`; the same file passed alone and the next full run was
+235/235.
 
-The shape is the one O-e2e-4 records for the browser suite — suites sharing one database, running in
-parallel, one of them committing. **The work:** make the support fixture address rows it created
-rather than the newest matching row. **To unblock:** nothing external.
+**The recorded cause was wrong, and worth stating plainly.** It was attributed to «suites sharing one
+database, running in parallel, one of them committing», with the work given as «make the support
+fixture address rows it created rather than the newest matching row». The fixture already addressed
+its own thread by reference, and nothing outside the transaction can reach it.
+
+**The real cause is the trap §8 records.** `created_at` defaults to `now()`, which is the
+TRANSACTION's timestamp, and the whole file runs inside one rollback transaction — so the opening
+message and the staff reply carry the identical instant to the microsecond. `thread()` orders by
+`created_at ASC, id ASC`, and with the timestamps tied the ORDER IS THE UUIDv7 TIEBREAKER, whose
+ordering inside a single millisecond is its random tail. Roughly one run in two was available to
+fail; it surfaced rarely only because two inserts usually land a millisecond apart.
+
+**Nothing is wrong in the service.** In production these are two transactions, seconds or days apart,
+and `created_at` separates them. The defect was a fixture asserting an order it never established, so
+the row now states its own time — `now() + INTERVAL '1 second'`, which is both true and the thing the
+assertion is about.
+
+**Watched to fail**, and the mutation reproduced the recorded symptom exactly: flipping the interval
+to `- INTERVAL '1 second'` gives «expected 'customer' to be 'staff'», the same words the flake
+produced. That is what confirms the diagnosis rather than merely stopping the flake.
+
+**Swept:** `INSERT INTO messages` appears in one other test, which asserts a LENGTH rather than an
+order and is therefore unaffected. The general shape — two rows written in one test transaction and
+an order asserted between them — is what §8's `now()` entry exists to warn about.
 
 ### O-e2e-4 — a spec cannot address "the last page" once a table passes COUNT_CAP
 
@@ -5647,33 +5695,92 @@ whole request and take away the one thing the banner promises; those three fail 
 dropped, and an invitation for somebody to later "fix" the omission on a route with no
 verification check. Now `.omit({ initialUnits: true })`.
 
-### O-web-1 — A refused account page says «تعذّر التحميل» when it could say why
+### O-web-1 — Closed: the account area says WHY, in one place, for sixteen pages
 
-**Status:** open · **Severity:** Low · **Owner:** engineering · **Recorded:** 2026-08-21
+**Status:** CLOSED 2026-09-27 · **Severity:** Low · **Owner:** engineering ·
+**Recorded:** 2026-08-21 · **Found by Bashar, on his own account**
 
-`apps/web/src/lib/account.ts` mapped BOTH 401 and 403 to `'unauthenticated'`, so an account with
-no `customer_profiles` row — which the API refuses precisely, with `customer.profile_missing` —
-reached محفظتي as «انتهت الجلسة، سجّل الدخول مجدداً». False, and a LOOP: signing in again yields
-the same token, the same 403 and the same sentence, so the only action the page offers is the one
-that cannot work. Reachable by any of the ~3,000 partner accounts, since the customer site's
-sign-in refuses staff but not partners. **Found by Bashar on 2026-08-21, on his own account.**
+`apps/web/src/lib/account.ts` mapped BOTH 401 and 403 to `'unauthenticated'`, so an account with no
+`customer_profiles` row — which the API refuses precisely, with `customer.profile_missing` — reached
+محفظتي as «انتهت الجلسة، سجّل الدخول مجدداً». False, and a LOOP: signing in again yields the same
+token, the same 403 and the same sentence, so the only action the page offered was the one that
+cannot work.
 
-**Fixed on 2026-08-21**: 403 now maps to `failed`, so the page says «تعذّر التحميل» — vague, but
-true, and it does not send anybody to sign in again. Held by `account-refusal.test.ts`, whose
-central assertion is the negative one.
+**Fixed on 2026-08-21** by mapping 403 to `failed`, which made the page say «تعذّر التحميل» — vague,
+but true. Held by `account-refusal.test.ts`, whose central assertion is the negative one.
 
-**What remains, and why it was not done at the same time.** «تعذّر التحميل» is not the useful
-sentence. The useful one names the cause — «هذا حساب شريك، ولوحة العميل ليست له» — and that needs
-a page state which SIXTEEN account pages do not have, plus its copy in three locales. Doing it
-under cover of a bug fix would have been a large untested change to every personal screen in the
-customer app. **To unblock:** nothing external; it is a decision about how much the customer app
-should say to somebody in the wrong place. **Order:** after the launch blockers.
+**What remained, and what closed it.** «تعذّر التحميل» is not the useful sentence, and the reason
+this stayed open was that the useful one «needs a page state which SIXTEEN account pages do not
+have, plus its copy in three locales». The premise was wrong: every personal screen is nested under
+`[locale]/account/`, so **one layout answers for all sixteen and not one of them changed**.
 
-**Related, and already closed:** the fixture that exposed it. `seed-testbed.ts` created the
-applicant account as a `users` row with no profile and no wallet, on the reasoning that applying
-needs neither. True, and beside the point — it is a CUSTOMER account, and `AuthService.register`
-writes user + profile + zero wallet in one transaction, so a customer made of only the first was
-a shape no registration can produce. The fixture now writes all three.
+`apps/web/src/app/[locale]/account/layout.tsx` now renders the named cause — «هذا الحساب ليس حساب
+عميل», with what that means and what to do — instead of `children`, and offers the two actions that
+can actually work: browse, and sign out so a customer account can sign in.
+
+**It costs no request.** `customerProfileId` is a CLAIM on the access token the API itself issued,
+and `!claims.customerProfileId` is the exact condition behind `CUSTOMER_PROFILE_MISSING` — so
+reading the cookie answers the same question the 403 does, without asking. It is NOT authorization:
+the API re-derives it from the same token and refuses on its own, so a tampered cookie buys a
+different paragraph and nothing else.
+
+**Driven**, not inferred: signed in on the customer site as an account whose profile is soft-deleted,
+and walked all ten sections — نظرة عامة, حجوزاتي, محفظتي, الفواتير, بطاقات الهدايا, المفضلة,
+النزاعات, الملف الشخصي, الدعم, تقييماتي. Every one names the cause, none says «تعذّر التحميل», none
+redirects to sign in. At 390 / 768 / 1024 / 1440 px with no sideways scroll, the browse link 40px
+high below `lg`, and the sign-out control confirmed to actually end the session.
+
+**Held by `account-segment.test.ts`**, which is a SWEEP rather than a test of the layout: the
+regression this cannot otherwise see is a new personal screen added OUTSIDE the segment, which
+inherits nothing and leaves every existing test green. Both halves were watched to fail — a planted
+nested `layout.tsx` and a planted `[locale]/wallet/page.tsx`.
+
+**Found beside it, and NOT fixed — see §7.** The customer app's sign-in has no second step, so an
+account with two-factor enabled cannot complete it there at all.
+
+### O-web-18 — A partner cannot sign in on the customer site, and the form does not say so
+
+**Status:** OPEN, needs a DECISION · **Severity:** Medium · **Owner:** **Bashar** (a product
+decision, then engineering) · **Found 2026-09-27**, while driving `O-web-1`
+
+**What happens.** A partner or partner employee types their address and password on the customer
+site. The API answers `auth.email_code_sent` — correct, and a code really is emailed — and the form
+renders that sentence: «أرسلنا رمزًا من ستة أرقام إلى بريدك الإلكتروني. أدخله لإتمام تسجيل الدخول.»
+**There is nowhere to enter it.** `apps/web/src/components/auth-form.tsx` posts `email` and
+`password` and has no second step, so the instruction is a true sentence in a place where it cannot
+be followed — the shape §«Built is not driven» names, and the one that reads as a broken product
+rather than as a refusal.
+
+**The capability exists on both sides of it.** `loginSchema` accepts `emailCode`, the customer app's
+own `/api/auth/login` route forwards it unchanged because it validates against that same schema, and
+`partner-login-form.tsx` has the whole two-step flow — including a resend that carries the password,
+because a resend taking only an address would post mail at any inbox with an account here. What is
+missing is the customer app's half of it.
+
+**Who it reaches: 3,462 accounts** — 2,998 partners and 464 partner employees, every one of which has
+the emailed second factor, which `O-partner-4` made mandatory. **No customer is affected**: not one
+customer account has TOTP and the customer app offers no enrolment, so nothing but a partner account
+can reach this branch.
+
+**Why it is a decision and not a bug to fix.** There are two coherent answers and they are opposite:
+
+1. **Build the second step**, mirroring the partner portal — a code field, a resend route, copy in
+   three locales. Partners may then sign in as customers, which is what the site allows today.
+2. **Refuse a partner outright**, the way a STAFF account is already refused here. The login route's
+   own docblock gives the argument: this is the internet-facing origin that renders partner-supplied
+   content, and a session held here is blast radius. The same reasoning half-applies to a partner,
+   and the separation it recommends — «staff who want to book use a personal account» — applies
+   unchanged.
+
+Option 2 is smaller and more consistent with what is already written down; option 1 is friendlier to
+a partner who also travels. **The engineering is not the hard part either way, and picking is not
+engineering's call.**
+
+**What is already true whichever way it goes.** Nobody who gets past sign-in meets a vague sentence
+any more: `O-web-1` closed that, and an account with no customer profile is told exactly what it is
+on all sixteen personal screens.
+
+**To unblock:** Bashar, on 1 or 2.
 
 ### O-page-1 — What numbered pages cost, and when it stops being affordable
 
@@ -6441,41 +6548,31 @@ which is a Next.js service that could carry the browser as the customer app does
 the contract being produced somewhere other than where it is stored and hashed. Recorded rather
 than chosen.
 
-### O-staff-3 — A staff member's city scope can be READ and no longer SET
+### O-staff-3 — Closed: the scope editor is back, on the person's own record
 
-**Status:** open, and it is a lost capability rather than missing work ·
-**Owner:** engineering · **Recorded:** 2026-08-23
+**Status:** CLOSED 2026-09-27 · **Owner:** engineering · **Recorded:** 2026-08-23 ·
+**Built:** 2026-09-18, and recorded as open here for nine days after it was built
 
 نطاق العمل — scoping a staff member to particular cities — was a paged table on الموظفون with an
 editing panel beside it. الموظفون was simplified on 2026-08-23 (Bashar: _"too complicated"_) and the
-table went, correctly: a scope is a property of a PERSON, and a paged list of everybody's scope sat
-on that page only because there was nowhere else to put it.
+table went, correctly. **The editor went with it and nothing replaced it**, so the console could show
+a super admin that a colleague was restricted to Damascus and give them no way to add Aleppo — while
+`PUT /admin/staff/:userId/scope` sat intact with no caller.
 
-**The editor went with the table, and nothing replaced it.** صفحة الموظف now DISPLAYS the scope —
-`StaffService.detail` joins `staff_scope_cities` and returns city names, with `[]` meaning every
-city — and offers no way to change it. `grep -rn "PUT" apps/admin/src | grep -i scope` returns
-nothing.
+**It was built on 2026-09-18** by commit `284044f` («let a super admin set a staff member's city
+scope from their record»). `StaffScopeEditor` renders on صفحة الموظف beside the النطاق row it
+already displayed, with the `all_cities` / `cities` choice and the city picker, posting to the
+existing route — and only where a scope can apply, since a super admin is not scopable and the form
+would be a control whose every submission is refused.
 
-So the console can show a super admin that a colleague is restricted to Damascus and give them no
-way to add Aleppo. **The API side is intact**: `PUT /admin/staff/:userId/scope` works, is guarded by
-`STAFF_MANAGE`, and revokes sessions on a narrowing. It was deliberately NOT deleted alongside the
-dead `GET /admin/staff/scopes` — removing an endpoint because its only caller went away turns a
-missing screen into a missing capability, and the console would then have to grow the endpoint back
-to get the feature back.
+**What this entry is now a record of** is the same drift `O-e2e-5` records: the work was done and the
+register was not. Confirmed against the code on 2026-09-27 — the import, the render and the
+`isScopable` guard are all present on the page, and the screen was driven in a browser the same day.
 
-**What it needs:** a scope editor on صفحة الموظف, beside the النطاق row it already renders — the
-cities picker plus the `all_cities` / `cities` choice, posting to the existing route. Roughly the
-panel that was deleted, rebuilt for one person instead of a table.
-
-**Why it is worth doing rather than closing:** scoping is the mechanism behind
-`.claude/CLAUDE.md`'s standing guarantee that a scope is server-enforced, and `scopeNote` on صفحة
-الموظف still states that guarantee to the reader. A promise the screen makes and cannot act on is
-the same defect as a capability with no feature behind it — see `O-staff-1`.
-
-**How it was found:** by checking what else died before deleting `GET /admin/staff/scopes` as dead
-code. The read really was dead; the write only looked dead. That distinction is the finding.
-
----
+**The finding that produced it is still the durable part.** It was found by checking what else died
+before deleting `GET /admin/staff/scopes` as dead code. The read really was dead; the write only
+looked it. Removing an endpoint because its only caller went away turns a missing screen into a
+missing capability.
 
 ### O-partner-11 — Enforcement mail went to `partners.email`, which can differ from the account
 
@@ -6957,28 +7054,53 @@ assertion askable.
 `packages/contracts/src/table-preferences.ts`, the three two-table pages, and the seven routes listed
 above. `pnpm verify` 2,919 (nothing skipped, `DATABASE_URL` exported) · `pnpm e2e` 277.
 
-### O-staff-2 — صفحة الموظف shows no per-person activity
+### O-staff-2 — Closed: نشاط هذا الموظف is on the record
 
-**Status:** open · **Owner:** engineering · **Recorded:** 2026-08-23
+**Status:** CLOSED 2026-09-27 · **Owner:** engineering · **Recorded:** 2026-08-23
 
 When مصفوفة الصلاحيات and نطاق العمل came off الموظفون on 2026-08-23, the page's docblock said آخر نشاط
-"moved to the member's own record". **It did not.** Nobody built it, the detail payload carries no
-history, and the sentence was written describing an intention rather than a change. It was then read,
-believed, and repeated back as fact in a cross-session message before anyone checked — which is the
-whole mechanism by which a false comment becomes a second source of truth.
+"moved to the member's own record". **It did not.** Nobody built it, the detail payload carried no
+history, and the sentence was written describing an intention — which was then read, believed, and
+repeated back as fact in a cross-session message before anyone checked.
 
-The platform-wide list is back on الموظفون at Bashar's request (2026-08-23) and سجل التدقيق has the
-complete record. What is missing is the narrow one: **what has this person done**, on their own page.
+**What was built.** `GET /admin/staff/:userId/activity`, guarded by `STAFF_MANAGE`, and a
+نشاط هذا الموظف panel at the foot of صفحة الموظف — last on the record on purpose, because الإجراءات
+moved directly under الحساب when a super admin could not find the controls, and a trail above them
+would bury them again.
 
-**Why it is worth building rather than closing:** the two answer different questions. Somebody
-reading a colleague's record is deciding whether their access is right, and "signed in twice this
-month and changed one booking" answers that where a platform-wide feed does not. `audit_log` already
-carries `actor_user_id`, so the query is one indexed filter on the endpoint that already exists.
+**It is the SAME query, narrowed.** `AuditLogService.staffActivity` gained an `actorUserId` rather
+than getting a query of its own, so the projection, the ordering, the cap and the staff-role
+predicate are decided once and cannot drift into telling two screens two stories about one event.
+The filter is added BESIDE the staff-role predicate, never instead of it — a person's page must not
+become a door to their CUSTOMER actions, which are `audit_log.read`, a capability `staff.manage` does
+not carry.
 
-**When:** الإجراءات moved directly under الحساب on 2026-08-23, which shortened the record and left the
-natural space for it at the bottom.
+**An identity, not a name.** The existing `actorSearch` resolves a typed TERM against `users` and is
+a reader's guess; this is an id the screen already holds. Two colleagues called أحمد would each read
+the other's work on their own page if it went through a name match, and the test plants exactly that
+pair.
 
----
+**Paged like everything else**, with its own `TABLE_SECTIONS` key (`staffMemberActivity`) and
+namespaced parameters `?apage=`/`?asize=`. The record screen already carries `?page=`/`?size=` so
+that «رجوع» restores the reader's place in الموظفون; a pager writing the plain names would rewrite
+where the back link goes. Its `TABLE_SECTION_PATHS` entry is the registry, not the record, for the
+reason `partnerViolations` states — a path in that map feeds a REDIRECT and must never contain a
+record reference.
+
+**Held by `staff-member-activity.integration.test.ts`** — five assertions, every one watched to fail.
+Two mutations: dropping the actor filter reddened all five, and replacing the staff-role predicate
+with `true` reddened the one that matters, «never surfaces what that account did as a CUSTOMER».
+
+The first version of the namesake assertion stayed GREEN against the dropped filter, because it asked
+whether one named row was absent and the unfiltered page is the newest twenty-five rows of an audit
+log with thousands in it — the row it named simply was not on that page. It now asserts over every
+row's actor. A test whose fixture cannot reach the thing it protects reports coverage and checks
+nothing.
+
+**Driven**, not inferred: signed into the console, opened three staff records, read ten rows and the
+pager («صفحة ١ من ٣٩ · اعرض ١٠ صفًا · ٣٨٢ نتيجة»), opened an activity row and got 200, confirmed
+«رجوع» still carried `?page=2` after the trail was paged, and checked 390 / 768 / 1024 / 1440 px with
+no sideways scroll at any of them.
 
 ### O-staff-4 — The enforcement policy is built and DRIVEN, on both sides
 
@@ -7131,22 +7253,29 @@ asking the guest for a better one.
 
 ---
 
-### O-partner-1 — Two observations left open on الشركاء
+### O-partner-1 — One observation answered, one still a decision
 
-**Status:** open · **Severity:** Low · **Owner:** engineering · **Recorded:** 2026-08-25
+**Status:** half closed 2026-09-27 · **Severity:** Low · **Owner:** **Bashar** for what remains ·
+**Recorded:** 2026-08-25
 
 §8.1 is met — see the commits of 2026-08-25 that added the map location and the transfer details.
 Bashar agreed the page is complete against that section. Two things were noticed while doing it and
-deliberately NOT investigated, so they are recorded rather than assumed:
+deliberately NOT investigated, so they were recorded rather than assumed.
 
-- **§8.2's «أنواع أخرى قابلة للإضافة من الإدارة».** Whether the console can add a new accommodation
-  type was not checked — it is a different screen. Unknown, not missing.
-- **The map location is READ-ONLY on the partner record.** §8.1 lists it as registration data and the
-  screen now shows it; nothing lets staff correct a wrong pin. Whether that is wanted is a decision.
+- **§8.2's «أنواع أخرى قابلة للإضافة من الإدارة» — ANSWERED 2026-09-27, and it was already there.**
+  «Unknown, not missing» was the right way to record it and the answer is that the console can add
+  one: `PropertyTypes` on الإعلانات carries a create form posting to `POST /admin/property-types`,
+  which requires the Arabic, English and German names — the catalogue rule is total, and a type with
+  no German name is a German customer reading Arabic in a filter — plus retire and restore through
+  `PATCH /admin/property-types/:code`. Nothing to build.
+- **The map location is READ-ONLY on the partner record — still open, and it is a decision.** §8.1
+  lists it as registration data and the screen shows it; nothing lets staff correct a wrong pin.
+  Whether staff SHOULD be able to is the question, and it is not an engineering one: the coordinate
+  is part of what SAFRA verified against the documents, so a staff edit is either a correction or a
+  quiet change to a verified fact, and which it is decides whether it needs a reason, an audit entry
+  and a re-verification. **To unblock:** Bashar.
 
 Neither is a blocker for anything.
-
----
 
 ### O-book-5 — What the final booking SRS audit found, and what closed it
 
@@ -7460,14 +7589,15 @@ and the reason the console has no endpoint that reveals a code either.
 
 ## 7. Open decisions needed from Bashar
 
-| #   | Decision                                | Blocks                           | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| --- | --------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 193 | Hosting provider and region             | M-1, and therefore M-3, S-1, S-3 | The single highest-leverage decision outstanding                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| 192 | WhatsApp BSP                            | S-2                              |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| 194 | Partner payout mechanism per country    | Item 84                          | Correspondent-banking problem, not a card-scheme one                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| 195 | Maps provider billing account           | Map UI                           | MapLibre + MapTiler recommended                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| —   | Retention period for identity documents | S-4                              | Compliance input needed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| 196 | Rates to SYP for EUR, JOD and LBP       | Every cross-currency movement    | **USD is the platform's default and needs nothing further**: `DEFAULT_MONEY_CURRENCY` is USD, declared once now rather than twice, and the USD path is pinned end to end across wallets, gift cards, compensation, refunds and ledger postings by `default-currency.integration.test.ts`, which deletes every non-USD rate first. EUR, JOD and LBP hold no rate and REFUSE with `pricing.unavailable` rather than defaulting — watched to fail by reinstating the old `?? '1'`. **The ledger's unit stays SYP and cannot follow the default**: `ledger_entries` is append-only, `trialBalance()` sums `amount_syp` across every group, and 71,463 rows are already in SYP — new rows in another unit would silently mix currencies four orders of magnitude apart. So the remaining work is one number per currency via `POST /admin/fx-rates`. **Business decision, no engineering left.** |
+| #   | Decision                                              | Blocks                           | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --- | ----------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 193 | Hosting provider and region                           | M-1, and therefore M-3, S-1, S-3 | The single highest-leverage decision outstanding                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| 192 | WhatsApp BSP                                          | S-2                              |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 194 | Partner payout mechanism per country                  | Item 84                          | Correspondent-banking problem, not a card-scheme one                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 195 | Maps provider billing account                         | Map UI                           | MapLibre + MapTiler recommended                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| —   | Retention period for identity documents               | S-4                              | Compliance input needed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 196 | Rates to SYP for EUR, JOD and LBP                     | Every cross-currency movement    | **USD is the platform's default and needs nothing further**: `DEFAULT_MONEY_CURRENCY` is USD, declared once now rather than twice, and the USD path is pinned end to end across wallets, gift cards, compensation, refunds and ledger postings by `default-currency.integration.test.ts`, which deletes every non-USD rate first. EUR, JOD and LBP hold no rate and REFUSE with `pricing.unavailable` rather than defaulting — watched to fail by reinstating the old `?? '1'`. **The ledger's unit stays SYP and cannot follow the default**: `ledger_entries` is append-only, `trialBalance()` sums `amount_syp` across every group, and 71,463 rows are already in SYP — new rows in another unit would silently mix currencies four orders of magnitude apart. So the remaining work is one number per currency via `POST /admin/fx-rates`. **Business decision, no engineering left.** |
+| —   | Partners on the customer site: second step, or refuse | `O-web-18`                       | 3,462 accounts see «we emailed you a code» with nowhere to type it. Build the step, or refuse a partner the way a staff account already is.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 ### OPEN DECISION — how many bed kinds, and one per unit or an inventory? (2026-09-16)
 
