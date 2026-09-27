@@ -664,7 +664,10 @@
     "bookingPaymentDeadline": "Zahlungsfrist endet",
     "unpaidTitle": "Ihre Zahlung ist noch nicht eingegangen",
     "unpaidBody": "Ihre Buchung ist bis zum oben genannten Zeitpunkt reserviert. Das SAFRA-Team kontaktiert Sie zur Zahlungsabwicklung; geht der Betrag nicht rechtzeitig ein, wird die Buchung storniert und die Daten werden freigegeben.",
-    "bookingTotalNeutral": "Buchungssumme"
+    "bookingTotalNeutral": "Buchungssumme",
+    "notCustomerTitle": "Dies ist kein Kundenkonto",
+    "notCustomerBody": "Dieses Konto kann sich anmelden, hat aber keinen Kundendatensatz — es gibt hier also keine Buchungen, kein Guthaben und keine Rechnungen. Partnerkonten werden über das Partnerportal verwaltet. Wenn Sie ein Kundenkonto haben, melden Sie sich ab und mit diesem wieder an.",
+    "notCustomerBrowse": "Unterkünfte ansehen"
   },
   "ads": {
     "title": "In der Nähe, von unseren Partnern",

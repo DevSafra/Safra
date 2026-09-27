@@ -664,7 +664,10 @@
     "bookingPaymentDeadline": "Payment window closes",
     "unpaidTitle": "We have not received your payment yet",
     "unpaidBody": "Your booking is held until the time above. The SAFRA team will contact you to complete payment; if the window closes before the amount is received the booking is cancelled and the dates are released.",
-    "bookingTotalNeutral": "Booking total"
+    "bookingTotalNeutral": "Booking total",
+    "notCustomerTitle": "This is not a customer account",
+    "notCustomerBody": "This account can sign in, but it has no customer record — so there are no bookings, wallet or invoices to show here. Partner accounts are managed from the partner portal. If you have a customer account, sign out and sign in with that one.",
+    "notCustomerBrowse": "Browse places to stay"
   },
   "ads": {
     "title": "Nearby, from our partners",
