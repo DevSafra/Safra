@@ -199,27 +199,34 @@ export default async function BookingDetailPage({
           })}
         </Row>
         {/*
-          Three labels, because there are three truths and one of them the page cannot know.
+          FOUR labels, because there are three truths and a fourth state where the page does not
+          know which it is looking at.
 
           «المطلوب دفعه» while unpaid and «الإجمالي المدفوع» once money is in — one label for both
-          called money paid that had not been. The third case is a CANCELLED booking: it may have
-          been paid and refunded, or cancelled for non-payment and never paid at all, and this
-          payload carries no capture signal to tell them apart. Read on BKG-2026-450171 after the
-          EC-001 sweep killed it: «الإجمالي المدفوع $196.99» on a booking cancelled BECAUSE nothing
-          was ever paid.
+          called money paid that had not been. Read on BKG-2026-450171 after the EC-001 sweep killed
+          it: «الإجمالي المدفوع $196.99» on a booking cancelled BECAUSE nothing was ever paid.
 
-          So a cancelled booking gets the neutral «إجمالي الحجز», which is true either way, and the
-          refunds list below says what actually came back when anything did. Naming the state
-          precisely would need a captured-at field in the payload — recorded as a follow-up rather
-          than guessed at from the status.
+          The CANCELLED case is the one that needed a third truth, and until 2026-09-27 the payload
+          could not supply it: such a booking may have been paid and refunded, or cancelled for
+          non-payment, and the two read identically. It now carries `paidAmount` — the sum of
+          CAPTURED payments, `null` when there were none — so the two are told apart, which is
+          finding 220.
+
+          `undefined` is kept as its own case and stays NEUTRAL. `null` means «captured nothing»,
+          and an absent field means «this API did not say» — collapsing them would print «لم يُدفع»
+          over a booking that was paid, the same class of confident lie in the other direction.
         */}
         <Row
           label={t(
             unpaid
               ? 'bookingTotalDue'
-              : booking.status === 'cancelled'
-                ? 'bookingTotalNeutral'
-                : 'bookingTotal',
+              : booking.status !== 'cancelled'
+                ? 'bookingTotal'
+                : booking.paidAmount === undefined
+                  ? 'bookingTotalNeutral'
+                  : booking.paidAmount === null || Number(booking.paidAmount) === 0
+                    ? 'bookingTotalUnpaid'
+                    : 'bookingTotal',
           )}
         >
           <span dir="ltr">

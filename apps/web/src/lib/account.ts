@@ -233,6 +233,16 @@ const bookingDetailSchema = z.object({
     instead of showing no ads. See «A zod .default() hides a missing field».
   */
   city: z.object({ slug: z.string() }).nullable().optional(),
+  /*
+    WHETHER MONEY WAS EVER RECEIVED — finding 220.
+
+    A cancelled booking may have been paid and refunded, or cancelled for non-payment and never
+    paid; without this the page cannot tell them apart and says the neutral «إجمالي الحجز» for
+    both. `null` means nothing was captured, which is a fact and not a missing field — so
+    `.nullable()`, never `.default('0.00')`: a zero is an amount and would read as one.
+  */
+  paidAmount: z.string().nullable().optional(),
+  paidAt: z.string().nullable().optional(),
   confirmationDeadlineAt: z
     .union([z.string(), z.date(), z.null()])
     .optional()

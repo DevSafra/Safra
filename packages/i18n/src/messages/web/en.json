@@ -667,7 +667,8 @@
     "bookingTotalNeutral": "Booking total",
     "notCustomerTitle": "This is not a customer account",
     "notCustomerBody": "This account can sign in, but it has no customer record — so there are no bookings, wallet or invoices to show here. Partner accounts are managed from the partner portal. If you have a customer account, sign out and sign in with that one.",
-    "notCustomerBrowse": "Browse places to stay"
+    "notCustomerBrowse": "Browse places to stay",
+    "bookingTotalUnpaid": "Booking total — never paid"
   },
   "ads": {
     "title": "Nearby, from our partners",

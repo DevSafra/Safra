@@ -667,7 +667,8 @@
     "bookingTotalNeutral": "Buchungssumme",
     "notCustomerTitle": "Dies ist kein Kundenkonto",
     "notCustomerBody": "Dieses Konto kann sich anmelden, hat aber keinen Kundendatensatz — es gibt hier also keine Buchungen, kein Guthaben und keine Rechnungen. Partnerkonten werden über das Partnerportal verwaltet. Wenn Sie ein Kundenkonto haben, melden Sie sich ab und mit diesem wieder an.",
-    "notCustomerBrowse": "Unterkünfte ansehen"
+    "notCustomerBrowse": "Unterkünfte ansehen",
+    "bookingTotalUnpaid": "Buchungssumme — nie gezahlt"
   },
   "ads": {
     "title": "In der Nähe, von unseren Partnern",

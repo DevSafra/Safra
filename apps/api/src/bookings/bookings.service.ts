@@ -255,6 +255,45 @@ export class BookingsService {
     `);
 
     /*
+      WHETHER MONEY WAS EVER RECEIVED, and how much of it.
+
+      ## The sentence this exists to make possible
+
+      Finding 220. A `cancelled` booking may have been paid and then refunded, or cancelled for
+      non-payment and never paid at all — and the payload carried nothing to tell those apart, so
+      the customer's page printed the neutral «إجمالي الحجز» for both. Honest, and less useful than
+      the truth: somebody whose money came back and somebody who never sent any read the same line.
+
+      It was found the other way round, which is worse. Before the neutral label, a booking the
+      EC-001 sweep had killed BECAUSE nothing was ever paid said «الإجمالي المدفوع $196.99».
+
+      ## `captured`, and only `captured`
+
+      Not `authorized`: an authorisation is a hold, the money has not moved, and telling a customer
+      it has is the exact claim that was wrong before. `min(captured_at)` rather than `max` — the
+      question is «when did SAFRA first receive anything», and a booking paid in two parts was paid
+      on the first of them.
+
+      ## It adds no reach
+
+      The booking was already found under the caller's own ownership condition, so this cannot
+      describe a booking they could not read. And it carries a SUM and a DATE only — no provider,
+      no provider reference, no method. A payment-processor identifier is operational plumbing a
+      customer would quote to their bank in error, which is the same line the refunds query draws.
+    */
+    const captured = await this.db.execute<{
+      paid_amount: string | null;
+      paid_at: string | null;
+    }>(sql`
+      SELECT sum(p.amount)::text     AS paid_amount,
+             min(p.captured_at)::text AS paid_at
+        FROM payments p
+       WHERE p.booking_id = ${booking.id}
+         AND p.deleted_at IS NULL
+         AND p.status = 'captured'
+    `);
+
+    /*
       Every room TYPE on the booking, as a second read.
 
       `unit` above is the LEAD line, so a customer's own booking page showed one type on a booking
@@ -272,6 +311,15 @@ export class BookingsService {
     return {
       ...booking,
       rooms: booking.rooms,
+      /*
+        `null` when nothing was ever captured, never `'0.00'`.
+
+        A zero is an amount and reads as one; the absence is the fact being reported. The consumer
+        types it `.nullable()` for the same reason — a default would invent a plausible figure for
+        a payload that stopped sending the field.
+      */
+      paidAmount: captured.rows[0]?.paid_amount ?? null,
+      paidAt: captured.rows[0]?.paid_at ?? null,
       lines: lines.rows[0]?.lines ?? [],
       refunds: refunds.rows.map((row) => ({
         amount: row.amount,
