@@ -7,6 +7,7 @@ import { RankingModule } from '../ranking/ranking.module.js';
 import { SanctionsModule } from '../sanctions/sanctions.module.js';
 import { MailService } from '../mail/mail.service.js';
 import { NotificationService } from '../notifications/notification.service.js';
+import { MediaRedriveService } from './media-redrive.service.js';
 import { NotificationRedriveService } from '../notifications/notification-redrive.service.js';
 import { DeadLetterService } from './dead-letter.service.js';
 import { MailProcessor } from './mail.processor.js';
@@ -85,6 +86,8 @@ import { GiftCardModule } from '../gift-cards/gift-card.module.js';
     DeadLetterService,
     NotificationService,
     NotificationRedriveService,
+    /* Re-drives lost image renders — `O-media-2`. Needs the `media` queue, registered above. */
+    MediaRedriveService,
     MailService,
   ],
   exports: [

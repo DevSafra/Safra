@@ -75,6 +75,19 @@ export const SCHEDULED_JOBS = {
    * there is nothing to do.
    */
   'notification-redrive': '*/5 * * * *',
+  /**
+   * Re-driving image renders whose jobs were lost — the recovery half media never had (`O-media-2`).
+   *
+   * Five minutes, matching `notification-redrive`, and for a version of the same reason: a lost
+   * render is a partner watching a spinner that will never stop, and the console gives up after
+   * forty seconds and tells them something is wrong. At :02 rather than on the multiple, so the two
+   * re-drives do not both run at the top of every fifth minute — one reads `notifications` and the
+   * other two media tables, and stacking them puts both indexed probes on the same second for no
+   * reason.
+   *
+   * It costs two indexed probes when there is nothing to do, which is the ordinary case.
+   */
+  'media-redrive': '2-59/5 * * * *',
 } as const;
 
 export type ScheduledJobName = keyof typeof SCHEDULED_JOBS;

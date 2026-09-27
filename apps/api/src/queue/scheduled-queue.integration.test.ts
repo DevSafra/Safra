@@ -109,6 +109,8 @@ describeIfReady('the scheduled queue', () => {
       } as never,
       /* The one whose recording lives at the call site rather than in its service. */
       { run: () => stub('notification-redrive').run() } as never,
+      /* And the media one, whose recording lives at the call site for the same reason. */
+      { run: () => stub('media-redrive').run() } as never,
       /* §6.4's refund sweep — records through `JobRunService` like the rest of them. */
       { sweep: () => stub('system-refunds').run() } as never,
       /* The hourly pass that retires gift cards past their expiry. */

@@ -630,26 +630,59 @@ export class MetricsService {
     some positions. The same clash cost time in `MessagingService` (`notifications`), which is why
     this one is named for what it measures instead.
   */
+  /**
+   * The render queue, by SUBJECT — both halves of one pipeline.
+   *
+   * It reported `property_images` only, and an advertising creative goes through the same
+   * `ImageService`, the same queue and the same worker. A creative stuck at `processing` was
+   * therefore invisible to the one signal that exists for exactly that failure — the asymmetry
+   * `O-media-2` records, where the listing pipeline predates a lesson and advertising inherited
+   * its shape.
+   *
+   * The label is added rather than a second metric being introduced, so an alert written against
+   * «is anything stuck» keeps working and gains the other half, instead of a second alert having
+   * to be remembered.
+   */
   private async imagePipeline(): Promise<Gauge[]> {
-    const rows = await this.db.execute<{ n: string; oldest: string | null }>(sql`
-      SELECT count(*)::text AS n,
+    const rows = await this.db.execute<{
+      subject: string;
+      n: string;
+      oldest: string | null;
+    }>(sql`
+      SELECT 'property_image' AS subject,
+             count(*)::text AS n,
              EXTRACT(EPOCH FROM (now() - min(updated_at)))::text AS oldest
-      FROM property_images
-      WHERE status = 'processing'
+        FROM property_images
+       WHERE status = 'processing' AND deleted_at IS NULL
+      UNION ALL
+      SELECT 'ad_campaign',
+             count(*)::text,
+             EXTRACT(EPOCH FROM (now() - min(updated_at)))::text
+        FROM ad_campaigns
+       WHERE image_status = 'processing' AND deleted_at IS NULL
     `);
-
-    const row = rows.rows[0];
 
     return [
       {
         name: 'safra_images_processing',
-        help: 'Uploaded photographs waiting for a worker to render their variants.',
-        samples: [{ labels: {}, value: Number(row?.n ?? 0) }],
+        help: 'Uploads waiting for a worker to render their variants, by subject.',
+        /*
+          Both series are ALWAYS reported, at zero when there is nothing waiting. A series that
+          disappears when it is healthy is a series an alert cannot distinguish from one whose
+          collector broke — the failure `safra_sanctions` records in its own note.
+        */
+        samples: rows.rows.map((row) => ({
+          labels: { subject: row.subject },
+          value: Number(row.n),
+        })),
       },
       {
         name: 'safra_images_processing_oldest_seconds',
-        help: 'Age of the longest-waiting unrendered photograph. 0 when none are waiting.',
-        samples: [{ labels: {}, value: Number(row?.oldest ?? 0) }],
+        help: 'Age of the longest-waiting unrendered upload, by subject. 0 when none are waiting.',
+        samples: rows.rows.map((row) => ({
+          labels: { subject: row.subject },
+          value: Number(row.oldest ?? 0),
+        })),
       },
     ];
   }

@@ -203,7 +203,7 @@ export class PropertyImageService {
 
       An enqueue that throws must not undo an upload the partner has already been told succeeded, and
       the row is the durable record: it sits at `processing` with its `original_key` set, which is
-      exactly what a re-drive needs and what `safra_images_processing_stuck` alerts on. Losing the
+      exactly what `media-redrive` needs and what `safra_images_processing` alerts on. Losing the
       job is recoverable; losing the row is not.
     */
     try {

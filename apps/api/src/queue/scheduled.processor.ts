@@ -7,6 +7,7 @@ import { RankingScheduler } from '../ranking/ranking.scheduler.js';
 import { SanctionsRefreshService } from '../sanctions/sanctions-refresh.service.js';
 import { CredentialRetentionService } from '../auth/credential-retention.service.js';
 import { WebhookRetentionService } from '../payments/webhook-retention.service.js';
+import { MediaRedriveService } from './media-redrive.service.js';
 import { NotificationRedriveService } from '../notifications/notification-redrive.service.js';
 import { JobRunService } from '../common/jobs/job-run.service.js';
 import { QUEUE } from './queue.definitions.js';
@@ -66,6 +67,7 @@ export class ScheduledProcessor {
     private readonly retention: WebhookRetentionService,
     private readonly credentials: CredentialRetentionService,
     private readonly redrive: NotificationRedriveService,
+    private readonly mediaRedrive: MediaRedriveService,
     private readonly systemRefunds: SystemRefundService,
     private readonly giftCardExpiry: GiftCardExpiryService,
     private readonly adExpiry: AdExpiryService,
@@ -124,6 +126,17 @@ export class ScheduledProcessor {
         */
         return this.runs.runExclusively('notification-redrive', 771_120_045, () =>
           this.redrive.run(),
+        );
+      case 'media-redrive':
+        /*
+          Its own advisory-lock key, and a DIFFERENT one.
+
+          Two jobs sharing a key means whichever runs second finds the lock held and SKIPS — the
+          defect `O-ops-3` records, where `webhook-retention` and `ranking-recompute` shared one and
+          a sweep could silently not happen. The number is arbitrary and only has to be unique.
+        */
+        return this.runs.runExclusively('media-redrive', 771_120_046, () =>
+          this.mediaRedrive.run(),
         );
       default: {
         const unreachable: never = name;
