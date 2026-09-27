@@ -503,11 +503,28 @@ export const ar = {
     readinessSome: '{incomplete} من {total} من إعلاناتك ينقصها شيء.',
     readinessDone: 'كل إعلاناتك مكتملة.',
     readinessAction: 'أكمِل الإعلانات',
+    /*
+      The NOUN is named and it agrees — «3 لا تظهر» was a bare numeral with a verb beside it, and
+      the verb has to agree with the number as much as a noun does («واحد لا يظهر», «اثنان لا
+      يظهران», «# إعلانات لا تظهر»). Naming «إعلان» also makes each line readable on its own,
+      which matters for a list a partner scans rather than reads.
+    */
     readinessGap: {
-      unit: '{n} لا تظهر في نتائج البحث',
-      location: '{n} لا تظهر على الخريطة',
-      photograph: '{n} بلا صور',
-      description: '{n} بلا وصف بالعربية',
+      unit:
+        '{n, plural, one {إعلان واحد لا يظهر في نتائج البحث} two {إعلانان لا يظهران في نتائج البحث} ' +
+        'few {# إعلانات لا تظهر في نتائج البحث} many {# إعلاناً لا يظهر في نتائج البحث} ' +
+        'other {# إعلان لا يظهر في نتائج البحث}}',
+      location:
+        '{n, plural, one {إعلان واحد لا يظهر على الخريطة} two {إعلانان لا يظهران على الخريطة} ' +
+        'few {# إعلانات لا تظهر على الخريطة} many {# إعلاناً لا يظهر على الخريطة} ' +
+        'other {# إعلان لا يظهر على الخريطة}}',
+      photograph:
+        '{n, plural, one {إعلان واحد بلا صور} two {إعلانان بلا صور} few {# إعلانات بلا صور} ' +
+        'many {# إعلاناً بلا صور} other {# إعلان بلا صور}}',
+      description:
+        '{n, plural, one {إعلان واحد بلا وصف بالعربية} two {إعلانان بلا وصف بالعربية} ' +
+        'few {# إعلانات بلا وصف بالعربية} many {# إعلاناً بلا وصف بالعربية} ' +
+        'other {# إعلان بلا وصف بالعربية}}',
     } as Record<string, string>,
     /*
       One sentence per event, and each is a LINK to the page that holds the detail.
@@ -531,13 +548,16 @@ export const ar = {
     kpiViolationsSub: 'اضغط لعرض التفاصيل',
     /* The furthest rung reached, so the card says what KIND of attention this needs. */
     kpiViolationsStage: 'أبعد مرحلة: {stage}',
-    kpiBookingsArriving: '{n} وصول هذا الأسبوع',
+    kpiBookingsArriving:
+      '{n, plural, one {وصول واحد} two {وصولان} few {# وصولات} many {# وصولاً} other {# وصول}} هذا الأسبوع',
     kpiBookingsNoneArriving: 'لا وصول هذا الأسبوع',
     kpiOccupancy: 'نسبة الإشغال',
     kpiOccupancyDetail: '{booked} من {available} ليلة',
     kpiResponse: 'متوسط سرعة الرد',
-    kpiResponseMinutes: '{n} دقيقة',
-    kpiResponseSample: 'عن {n} حجزًا خلال 90 يومًا',
+    kpiResponseMinutes:
+      '{n, plural, one {دقيقة واحدة} two {دقيقتان} few {# دقائق} many {# دقيقة} other {# دقيقة}}',
+    kpiResponseSample:
+      'عن {n, plural, one {حجز واحد} two {حجزين} few {# حجوزات} many {# حجزًا} other {# حجز}} خلال 90 يومًا',
     noData: '—',
     noDataYet: 'لا بيانات بعد',
 
@@ -604,7 +624,8 @@ export const ar = {
 
     /** التقويم — one unit, this month. */
     calendarTitle: 'تقويم {month} — كل وحداتك',
-    calendarDefaultPrice: '{count} وحدة · تبدأ من {price}',
+    calendarDefaultPrice:
+      '{count, plural, zero {لا وحدات} one {وحدة واحدة} two {وحدتان} few {# وحدات} many {# وحدة} other {# وحدة}} · تبدأ من {price}',
     /* One square per day, describing the portfolio rather than a single room. */
     calendarDayDetail: '{date} · محجوز {booked} · مغلق {blocked} · متاح {available}',
     /*
@@ -847,7 +868,8 @@ export const ar = {
     unitAdded: 'أُضيفت الوحدة.',
     unitAddFailed: 'تعذّرت إضافة الوحدة. راجع الحقول وحاول مرة أخرى.',
     unitCurrency: 'العملة',
-    unitGuests: '{n} ضيف',
+    unitGuests:
+      '{n, plural, zero {لا ضيوف} one {ضيف واحد} two {ضيفان} few {# ضيوف} many {# ضيفاً} other {# ضيف}}',
     unitInactive: 'موقوفة',
     openUnitCalendar: 'تقويم هذه الوحدة',
     /* The unit editor. Every unit on one screen, each saved on its own. */
@@ -992,18 +1014,22 @@ export const ar = {
     /* The range editor is folded away per unit: the calendar is what a partner came to read. */
     editRange: 'تعديل مدة',
     /* A property is a folder here, so it says how much is inside before it is opened. */
-    unitsInside: '{n} وحدة',
+    unitsInside:
+      '{n, plural, zero {لا وحدات} one {وحدة واحدة} two {وحدتان} few {# وحدات} many {# وحدة} other {# وحدة}}',
   },
 
   properties: {
     /** The handoff's §7.2 header, verbatim. */
     title: 'عروضي المنشورة على سفرة',
     note: 'التعديلات تمر بمراجعة سفرة قبل النشر',
-    count: '{n} عقار',
+    count:
+      '{n, plural, zero {لا عقارات} one {عقار واحد} two {عقاران} few {# عقارات} many {# عقاراً} other {# عقار}}',
     empty: 'لا عقارات بعد.',
     perNight: '/ ليلة',
-    units: '{n} وحدة',
-    reviews: 'من {n} تقييماً',
+    units:
+      '{n, plural, zero {لا وحدات} one {وحدة واحدة} two {وحدتان} few {# وحدات} many {# وحدة} other {# وحدة}}',
+    reviews:
+      'من {n, plural, one {تقييم واحد} two {تقييمين} few {# تقييمات} many {# تقييماً} other {# تقييم}}',
     /** Shown where a listing has no photo yet, in place of the 140px image. */
     noPhoto: 'لا صورة بعد',
     /*
@@ -1145,7 +1171,8 @@ export const ar = {
     */
     note: 'صورة الغلاف هي التي تظهر في نتائج البحث، وتُختار بزر «اجعلها صورة الغلاف» لا بالترتيب. تُعالَج كل صورة وتُزال منها بيانات الموقع قبل النشر.',
     empty: 'لا صور بعد. ارفع أول صورة لهذا العقار.',
-    count: '{n} من {max} صورة',
+    count:
+      '{n} من {max, plural, one {صورة واحدة} two {صورتين} few {# صور} many {# صورة} other {# صورة}}',
     upload: 'رفع صور',
     uploading: 'جارٍ الرفع…',
     cover: 'صورة الغلاف',
@@ -1188,7 +1215,8 @@ export const ar = {
     backToProperties: 'رجوع إلى عقاراتي',
     /* Each failure says which one it was: a partner who cannot tell them apart retries the wrong thing. */
     /* Several at once: what landed, and what the limit refused. */
-    uploadedSome: 'رُفعت {done} من {total} صور. تحقق من الصور المتبقية وأعد المحاولة.',
+    uploadedSome:
+      'رُفعت {done} من {total, plural, one {صورة واحدة} two {صورتين} few {# صور} many {# صورة} other {# صورة}}. تحقق من الصور المتبقية وأعد المحاولة.',
     limitReached: 'بلغت الحد الأقصى وهو {max} صورة لهذا العقار.',
     lastImage: 'لا يمكن أرشفة الصورة الأخيرة لعقار منشور. ارفع صورة بديلة أولاً.',
     failed: 'تعذّر تنفيذ الطلب.',
@@ -1518,7 +1546,8 @@ export const ar = {
     /** P-006, quoted by the handoff verbatim. */
     rule: 'لا يمكن حذف تقييم — يمكنك الرد عليه أو الإبلاغ عنه (P-006)',
     /** The §7.3 header figure. Shown only when there is an average to show. */
-    summary: 'المعدل العام ★ {average} من {n} تقييماً',
+    summary:
+      'المعدل العام ★ {average} من {n, plural, one {تقييم واحد} two {تقييمين} few {# تقييمات} many {# تقييماً} other {# تقييم}}',
     summaryEmpty: 'لا تقييمات بعد.',
     empty: 'لا تقييمات بعد. تظهر هنا بعد أن يقيّم ضيوفك إقاماتهم المكتملة.',
 
@@ -1773,7 +1802,7 @@ export const ar = {
     /* Named, because a list of roles offers one «حذف» per row and they are otherwise identical. */
     editLabel: 'تعديل الدور {name}',
     removeLabel: 'حذف الدور {name}',
-    held: 'يحمله {n}',
+    held: '{n, plural, one {يحمله موظف واحد} two {يحمله موظفان} few {يحمله # موظفين} many {يحمله # موظفاً} other {يحمله # موظف}}',
     heldNobody: 'لا يحمله أحد',
     confirmRemove: 'حذف الدور «{name}»؟ لا يمكن التراجع.',
     loadFailed: 'تعذّر تحميل الأدوار.',

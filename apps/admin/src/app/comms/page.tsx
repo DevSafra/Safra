@@ -195,7 +195,7 @@ function Summary({ counters }: { counters: Notifications['counters'] }) {
 
   return (
     <span className="text-13 text-faint">
-      {fill(t.sections.comms.window, { days: count(counters.windowDays) })}
+      {plural(t.sections.comms.window, { days: counters.windowDays })}
       {entries.map(([channel, statuses]) => {
         const failed = statuses['failed'] ?? 0;
         const delivered = (statuses['delivered'] ?? 0) + (statuses['sent'] ?? 0);

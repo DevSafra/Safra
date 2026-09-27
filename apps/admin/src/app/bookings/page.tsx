@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 
 import { getBookings, type BookingListItem } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
-import { count, dateRange, money } from '@/lib/format';
+import { dateRange, money } from '@/lib/format';
 import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
 import { TablePagination } from '@/components/table-pagination';
 import {
@@ -15,7 +15,7 @@ import {
   type AdminColumn,
 } from '@/components/admin-table';
 import { OutlineAction, TableToolbar, ToolbarNote } from '@/components/table-toolbar';
-import { bookingStatus, fill, t } from '@/lib/strings';
+import { bookingStatus, plural, t } from '@/lib/strings';
 import { oneOf, pageNumber, returnQuery } from '@/lib/search-params';
 import { isUnread, readerView } from '@/lib/table-size';
 import { MarkSectionSeen } from '@/components/mark-section-seen';
@@ -184,11 +184,16 @@ export default async function BookingsPage({
             result === 'failed' || result === 'unauthenticated' ? null : (
               <>
                 <ToolbarNote>
-                  {fill(
+                  {/*
+                    `plural`, and the count as a NUMBER — «حجز» has to agree with it, and
+                    `Intl.PluralRules` handed a pre-formatted string has nothing numeric to
+                    classify, so every figure would silently read as the singular.
+                  */}
+                  {plural(
                     result.counts.capped
                       ? t.sections.bookings.countAtLeast
                       : t.sections.bookings.count,
-                    { n: count(total(result.counts.byStatus)) },
+                    { n: total(result.counts.byStatus) },
                   )}
                 </ToolbarNote>
                 {/*

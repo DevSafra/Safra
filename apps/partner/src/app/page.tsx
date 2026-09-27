@@ -178,8 +178,9 @@ function Readiness({ listings }: { readonly listings: PartnerDashboard['listings
               (check) => (listings.counts[check] ?? 0) > 0,
             ).map((check) => (
               <li key={check} data-readiness-gap={check}>
-                {fill(t.dashboard.readinessGap[check] ?? `${check}: {n}`, {
-                  n: count(listings.counts[check] ?? 0),
+                {plural(t.dashboard.readinessGap[check] ?? `${check}: {n}`, {
+                  /* A NUMBER: `Intl.PluralRules` cannot classify a formatted string. */
+                  n: listings.counts[check] ?? 0,
                 })}
               </li>
             ))}
@@ -245,8 +246,8 @@ function Kpis({
         tone="text-text"
         sub={
           bookings.arrivingThisWeek > 0
-            ? fill(t.dashboard.kpiBookingsArriving, {
-                n: count(bookings.arrivingThisWeek),
+            ? plural(t.dashboard.kpiBookingsArriving, {
+                n: bookings.arrivingThisWeek,
               })
             : t.dashboard.kpiBookingsNoneArriving
         }
@@ -270,13 +271,13 @@ function Kpis({
         label={t.dashboard.kpiResponse}
         value={
           response
-            ? fill(t.dashboard.kpiResponseMinutes, { n: count(response.medianMinutes) })
+            ? plural(t.dashboard.kpiResponseMinutes, { n: response.medianMinutes })
             : t.dashboard.noData
         }
         tone="text-ok"
         sub={
           response
-            ? fill(t.dashboard.kpiResponseSample, { n: count(response.sampleSize) })
+            ? plural(t.dashboard.kpiResponseSample, { n: response.sampleSize })
             : t.dashboard.noDataYet
         }
       />
@@ -538,8 +539,9 @@ function Calendar({ calendar }: { readonly calendar: PartnerDashboard['calendar'
             already renders correctly, and putting invisible control characters into every money
             string in the app would change what a hundred assertions compare against for no defect.
           */}
-          {fill(t.dashboard.calendarDefaultPrice, {
-            count: count(calendar.unitCount),
+          {plural(t.dashboard.calendarDefaultPrice, {
+            /* A NUMBER: `Intl.PluralRules` cannot classify a formatted string. */
+            count: calendar.unitCount,
             price: ltrIsolate(amount(calendar.fromPrice, calendar.currencyCode)),
           })}
         </span>

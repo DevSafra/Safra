@@ -15,7 +15,7 @@ import {
   SelectField,
 } from '@/components/geo-form';
 import type { Geography } from '@/lib/api';
-import { t, apiErrorOf, fill } from '@/lib/strings';
+import { apiErrorOf, fill, plural, t } from '@/lib/strings';
 
 type Country = Geography['countries'][number];
 type Currency = Geography['currencies'][number];
@@ -62,7 +62,7 @@ export function CountryRows({
             <span className="font-bold text-text">{row.nameAr}</span>
             <span className="text-13 text-faint">
               {row.currencyCode ?? t.admin.noData} ·{' '}
-              {fill(c.activeCitiesShort, { n: String(row.activeCities) })}
+              {plural(c.activeCitiesShort, { n: row.activeCities })}
             </span>
             <span className="ms-auto flex items-center gap-2">
               <span

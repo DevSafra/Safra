@@ -2,7 +2,7 @@ import { getContracts, type ContractItem } from '@/lib/api';
 import { shortDate } from '@/lib/format';
 import { ConsolePanel } from '@/components/console-shell';
 import { FootNote, Ltr, StatusPill, type Tone } from '@/components/admin-table';
-import { fill, t } from '@/lib/strings';
+import { fill, plural, t } from '@/lib/strings';
 import { statusTone } from '@/lib/status-tone';
 
 /**
@@ -130,7 +130,7 @@ function statusLabel(contract: ContractItem): string {
 
   /* Inside 60 days the message becomes a countdown, which is what prompts a renewal. */
   return contract.daysToExpiry <= 60
-    ? fill(t.sections.contracts.expiringIn, { days: String(contract.daysToExpiry) })
+    ? plural(t.sections.contracts.expiringIn, { days: contract.daysToExpiry })
     : fill(t.sections.contracts.validUntil, { date: shortDate(contract.expiresAt) });
 }
 

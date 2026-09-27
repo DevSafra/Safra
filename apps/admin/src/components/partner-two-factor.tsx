@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { apiErrorOf, fill, t } from '@/lib/strings';
+import { apiErrorOf, plural, t } from '@/lib/strings';
 
 /**
  * Clearing a partner's second factor — the lost-phone path (§4.1 sensitive operation).
@@ -97,7 +97,7 @@ export function PartnerTwoFactor({
 
       {done !== null ? (
         <p role="status" className="mb-3 text-xs text-ok">
-          {fill(t.sections.partnerTwoFactor.done, { n: done })}
+          {plural(t.sections.partnerTwoFactor.done, { n: done })}
         </p>
       ) : null}
 

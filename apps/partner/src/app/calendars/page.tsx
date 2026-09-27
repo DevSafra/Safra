@@ -8,7 +8,7 @@ import { requireVerifiedPartner, sectionAccess } from '@/lib/gate';
 import { Shell } from '@/components/shell';
 import { SectionRefusal } from '@/components/section-refusal';
 import { amount, count, marketToday } from '@/lib/format';
-import { fill, t } from '@/lib/strings';
+import { fill, plural, t } from '@/lib/strings';
 
 /**
  * التقويمات — every unit's month on one screen, grouped under the property that owns it.
@@ -256,7 +256,7 @@ export default async function CalendarsPage({
               {property.reference}
             </span>
             <span className="ms-auto text-13 text-faint">
-              {fill(t.calendars.unitsInside, { n: count(property.units.length) })}
+              {plural(t.calendars.unitsInside, { n: property.units.length })}
             </span>
           </>
         );

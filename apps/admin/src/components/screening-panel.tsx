@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { SanctionsPolicy } from '@safra/contracts';
 
-import { apiErrorOf, fill, t } from '@/lib/strings';
+import { apiErrorOf, fill, plural, t } from '@/lib/strings';
 
 interface Candidate {
   name: string;
@@ -125,7 +125,7 @@ export function ScreeningPanel({
       >
         <p className={`text-sm ${advisory ? 'text-gold-read' : 'text-bad'}`}>
           {listStatus.imported
-            ? fill(t.sections.screening.listStale, { days: listStatus.ageDays ?? 0 })
+            ? plural(t.sections.screening.listStale, { days: listStatus.ageDays ?? 0 })
             : listStatus.fixtureLoaded
               ? t.sections.screening.listFixture
               : t.sections.screening.listMissing}

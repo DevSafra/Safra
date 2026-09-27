@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { COUNT_CAP } from '@safra/contracts';
 
 import { count } from '@/lib/format';
-import { fill, t } from '@/lib/strings';
+import { plural, t } from '@/lib/strings';
 
 /**
  * The toolbar note above الحجوزات must not print a capped figure as an exact one.
@@ -22,10 +22,18 @@ import { fill, t } from '@/lib/strings';
  * `total: 10000, capped: true`, which is the input asserted below.
  */
 describe('the الحجوزات toolbar note', () => {
-  /** The page's own choice of sentence, as `page.tsx` makes it. */
+  /**
+   * The page's own choice of sentence, as `page.tsx` makes it.
+   *
+   * `plural`, and the count as a NUMBER. «حجز» has to agree with the figure beside it — 3–10 takes
+   * the broken plural, 11–99 the accusative singular — and `Intl.PluralRules` handed a
+   * pre-formatted STRING has nothing numeric to classify, so every figure would silently resolve
+   * to `other` and read as the singular. That failure leaves every test green, which is why this
+   * helper mirrors the page rather than approximating it.
+   */
   const note = (byStatus: Record<string, number>, capped: boolean): string =>
-    fill(capped ? t.sections.bookings.countAtLeast : t.sections.bookings.count, {
-      n: count(Object.values(byStatus).reduce((sum, value) => sum + value, 0)),
+    plural(capped ? t.sections.bookings.countAtLeast : t.sections.bookings.count, {
+      n: Object.values(byStatus).reduce((sum, value) => sum + value, 0),
     });
 
   it('says «أكثر من» when any status hit the cap', () => {
@@ -42,6 +50,33 @@ describe('the الحجوزات toolbar note', () => {
 
     expect(rendered).not.toContain('أكثر من');
     expect(rendered).toContain(count(1020));
+  });
+
+  /**
+   * THE noun agrees with THE number — finding 236.
+   *
+   * «{n} حجز» was right for one booking and wrong for every other figure on the screen. Arabic has
+   * six plural categories and the boundaries are not an English speaker's: 3–10 takes the broken
+   * plural («# حجوزات»), **11–99 takes the accusative SINGULAR** («# حجزاً»), 100 and above the
+   * bare singular. A registry with 1,020 rows read «1,020 حجز» to every operator, all day.
+   *
+   * Every boundary is asserted rather than one sample, because the rule is the boundaries: a
+   * conversion that got `few` right and `many` wrong looks correct on the only number somebody
+   * happened to check.
+   */
+  it('makes the noun agree with the figure, at every boundary', () => {
+    const noun = (n: number) => note({ confirmed: n }, false).split(' · ')[0] ?? '';
+
+    expect(noun(0), 'zero').toContain('لا حجوزات');
+    expect(noun(1), 'one').toContain('حجز واحد');
+    expect(noun(2), 'two').toContain('حجزان');
+    expect(noun(5), 'few — the broken plural').toContain('حجوزات');
+    expect(noun(15), 'many — the accusative singular').toContain('حجزاً');
+    expect(noun(1020), 'many, grouped').toBe('1,020 حجزاً');
+    expect(noun(100), 'other — the bare singular').toBe('100 حجز');
+
+    /* And the one that was wrong before: a plural figure must NOT read as the singular. */
+    expect(noun(5), 'five bookings is not «5 حجز»').not.toMatch(/^5 حجز$/);
   });
 
   /**

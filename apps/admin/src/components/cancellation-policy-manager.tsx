@@ -172,8 +172,12 @@ function ladder(tiers: readonly CancellationTierRow[]): string[] {
   return [...tiers]
     .sort((a, b) => b.hoursBeforeCheckIn - a.hoursBeforeCheckIn)
     .map((tier) =>
-      fill(t.sections.catalogue.tierSummary, {
-        hours: count(tier.hoursBeforeCheckIn),
+      /*
+        `plural` on the HOURS: «3 ساعة» is what a concatenation produces and «3 ساعات» is the
+        Arabic. The percentage stays a formatted string — a percentage agrees with nothing.
+      */
+      plural(t.sections.catalogue.tierSummary, {
+        hours: tier.hoursBeforeCheckIn,
         percent: count(tier.refundPercent),
       }),
     );

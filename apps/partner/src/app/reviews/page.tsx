@@ -5,7 +5,7 @@ import { SectionRefusal } from '@/components/section-refusal';
 import { Ltr } from '@/components/ltr';
 import { ReviewActions } from '@/components/review-actions';
 import { count } from '@/lib/format';
-import { fill, t } from '@/lib/strings';
+import { plural, t } from '@/lib/strings';
 
 /**
  * تقييمات ضيوفي (design handoff §7.3).
@@ -79,9 +79,10 @@ export default async function ReviewsPage({
           <header className="grid gap-1">
             <p className="text-14 font-bold text-gold-read">
               {result.summary.average
-                ? fill(t.reviews.summary, {
+                ? plural(t.reviews.summary, {
                     average: result.summary.average,
-                    n: count(result.summary.published),
+                    /* A NUMBER: `Intl.PluralRules` cannot classify a formatted string. */
+                    n: result.summary.published,
                   })
                 : t.reviews.summaryEmpty}
             </p>

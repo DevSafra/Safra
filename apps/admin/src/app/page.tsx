@@ -12,7 +12,7 @@ import { amount, count, customerFeeLabel } from '@/lib/format';
 import { AdminSidebar } from '@/components/admin-sidebar';
 import { RevenueChart } from '@/components/revenue-chart';
 import { ConsoleHeader } from '@/components/console-header';
-import { fill, t, auditAction, bookingStatus } from '@/lib/strings';
+import { auditAction, bookingStatus, fill, plural, t } from '@/lib/strings';
 import { partnerCommissionPercent, SLA_EXPIRY_WARNING_MINUTES } from '@safra/contracts';
 import { StatusPill } from '@/components/admin-table';
 import { statusTone } from '@/lib/status-tone';
@@ -305,7 +305,9 @@ function Attention({ counters }: { counters: DashboardOverview['counters'] }) {
     counters.arrivals_not_checked_in > 0
       ? {
           code: 'EC-011',
-          text: `${count(counters.arrivals_not_checked_in)} ${t.admin.attentionArrivals}`,
+          text: plural(t.admin.attentionArrivals, {
+            n: counters.arrivals_not_checked_in,
+          }),
           href: '/bookings?attention=no_check_in',
         }
       : null,
@@ -319,7 +321,7 @@ function Attention({ counters }: { counters: DashboardOverview['counters'] }) {
     counters.refunds_owed > 0
       ? {
           code: '§6.4',
-          text: `${count(counters.refunds_owed)} ${t.admin.attentionRefundsOwed}`,
+          text: plural(t.admin.attentionRefundsOwed, { n: counters.refunds_owed }),
           href: '/bookings?attention=refund_owed',
         }
       : null,
@@ -327,14 +329,19 @@ function Attention({ counters }: { counters: DashboardOverview['counters'] }) {
     counters.confirmed_not_recorded > 0
       ? {
           code: 'EC-004',
-          text: `${count(counters.confirmed_not_recorded)} ${t.admin.attentionUnconfirmed}`,
+          text: plural(t.admin.attentionUnconfirmed, {
+            n: counters.confirmed_not_recorded,
+          }),
           href: '/bookings?attention=unconfirmed',
         }
       : null,
     counters.sla_expiring_soon > 0
       ? {
           code: 'EC-008',
-          text: `${count(counters.sla_expiring_soon)} ${fill(t.admin.attentionSla, { minutes: SLA_EXPIRY_WARNING_MINUTES })}`,
+          text: plural(t.admin.attentionSla, {
+            n: counters.sla_expiring_soon,
+            minutes: SLA_EXPIRY_WARNING_MINUTES,
+          }),
           /*
             The most time-critical row on this screen, and until 2026-08-13 the only one with no
             destination.
@@ -354,14 +361,18 @@ function Attention({ counters }: { counters: DashboardOverview['counters'] }) {
     counters.partners_pending_verification > 0
       ? {
           code: 'P-002',
-          text: `${count(counters.partners_pending_verification)} ${t.admin.attentionPartners}`,
+          text: plural(t.admin.attentionPartners, {
+            n: counters.partners_pending_verification,
+          }),
           href: '/partners',
         }
       : null,
     counters.properties_pending_review > 0
       ? {
           code: 'P-002',
-          text: `${count(counters.properties_pending_review)} ${t.admin.attentionProperties}`,
+          text: plural(t.admin.attentionProperties, {
+            n: counters.properties_pending_review,
+          }),
           href: '/properties',
         }
       : null,
@@ -394,7 +405,19 @@ function Attention({ counters }: { counters: DashboardOverview['counters'] }) {
               >
                 {row.code}
               </span>
-              <span className="text-14 text-text2">{row.text}</span>
+              {/*
+                A seam that is not a word.
+
+                `booking-actions.spec.ts` used to find this line by matching the message STRING from
+                the catalogue, and that stopped working the moment the message became ICU: the
+                source now reads `{n, plural, …}` and what renders is a sentence. Matching rendered
+                Arabic instead would be a test that breaks on every rewording, and matching the
+                `<li>` returns the EC code's digits before the count. Same reasoning as
+                `data-status-pill` and `data-readiness-gap`.
+              */}
+              <span data-attention-text="" className="text-14 text-text2">
+                {row.text}
+              </span>
               <Link
                 href={row.href}
                 className="ms-auto inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1 text-13 font-bold text-gold-read transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"

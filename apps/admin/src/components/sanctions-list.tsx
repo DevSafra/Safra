@@ -7,7 +7,7 @@ import { z } from 'zod';
 
 import type { SanctionsStatus } from '@/lib/api';
 import { count, shortDateTime } from '@/lib/format';
-import { apiErrorOf, fill, t } from '@/lib/strings';
+import { apiErrorOf, plural, t } from '@/lib/strings';
 
 /**
  * The sanctions list: what is on record, and the way to replace it.
@@ -152,7 +152,7 @@ export function SanctionsList({ status }: { readonly status: SanctionsStatus }) 
             value={
               status.ageDays === null
                 ? '—'
-                : fill(c.sanctionsAgeDays, { n: count(status.ageDays) })
+                : plural(c.sanctionsAgeDays, { n: status.ageDays })
             }
           />
         </dl>
@@ -198,7 +198,7 @@ export function SanctionsList({ status }: { readonly status: SanctionsStatus }) 
 
       {error === null ? null : <p className="text-13 text-bad">{error}</p>}
       {done === null ? null : (
-        <p className="text-13 text-ok">{fill(c.sanctionsImported, { n: count(done) })}</p>
+        <p className="text-13 text-ok">{plural(c.sanctionsImported, { n: done })}</p>
       )}
     </section>
   );

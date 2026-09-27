@@ -10,7 +10,7 @@ import { errorMessage } from '@safra/i18n';
 import type { PropertyImage } from '@/lib/api';
 import { count } from '@/lib/format';
 import { refusalFor } from '@/lib/refusal';
-import { fill, t } from '@/lib/strings';
+import { fill, plural, t } from '@/lib/strings';
 
 /*
   THE cap, imported rather than restated.
@@ -198,9 +198,9 @@ export function ImageManager({
 
     if (done < files.length) {
       setError(
-        fill(t.images.uploadedSome, {
+        plural(t.images.uploadedSome, {
           done: count(done),
-          total: count(files.length),
+          total: files.length,
         }),
       );
     }
@@ -264,7 +264,7 @@ export function ImageManager({
         </label>
 
         <span className="text-13 text-faint">
-          {fill(t.images.count, { n: count(images.length), max: count(MAX) })}
+          {plural(t.images.count, { n: count(images.length), max: MAX })}
         </span>
       </div>
 

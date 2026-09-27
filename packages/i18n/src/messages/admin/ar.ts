@@ -203,27 +203,33 @@ export const ar = {
       EC-011 — «الشريك نسي Check-in». Says what to DO, not only what is wrong: the row links to the
       same predicate the counter used, and the operator's next move is to ring the property.
     */
-    attentionArrivals: 'حجز مؤكد مضى موعد وصوله ولم يُسجَّل — راجع الشريك',
+    attentionArrivals:
+      '{n, plural, one {حجز مؤكد واحد مضى موعد وصوله ولم يُسجَّل} two {حجزان مؤكدان مضى موعد وصولهما ولم يُسجَّلا} few {# حجوزات مؤكدة مضى موعد وصولها ولم تُسجَّل} many {# حجزاً مؤكداً مضى موعد وصوله ولم يُسجَّل} other {# حجز مؤكد مضى موعد وصوله ولم يُسجَّل}} — راجع الشريك',
     /*
       EC-004. Phrased as a fault rather than a queue, because it should be zero: the partner's
       answer and the status move are one transaction, so a row here means something is broken.
     */
-    attentionUnconfirmed: 'حجز ردّ عليه الشريك ولم تتغيّر حالته — خلل يحتاج مراجعة',
+    attentionUnconfirmed:
+      '{n, plural, one {حجز واحد ردّ عليه الشريك ولم تتغيّر حالته} two {حجزان ردّ عليهما الشريك ولم تتغيّر حالتهما} few {# حجوزات ردّ عليها الشريك ولم تتغيّر حالتها} many {# حجزاً ردّ عليه الشريك ولم تتغيّر حالته} other {# حجز ردّ عليه الشريك ولم تتغيّر حالته}} — خلل يحتاج مراجعة',
     /*
       §6.4. «لم يبدأ» rather than «لم يُسترد»: the sweep issues the refund automatically and the
       outbound transfer is a human step afterwards, so a row here means nothing has STARTED — which
       is the state that needs somebody, not a refund merely still in flight.
     */
-    attentionRefundsOwed: 'حجز ألغته سفرة ولم يبدأ استرداد مبلغه — يحتاج متابعة',
+    attentionRefundsOwed:
+      '{n, plural, one {حجز واحد ألغته سفرة ولم يبدأ استرداد مبلغه} two {حجزان ألغتهما سفرة ولم يبدأ استرداد مبلغيهما} few {# حجوزات ألغتها سفرة ولم يبدأ استرداد مبالغها} many {# حجزاً ألغته سفرة ولم يبدأ استرداد مبلغه} other {# حجز ألغته سفرة ولم يبدأ استرداد مبلغه}} — يحتاج متابعة',
     /*
       «30» من `SLA_EXPIRY_WARNING_MINUTES` لا مكتوبة هنا.
 
       ليست إعداداً في لوحة الإدارة، لكنها الثابت نفسه الذي يُبنى عليه العداد وفلتر السجل — وقد صُدِّر
       أصلاً «حتى لا يختلف الرقم هنا عن الصفوف هناك». نسخُه في النص يعيد الخلاف من باب ثالث.
     */
-    attentionSla: 'حجز تنتهي مهلة تأكيده خلال {minutes} دقيقة',
-    attentionPartners: 'شريك بانتظار التحقق من الوثائق',
-    attentionProperties: 'عقار بانتظار المراجعة قبل النشر',
+    attentionSla:
+      '{n, plural, one {حجز واحد تنتهي مهلة تأكيده} two {حجزان تنتهي مهلة تأكيدهما} few {# حجوزات تنتهي مهلة تأكيدها} many {# حجزاً تنتهي مهلة تأكيده} other {# حجز تنتهي مهلة تأكيده}} خلال {minutes, plural, one {دقيقة} two {دقيقتين} few {# دقائق} many {# دقيقة} other {# دقيقة}}',
+    attentionPartners:
+      '{n, plural, one {شريك واحد بانتظار التحقق من الوثائق} two {شريكان بانتظار التحقق من الوثائق} few {# شركاء بانتظار التحقق من الوثائق} many {# شريكاً بانتظار التحقق من الوثائق} other {# شريك بانتظار التحقق من الوثائق}}',
+    attentionProperties:
+      '{n, plural, one {عقار واحد بانتظار المراجعة قبل النشر} two {عقاران بانتظار المراجعة قبل النشر} few {# عقارات بانتظار المراجعة قبل النشر} many {# عقاراً بانتظار المراجعة قبل النشر} other {# عقار بانتظار المراجعة قبل النشر}}',
     /*
       Documents SENT, waiting to be looked at (Bashar, 2026-08-21).
 
@@ -613,7 +619,8 @@ export const ar = {
       tierPercent: 'نسبة الاسترداد (%)',
       tierAdd: '+ إضافة درجة',
       tierRemove: 'حذف الدرجة',
-      tierSummary: '{hours} ساعة ← {percent}٪',
+      tierSummary:
+        '{hours, plural, one {ساعة} two {ساعتان} few {# ساعات} many {# ساعة} other {# ساعة}} ← {percent}٪',
       propertyCount:
         '{n, plural, zero {لا عقارات} one {عقار واحد} two {عقاران} few {# عقارات} many {# عقاراً} other {# عقار}}',
       activePolicyLabel: 'مفعَّلة — يستطيع الشريك اختيارها لعقار',
@@ -887,7 +894,8 @@ export const ar = {
         table an operator concludes is broken.
       */
       expiringOnly: 'تنتهي مهلتها قريباً',
-      count: '{n} حجز · كل حجز له خط زمني وسجل تدقيق ورقم مرجعي (P-004)',
+      count:
+        '{n, plural, zero {لا حجوزات} one {حجز واحد} two {حجزان} few {# حجوزات} many {# حجزاً} other {# حجز}} · كل حجز له خط زمني وسجل تدقيق ورقم مرجعي (P-004)',
       /**
        * Shown instead of `count` when the per-status counts hit `COUNT_CAP`.
        *
@@ -896,7 +904,8 @@ export const ar = {
        * same screen — and next to a pagination bar already saying «أكثر من ١٠٠٠٠ نتيجة» it would
        * read as two answers to one question.
        */
-      countAtLeast: 'أكثر من {n} حجز · كل حجز له خط زمني وسجل تدقيق ورقم مرجعي (P-004)',
+      countAtLeast:
+        'أكثر من {n, plural, zero {لا حجوزات} one {حجز واحد} two {حجزان} few {# حجوزات} many {# حجزاً} other {# حجز}} · كل حجز له خط زمني وسجل تدقيق ورقم مرجعي (P-004)',
       note: 'فتح أي حجز يعرض: بيانات العميل والشريك والعقار والدفع والرسائل والواتساب والبريد والخط الزمني، مع ملاحظات داخلية لا يراها العميل أو الشريك. تغيير الحالة بصلاحيات محددة فقط ويسجَّل في سجل التدقيق.',
     },
 
@@ -1416,7 +1425,8 @@ export const ar = {
         question. A job that stopped firing is invisible otherwise — the failure that matters is
         silence, not an error.
       */
-      lastAccrual: 'آخر تجميع تلقائي: {when} — ضُمّ {n} حجزاً',
+      lastAccrual:
+        'آخر تجميع تلقائي: {when} — ضُمّ {n, plural, zero {لا حجوزات} one {حجز واحد} two {حجزان} few {# حجوزات} many {# حجزاً} other {# حجز}}',
       lastAccrualFailed:
         'آخر تجميع تلقائي فشل ({when}). راجع docs/runbook-scheduled-jobs.md',
       lastAccrualNever: 'لم يُسجَّل تجميع تلقائي بعد.',
@@ -1625,7 +1635,8 @@ export const ar = {
       saving: 'جارٍ الحفظ…',
       create: 'إضافة',
       addCityTitle: 'مدينة جديدة',
-      activeCitiesShort: '{n} مدينة نشطة',
+      activeCitiesShort:
+        '{n, plural, zero {لا مدن نشطة} one {مدينة نشطة واحدة} two {مدينتان نشطتان} few {# مدن نشطة} many {# مدينة نشطة} other {# مدينة نشطة}}',
       /* ── A city's own prose, and what each photograph says (Bashar, 2026-08-31) ── */
       descriptionAr: 'الوصف بالعربية',
       descriptionEn: 'الوصف بالإنجليزية',
@@ -1721,7 +1732,8 @@ export const ar = {
         'تختفي المدينة و{n} من عقاراتها المنشورة من البحث العام. الحجوزات القائمة لا تتأثر، ويمكن تفعيلها مجدداً.',
       images: 'الصور',
       imagesNone: 'لا صور',
-      imagesCount: '{n} صورة',
+      imagesCount:
+        '{n, plural, zero {لا صور} one {صورة واحدة} two {صورتان} few {# صور} many {# صورة} other {# صورة}}',
       imagesAdd: '+ إضافة صورة',
       imagesUploading: 'جارٍ الرفع…',
       imagesRemove: 'حذف',
@@ -2396,7 +2408,8 @@ export const ar = {
       channelInApp: 'داخل التطبيق',
       attempts:
         '{n, plural, zero {لا محاولات} one {محاولة واحدة} two {محاولتان} few {# محاولات} many {# محاولة} other {# محاولة}}',
-      window: 'آخر {days} يوماً',
+      window:
+        'آخر {days, plural, one {يوم} two {يومين} few {# أيام} many {# يوماً} other {# يوم}}',
       note: 'واتساب للتنبيهات فقط (ليس بديلاً للدعم). تأكيد الحجز يُرسل خلال {window} على الأكثر من الدفع. حالة كل رسالة تُسجَّل: مرسلة / فشلت / قيد الانتظار، وكل بريد يرتبط بالحجز في الخط الزمني. الإرسال عبر طابور خلفي.',
       whatsappBlocked:
         'قناة واتساب موقوفة على قرار المزود (البند 192): يُسجَّل كل ما يُفترض إرساله ولا تُرسل رسالة فعلياً. البريد يعمل.',
@@ -2597,7 +2610,8 @@ export const ar = {
       signedOn: 'وُقِّع {date}',
       uploadedBy: 'رُفِع {date} بواسطة {who}',
       validUntil: 'ساري حتى {date}',
-      expiringIn: 'ينتهي خلال {days} يوماً',
+      expiringIn:
+        'ينتهي خلال {days, plural, zero {اليوم} one {يوم واحد} two {يومين} few {# أيام} many {# يوماً} other {# يوم}}',
       expired: 'منتهٍ',
       awaitingSignature: 'بانتظار توقيع الشريك',
       /*
@@ -2897,7 +2911,8 @@ export const ar = {
       sanctionsEntries: 'عدد المُدرَجين',
       sanctionsFetched: 'تاريخ الاستيراد',
       sanctionsAge: 'عمر القائمة',
-      sanctionsAgeDays: '{n} يوماً',
+      sanctionsAgeDays:
+        '{n, plural, zero {اليوم} one {يوم واحد} two {يومان} few {# أيام} many {# يوماً} other {# يوم}}',
       sanctionsStale: 'قديمة — التوثيق متوقّف',
       sanctionsFresh: 'حديثة',
       sanctionsNever: 'لم تُستورد أي قائمة بعد — التوثيق متوقّف.',
@@ -2908,7 +2923,8 @@ export const ar = {
       sanctionsSourceEu: 'القائمة الأوروبية الموحّدة',
       sanctionsImport: 'استيراد القائمة',
       sanctionsImporting: 'يجري الاستيراد…',
-      sanctionsImported: 'تمّ استيراد {n} مُدرَجاً.',
+      sanctionsImported:
+        'تمّ استيراد {n, plural, zero {لا مُدرَجين} one {مُدرَج واحد} two {مُدرَجين} few {# مُدرَجين} many {# مُدرَجاً} other {# مُدرَج}}.',
       sanctionsPickFile: 'اختر ملفاً أولاً.',
       sanctionsPolicyRequired: 'السياسة: الفحص إلزامي قبل التوثيق.',
       sanctionsPolicyAdvisory: 'السياسة: الفحص إرشادي — يُسجَّل ولا يمنع التوثيق.',
@@ -2985,7 +3001,8 @@ export const ar = {
       send: 'إرسال رمز التحقق',
       sending: 'جارٍ الإرسال…',
       /* A MASKED destination — enough to recognise, not enough to learn. */
-      sentTo: 'أُرسل رمز إلى {destination}. ينتهي خلال {minutes} دقائق.',
+      sentTo:
+        'أُرسل رمز إلى {destination}. ينتهي خلال {minutes, plural, one {دقيقة} two {دقيقتين} few {# دقائق} many {# دقيقة} other {# دقيقة}}.',
       codeLabel: 'الرمز كما قرأه المتصل',
       confirm: 'تحقّق',
       confirming: 'جارٍ التحقق…',
@@ -3285,7 +3302,8 @@ export const ar = {
       nameEn: 'الاسم بالإنجليزية',
       nameDe: 'الاسم بالألمانية',
       hasMultipleUnits: 'يحتوي على أكثر من وحدة (فندق مثلًا)',
-      inUse: '{n} عقار',
+      inUse:
+        '{n, plural, zero {لا عقارات} one {عقار واحد} two {عقاران} few {# عقارات} many {# عقاراً} other {# عقار}}',
       add: 'إضافة نوع',
       save: 'حفظ',
       saving: 'جارٍ الحفظ…',
@@ -3342,7 +3360,8 @@ export const ar = {
       nextPhoto: 'الصورة التالية',
       closePhoto: 'إغلاق المعاينة',
       /* Said plainly — a truncated gallery that says nothing reads as the whole gallery. */
-      morePhotos: 'و{n} صورة أخرى غير معروضة هنا.',
+      morePhotos:
+        'و{n, plural, one {صورة واحدة أخرى غير معروضة} two {صورتان أخريان غير معروضتين} few {# صور أخرى غير معروضة} many {# صورة أخرى غير معروضة} other {# صورة أخرى غير معروضة}} هنا.',
       noUnits: 'لا وحدات. عقار بلا وحدة لا يمكن حجزه ولا يجب نشره.',
     },
 
@@ -3493,7 +3512,8 @@ export const ar = {
         'التحقق من الشريك موقوف حتى تُحل هذه المسألة. الفحص مقابل قائمة لا يمكن إثبات أنها محدَّثة يبدو التزاماً دون أن يكون كذلك.',
       notScreened: 'لم يُفحص. لا يمكن التحقق من شريك قبل إجراء الفحص.',
       confirmOverride: 'تأكيد التجاوز',
-      listStale: 'قائمة العقوبات عمرها {days} يوماً ولا يمكن الفحص مقابلها.',
+      listStale:
+        'قائمة العقوبات عمرها {days, plural, one {يوم واحد} two {يومان} few {# أيام} many {# يوماً} other {# يوم}} ولا يمكن الفحص مقابلها.',
       listMissing: 'لم تُستورد أي قائمة عقوبات.',
 
       /*
@@ -3637,7 +3657,7 @@ export const ar = {
         'سبب إعادة التعيين. يُسجَّل في سجل التدقيق ويُطلب منه ثلاثة أحرف على الأقل.',
       confirm: 'تأكيد إعادة التعيين',
       working: 'جارٍ التنفيذ…',
-      done: 'أُعيد التعيين. أُنهيت {n} جلسة، وعلى الشريك تسجيل مُصادِق جديد عند الدخول التالي.',
+      done: 'أُعيد التعيين. أُنهيت {n, plural, zero {لا جلسات} one {جلسة واحدة} two {جلستان} few {# جلسات} many {# جلسة} other {# جلسة}}، وعلى الشريك تسجيل مُصادِق جديد عند الدخول التالي.',
       failed: 'تعذّرت إعادة التعيين.',
       unreachable: 'تعذّر الوصول إلى الخادم.',
     },

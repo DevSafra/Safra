@@ -13,7 +13,7 @@ import {
 } from '@safra/contracts';
 
 import { codeOfResponse, refusalFor } from '@/lib/refusal';
-import { fill, t } from '@/lib/strings';
+import { fill, plural, t } from '@/lib/strings';
 import type { PartnerEmployeeRoleDetail } from '@/lib/api';
 
 /** Every refusal the roles API can give, as a sentence about the SITUATION. */
@@ -342,7 +342,7 @@ export function EmployeeRoleManager({
                     <span className="text-13 text-faint">
                       {role.employeeCount === 0
                         ? t.employeeRoles.heldNobody
-                        : fill(t.employeeRoles.held, { n: String(role.employeeCount) })}
+                        : plural(t.employeeRoles.held, { n: role.employeeCount })}
                     </span>
                   </div>
 

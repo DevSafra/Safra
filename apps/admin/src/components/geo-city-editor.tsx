@@ -17,7 +17,7 @@ import {
   TimezoneField,
 } from '@/components/geo-form';
 import { count } from '@/lib/format';
-import { t, apiErrorOf, fill } from '@/lib/strings';
+import { apiErrorOf, fill, plural, t } from '@/lib/strings';
 
 /**
  * The categories a city may be filed under — from the DATABASE, not a constant.
@@ -602,7 +602,7 @@ export function GeoCities({
                 >
                   {row.images === 0
                     ? c.imagesNone
-                    : fill(c.imagesCount, { n: String(row.images) })}
+                    : plural(c.imagesCount, { n: row.images })}
                 </span>
                 <button
                   type="button"

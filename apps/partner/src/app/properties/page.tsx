@@ -18,7 +18,7 @@ import { TONES } from '@/lib/tones';
 import { fixHref } from '@/lib/fix-href';
 import { amount } from '@/lib/format';
 import { coverUrl } from '@/lib/media';
-import { fill, propertyStatus, propertyType, t, tripAttribute } from '@/lib/strings';
+import { plural, propertyStatus, propertyType, t, tripAttribute } from '@/lib/strings';
 import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 
 /**
@@ -102,7 +102,8 @@ export default async function PropertiesPage() {
           ) : (
             <>
               <p className="mb-3 text-14 text-faint">
-                {fill(t.properties.count, { n: properties.length })} · {t.properties.note}
+                {plural(t.properties.count, { n: properties.length })} ·{' '}
+                {t.properties.note}
               </p>
 
               <ul className="grid gap-3.5 sm:grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
@@ -128,7 +129,7 @@ function Card({ property }: { readonly property: PartnerProperty }) {
   const meta = [
     property.city,
     propertyType(property.propertyType),
-    fill(t.properties.units, { n: property.unitCount }),
+    plural(t.properties.units, { n: property.unitCount }),
   ]
     .filter(Boolean)
     .join(' · ');

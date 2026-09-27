@@ -16,7 +16,7 @@ import { StarRating } from '@safra/ui';
 import { backTarget, detailHref, origin } from '@/lib/search-params';
 import { statusTone } from '@/lib/status-tone';
 import { count } from '@/lib/format';
-import { fill, label, t, plural } from '@/lib/strings';
+import { fill, label, plural, t } from '@/lib/strings';
 import { refuseSection } from '@/components/section-refusal';
 
 /**
@@ -302,8 +302,8 @@ export default async function PropertyPage({
 
             {property.images.length > PHOTO_LIMIT ? (
               <p className="mt-2 text-13 text-faint">
-                {fill(t.sections.propertyDetail.morePhotos, {
-                  n: count(property.images.length - PHOTO_LIMIT),
+                {plural(t.sections.propertyDetail.morePhotos, {
+                  n: property.images.length - PHOTO_LIMIT,
                 })}
               </p>
             ) : null}

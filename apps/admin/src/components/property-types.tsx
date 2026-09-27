@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { apiErrorOf, fill, t } from '@/lib/strings';
+import { apiErrorOf, plural, t } from '@/lib/strings';
 import type { PropertyType } from '@/lib/api';
 
 /**
@@ -81,7 +81,7 @@ export function PropertyTypes({ types }: { types: readonly PropertyType[] }) {
             </span>
 
             <span className="flex items-center gap-3 text-13 text-muted">
-              {fill(copy.inUse, { n: String(type.inUse) })}
+              {plural(copy.inUse, { n: type.inUse })}
               <button
                 type="button"
                 disabled={busy}

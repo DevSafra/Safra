@@ -17,7 +17,7 @@ import {
 import { TableToolbar } from '@/components/table-toolbar';
 import { statusTone } from '@/lib/status-tone';
 import { rowAnchor, returnQuery } from '@/lib/search-params';
-import { fill, label, t } from '@/lib/strings';
+import { fill, label, plural, t } from '@/lib/strings';
 import { listParamsFor } from '@/lib/table-size';
 import { oneOf } from '@/lib/search-params';
 import { refuseSection } from '@/components/section-refusal';
@@ -171,9 +171,9 @@ export default async function PayoutsPage({
                 ? fill(t.sections.payouts.lastAccrualFailed, {
                     when: shortDateTime(accrual.startedAt),
                   })
-                : fill(t.sections.payouts.lastAccrual, {
+                : plural(t.sections.payouts.lastAccrual, {
                     when: shortDateTime(accrual.startedAt),
-                    n: String(attachedIn(accrual.detail)),
+                    n: attachedIn(accrual.detail),
                   })}
           </FootNote>
 

@@ -7,7 +7,7 @@ import { BOOKING_VERIFICATION_MINUTES } from '@safra/contracts';
 
 import { text } from '@/lib/form';
 import { Ltr } from '@/components/admin-table';
-import { apiErrorOf, fill, t } from '@/lib/strings';
+import { apiErrorOf, plural, t } from '@/lib/strings';
 
 /**
  * EC-010 tier 2 — proving a caller controls the contact details on a booking (SRS §16).
@@ -158,7 +158,7 @@ export function BookingVerification() {
           }}
         >
           <p className="text-14 text-text">
-            {fill(copy.sentTo, {
+            {plural(copy.sentTo, {
               destination: sentTo,
               minutes: String(BOOKING_VERIFICATION_MINUTES),
             })}

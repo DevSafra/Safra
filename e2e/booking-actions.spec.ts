@@ -639,14 +639,21 @@ test('the arrivals alert links to a list of exactly that many bookings', async (
   );
 
   /*
-    The element carrying the SENTENCE, not an ancestor that happens to contain it.
+    The element carrying the SENTENCE, addressed by a SEAM.
 
-    A `li, div` filter matched the whole panel first, and the leading number it returned was the
-    rows-per-page select's «25» — a figure with no relationship to the alert. `getByText` on the
-    phrase lands on the element the count is prefixed to.
+    Two earlier versions were wrong in two different ways. A `li, div` filter matched the whole
+    panel and returned the rows-per-page select's «25», a figure with no relationship to the alert.
+    Then `getByText(t.admin.attentionArrivals)` matched the element the count is prefixed to — until
+    that message became ICU for Arabic agreement, at which point the catalogue holds
+    `{n, plural, …}` and the screen holds a sentence, so it matched nothing.
+
+    `data-attention-text` is neither: it survives a rewording AND excludes the EC code beside it,
+    whose own digits would otherwise be the first number this regex found.
   */
   const alert = await page
-    .getByText(t.admin.attentionArrivals, { exact: false })
+    .locator('li')
+    .filter({ has: row })
+    .locator('[data-attention-text]')
     .first()
     .innerText();
 
