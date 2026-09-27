@@ -230,12 +230,34 @@ describeIfDb('SupportService', () => {
     expect(seen.messageCount).toBe(1);
   });
 
+  /**
+   * The reply comes SECOND, and saying so is what makes this test stable.
+   *
+   * ## Why the timestamp is written rather than defaulted
+   *
+   * It read `customer` where it expected `staff`, once, in a full `pnpm verify` — recorded as
+   * `O-test-4` and attributed to suites sharing one database. That was wrong: this test addresses
+   * its own thread by reference and nothing else can reach it.
+   *
+   * The real cause is the trap §8 records. `created_at` defaults to `now()`, which is the
+   * TRANSACTION's timestamp, and the whole file runs inside one rollback transaction — so the
+   * opening message and this reply carry the identical instant, to the microsecond. `thread()`
+   * orders by `created_at ASC, id ASC`, and the tiebreaker is a uuidv7 whose ordering within a
+   * single millisecond is its RANDOM tail. Roughly one run in two could have put the reply first;
+   * it took months to show because both rows are usually generated a millisecond apart.
+   *
+   * Nothing is wrong in the service: in production these are two transactions, seconds or days
+   * apart, and `created_at` separates them. The defect is a fixture that asserts an order it never
+   * established. So the row states its own time, one second after the thread was opened, which is
+   * both true and the thing the assertion is about.
+   */
   it('shows a staff reply that is not internal', async () => {
     const thread = await support.open(customer(), LONG);
 
     await db.execute(sql`
-      INSERT INTO messages (conversation_id, sender_kind, body, redacted_count, internal)
-      SELECT c.id, 'staff', 'We have contacted the partner about the heating.', 0, false
+      INSERT INTO messages (conversation_id, sender_kind, body, redacted_count, internal, created_at)
+      SELECT c.id, 'staff', 'We have contacted the partner about the heating.', 0, false,
+             now() + INTERVAL '1 second'
       FROM conversations c WHERE c.reference = ${thread.reference}`);
 
     const seen = await support.thread(customer(), thread.reference);
