@@ -3252,6 +3252,20 @@ submitted anyway**, which answered `400 property.location_required`. The endpoin
   GUESS and would have to be stored as provisional and confirmed. It is the only option on this
   list carrying a quality risk.
 
+### O-test-3 — the sweep-contention family, and one member of it closed
+
+**Narrowed 2026-09-27.** `scheduled-queue.integration.test.ts` › «dispatches each job to its own
+service» joined this family and was fixed the same day. It failed with `notification-redrive` the
+one name missing from an otherwise complete dispatch: a development worker held that job's advisory
+lock at that second, `runExclusively` SKIPPED, and a skip reads in a test as «the job never ran».
+The exposure had just doubled — `media-redrive` is a second job whose recording lives at the call
+site — so the suite now uses `unlockedJobRuns`, which records exactly as the real runner does and
+takes no lock. Locking itself stays covered by `job-run.integration.test.ts`, which is about that
+and takes its own.
+
+That is now **nine** suites on the unlocked runner. What follows is the one member that the fix does
+not reach.
+
 ### O-test-3 — FOUND, NOT FIXED: `refund-owed-parity` still races the refund sweep
 
 **Found 2026-09-24** during an ordinary `pnpm verify`, which failed on

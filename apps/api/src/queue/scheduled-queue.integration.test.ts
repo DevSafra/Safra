@@ -7,7 +7,7 @@ import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { DeadLetterService } from './dead-letter.service.js';
 import { ScheduledProcessor } from './scheduled.processor.js';
-import { JobRunService } from '../common/jobs/job-run.service.js';
+import { unlockedJobRuns } from '../common/jobs/job-run.testing.js';
 import {
   SCHEDULED_JOBS,
   scheduledJobId,
@@ -55,7 +55,19 @@ describeIfReady('the scheduled queue', () => {
    * The six services are stubbed to record that they were CALLED, because dispatch is what this
    * file tests. `webhook-retention` is the exception: it runs for real through `JobRunService`, so
    * one test proves end to end that a queued occurrence writes the row the runbook reads — with a
-   * genuine service, a genuine advisory lock and a genuine insert.
+   * genuine service and a genuine insert.
+   *
+   * ## The LOCK is the one genuine thing this suite gives up
+   *
+   * `unlockedJobRuns` records exactly as the real runner does and skips the advisory lock. That is
+   * `O-test-3`'s family: the development workers take the same locks on the same schedule, and a
+   * contended lock makes a sweep SKIP — which reads in a test as «the job never ran». It bit this
+   * file on 2026-09-27, where `notification-redrive` was the one name missing from an otherwise
+   * complete dispatch, because a worker held its lock at that second.
+   *
+   * The exposure doubled the same day: `media-redrive` is a second job whose recording lives at the
+   * call site, so there are now two locks this suite can lose rather than one. Locking itself is
+   * covered by `job-run.integration.test.ts`, which is about exactly that and takes its own.
    */
   const called: string[] = [];
   const stub = (name: string) => ({
@@ -78,7 +90,7 @@ describeIfReady('the scheduled queue', () => {
     connection = new Redis(REDIS_URL ?? '', { maxRetriesPerRequest: null });
     queue = new Queue('scheduled', { connection, prefix });
 
-    const runs = new JobRunService(db);
+    const runs = unlockedJobRuns(db);
 
     const processor = new ScheduledProcessor(
       { sweep: () => stub('booking-sla-sweep').run() } as never,
