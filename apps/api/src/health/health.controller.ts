@@ -5,6 +5,7 @@ import type { Redis } from 'ioredis';
 
 import type { Database } from '@safra/db';
 
+import { ContractRendererService } from '../admin/contract-renderer.service.js';
 import { MediaReachabilityService } from '../storage/media-reachability.service.js';
 import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { DATABASE } from '../database/database.module.js';
@@ -54,6 +55,7 @@ export class HealthController {
     @Inject(DATABASE) private readonly db: Database,
     @Inject(REDIS) private readonly redis: Redis,
     private readonly media: MediaReachabilityService,
+    private readonly contracts: ContractRendererService,
   ) {}
 
   /**
@@ -85,6 +87,7 @@ export class HealthController {
     database: 'up';
     redis: 'up' | 'degraded';
     media: string;
+    contractRenderer: string;
   }> {
     const [database, redis] = await Promise.all([
       this.check(() => this.db.execute(sql`SELECT 1`)),
@@ -101,6 +104,7 @@ export class HealthController {
         database: 'down',
         redis: redis ? 'up' : 'degraded',
         media: this.media.status(),
+        contractRenderer: this.contracts.status(),
       });
     }
 
@@ -111,11 +115,20 @@ export class HealthController {
       take a replica out of rotation — bookings and payments do not touch it. A deployment that
       wants to gate on it reads this field, or sets `MEDIA_REQUIRE_PUBLIC` and never gets here.
     */
+    /*
+      The contract RENDERER is reported for the same reason and on the same terms — `O-ops-1`.
+
+      A missing headless browser breaks one staff action, «إنشاء العقد», and nothing else; taking a
+      replica out of rotation for it would be the self-inflicted outage this controller's note
+      warns about. But an image built without it answers every probe and every route, so without a
+      field here the first thing that says so is a staff member meeting a failure.
+    */
     return {
       status: 'ready',
       database: 'up',
       redis: redis ? 'up' : 'degraded',
       media: this.media.status(),
+      contractRenderer: this.contracts.status(),
     };
   }
 

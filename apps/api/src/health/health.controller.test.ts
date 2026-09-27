@@ -1,6 +1,7 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import type { Redis } from 'ioredis';
 
+import type { ContractRendererService } from '../admin/contract-renderer.service.js';
 import type { MediaReachabilityService } from '../storage/media-reachability.service.js';
 import { describe, expect, it } from 'vitest';
 
@@ -24,11 +25,13 @@ describe('HealthController', () => {
     database: () => Promise<unknown>,
     redis: () => Promise<unknown>,
     media: 'ok' | 'unreadable' | 'unreachable' | 'unknown' | 'skipped' = 'ok',
+    contracts: 'ok' | 'missing' | 'unknown' = 'ok',
   ) {
     return new HealthController(
       { execute: database } as unknown as Database,
       { ping: redis } as unknown as Redis,
       { status: () => media } as unknown as MediaReachabilityService,
+      { status: () => contracts } as unknown as ContractRendererService,
     );
   }
 
@@ -55,6 +58,7 @@ describe('HealthController', () => {
         database: 'up',
         redis: 'up',
         media: 'ok',
+        contractRenderer: 'ok',
       });
     });
 
@@ -75,6 +79,7 @@ describe('HealthController', () => {
         database: 'up',
         redis: 'degraded',
         media: 'ok',
+        contractRenderer: 'ok',
       });
     });
 
