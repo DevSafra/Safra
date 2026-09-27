@@ -106,6 +106,19 @@ export const TABLE_SECTIONS = [
    * rows is a log you search».
    */
   'landmarks',
+  /**
+   * آخر نشاط — one staff member's own actions, on their record.
+   *
+   * `O-staff-2`. الموظفون carries the platform-wide feed and سجل التدقيق the whole trail; this is
+   * the narrow question «what has THIS person done», which is what somebody reviewing a colleague's
+   * access is actually asking. A platform-wide list does not answer it.
+   *
+   * Its own key rather than sharing `staffActivity`: they are two tables read two different ways —
+   * a feed you scan and a record you study — and «ten bookings is a queue you scan; a hundred audit
+   * rows is a log you search» is exactly the distinction this list exists to keep. Sharing the key
+   * would mean choosing fifty rows on one silently rewrote the other.
+   */
+  'staffMemberActivity',
 ] as const;
 
 export type TableSection = (typeof TABLE_SECTIONS)[number];
@@ -149,6 +162,12 @@ export const TABLE_SECTION_PATHS: Readonly<Record<TableSection, string>> = {
   propertiesPending: '/properties',
   adInvoices: '/ads',
   landmarks: '/landmarks',
+  /*
+    The registry, not the record — for the reason `partnerViolations` states above. This section's
+    real URL carries a user id, and a path in this map feeds the save endpoint's REDIRECT, which
+    must never take a path from a request. The reader lands one click from where they were.
+  */
+  staffMemberActivity: '/staff',
 };
 
 /**
@@ -173,6 +192,13 @@ const NAMESPACED: Readonly<
   adInvoices: { page: 'ipage', size: 'isize' },
   /* The only table on its screen, so the plain names. */
   landmarks: { page: 'page', size: 'size' },
+  /*
+    Namespaced although it is the only table on صفحة الموظف today. The record screen already carries
+    `?page=` and `?size=` for its own purpose — «رجوع» restores the reader's position in الموظفون —
+    and a pager writing the plain names would send them back to a page of the registry they never
+    chose. Same reasoning as `partnerViolations`.
+  */
+  staffMemberActivity: { page: 'apage', size: 'asize' },
 };
 
 export const TABLE_SECTION_PARAMS: Readonly<

@@ -729,6 +729,28 @@ export async function getStaffActivity(params: {
 }
 
 /**
+ * آخر نشاط on صفحة الموظف — one person's own actions (`O-staff-2`).
+ *
+ * Same projection and same narrowing as the platform-wide feed, because it is the same query with
+ * an actor filter. No `q`: the reader is already looking at one person, and a search box that
+ * narrows one person's twenty rows is a control with nothing to do.
+ */
+export async function getStaffMemberActivity(
+  userId: string,
+  params: { page?: number | undefined; limit: number },
+) {
+  const query = new URLSearchParams();
+
+  if (params.page !== undefined) query.set('page', String(params.page));
+  query.set('limit', String(params.limit));
+
+  return staffFetch(
+    `/admin/staff/${encodeURIComponent(userId)}/activity?${query.toString()}`,
+    auditPageSchema,
+  );
+}
+
+/**
  * One activity entry, for its own screen.
  *
  * Answers 404 for an id that names nothing AND for one that names a customer's or a partner's

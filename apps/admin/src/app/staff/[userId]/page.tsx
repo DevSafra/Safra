@@ -1,15 +1,22 @@
-import { getGeography, getStaffMember, getStaffRoles } from '@/lib/api';
+import {
+  getGeography,
+  getStaffMember,
+  getStaffMemberActivity,
+  getStaffRoles,
+} from '@/lib/api';
 import { getStaffSession } from '@/lib/session-server';
 import { sidebarCounts } from '@/lib/console';
 import { shortDateTime } from '@/lib/format';
 import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
+import { TablePagination } from '@/components/table-pagination';
 import { BackLink } from '@/components/back-link';
 import { Ltr } from '@/components/admin-table';
 import { StaffMemberActions } from '@/components/staff-member-actions';
 import { StaffScopeEditor } from '@/components/staff-scope-editor';
 import { backTarget } from '@/lib/search-params';
+import { listParamsFor } from '@/lib/table-size';
 import { groupPermissions, isScopable, type Role } from '@safra/contracts';
-import { fill, label, roleName, t } from '@/lib/strings';
+import { auditAction, auditSubject, fill, label, roleName, t } from '@/lib/strings';
 import { refuseSection } from '@/components/section-refusal';
 
 /**
@@ -55,8 +62,16 @@ export default async function StaffMemberPage({
     redirect off the console or point it at a row the reader is not looking at.
   */
   const back = backTarget('/staff', query, userId);
+  /*
+    آخر نشاط pages with `?apage=`/`?asize=`, not the plain names.
 
-  const [member, roles, geography, session, counts] = await Promise.all([
+    «رجوع» restores the reader's place in الموظفون from `?page=`/`?size=` on THIS url — so a pager
+    writing the plain names would quietly rewrite where the back link goes, and the reader would
+    step through one person's activity and land on a page of the registry they never chose.
+  */
+  const activity = await listParamsFor('staffMemberActivity', searchParams);
+
+  const [member, roles, geography, session, counts, activityPage] = await Promise.all([
     getStaffMember(userId),
     getStaffRoles(),
     /*
@@ -69,6 +84,12 @@ export default async function StaffMemberPage({
     getGeography(),
     getStaffSession(),
     sidebarCounts(),
+    /*
+      Fetched beside the record rather than after it. A failed read renders as an empty panel with
+      its own sentence — the record must not go down because a trail could not be read, which is
+      the same rule the geography fetch above states for the picker.
+    */
+    getStaffMemberActivity(userId, { page: activity.page, limit: activity.size }),
   ]);
 
   if (member === 'unauthenticated' || member === 'failed') {
@@ -281,6 +302,86 @@ export default async function StaffMemberPage({
             </p>
           </ConsolePanel>
         ) : null}
+
+        {/*
+          نشاط هذا الموظف — `O-staff-2`, and the one question the other two feeds do not answer.
+
+          الموظفون carries the platform-wide staff feed and سجل التدقيق the whole trail. Somebody
+          reading a colleague's record is deciding whether their access is right, and «signed in
+          twice this month and changed one booking» answers that where a feed of everybody's work
+          does not.
+
+          LAST on the record on purpose. الإجراءات moved directly under الحساب on 2026-08-23
+          because a super admin could not find the controls; putting a trail above them would bury
+          them again. This is the thing you read after you have decided what you are looking at.
+        */}
+        <ConsolePanel title={t.sections.staff.member.activity}>
+          <p className="-mt-1 mb-3 text-13 text-faint">
+            {t.sections.staff.member.activityHint}
+          </p>
+
+          {activityPage === 'unauthenticated' ? (
+            <p className="text-14 text-muted">{t.dashboard.sessionExpired}</p>
+          ) : activityPage === 'failed' ? (
+            <p className="text-14 text-bad">{t.dashboard.queueFailed}</p>
+          ) : activityPage.items.length === 0 ? (
+            <p className="text-14 text-faint">{t.sections.staff.member.activityNone}</p>
+          ) : (
+            <>
+              {/*
+                The actor is NOT repeated on each row — it is the person whose page this is, and a
+                column of one address thirty times is a column that says nothing. The platform-wide
+                panel prints it because there it is the thing that varies.
+              */}
+              <ul className="grid gap-2.25 text-14">
+                {activityPage.items.map((row) => (
+                  <li key={row.id}>
+                    <a
+                      href={`/staff/activity/${row.id}`}
+                      aria-label={t.sections.staff.activityOpen}
+                      className="flex flex-wrap items-center gap-2.5 rounded-card border border-line bg-field px-3.25 py-2.5 hover:border-gold/50"
+                    >
+                      <span className="font-bold text-text">
+                        {auditAction(row.action)}
+                      </span>
+                      <span className="text-13 text-faint">
+                        {auditSubject(row.subjectType)}
+                      </span>
+                      <Ltr className="ms-auto text-13 text-faint">
+                        {shortDateTime(row.createdAt)}
+                      </Ltr>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+
+              <TablePagination
+                basePath={`/staff/${encodeURIComponent(userId)}`}
+                section="staffMemberActivity"
+                /*
+                  The registry position is carried FORWARD, so paging the trail does not lose where
+                  «رجوع» goes. Only the four fields `backTarget` reads — anything else in the URL is
+                  not ours to reflect back into a link on our own page.
+                */
+                query={Object.fromEntries(
+                  (['page', 'size', 'q', 'status'] as const)
+                    .map((key) => [key, query[key]])
+                    .filter(
+                      (entry): entry is [string, string] => typeof entry[1] === 'string',
+                    ),
+                )}
+                page={activityPage.page}
+                pages={activityPage.pages}
+                total={activityPage.total}
+                capped={activityPage.capped}
+                size={activity.size}
+                label={fill(t.table.paginationLabelOf, {
+                  section: t.sections.staff.member.activity,
+                })}
+              />
+            </>
+          )}
+        </ConsolePanel>
       </div>
     </ConsoleShell>
   );

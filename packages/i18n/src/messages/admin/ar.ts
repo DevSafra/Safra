@@ -2181,6 +2181,21 @@ export const ar = {
         invitationExpires: 'تنتهي {when}',
         actions: 'الإجراءات',
         actionsSelf: 'لا يمكنك تغيير دور حسابك أو تعطيله.',
+        /*
+          آخر نشاط on the person's OWN record (`O-staff-2`).
+
+          «نشاط هذا الموظف» and not «آخر نشاط الموظفين», which is the platform-wide panel on
+          الموظفون. Two lists that look alike need titles that do not: a reader who mistook one
+          for the other would read a colleague's work as this person's.
+        */
+        activity: 'نشاط هذا الموظف',
+        activityHint: 'ما نفّذه هذا الحساب في الكونسول. السجل الكامل في سجل التدقيق.',
+        /*
+          NOT «لا نشاط مطابق لهذا البحث» — there is no search here, so there is nothing that could
+          have failed to match. The honest sentence is that this person has not done anything yet,
+          which is a real and ordinary state for a newly invited account.
+        */
+        activityNone: 'لم ينفّذ هذا الحساب أي إجراء بعد.',
       },
     },
 

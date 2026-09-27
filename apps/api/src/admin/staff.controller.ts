@@ -157,6 +157,50 @@ export class StaffController {
   }
 
   /**
+   * آخر نشاط — what THIS person has done (`O-staff-2`).
+   *
+   * ## Why the narrow list exists beside the platform-wide one
+   *
+   * الموظفون carries the whole staff feed and سجل التدقيق the whole trail. Neither answers the
+   * question somebody reading a colleague's record is actually asking: «is this person's access
+   * right?» — and «signed in twice this month and changed one booking» answers that where a feed of
+   * everybody's work does not.
+   *
+   * ## It is the SAME query, narrowed
+   *
+   * `staffActivity` with an `actorUserId`, not a query of its own — so the projection, the
+   * ordering, the cap and the staff-role predicate are decided once and cannot drift into telling
+   * two screens two stories about one event. In particular the staff-role narrowing is kept: a
+   * person's page must not become a door to their CUSTOMER actions, which are `audit_log.read`.
+   *
+   * ## `:userId/activity`, and why the order is safe
+   *
+   * `@Get(':userId')` above matches exactly one segment, so `/staff/<id>/activity` can never reach
+   * it whatever the declaration order. That is different from `@Get('activity')`, which shares a
+   * shape with `:userId` and therefore has to come first — see the note on it.
+   *
+   * No 404 for an id that names nobody: it is the same authority as the record beside it, the
+   * record itself already answers 404, and an empty list for a stranger's id tells a reader with
+   * `staff.manage` nothing they cannot already ask for directly.
+   */
+  @Get(':userId/activity')
+  @RequirePermissions(P.STAFF_MANAGE)
+  @AuditExempt(
+    'Reading the trail of one person; changes nothing, and reading it is itself not recorded.',
+  )
+  async memberActivity(
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Query(new ZodValidationPipe(pageQuerySchema))
+    query: z.infer<typeof pageQuerySchema>,
+  ) {
+    return this.audit.staffActivity({
+      limit: query.limit,
+      page: query.page,
+      actorUserId: userId,
+    });
+  }
+
+  /**
    * Invites a staff member. Throttled hard: it sends mail to an
    * attacker-chosen address, so an unthrottled version is a spam relay that happens
    * to require a super-admin session.

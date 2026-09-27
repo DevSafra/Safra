@@ -251,7 +251,21 @@ export class AuditLogService {
    * unfiltered list would read the first row as that person's work.
    */
   async staffActivity(
-    query: AuditQuery & { readonly actorSearch?: string | undefined },
+    query: AuditQuery & {
+      readonly actorSearch?: string | undefined;
+      /**
+       * ONE person's actions, for their own record (`O-staff-2`).
+       *
+       * Separate from `actorSearch`, which resolves a typed TERM to a set of ids and is a reader's
+       * guess. This is an identity the screen already holds, so it must not go through a name
+       * match: two colleagues called أحمد would each read the other's work on their own page, and
+       * a name that matches nobody must not quietly widen to everybody.
+       *
+       * Both may be set; they intersect, which is the honest reading of «this person, matching
+       * that term». Nothing sends both today.
+       */
+      readonly actorUserId?: string | undefined;
+    },
   ): Promise<OffsetPage<AuditEntry>> {
     const conditions: SQL[] = [
       /*
@@ -264,6 +278,16 @@ export class AuditLogService {
         sql`, `,
       )})`,
     ];
+
+    /*
+      Added BEFORE the staff-role predicate is narrowed by anything else, and alongside it rather
+      than instead of it: a person's own page must still show only what they did AS STAFF. Reading
+      `actor_user_id` directly uses `audit_log_actor_idx`, which is `(actor_user_id, created_at)`
+      and therefore serves the ordering too.
+    */
+    if (query.actorUserId) {
+      conditions.push(sql`a.actor_user_id = ${query.actorUserId}::uuid`);
+    }
 
     const term = query.actorSearch?.trim();
 
