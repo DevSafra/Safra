@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next';
 
 import { getCities, getLandmarks } from '@/lib/catalog';
+import { getGroupTrips } from '@/lib/group-trips';
 import { routing } from '@/i18n/routing';
 
 /**
@@ -17,6 +18,16 @@ import { routing } from '@/i18n/routing';
  * them, the set turns over as partners publish and withdraw, and a sitemap that lists a listing
  * withdrawn yesterday is a crawler following a 404 on our own invitation. Listings are reached
  * through the city and landmark pages, which is the same route a person takes.
+ *
+ * GROUP TRIPS are here, and the difference from properties is the reason (Bashar, 2026-09-28).
+ * There are a few dozen at most, every one is authored by staff rather than by 2,998 partners, and
+ * `getGroupTrips` returns only what is PUBLISHED — so a trip archived this morning leaves this
+ * document on the next hourly revalidation rather than lingering as an invitation to a 404. That
+ * is the property the properties set does not have, and it is what earns them the entry.
+ *
+ * Trips that have already finished stay listed. Their page still answers 200 and still says
+ * «انتهت», which is a true page about a real thing SAFRA ran; dropping it would be a claim that
+ * the trip never happened.
  *
  * ## No coordinates, no prices, no availability
  *
@@ -52,6 +63,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   }
 
+  /*
+    Published trips only — the API's own `WHERE`, not a filter here. A failed read yields `[]`, so
+    a blip omits trips from one revalidation rather than failing the whole document: a sitemap that
+    500s tells a crawler nothing, and one that is briefly short tells it almost everything.
+  */
+  const trips = await getGroupTrips();
+
   const now = new Date();
 
   const entries: MetadataRoute.Sitemap = [];
@@ -70,6 +88,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         lastModified: now,
         changeFrequency: 'weekly',
         priority: 0.8,
+      });
+    }
+
+    entries.push({
+      url: `${base}/${locale}/groups`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      /* A destination in its own right, like a city — somebody searches for «رحلات جماعية». */
+      priority: 0.8,
+    });
+
+    for (const trip of trips) {
+      entries.push({
+        url: `${base}/${locale}/groups/${trip.slug}`,
+        lastModified: now,
+        changeFrequency: 'weekly',
+        /*
+          Just under the list. Unlike a landmark, a trip page IS the destination rather than a way
+          in to one — so it does not sit as low as 0.6 — but the list is what ranks for the phrase.
+        */
+        priority: 0.7,
       });
     }
 
