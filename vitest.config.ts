@@ -125,6 +125,11 @@ export default defineConfig({
       // sibling of the one above: `/properties/{reference}` was linked from every gap on
       // الإعلانات and no such route exists, so the one control that closed the gap 404'd.
       'tools/page-links/*.test.ts',
+      // And the check that every NEXT_PUBLIC_ variable is declared to Turborepo. Next inlines them
+      // at build time and turbo filters the task environment, so an undeclared one is baked in as
+      // `undefined` and nothing fails — the map vanished twice that way, and the sitemap would
+      // have shipped localhost canonicals for the pages §5.4 makes an SEO target.
+      'tools/build-env/*.test.ts',
     ],
     environment: 'node',
     // Security-relevant paths must stay covered as the codebase grows.
