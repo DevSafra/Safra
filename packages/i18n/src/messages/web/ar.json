@@ -183,7 +183,7 @@
     "reviews": "{count, plural, zero {لا تقييمات} one {تقييم واحد} two {تقييمان} few {# تقييمات} many {# تقييمًا} other {# تقييم}}",
     "guestsUpTo": "حتى {count, plural, zero {لا ضيوف} one {ضيف واحد} two {ضيفين} few {# ضيوف} many {# ضيفًا} other {# ضيف}}",
     "badgeVerified": "موثّق من سفرة",
-    "badgeRecommends": "سفرة توصي",
+    "badgeRecommends": "سفرة توصي به",
     "amenities": "المرافق",
     "cancellationPolicy": "سياسة الإلغاء",
     "refundFloor": "الحد الأدنى للاسترداد في سياسات سفرة {percent}٪ إلا في حالات خاصة تعتمدها الإدارة.",
