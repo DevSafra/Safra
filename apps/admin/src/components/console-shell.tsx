@@ -30,7 +30,14 @@ export async function ConsoleShell({
 }) {
   return (
     <div className="console-layout mx-auto max-w-[1380px] px-6 pt-6 pb-16">
-      <main className="console-main min-w-0">
+      {/*
+        The rhythm between panels lives HERE, in one place, rather than as a margin every section
+        page remembers to add. It was nowhere: five stacked `ConsolePanel`s on كتالوج المنصّة sat
+        at 0px from each other, so five bordered cards read as one undifferentiated slab (measured,
+        Bashar 2026-09-28). `space-y` rather than a grid because it adds a margin and changes the
+        layout model of nothing — thirty-five pages render through this element.
+      */}
+      <main className="console-main min-w-0 space-y-5">
         <ConsoleHeader title={title} {...(subtitle ? { subtitle } : {})} />
 
         {children}
