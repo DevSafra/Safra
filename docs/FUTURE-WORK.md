@@ -114,6 +114,24 @@ deleting it; the reason something was blocked is often the reason it comes back.
 > **Nothing that remains open is blocked on engineering alone** except the four test-infrastructure
 > items in §5 — and every one of those is bounded, named, and blocks nothing.
 
+> ### Customer-site work after the pass, 2026-09-27 evening
+>
+> Three asked-for changes, all shipped and pushed. They are recorded here so a new session is not
+> surprised by a navbar and a search bar that the earlier sections do not describe.
+>
+> |                                     |                                                                                                                                                                                                                                                                                                                          |
+> | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+> | **نوع العقار on the search bar**    | An existing capability moved to where people start: `searchQuerySchema` has taken `propertyTypeCode` since the contract was written and the results sidebar already filtered on it. On `/search` the bar and the sidebar now read the same parsed value, so neither silently clears the other.                           |
+> | **A six-item navbar**               | «الرئيسية · سياحة علاجية · الإقامات · المدن · جروبات · تواصل معنا», in Bashar's order — including سياحة علاجية ahead of الإقامات, which is his call about what the business leads with and is pinned by an assertion. المدن is a real index; the other three are `O-web-19`.                                             |
+> | **Every popup portals to `<body>`** | The sticky header gains `backdrop-filter` when stuck, which makes it a containing block for `position: fixed` — so a popup opened from the bar was trapped inside it once the page scrolled, at 1440×84 instead of 1440×900. `Modal` also now draws the heading its own docblock had always promised and never rendered. |
+>
+> **Measured at HEAD:** `pnpm verify` 292 files, **4,316 tests**, 0 failed, 0 skipped;
+> `pnpm e2e:run` **559 passed, 0 failed, 1 skipped**.
+>
+> **The one thing that must not reach production** is تواصل معنا, which is live with invented
+> contact details — `safra.example` and an all-zero telephone, `noindex` until the real ones arrive.
+> See `O-web-19`.
+
 > ### Engineering-complete, confirmed by Bashar on 2026-09-04
 >
 > **All three applications: engineering complete.** Super Admin Console, Partner Portal, Customer
