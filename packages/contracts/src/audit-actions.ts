@@ -312,6 +312,21 @@ export const AUDIT_ACTIONS = [
   'partner_type.updated',
   'partner_type.deleted',
   /*
+    الأسئلة الشائعة and جروبات (2026-09-28). Same three verbs, same reason: both became content a
+    super admin manages rather than SQL, and سجل التدقيق must be able to name what was written.
+    The FAQ entries were MISSED when that feature shipped — the sweep only fires once a real row
+    exists, and the first ones were written by hand-driving the console.
+  */
+  'faq_question.created',
+  'faq_question.updated',
+  'faq_question.deleted',
+  'faq_general.created',
+  'faq_general.updated',
+  'faq_general.deleted',
+  'group_trip.created',
+  'group_trip.updated',
+  'group_trip.deleted',
+  /*
     SAFRA's own treasury (Bashar, 2026-09-05). Every step of both lifecycles — the destination and
     the transfer — because this is the money the platform keeps, and «who sent SAFRA's revenue
     where, and who approved the account» must be answerable from the trail alone.

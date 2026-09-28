@@ -152,6 +152,7 @@ export const ar = {
     geo: 'المدن والدول والعملات',
     cityCategories: 'الفئات',
     landmarks: 'المعالم',
+    groupTrips: 'جروبات',
     catalogue: 'كتالوج المنصّة',
     treasury: 'خزينة سفرة',
     reports: 'التقارير',
@@ -435,6 +436,51 @@ export const ar = {
       evidence and an ad creative all open the SAME component, and a copy of these keys per screen
       is how four galleries came to behave four different ways.
     */
+    /* ── جروبات (Bashar, 2026-09-27) ─────────────────────────────────────── */
+    groupTrips: {
+      title: 'جروبات',
+      note: 'رحلات جماعية تُعدّها سفرة وتُعلنها على الموقع. تُكتب هنا، ولا ينشئها شريك ولا عميل. النسخة الحالية تُعلن الرحلة ولا تبيعها: الاستفسار يصل إلى صندوق الدعم.',
+      add: '+ رحلة جديدة',
+      empty: 'لا توجد رحلات بعد.',
+      colTitle: 'الرحلة',
+      colCity: 'الوجهة',
+      colDates: 'التواريخ',
+      colPrice: 'السعر',
+      colSeats: 'المقاعد',
+      colStatus: 'الحالة',
+      edit: 'تعديل',
+      remove: 'حذف',
+      removing: 'جارٍ الحذف…',
+      addTitle: 'رحلة جديدة',
+      editTitle: 'تعديل الرحلة',
+      slug: 'المعرّف',
+      slugHint: 'يظهر في رابط الرحلة ولا يُعدَّل بعد الإنشاء — أحرف لاتينية صغيرة وشرطات',
+      city: 'المدينة',
+      titleAr: 'العنوان بالعربية',
+      titleEn: 'العنوان بالإنجليزية',
+      titleDe: 'العنوان بالألمانية',
+      summaryAr: 'سطر التعريف بالعربية',
+      summaryEn: 'سطر التعريف بالإنجليزية',
+      summaryDe: 'سطر التعريف بالألمانية',
+      descriptionAr: 'الوصف بالعربية',
+      descriptionEn: 'الوصف بالإنجليزية',
+      descriptionDe: 'الوصف بالألمانية',
+      startsOn: 'تبدأ في',
+      endsOn: 'تنتهي في',
+      priceFrom: 'السعر من',
+      currency: 'العملة',
+      /* Said once, because the pair is the thing operators get wrong. */
+      priceHint: 'السعر والعملة معاً أو لا شيء. اتركهما فارغين إن كان السعر عند الطلب.',
+      seats: 'عدد المقاعد',
+      status: 'الحالة',
+      localeHint:
+        'العربية مطلوبة. إن تُركت الإنجليزية أو الألمانية فارغة يُعرض النص العربي.',
+      /* The only state a reader can see, so it is named where the choice is made. */
+      publishHint: 'الرحلة لا تظهر على الموقع إلا في حالة «منشورة».',
+      deleteHint: 'الحذف متاح فقط لرحلة لم تُنشر بعد. الرحلة المنشورة تُؤرشف بدل حذفها.',
+      onRequest: 'عند الطلب',
+    },
+
     landmarks: {
       title: 'المعالم',
       note: 'المعالم هي ما تُقاس إليه المسافات على صفحة العقار — «وسط المدينة»، «مطار دمشق الدولي». المسافة تُحسب من منطقة العقار التقريبية لا من عنوانه الدقيق، فدقّة إحداثيات المعلم تنعكس على كل عقار في مدينته.',
@@ -3855,6 +3901,10 @@ export const ar = {
     safra_payout_account: 'حساب تحويل سفرة',
     safra_payout: 'تحويل إيرادات سفرة',
     /* كتالوج المنصّة (2026-09-04) — the three entities a super admin manages there. */
+    /* الأسئلة الشائعة وجروبات (2026-09-28) — what a super admin authors on those screens. */
+    faq_question: 'سؤال للشركاء',
+    faq_general: 'سؤال عام',
+    group_trip: 'رحلة جماعية',
     amenity: 'خدمة',
     cancellation_policy: 'سياسة إلغاء',
     partner_type: 'نوع شريك',
@@ -3974,6 +4024,15 @@ export const ar = {
     'landmark_kind.archived': 'أرشفة فئة معالم',
 
     /* كتالوج المنصّة — الخدمات وسياسات الإلغاء وأنواع الشركاء (2026-09-04). */
+    'faq_question.created': 'إضافة سؤال للشركاء',
+    'faq_question.updated': 'تعديل سؤال للشركاء',
+    'faq_question.deleted': 'حذف سؤال للشركاء',
+    'faq_general.created': 'إضافة سؤال عام',
+    'faq_general.updated': 'تعديل سؤال عام',
+    'faq_general.deleted': 'حذف سؤال عام',
+    'group_trip.created': 'إضافة رحلة جماعية',
+    'group_trip.updated': 'تعديل رحلة جماعية',
+    'group_trip.deleted': 'حذف رحلة جماعية',
     'amenity.created': 'إضافة خدمة',
     'amenity.updated': 'تعديل خدمة',
     'amenity.deleted': 'حذف خدمة',
@@ -4382,6 +4441,18 @@ export const ar = {
      * the payload at all is that a dispute can turn on which fine was applied.
      */
     payloadKey: {
+      /*
+        ── الأسئلة الشائعة وجروبات (2026-09-28) ───────────────────────────────
+
+        ما تكتبه الخدمتان في `before`/`after`. المعرّف والعنوان يكفيان لقراءة السطر دون فتح
+        الشاشة، وهو الغرض من سجل التدقيق.
+      */
+      id: 'المعرّف',
+      questionAr: 'السؤال',
+      titleAr: 'العنوان',
+      isRequired: 'إلزامي',
+      startsOn: 'تبدأ في',
+
       /* المعالم: المدينة التي يتبعها المعلم وفئته — كلاهما معرّف لا اسم. */
       citySlug: 'المدينة',
       kindCode: 'الفئة',
@@ -5337,6 +5408,20 @@ export const ar = {
       active: 'نشط',
       paused: 'متوقف',
       expired: 'منتهٍ',
+    } as Record<string, string>,
+
+    /*
+      جروبات — the same three values `propertyStatus` carries, in the FEMININE.
+
+      «رحلة» is feminine and «عقار» is not, so reusing the property words would print «منشور» over
+      a «رحلة». The colours are shared deliberately — `statusTone` is keyed by the VALUE, so a
+      published trip and a published listing are the same green, which is rule 1 — and only the
+      WORDS differ, which is what rule «labels as distinct as the colours» is about.
+    */
+    groupTripStatus: {
+      draft: 'مسودة',
+      published: 'منشورة',
+      archived: 'مؤرشفة',
     } as Record<string, string>,
 
     adInvoiceStatus: {

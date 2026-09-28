@@ -49,14 +49,23 @@ const questionText = z.string().trim().min(3).max(300);
 /** An answer. Two thousand characters is several paragraphs — past that it is not an FAQ answer. */
 const answerText = z.string().trim().min(1).max(2000);
 
-/** `en`/`de` are optional everywhere; an empty string means "not given", never "answered blank". */
+/**
+ * An optional translation: `null` clears it, and OMITTING it leaves it alone.
+ *
+ * The distinction is load-bearing and was wrong: `.transform((v) => (v ? v : null))` maps an absent
+ * field to `null`, so a PATCH carrying only a question would have WIPED the English and German copy it
+ * never mentioned — and the service's `=== undefined ? before : input` merge could never see the
+ * `undefined` it tests for. Preserving it keeps «not mentioned» and «cleared» different requests.
+ */
 const optionalText = (schema: z.ZodString) =>
   z
     .string()
     .trim()
     .max(schema.maxLength ?? 2000)
-    .nullish()
-    .transform((value) => (value ? value : null));
+    .nullable()
+    .transform((value) => value || null)
+    /* LAST, so the KEY itself is optional — a transform inside `.nullish()` makes it required. */
+    .optional();
 
 /**
  * Where a question sits in the list the reader meets.
