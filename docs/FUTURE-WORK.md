@@ -150,6 +150,37 @@ deleting it; the reason something was blocked is often the reason it comes back.
 >
 > **Measured at HEAD:** `pnpm verify` 297 files, **4,354 tests**, 0 failed, 0 skipped.
 
+> ### O-seo-1 — 125 sitemap entries lead a crawler to a `noindex` page
+>
+> **Status:** OPEN · **Severity:** Medium · **Owner:** **Bashar** (an SEO/product decision) ·
+> **Found 2026-09-28**, by the sitemap test written for جروبات
+>
+> `sitemap.xml` lists `/{locale}/landmark/{slug}` for every landmark in every locale — 125 URLs.
+> That route is a **307 by design**: it resolves the landmark and forwards to `/search` with the
+> filter applied, which `landmark/[slug]/page.tsx` argues for well (one search, one set of rules,
+> one surface). The problem is the far end: **`/search` answers `noindex, follow`**.
+>
+> So the page built precisely so that «فنادق قرب الجامع الأموي» — named in that file as _the phrase
+> this business runs on_ — would have somewhere to land **cannot rank**, and a quarter of the
+> sitemap spends crawl budget arriving at a page Google is told to ignore.
+>
+> Nothing is broken for a PERSON: the redirect works and the results are correct. This is purely
+> about what a crawler can index.
+>
+> **Three ways out, and the choice is a product one:**
+>
+> 1. **Render the landmark page** instead of redirecting — it ranks, at the cost of the second
+>    search surface that file deliberately refused. Biggest win, biggest cost.
+> 2. **Make the filtered search indexable** for landmark queries only — cheaper, but `noindex` on
+>    `/search` is there to stop an infinite filter-combination crawl, and carving an exception out
+>    of that needs care.
+> 3. **Drop landmarks from the sitemap** — honest and free. They stay reachable by crawl from the
+>    city pages; SAFRA simply stops advertising URLs that cannot be indexed.
+>
+> **To unblock:** Bashar, on 1, 2 or 3. `e2e/sitemap.spec.ts` currently asserts only that nothing is
+> DEAD; the strict «200, no redirect» assertion is applied to the group-trip entries alone, with the
+> reason written there rather than hidden in an exemption list.
+
 > ### Engineering-complete, confirmed by Bashar on 2026-09-04
 >
 > **All three applications: engineering complete.** Super Admin Console, Partner Portal, Customer
