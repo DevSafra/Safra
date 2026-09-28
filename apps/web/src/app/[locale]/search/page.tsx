@@ -23,7 +23,7 @@ import {
 import { searchSafely } from '@/lib/api';
 import { BBOX_PLACEHOLDER } from '@/lib/basemap';
 import { formatMoney, localisedName, localisedText } from '@/lib/localise';
-import { todayInDamascus } from '@/lib/settings';
+import { addDays, todayInDamascus } from '@/lib/settings';
 
 /**
  * Results page (§5.5).
@@ -726,11 +726,6 @@ function Arrow({ direction }: { direction: 'back' | 'forward' }) {
       <path d="M19 12H5m0 0 6-6m-6 6 6 6" />
     </svg>
   );
-}
-
-function addDays(date: string, days: number): string {
-  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
-  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
 
 /**

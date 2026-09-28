@@ -11,7 +11,7 @@ import { getCities, getCity, getPropertyTypes } from '@/lib/catalog';
 import { localisedDescription, localisedName, localisedText } from '@/lib/localise';
 import { imageUrl as cityImageUrl } from '@/lib/property';
 import { searchSafely } from '@/lib/api';
-import { todayInDamascus } from '@/lib/settings';
+import { addDays, todayInDamascus } from '@/lib/settings';
 
 /**
  * City page (SRS §5.4).
@@ -284,9 +284,4 @@ function pickTags(
   if (locale === 'en') return city.tagsEn.length > 0 ? city.tagsEn : city.tagsAr;
   if (locale === 'de') return city.tagsDe.length > 0 ? city.tagsDe : city.tagsAr;
   return city.tagsAr;
-}
-
-function addDays(date: string, days: number): string {
-  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
-  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }

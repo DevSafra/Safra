@@ -102,6 +102,20 @@ export function todayInDamascus(): string {
 }
 
 /**
+ * A date `days` after this one, as `YYYY-MM-DD`.
+ *
+ * Shared rather than copied because it was already written twice — on the city page and on
+ * `/search` — and the landmark page would have been the third. It goes through `Date.UTC` on
+ * purpose: `new Date('2026-03-29')` plus two days is arithmetic in the RUNNING machine's zone,
+ * which loses or gains an hour across a DST boundary and can hand the API yesterday.
+ */
+export function addDays(date: string, days: number): string {
+  const [year, month, day] = date.split('-').map(Number) as [number, number, number];
+
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
+/**
  * The header announcement for this reader, or nothing.
  *
  * Bashar, 2026-09-11: the banner stays and «the super admin should be able to manage it example
