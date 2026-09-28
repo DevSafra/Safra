@@ -302,6 +302,13 @@
     "backHome": "Home",
     "highlights": "Highlights"
   },
+  "landmark": {
+    "title": "Stays near {landmark}",
+    "description": "Places to stay near {landmark} in {city}, nearest first.",
+    "staysNearby": "Nearest to {landmark}",
+    "viewAll": "All nearby stays",
+    "otherLandmarks": "Other landmarks in {city}"
+  },
   "common": {
     "loading": "Loading…",
     "error": "Something went wrong",

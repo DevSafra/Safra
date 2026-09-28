@@ -302,6 +302,13 @@
     "backHome": "Startseite",
     "highlights": "Highlights"
   },
+  "landmark": {
+    "title": "Unterkünfte nahe {landmark}",
+    "description": "Unterkünfte in der Nähe von {landmark} in {city}, die nächsten zuerst.",
+    "staysNearby": "Am nächsten zu {landmark}",
+    "viewAll": "Alle Unterkünfte in der Nähe",
+    "otherLandmarks": "Weitere Sehenswürdigkeiten in {city}"
+  },
   "common": {
     "loading": "Wird geladen…",
     "error": "Etwas ist schiefgelaufen",

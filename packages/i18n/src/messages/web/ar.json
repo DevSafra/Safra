@@ -302,6 +302,13 @@
     "backHome": "الرئيسية",
     "highlights": "أبرز ما فيها"
   },
+  "landmark": {
+    "title": "إقامات قرب {landmark}",
+    "description": "الإقامات المتاحة قرب {landmark} في {city}، مرتّبة من الأقرب.",
+    "staysNearby": "الأقرب إلى {landmark}",
+    "viewAll": "كل الإقامات القريبة",
+    "otherLandmarks": "معالم أخرى في {city}"
+  },
   "common": {
     "loading": "جارٍ التحميل…",
     "error": "حدث خطأ",
