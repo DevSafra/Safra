@@ -132,6 +132,24 @@ deleting it; the reason something was blocked is often the reason it comes back.
 > contact details — `safra.example` and an all-zero telephone, `noindex` until the real ones arrive.
 > See `O-web-19`.
 
+> ### الأسئلة الشائعة and جروبات, 2026-09-28
+>
+> Two features and three guardrails, all pushed.
+>
+> |                     |                                                                                                                                                                                                                                                                                                                                                                                   |
+> | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+> | **الأسئلة الشائعة** | Two FAQs under تقييمات الضيوف on every property page: questions a super admin asks and the PARTNER answers about their own listing, then questions SAFRA asks and answers itself. Migration 0082, console authoring on كتالوج المنصّة, partner answering above the submit step. A REQUIRED question blocks submission — never retroactively, so no published listing is affected. |
+> | **جروبات**          | `group_trips` (migration 0083), a console section, and `/groups` as a real list with a detail page. An ANNOUNCEMENT, not a booking — see `O-web-19`. A draft answers 404 exactly as a slug nobody used does.                                                                                                                                                                      |
+> | **Guardrails**      | Every `NEXT_PUBLIC_` variable declared to turbo with a sweep holding it (the map vanished twice from an undeclared one, and the sitemap would have shipped localhost canonicals); the catalogue screen's five unpaginated tables held to their exception; both public payloads capped.                                                                                            |
+>
+> **Two bugs found by the work rather than by a test**, both now fixed: the `optional()` contract
+> helper mapped an ABSENT field to `null`, so a PATCH carrying only a title would have wiped the
+> English and German copy it never mentioned — in the FAQ contract too, which had already shipped.
+> And the FAQ's audit actions were never declared, so سجل التدقيق showed raw identifiers; the sweep
+> only fires once a real row exists, and the first ones came from hand-driving the console.
+>
+> **Measured at HEAD:** `pnpm verify` 297 files, **4,354 tests**, 0 failed, 0 skipped.
+
 > ### Engineering-complete, confirmed by Bashar on 2026-09-04
 >
 > **All three applications: engineering complete.** Super Admin Console, Partner Portal, Customer
@@ -5905,12 +5923,28 @@ the last place to invent a claim.** The cheapest real version was offered and de
 «سياحة علاجية» trip attribute partners tag their listings with, like بحر and جبل, so the item opens
 a filtered search — that needs one catalogue row and no new model.
 
-**2. جروبات — the shape is decided, nothing is built.** Bashar: «only the admin can create a group
-trip for this». So a group trip is AUTHORED by staff rather than assembled by a customer, and none
-of it exists: no entity, no console screen, no public listing. The booking engine books one unit
-with a quantity, which is a different thing. The page says whose trips these will be and that there
-are none. **What it needs:** a `group_trips` entity, a console screen to author one, and this page
-becoming a list — a real feature, not a gap in an existing one.
+**2. جروبات — BUILT 2026-09-28, in the announcement shape.** Bashar: «only the admin can create a
+group trip for this», and that is what shipped: `group_trips` (migration 0083), a console section
+under جروبات with numbered paging, and `/groups` as a real list with a detail page behind it.
+
+**It announces a trip; it does not sell one.** No seats sold, no payment, no cancellation ladder —
+the booking engine books a UNIT with a quantity and a group trip is a different object, so bolting
+it onto that path is weeks of work for a demand nobody has evidenced. Interest routes to the
+support inbox that already exists. `seats` and `price_from` are things a reader is TOLD.
+
+**Two things deliberately left out**, each recorded here rather than half-built:
+
+- **No cover image.** A photograph needs the variant pipeline `property_images` runs — `mediaUrl`
+  builds its URL from the widths actually RENDERED, so a bare object key asks for a variant nobody
+  made and 404s. The column is ABSENT rather than nullable-and-unused: a field nothing can fill
+  reads as coverage. It arrives with the pipeline, together.
+- **No itinerary model.** A join table of stops buys a richer structure and costs a screen to
+  maintain it; the itinerary a reader wants is prose, and the description carries it. One
+  destination city is a foreign key so a trip is findable from the city page.
+
+**Still open, and Bashar's:** whether a group trip should become BOOKABLE. That is the decision
+that swings the next version by roughly 5× — an announcement is ~2 days, a booking path is 2-3
+weeks because it is a second booking object beside the unit engine.
 
 **3. تواصل معنا — THE DETAILS ON THE PAGE ARE INVENTED.** No support address, telephone, postal
 address or WhatsApp number is stored anywhere in the platform: not in `settings`, not in the public
