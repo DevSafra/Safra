@@ -222,6 +222,13 @@ for (const { locale, path, reads } of [
   { locale: 'de', path: '/de/property/qasr-al-sharq-malki', reads: 'right' },
   { locale: 'ar', path: '/ar/city/damascus', reads: 'left' },
   { locale: 'en', path: '/en/city/damascus', reads: 'right' },
+  /*
+    The landmark page, added 2026-09-28. It is the third instance of the breadcrumb shape and the
+    only one that draws TWO chevrons, so it is the one where a direction taken from the element
+    rather than from the document would show up as a pair disagreeing with each other.
+  */
+  { locale: 'ar', path: '/ar/landmark/souq-al-hamidiyah', reads: 'left' },
+  { locale: 'en', path: '/en/landmark/souq-al-hamidiyah', reads: 'right' },
 ] as const) {
   test(`the breadcrumb chevron on ${path} points ${reads}`, async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });

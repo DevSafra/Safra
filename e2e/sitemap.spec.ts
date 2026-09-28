@@ -17,16 +17,18 @@ import { expect, test } from '@playwright/test';
  * ## Two assertions, and why they are not the same one
  *
  * «Nothing 404s» is the check every entry must pass: a dead URL spends crawl budget and teaches
- * Google an address we did not mean. «200 without a redirect» is stricter and is applied to the
- * GROUP-TRIP entries only — deliberately, because the landmark entries do not pass it.
+ * Google an address we did not mean. «200 without a redirect» is stricter, and as of 2026-09-28 it
+ * applies to EVERY entry.
  *
- * `/{locale}/landmark/{slug}` is a 307 BY DESIGN: it resolves the landmark and forwards to
- * `/search` with the filter applied, which `landmark/[slug]/page.tsx` argues for at length and is
- * a reasonable build. What makes it a defect in THIS document is the far end — `/search` answers
- * `noindex, follow`, so 125 sitemap entries lead a crawler to a page it is told not to index, and
- * the page built so «فنادق قرب الجامع الأموي» would have somewhere to rank cannot rank. That is a
- * product decision rather than a test's to make: recorded in `docs/FUTURE-WORK.md`, not excused
- * here with an exemption list that would quietly grow.
+ * It did not, once. `/{locale}/landmark/{slug}` used to be a 307 to `/search`, and `/search`
+ * answers `noindex, follow` — so 125 entries, a quarter of this document, led a crawler to a page
+ * we tell it to skip, and the surface built so «فنادق قرب الجامع الأموي» would have somewhere to
+ * rank could not rank. That was recorded as O-seo-1 rather than excused here with an exemption
+ * list, and Bashar resolved it by making the landmark pages real (see `landmark/[slug]/page.tsx`).
+ *
+ * So the carve-out is gone, and its absence is the assertion: a future change that turns any
+ * sitemap address back into a redirect fails «every URL answers on its own address» immediately,
+ * rather than being quietly added to a list of exceptions.
  */
 const BASE = 'http://localhost:3000';
 
@@ -43,7 +45,7 @@ async function sitemapUrls(request: {
   );
 }
 
-test('no URL in the sitemap is dead', async ({ request }) => {
+test('every URL in the sitemap answers 200 on its own address', async ({ request }) => {
   const urls = await sitemapUrls(request);
 
   /*
@@ -53,33 +55,20 @@ test('no URL in the sitemap is dead', async ({ request }) => {
   */
   expect(urls.length, 'the sitemap should not be empty').toBeGreaterThan(10);
 
-  const dead: string[] = [];
+  /*
+    Named rather than merely counted. «Some URL is strict» would stay green if the landmark
+    entries — the ones that used to redirect, and the reason this assertion widened — stopped
+    reaching the document at all, which is indistinguishable from them passing.
+  */
+  const landmarks = urls.filter((url) => /\/(ar|en|de)\/landmark\//.test(url));
+  const groups = urls.filter((url) => /\/(ar|en|de)\/groups/.test(url));
 
-  for (const url of urls) {
-    /*
-      NOT followed, and that is both correct and fast. A landmark whose slug no longer resolves
-      answers 404 BEFORE it would redirect — `landmark/[slug]` calls `notFound()` on a missing one
-      — so a 3xx already proves the entry is alive. Following them instead ran 125 real searches
-      and timed out the test, which would have read as «the sitemap is broken».
-    */
-    const response = await request.get(url, { maxRedirects: 0 });
-
-    if (response.status() >= 400) dead.push(`${url} → ${response.status()}`);
-  }
-
-  expect(
-    dead,
-    'These are advertised to crawlers and do not answer. A dead sitemap entry is worse than no ' +
-      'entry: it spends crawl budget and teaches Google an address we did not mean.',
-  ).toEqual([]);
-});
-
-test('every group-trip URL answers 200 with no redirect', async ({ request }) => {
-  const urls = (await sitemapUrls(request)).filter((url) =>
-    /\/(ar|en|de)\/groups/.test(url),
+  expect(landmarks.length, 'no landmark URL reached the sitemap at all').toBeGreaterThan(
+    0,
   );
-
-  expect(urls.length, 'no group-trip URL reached the sitemap at all').toBeGreaterThan(0);
+  expect(groups.length, 'no group-trip URL reached the sitemap at all').toBeGreaterThan(
+    0,
+  );
 
   const notCanonical: string[] = [];
 
@@ -90,11 +79,18 @@ test('every group-trip URL answers 200 with no redirect', async ({ request }) =>
   }
 
   /*
-    Strict here and nowhere else. A sitemap's whole job is to name CANONICAL addresses, and a
-    crawler handed a redirect learns the URL we named is not the one we meant. These are the
-    entries this change added, so these are the ones it is answerable for.
+    One sweep, not two. This subsumes the «nothing 404s» check it replaced — every status at or
+    above 400 is also not 200 — and running both meant two passes over ~150 URLs to learn the same
+    thing. Redirects are NOT followed, which is what keeps it quick: before this change, following
+    them ran 125 real searches and timed the test out.
   */
-  expect(notCanonical, 'a group-trip URL does not answer on its own address').toEqual([]);
+  expect(
+    notCanonical,
+    'These are advertised to crawlers and do not answer on the address we named. A dead entry ' +
+      'spends crawl budget and teaches Google an address we did not mean; a redirecting one ' +
+      'teaches it that the address we named is not the one we meant. A sitemap names CANONICAL ' +
+      'addresses or it is worse than absent.',
+  ).toEqual([]);
 });
 
 test('the sitemap carries every locale of the group-trip pages', async ({ request }) => {

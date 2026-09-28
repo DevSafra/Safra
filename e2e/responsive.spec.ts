@@ -65,6 +65,13 @@ const CUSTOMER = [
     that route stopped answering 500.
   */
   '/ar/property/coastal-resort',
+  /*
+    A landmark page, added 2026-09-28 — the day it stopped being a 307 and became a page. It has
+    the widest breadcrumb on the customer site (home › city › landmark, two chevrons), a heading
+    that is a SENTENCE rather than a name, and a strip of sibling-landmark chips that wrap; 390px
+    is where all three of those go wrong, and nothing else in this list exercises any of them.
+  */
+  '/ar/landmark/souq-al-hamidiyah',
   '/ar/login',
   '/ar/register',
   '/ar/forgot-password',
