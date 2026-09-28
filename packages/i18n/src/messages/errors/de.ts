@@ -276,6 +276,12 @@ export const de = {
     'Diese Frage wird nicht mehr gestellt und kann nicht beantwortet werden.',
   'faq.answer_required':
     'Beantworten Sie die Pflichtfragen, bevor Sie das Inserat zur Prüfung einreichen.',
+  'group_trip.not_found': 'Zu dieser Kennung gibt es keine Gruppenreise.',
+  'group_trip.slug_taken':
+    'Diese Kennung gehört zu einer anderen Reise. Wählen Sie eine andere.',
+  'group_trip.price_needs_currency':
+    'Geben Sie eine Währung zum Preis an, oder lassen Sie beide Felder leer.',
+  'group_trip.dates_order': 'Das Enddatum darf nicht vor dem Startdatum liegen.',
   'geo.category_in_use':
     'Diese Kategorie ist {n} Städten zugeordnet — deaktivieren statt entfernen.',
   'geo.city_in_use':

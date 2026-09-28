@@ -243,6 +243,12 @@ export const en = {
     'That question is no longer asked, so it cannot be answered.',
   'faq.answer_required':
     'Answer the required questions before submitting the listing for review.',
+  'group_trip.not_found': 'No group trip exists with that identifier.',
+  'group_trip.slug_taken':
+    'That identifier belongs to another trip. Choose a different one.',
+  'group_trip.price_needs_currency':
+    'Give a currency with the price, or leave both empty.',
+  'group_trip.dates_order': 'The end date must not fall before the start date.',
   'geo.category_in_use':
     'That category is filed against {n} cities — deactivate it instead of removing it.',
   'geo.city_in_use':

@@ -2702,3 +2702,50 @@ export async function getGeneralFaq() {
     z.object({ entries: z.array(generalFaqRowSchema) }),
   );
 }
+
+/* ── جروبات (Bashar, 2026-09-27) ───────────────────────────────────────────────────────── */
+
+/**
+ * One announced trip, as the console reads it.
+ *
+ * `priceFrom` and `currencyCode` are nullable AS A PAIR — the database holds that as a CHECK
+ * constraint, so there is no row where one is set and the other is not, and the row type says so.
+ */
+const groupTripRowSchema = z.object({
+  slug: z.string(),
+  titleAr: z.string(),
+  titleEn: z.string().nullable(),
+  titleDe: z.string().nullable(),
+  summaryAr: z.string(),
+  summaryEn: z.string().nullable(),
+  summaryDe: z.string().nullable(),
+  descriptionAr: z.string(),
+  descriptionEn: z.string().nullable(),
+  descriptionDe: z.string().nullable(),
+  citySlug: z.string(),
+  cityNameAr: z.string(),
+  startsOn: z.string(),
+  endsOn: z.string(),
+  priceFrom: z.string().nullable(),
+  currencyCode: z.string().nullable(),
+  seats: z.number().nullable(),
+  status: z.string(),
+});
+
+export type GroupTripRow = z.infer<typeof groupTripRowSchema>;
+
+export async function getGroupTrips(query: { page: number; size: number }) {
+  const search = new URLSearchParams({
+    page: String(query.page),
+    limit: String(query.size),
+  });
+
+  return staffFetch(
+    `/admin/group-trips?${search.toString()}`,
+    z.object({
+      items: z.array(groupTripRowSchema),
+      total: z.number(),
+      capped: z.boolean(),
+    }),
+  );
+}

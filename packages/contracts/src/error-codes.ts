@@ -392,6 +392,16 @@ export const ERROR = {
   FAQ_QUESTION_UNAVAILABLE: 'faq.question_unavailable',
   /* A required question is unanswered. Raised where a listing is SUBMITTED, never retroactively. */
   FAQ_ANSWER_REQUIRED: 'faq.answer_required',
+  /*
+    ── جروبات: the trips SAFRA announces (Bashar, 2026-09-28) ─────────────────────────────
+    Their own codes rather than a reuse of `catalogue.*`: the reader is a super admin on a screen
+    about trips, and «لا يوجد عنصر بهذا الرمز في الكتالوج» would name a screen they are not on.
+  */
+  GROUP_TRIP_NOT_FOUND: 'group_trip.not_found',
+  GROUP_TRIP_SLUG_TAKEN: 'group_trip.slug_taken',
+  /* The pair the database also enforces, so a form can name the field rather than show a 500. */
+  GROUP_TRIP_PRICE_NEEDS_CURRENCY: 'group_trip.price_needs_currency',
+  GROUP_TRIP_DATES_ORDER: 'group_trip.dates_order',
   SETTING_VALUE_FLAT_OR_PERCENT: 'setting.value_flat_or_percent',
   SETTING_VALUE_SANCTIONS_POLICY: 'setting.value_sanctions_policy',
   SETTING_VALUE_PERCENT_RANGE: 'setting.value_percent_range',

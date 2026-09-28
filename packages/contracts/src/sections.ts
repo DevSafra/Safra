@@ -94,6 +94,14 @@ export const CONSOLE_SECTION_PERMISSIONS = {
   */
   landmarks: P.SETTINGS_READ,
   /*
+    جروبات — the trips SAFRA announces (Bashar, 2026-09-27).
+
+    `SETTINGS_READ` opens the registry, the same authority كتالوج المنصّة uses: an operator
+    answering «is that trip still running» needs to read it. Authoring is `CATALOGUE_MANAGE`,
+    declared on the routes — «only the admin can create a group trip for this».
+  */
+  groupTrips: P.SETTINGS_READ,
+  /*
     كتالوج المنصّة — الخدمات وسياسات الإلغاء وأنواع الشركاء (2026-09-04).
 
     `SETTINGS_READ` to open it, because operations staff work against this catalogue all day and

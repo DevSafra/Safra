@@ -212,6 +212,15 @@ export const VOCABULARIES: Readonly<Record<string, readonly string[]>> = {
     'suspended',
     'archived',
   ],
+  /*
+    جروبات — a staff-authored trip's three states (2026-09-28).
+
+    Its values all exist already and all coexist on the property vocabulary, so rule 2 is not in
+    question for this triple. It is declared anyway: the rule is that every status SET is listed
+    here, and a set nobody declared is a set the test cannot prove anything about — including the
+    day somebody adds a fourth state to it.
+  */
+  groupTrip: ['draft', 'published', 'archived'],
   verification: ['pending', 'in_review', 'approved', 'rejected'],
   /*
     Where a partner's money goes, and whether anybody has checked it (§11.4).

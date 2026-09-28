@@ -37,6 +37,7 @@ export const CONSOLE_SECTION_PATHS: Readonly<Record<ConsoleSection, string>> = {
   geo: '/geo',
   cityCategories: '/city-categories',
   landmarks: '/landmarks',
+  groupTrips: '/groups',
   catalogue: '/catalogue',
   treasury: '/treasury',
   reports: '/reports',

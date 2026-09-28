@@ -26,6 +26,7 @@ export * from './dispute.js';
 export * from './safra.js';
 export * from './review.js';
 export * from './faq.js';
+export * from './group-trip.js';
 export * from './favourite.js';
 export * from './messaging.js';
 export * from './advertising.js';

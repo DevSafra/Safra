@@ -106,6 +106,7 @@ export const TABLE_SECTIONS = [
    * rows is a log you search».
    */
   'landmarks',
+  'groupTrips',
   /**
    * آخر نشاط — one staff member's own actions, on their record.
    *
@@ -162,6 +163,7 @@ export const TABLE_SECTION_PATHS: Readonly<Record<TableSection, string>> = {
   propertiesPending: '/properties',
   adInvoices: '/ads',
   landmarks: '/landmarks',
+  groupTrips: '/groups',
   /*
     The registry, not the record — for the reason `partnerViolations` states above. This section's
     real URL carries a user id, and a path in this map feeds the save endpoint's REDIRECT, which
@@ -192,6 +194,7 @@ const NAMESPACED: Readonly<
   adInvoices: { page: 'ipage', size: 'isize' },
   /* The only table on its screen, so the plain names. */
   landmarks: { page: 'page', size: 'size' },
+  groupTrips: { page: 'page', size: 'size' },
   /*
     Namespaced although it is the only table on صفحة الموظف today. The record screen already carries
     `?page=` and `?size=` for its own purpose — «رجوع» restores the reader's position in الموظفون —

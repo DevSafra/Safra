@@ -514,6 +514,19 @@ export const violationStage = pgEnum('violation_stage', [
 
 export const adStatus = pgEnum('ad_status', ['draft', 'active', 'paused', 'expired']);
 
+/**
+ * جروبات — where a staff-authored group trip is in its life (Bashar, 2026-09-28).
+ *
+ * Three states and no `cancelled`: a trip that will not run is `archived`, which keeps the row and
+ * its history exactly as P-003 requires of everything else. `draft` is the only state a trip can be
+ * edited freely in; `published` is the only one a customer can see.
+ */
+export const groupTripStatus = pgEnum('group_trip_status', [
+  'draft',
+  'published',
+  'archived',
+]);
+
 /** SRS §5.4: the four fixed city categories. Cities may carry several. */
 export const cityCategory = pgEnum('city_category', [
   'coastal',

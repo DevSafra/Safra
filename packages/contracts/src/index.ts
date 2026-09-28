@@ -17,6 +17,7 @@ export * from './readiness.js';
 export * from './gift-card.js';
 export * from './catalogue.js';
 export * from './faq.js';
+export * from './group-trip.js';
 export * from './customer-fee.js';
 export * from './operating-rules.js';
 export * from './invoice.js';

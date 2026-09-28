@@ -853,10 +853,26 @@
     "cities": "Städte ansehen"
   },
   "groups": {
-    "title": "Gruppen",
-    "body": "Gruppenreisen, die SAFRA selbst zusammenstellt — Ziel, Termine und Unterkunft im Voraus arrangiert. Zurzeit ist keine Reise offen.",
+    "title": "Gruppenreisen",
+    "body": "Reisen, die SAFRA selbst zusammenstellt: Ziel, Termine und Unterkunft sind im Voraus organisiert.",
+    "empty": "Derzeit ist keine Gruppenreise ausgeschrieben. Sehen Sie sich solange die Unterkünfte an.",
     "browse": "Unterkünfte ansehen",
-    "cities": "Städte ansehen"
+    "cities": "Städte ansehen",
+    "seats": "{n, plural, one {# Platz} other {# Plätze}}",
+    "priceFrom": "Ab {amount}",
+    "priceOnRequest": "Preis auf Anfrage",
+    "dates": "{from} - {to}",
+    "nights": "{n, plural, one {# Nacht} other {# Nächte}}",
+    "past": "Beendet",
+    "upcoming": "Bevorstehend",
+    "about": "Über diese Reise",
+    "enquire": "Zu dieser Reise anfragen",
+    "enquireNote": "Melden Sie sich an, um eine Anfrage zu stellen; das SAFRA-Team antwortet Ihnen.",
+    "backToList": "Alle Reisen",
+    "labelDates": "Termine",
+    "labelDuration": "Dauer",
+    "labelSeats": "Plätze",
+    "labelPrice": "Preis"
   },
   "contact": {
     "title": "Kontakt",

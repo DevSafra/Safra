@@ -2,22 +2,26 @@ import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 
+import { GroupTripCard } from '@/components/group-trip-card';
 import { SectionPlaceholder } from '@/components/section-placeholder';
-import { isLocale } from '@/i18n/routing';
+import { getGroupTrips } from '@/lib/group-trips';
+import { isLocale, routing } from '@/i18n/routing';
 
 /**
- * جروبات — trips SAFRA puts together, and there are none yet.
+ * جروبات — the trips SAFRA puts together (Bashar, 2026-09-27; built 2026-09-28).
  *
- * Bashar, 2026-09-27: «only the admin can create a group trip for this». That is the shape — a
- * group trip is AUTHORED by staff in the console rather than assembled by a customer — and none of
- * it exists yet: no entity, no console screen, no public listing. The booking engine books one unit
- * with a quantity, which is a different thing.
+ * *«only the admin can create a group trip for this»*: every trip here is authored by staff in the
+ * console. This page announces them; it does not sell them. Interest is routed to the support inbox
+ * that already exists, from the trip's own page.
  *
- * So the page is honest about being empty and says whose trips these will be. The entity and its
- * console screens are recorded in `docs/FUTURE-WORK.md`; building them behind a navbar item nobody
- * has specified would be inventing a product.
+ * ## It keeps the placeholder for the empty case
+ *
+ * A section with nothing in it is a real state, not a failure — and the placeholder already says
+ * what جروبات is and offers somewhere to go. Replacing it with «no results» would be a worse
+ * version of a screen that already exists. The `noindex` comes OFF the moment there is a trip,
+ * which is the condition the original page said it was waiting for.
  */
-export const dynamic = 'force-static';
+export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({
   params,
@@ -29,13 +33,22 @@ export async function generateMetadata({
   if (!isLocale(locale)) return {};
 
   const t = await getTranslations({ locale, namespace: 'groups' });
+  const trips = await getGroupTrips();
 
   /*
-    Not indexed while it is empty. A page with no content that Google has crawled is a result that
-    disappoints somebody who searched for exactly this, and it stays in the index long after the
-    section fills. `robots` comes off the day there is something here.
+    Indexed once there is something to find, and not before. A crawled page with no content is a
+    search result that disappoints the person who searched for exactly this, and it outlives the
+    emptiness by weeks.
   */
-  return { title: t('title'), description: t('body'), robots: { index: false } };
+  return {
+    title: t('title'),
+    description: t('body'),
+    ...(trips.length === 0 ? { robots: { index: false } } : {}),
+    alternates: {
+      canonical: `/${locale}/groups`,
+      languages: Object.fromEntries(routing.locales.map((l) => [l, `/${l}/groups`])),
+    },
+  };
 }
 
 export default async function GroupsPage({
@@ -50,15 +63,51 @@ export default async function GroupsPage({
   setRequestLocale(locale);
 
   const t = await getTranslations('groups');
+  const trips = await getGroupTrips();
+
+  if (trips.length === 0) {
+    return (
+      <SectionPlaceholder
+        locale={locale}
+        ornamentId="groups"
+        title={t('title')}
+        body={t('empty')}
+        browseLabel={t('browse')}
+        citiesLabel={t('cities')}
+      />
+    );
+  }
 
   return (
-    <SectionPlaceholder
-      locale={locale}
-      ornamentId="groups"
-      title={t('title')}
-      body={t('body')}
-      browseLabel={t('browse')}
-      citiesLabel={t('cities')}
-    />
+    <article className="mx-auto max-w-7xl px-4 py-10">
+      <header className="max-w-2xl">
+        <h1 className="font-display text-3xl font-bold text-gold sm:text-4xl">
+          {t('title')}
+        </h1>
+        <p className="mt-3 text-muted">{t('body')}</p>
+      </header>
+
+      {/*
+        A grid rather than a row of equal cards in a slider: a trip is read, not browsed past, and
+        the set is small enough that everything fits on one screen at desktop. `min-width: 0` is
+        handled globally, so a long Arabic title cannot push the column wider than its track.
+      */}
+      <ul className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {trips.map((trip) => (
+          <GroupTripCard
+            key={trip.slug}
+            trip={trip}
+            locale={locale}
+            labels={{
+              priceFrom: (amount) => t('priceFrom', { amount }),
+              priceOnRequest: t('priceOnRequest'),
+              nights: (n) => t('nights', { n }),
+              seats: (n) => t('seats', { n }),
+              past: t('past'),
+            }}
+          />
+        ))}
+      </ul>
+    </article>
   );
 }

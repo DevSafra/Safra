@@ -853,10 +853,26 @@
     "cities": "Browse cities"
   },
   "groups": {
-    "title": "Groups",
-    "body": "Group trips that SAFRA puts together itself — a destination, dates and accommodation arranged in advance. There is no open trip right now.",
+    "title": "Group trips",
+    "body": "Trips SAFRA puts together itself, with the destination, the dates and the stay arranged in advance.",
+    "empty": "No group trip is announced right now. Browse the stays in the meantime.",
     "browse": "Browse stays",
-    "cities": "Browse cities"
+    "cities": "Browse cities",
+    "seats": "{n, plural, one {# seat} other {# seats}}",
+    "priceFrom": "From {amount}",
+    "priceOnRequest": "Price on request",
+    "dates": "{from} - {to}",
+    "nights": "{n, plural, one {# night} other {# nights}}",
+    "past": "Finished",
+    "upcoming": "Upcoming",
+    "about": "About this trip",
+    "enquire": "Ask about this trip",
+    "enquireNote": "Sign in to open an enquiry and the SAFRA team will reply.",
+    "backToList": "All trips",
+    "labelDates": "Dates",
+    "labelDuration": "Duration",
+    "labelSeats": "Seats",
+    "labelPrice": "Price"
   },
   "contact": {
     "title": "Contact us",

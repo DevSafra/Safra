@@ -128,6 +128,7 @@ const NAV: readonly NavItem[] = [
   { key: 'cityCategories', href: '/city-categories' },
   /* Beside الفئات: a landmark is geography, and it is what distances are measured to. */
   { key: 'landmarks', href: '/landmarks' },
+  { key: 'groupTrips', href: '/groups' },
   { key: 'catalogue', href: '/catalogue' },
   { key: 'treasury', href: '/treasury' },
   { key: 'reports', href: '/reports' },

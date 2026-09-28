@@ -41,8 +41,10 @@ import { SettingsModule } from '../settings/settings.module.js';
 import { SettingsAdminService } from '../settings/settings-admin.service.js';
 import { CatalogueController } from './catalogue.controller.js';
 import { FaqController } from './faq.controller.js';
+import { GroupTripsController } from './group-trips.controller.js';
 import { CatalogueService } from './catalogue.service.js';
 import { FaqService } from './faq.service.js';
+import { GroupTripsService } from './group-trips.service.js';
 import { RegistriesController } from './registries.controller.js';
 import { BookingListService } from './booking-list.service.js';
 import { RegistryService } from './registry.service.js';
@@ -97,6 +99,7 @@ import { StaffScopeService } from './staff-scope.service.js';
     AdminController,
     CatalogueController,
     FaqController,
+    GroupTripsController,
     RegistriesController,
     CommsController,
     CityImagesController,
@@ -132,6 +135,7 @@ import { StaffScopeService } from './staff-scope.service.js';
     GeoWriteService,
     CatalogueService,
     FaqService,
+    GroupTripsService,
     GeoCategoryService,
     LandmarkService,
     ReportsService,

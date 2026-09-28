@@ -8,6 +8,7 @@ import { Public } from '../rbac/decorators.js';
 import { CatalogService } from './catalog.service.js';
 import { PropertyDetailService } from './property-detail.service.js';
 import { NearbyService } from './nearby.service.js';
+import { PublicGroupTripsService } from './group-trips.service.js';
 
 /**
  * Public catalogue. @Public() because §5.1 requires a visitor to browse and search
@@ -19,6 +20,7 @@ class CatalogController {
     private readonly catalog: CatalogService,
     private readonly properties: PropertyDetailService,
     private readonly nearby: NearbyService,
+    private readonly groupTrips: PublicGroupTripsService,
   ) {}
 
   @Public()
@@ -31,6 +33,24 @@ class CatalogController {
   @Get('cities/:slug')
   async city(@Param('slug') slug: string) {
     return this.catalog.city(slug);
+  }
+
+  /**
+   * جروبات — the trips SAFRA announces.
+   *
+   * Public for the same reason the catalogue is: §5.1 requires a visitor to browse without
+   * registering, and a trip announcement is the most browse-able thing on the site.
+   */
+  @Public()
+  @Get('group-trips')
+  async groupTripList() {
+    return this.groupTrips.list();
+  }
+
+  @Public()
+  @Get('group-trips/:slug')
+  async groupTrip(@Param('slug') slug: string) {
+    return this.groupTrips.bySlug(slug);
   }
 
   /** §5.6 — the full property page payload. */
@@ -181,7 +201,12 @@ class CatalogController {
 
 @Module({
   controllers: [CatalogController],
-  providers: [CatalogService, PropertyDetailService, NearbyService],
+  providers: [
+    CatalogService,
+    PropertyDetailService,
+    NearbyService,
+    PublicGroupTripsService,
+  ],
   exports: [CatalogService, PropertyDetailService, NearbyService],
 })
 export class CatalogModule {}

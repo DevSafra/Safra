@@ -14,6 +14,7 @@ import { PERMISSIONS_KEY } from './decorators.js';
 import { CatalogueController } from '../admin/catalogue.controller.js';
 import { SafraPayoutController } from '../payouts/safra-payout.controller.js';
 import { RegistriesController } from '../admin/registries.controller.js';
+import { GroupTripsController } from '../admin/group-trips.controller.js';
 import { StaffController } from '../admin/staff.controller.js';
 import { StaffRolesController } from '../admin/staff-roles.controller.js';
 
@@ -80,6 +81,7 @@ const SECTION_HANDLERS: Record<
   geo: [RegistriesController, 'geography', 'getGeography'],
   cityCategories: [RegistriesController, 'cityCategories', 'getCityCategories'],
   landmarks: [RegistriesController, 'landmarks', 'getLandmarks'],
+  groupTrips: [GroupTripsController, 'list', 'getGroupTrips'],
   /*
     كتالوج المنصّة reads three lists. `amenities` is the PRIMARY one — it is the table at the top
     of the page and the one a reader opens the section for; the other two degrade to their own
