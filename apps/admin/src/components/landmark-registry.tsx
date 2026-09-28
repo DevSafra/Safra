@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { AddButton } from '@/components/add-button';
 import { useRouter } from 'next/navigation';
 
 import { LocationPicker, Modal, useConfirm } from '@safra/ui';
@@ -76,13 +77,11 @@ export function LandmarkRegistry({
     <section>
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h2 className="text-16 font-bold text-text">{t.sections.landmarks.title}</h2>
-        <button
-          type="button"
+        <AddButton
+          label={t.sections.landmarks.add}
           onClick={() => setEditing('new')}
-          className="min-h-10 cursor-pointer rounded-lg bg-gold px-3 text-13 font-extrabold text-ink lg:min-h-0 lg:py-1.5"
-        >
-          {t.sections.landmarks.add}
-        </button>
+          attribute="data-landmark-add"
+        />
       </div>
 
       {/*

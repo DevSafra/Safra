@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { AddButton } from '@/components/add-button';
 import { useState, type ReactNode } from 'react';
 
 import { preferredCurrency } from '@safra/contracts';
@@ -271,15 +272,12 @@ function AddForm({
       <div className="mb-2.5 flex flex-wrap items-center gap-2.5">
         <h2 className="text-16 font-extrabold text-gold-read">{title}</h2>
         <span className="ms-auto">
-          <button
-            type="button"
-            data-geo-add={marker}
-            aria-expanded={open}
+          <AddButton
+            label={label}
             onClick={() => setOpen(!open)}
-            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1.5 text-13 font-bold text-gold-read transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
-          >
-            {label}
-          </button>
+            expanded={open}
+            attribute="data-geo-"
+          />
         </span>
       </div>
 

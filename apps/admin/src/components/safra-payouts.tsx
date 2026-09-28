@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { AddButton } from '@/components/add-button';
 import { useState } from 'react';
 
 import { useConfirm, statusTone } from '@safra/ui';
@@ -144,15 +145,12 @@ export function SafraPayouts({ payouts }: { readonly payouts: readonly SafraPayo
       <div className="flex flex-wrap items-baseline gap-2.5">
         <h2 className="text-16 font-extrabold text-gold-read">{c.payoutsTitle}</h2>
         <span className="ms-auto">
-          <button
-            type="button"
-            data-safra-payout-open
-            aria-expanded={opening}
+          <AddButton
+            label={c.payoutOpen}
             onClick={() => setOpening(!opening)}
-            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1.5 text-13 font-bold text-gold-read transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
-          >
-            {c.payoutOpen}
-          </button>
+            expanded={opening}
+            attribute="data-safra-payout-open"
+          />
         </span>
       </div>
 
