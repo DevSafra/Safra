@@ -205,6 +205,8 @@
     "reviewsShowing": "Showing the latest {shown} of {total, plural, one {1 review} other {# reviews}}",
     "reviewsPartnerReply": "The host replied",
     "reviewsVerified": "From a completed stay",
+    "faqTitle": "Frequently asked questions about this property",
+    "faqGeneralTitle": "Frequently asked questions about SAFRA",
     "save": "Save to favourites",
     "saved": "Saved to favourites",
     "saveFailed": "Could not save. Try again.",

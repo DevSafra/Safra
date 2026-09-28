@@ -22,6 +22,7 @@ import {
   type CalendarRangeUpdate,
   type PortfolioCalendarQuery,
   type PropertyCreateInput,
+  type PropertyFaqAnswersInput,
   type PropertyUpdateInput,
   type UnitCreateInput,
   type UnitUpdateInput,
@@ -29,6 +30,7 @@ import {
   calendarRangeUpdateSchema,
   portfolioCalendarQuerySchema,
   propertyCreateSchema,
+  propertyFaqAnswersSchema,
   propertyUpdateSchema,
   unitCreateSchema,
   unitUpdateSchema,
@@ -313,6 +315,32 @@ export class PartnerController {
     @Param('reference') reference: string,
   ) {
     return this.properties.submitForReview(user, reference);
+  }
+
+  /**
+   * الأسئلة الشائعة — the questions SAFRA asks about this listing, and its answers.
+   *
+   * Not `@RefusedWhileSuspended`, and that is deliberate: a suspended partner's listings are still
+   * PUBLIC, so their answers are still being read. Freezing a correction while the wrong sentence
+   * stays on the page would punish the reader for the partner's suspension.
+   */
+  @Get('properties/:reference/faq')
+  @RequirePermissions(P.PROPERTY_MANAGE_OWN)
+  async faq(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+  ) {
+    return this.properties.faqForOwn(user, reference);
+  }
+
+  @Put('properties/:reference/faq')
+  @RequirePermissions(P.PROPERTY_MANAGE_OWN)
+  async saveFaq(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+    @Body(new ZodValidationPipe(propertyFaqAnswersSchema)) body: PropertyFaqAnswersInput,
+  ) {
+    return this.properties.saveFaqAnswers(user, reference, body);
   }
 
   /*

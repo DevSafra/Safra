@@ -205,6 +205,8 @@
     "reviewsShowing": "أحدث {shown} من {total, plural, zero {لا تقييمات} one {تقييم واحد} two {تقييمين} few {# تقييمات} many {# تقييمًا} other {# تقييم}}",
     "reviewsPartnerReply": "رد المضيف",
     "reviewsVerified": "من إقامة مؤكدة",
+    "faqTitle": "الأسئلة الشائعة عن هذا العقار",
+    "faqGeneralTitle": "أسئلة شائعة عن سفرة",
     "save": "حفظ في المفضلة",
     "saved": "محفوظ في المفضلة",
     "saveFailed": "تعذّر الحفظ. حاول مرة أخرى.",

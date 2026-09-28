@@ -6,10 +6,12 @@ import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 import {
   getOfferableAmenities,
   getProperty,
+  getPropertyFaq,
   getPropertyFormReference,
   sidebarBadges,
 } from '@/lib/api';
 import { PropertyAmenities } from '@/components/property-amenities';
+import { PropertyFaq } from '@/components/property-faq';
 import { PropertyEditor } from '@/components/property-editor';
 import { PropertyDescriptionForm } from '@/components/property-description-form';
 import { PropertyLocationForm } from '@/components/property-location-form';
@@ -43,11 +45,12 @@ export default async function EditPropertyPage({
     the same list, so a fetch per component would be one request per unit for an answer that cannot
     differ between them.
   */
-  const [profile, property, formReference, amenities] = await Promise.all([
+  const [profile, property, formReference, amenities, faq] = await Promise.all([
     requireVerifiedPartner(),
     getProperty(reference),
     getPropertyFormReference(),
     getOfferableAmenities(),
+    getPropertyFaq(reference),
   ]);
 
   const name =
@@ -188,6 +191,16 @@ export default async function EditPropertyPage({
             }
           />
         </section>
+
+        {/*
+          الأسئلة الشائعة sits ABOVE the submit step for the reason الوحدات does: submitting is
+          refused while a REQUIRED question is unanswered, so the reader must meet the requirement
+          before they meet the button that depends on it. A failed read degrades to nothing rather
+          than taking the editor down — a partner correcting a price is not blocked by it.
+        */}
+        {faq === 'failed' || faq === 'unauthenticated' ? null : (
+          <PropertyFaq reference={property.reference} questions={faq.questions} />
+        )}
 
         {/*
           The step that was missing entirely — see `submit-for-review.tsx`. It sits BELOW الوحدات

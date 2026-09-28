@@ -381,6 +381,17 @@ export const ERROR = {
   CATALOGUE_IN_USE: 'catalogue.in_use',
   /* Lowercase Latin, digits and hyphens: a code is keyed on by seeds, contracts and links. */
   CATALOGUE_CODE_FORMAT: 'catalogue.code_format',
+  /*
+    ── الأسئلة الشائعة: the two FAQs on a property page (Bashar, 2026-09-28) ──────────────
+    Their own codes rather than reusing `catalogue.*`: the reader of the last one is a PARTNER
+    being told their listing is not ready to submit, and «لا يمكن حذف هذا العنصر» from a screen
+    they have never seen would be the wrong sentence in the wrong voice.
+  */
+  FAQ_NOT_FOUND: 'faq.not_found',
+  /* Answering a question that was retired, or never existed. Named, so it is not a silent no-op. */
+  FAQ_QUESTION_UNAVAILABLE: 'faq.question_unavailable',
+  /* A required question is unanswered. Raised where a listing is SUBMITTED, never retroactively. */
+  FAQ_ANSWER_REQUIRED: 'faq.answer_required',
   SETTING_VALUE_FLAT_OR_PERCENT: 'setting.value_flat_or_percent',
   SETTING_VALUE_SANCTIONS_POLICY: 'setting.value_sanctions_policy',
   SETTING_VALUE_PERCENT_RANGE: 'setting.value_percent_range',

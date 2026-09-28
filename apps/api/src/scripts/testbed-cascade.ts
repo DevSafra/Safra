@@ -89,6 +89,12 @@ export const CASCADE_HANDLES = new Set<string>([
   'reviews',
   'unit_amenities',
   'property_amenities',
+  /*
+    A listing's answers to SAFRA's questions. A pure child of `properties`: the QUESTION is
+    platform-wide reference data and survives a testbed reset, the ANSWER is a fact about one
+    listing and goes with it.
+  */
+  'property_faq_answers',
   'wallet_transactions',
 ]);
 

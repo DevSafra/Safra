@@ -238,6 +238,11 @@ export const en = {
     '{count} records point at it, so it cannot be deleted — deactivate it instead: it leaves the pickers and everything already using it keeps working.',
   'catalogue.code_format':
     'A code is lowercase Latin letters, digits and hyphens, e.g. ev-charger.',
+  'faq.not_found': 'No question exists with that identifier.',
+  'faq.question_unavailable':
+    'That question is no longer asked, so it cannot be answered.',
+  'faq.answer_required':
+    'Answer the required questions before submitting the listing for review.',
   'geo.category_in_use':
     'That category is filed against {n} cities — deactivate it instead of removing it.',
   'geo.city_in_use':

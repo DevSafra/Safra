@@ -89,14 +89,17 @@ export class PropertyDetailService {
     const publicLatitude = publicCoordinate(row['public_latitude']);
     const publicLongitude = publicCoordinate(row['public_longitude']);
 
-    const [units, images, calendar, fees, reviews, landmarks] = await Promise.all([
-      this.units(slug, stay),
-      this.images(slug),
-      this.calendar(slug),
-      this.publicFees(),
-      this.reviews(slug),
-      this.landmarks(row['city_id'], publicLatitude, publicLongitude),
-    ]);
+    const [units, images, calendar, fees, reviews, landmarks, faq, generalFaq] =
+      await Promise.all([
+        this.units(slug, stay),
+        this.images(slug),
+        this.calendar(slug),
+        this.publicFees(),
+        this.reviews(slug),
+        this.landmarks(row['city_id'], publicLatitude, publicLongitude),
+        this.faq(slug),
+        this.generalFaq(),
+      ]);
 
     return {
       reference: row['reference'],
@@ -162,7 +165,83 @@ export class PropertyDetailService {
       calendar,
       fees,
       reviews,
+      faq,
+      generalFaq,
     };
+  }
+
+  /**
+   * الأسئلة الشائعة عن هذا العقار — the questions SAFRA asks, as this partner answered them.
+   *
+   * ## An unanswered question is not returned, and that is the whole empty state
+   *
+   * The join is INNER on the answer. A question nobody answered is not a fact about this listing,
+   * and rendering it blank would put SAFRA's question over a silence that reads as a refusal to
+   * say. A listing with no answers returns `[]` and the section does not draw at all.
+   *
+   * ## A retired question keeps rendering what was already answered
+   *
+   * `q.is_active` is NOT in the predicate. SAFRA stopping ASKING is not the partner un-saying it,
+   * and pulling a true, published answer off a page because an operator tidied a list would change
+   * what a reader was told about a property they may have already booked. The partner can still
+   * correct it — `faqForOwn` offers exactly these.
+   *
+   * Nothing here is filtered in the application: the slug and the soft-delete predicates are in the
+   * WHERE clause, so an answer belonging to another listing is never read out of the database.
+   */
+  private async faq(slug: string) {
+    const rows = await this.db.execute<{
+      question_ar: string;
+      question_en: string | null;
+      question_de: string | null;
+      answer_ar: string;
+      answer_en: string | null;
+      answer_de: string | null;
+    }>(sql`
+      SELECT q.question_ar, q.question_en, q.question_de,
+             a.answer_ar, a.answer_en, a.answer_de
+        FROM property_faq_answers a
+        JOIN property_faq_questions q ON q.id = a.question_id AND q.deleted_at IS NULL
+        JOIN properties p             ON p.id = a.property_id
+       WHERE p.slug = ${slug}
+         AND a.deleted_at IS NULL
+         AND btrim(a.answer_ar) <> ''
+       ORDER BY q.position, q.created_at
+    `);
+
+    return rows.rows.map((r) => ({
+      question: { ar: r.question_ar, en: r.question_en, de: r.question_de },
+      answer: { ar: r.answer_ar, en: r.answer_en, de: r.answer_de },
+    }));
+  }
+
+  /**
+   * الأسئلة الشائعة — SAFRA's own, identical on every property page.
+   *
+   * Retired entries ARE excluded here, unlike the per-property questions above, and the difference
+   * is who wrote the answer. A partner's answer is a statement about their property that stays true
+   * after SAFRA stops asking; a general entry is SAFRA's own text about SAFRA, so retiring one is
+   * SAFRA withdrawing what it said. There is nobody else's words to preserve.
+   */
+  private async generalFaq() {
+    const rows = await this.db.execute<{
+      question_ar: string;
+      question_en: string | null;
+      question_de: string | null;
+      answer_ar: string;
+      answer_en: string | null;
+      answer_de: string | null;
+    }>(sql`
+      SELECT question_ar, question_en, question_de, answer_ar, answer_en, answer_de
+        FROM general_faq_entries
+       WHERE deleted_at IS NULL AND is_active
+       ORDER BY position, created_at
+    `);
+
+    return rows.rows.map((r) => ({
+      question: { ar: r.question_ar, en: r.question_en, de: r.question_de },
+      answer: { ar: r.answer_ar, en: r.answer_en, de: r.answer_de },
+    }));
   }
 
   /**

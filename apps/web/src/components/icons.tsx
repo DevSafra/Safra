@@ -89,6 +89,23 @@ export function BreadcrumbChevron() {
   );
 }
 
+/**
+ * The marker on an FAQ question, pointing down when shut and up when open.
+ *
+ * A chevron rather than the browser's own `▸`: `list-style: none` on the `<summary>` removes that
+ * triangle, and what replaces it has to be drawn for the same reason this whole file exists — the
+ * default marker is rendered by the operating system, at a weight and colour this design does not
+ * choose. It is NOT mirrored by direction: it points at the content below it, and down is down in
+ * every language.
+ */
+export function DisclosureChevron() {
+  return (
+    <svg {...ICON} className="shrink-0">
+      <path d="M6.5 9.5 12 15l5.5-5.5" />
+    </svg>
+  );
+}
+
 /* ── What SAFRA is answerable for ────────────────────────────────────────── */
 
 /** A shield with a check: nothing is listed before it has been verified. */

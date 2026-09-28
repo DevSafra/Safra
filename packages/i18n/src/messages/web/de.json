@@ -205,6 +205,8 @@
     "reviewsShowing": "Neueste {shown} von {total, plural, one {1 Bewertung} other {# Bewertungen}}",
     "reviewsPartnerReply": "Der Gastgeber hat geantwortet",
     "reviewsVerified": "Aus einem abgeschlossenen Aufenthalt",
+    "faqTitle": "Häufige Fragen zu dieser Unterkunft",
+    "faqGeneralTitle": "Häufige Fragen zu SAFRA",
     "save": "Zu Favoriten hinzufügen",
     "saved": "In Favoriten gespeichert",
     "saveFailed": "Speichern fehlgeschlagen. Bitte erneut versuchen.",

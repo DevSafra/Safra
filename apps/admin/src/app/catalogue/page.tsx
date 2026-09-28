@@ -2,10 +2,13 @@ import {
   getAmenities,
   getCancellationPolicies,
   getCataloguePartnerTypes,
+  getFaqQuestions,
+  getGeneralFaq,
 } from '@/lib/api';
 import { AmenityManager } from '@/components/amenity-manager';
 import { CancellationPolicyManager } from '@/components/cancellation-policy-manager';
 import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
+import { FaqQuestionManager, GeneralFaqManager } from '@/components/faq-manager';
 import { FootNote } from '@/components/admin-table';
 import { PartnerTypeManager } from '@/components/partner-type-manager';
 import { refuseSection } from '@/components/section-refusal';
@@ -50,12 +53,15 @@ export default async function CataloguePage() {
 
   if (refused) return refused;
 
-  const [amenities, policies, partnerTypes, counts] = await Promise.all([
-    getAmenities(),
-    getCancellationPolicies(),
-    getCataloguePartnerTypes(),
-    sidebarCounts(),
-  ]);
+  const [amenities, policies, partnerTypes, faqQuestions, generalFaq, counts] =
+    await Promise.all([
+      getAmenities(),
+      getCancellationPolicies(),
+      getCataloguePartnerTypes(),
+      getFaqQuestions(),
+      getGeneralFaq(),
+      sidebarCounts(),
+    ]);
 
   return (
     <ConsoleShell title={t.nav.catalogue} counts={counts}>
@@ -82,6 +88,22 @@ export default async function CataloguePage() {
         </Section>
 
         <FootNote>{t.sections.catalogue.note}</FootNote>
+      </ConsolePanel>
+
+      {/*
+        الأسئلة الشائعة, in their own panels for the reason the three above have theirs: a blip on
+        one read must not take the others down, and this is the screen somebody opens to fix things.
+      */}
+      <ConsolePanel>
+        <Section result={faqQuestions}>
+          {(data) => <FaqQuestionManager questions={data.questions} />}
+        </Section>
+      </ConsolePanel>
+
+      <ConsolePanel>
+        <Section result={generalFaq}>
+          {(data) => <GeneralFaqManager entries={data.entries} />}
+        </Section>
       </ConsolePanel>
     </ConsoleShell>
   );

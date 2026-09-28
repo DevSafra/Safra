@@ -1504,3 +1504,31 @@ export async function getMyDispute(reference: string) {
     disputeDetailSchema,
   );
 }
+
+/**
+ * الأسئلة الشائعة — what SAFRA asks about this listing, and what it has answered.
+ *
+ * `answerAr` is nullable because an unanswered question is the ordinary case: the form shows every
+ * question and pre-fills the ones already answered. A retired question arrives only when it has an
+ * answer, so the partner can still correct what is on their public page.
+ */
+const propertyFaqQuestionSchema = z.object({
+  id: z.string(),
+  questionAr: z.string(),
+  questionEn: z.string().nullable(),
+  questionDe: z.string().nullable(),
+  isRequired: z.boolean(),
+  isActive: z.boolean(),
+  answerAr: z.string().nullable(),
+  answerEn: z.string().nullable(),
+  answerDe: z.string().nullable(),
+});
+
+export type PropertyFaqQuestion = z.infer<typeof propertyFaqQuestionSchema>;
+
+export async function getPropertyFaq(reference: string) {
+  return partnerFetch(
+    `/partner/properties/${encodeURIComponent(reference)}/faq`,
+    z.object({ questions: z.array(propertyFaqQuestionSchema) }),
+  );
+}

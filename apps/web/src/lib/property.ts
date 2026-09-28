@@ -166,6 +166,35 @@ const propertyDetailSchema = z.object({
       }),
     )
     .default([]),
+  /**
+   * الأسئلة الشائعة عن هذا العقار — what the partner answered, in all three languages.
+   *
+   * Only ANSWERED questions arrive; the API's inner join drops the rest, so an empty array means
+   * «this listing has answered nothing» and the section does not draw. That is the whole empty
+   * state: a heading over a silence would read as a refusal to say.
+   *
+   * `.default([])` for the same reason `reviews` above carries one — an older API still renders a
+   * property page, and the listing is the point of the screen. Unlike the `.default()` this
+   * codebase warns about, an empty FAQ is not an invented plausible value: it renders exactly what
+   * «no FAQ» renders, so there is no state it can disguise.
+   */
+  faq: z
+    .array(
+      z.object({
+        question: translated,
+        answer: translated,
+      }),
+    )
+    .default([]),
+  /** الأسئلة الشائعة — SAFRA's own, identical on every property page. */
+  generalFaq: z
+    .array(
+      z.object({
+        question: translated,
+        answer: translated,
+      }),
+    )
+    .default([]),
 });
 
 export type PropertyDetail = z.infer<typeof propertyDetailSchema>;

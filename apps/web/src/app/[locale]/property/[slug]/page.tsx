@@ -9,6 +9,7 @@ import { isLocale, routing, type Locale } from '@/i18n/routing';
 import { MAX_BASKET_ROOMS } from '@/lib/basket-limits';
 import { readableDate, readableMonth } from '@/lib/readable-date';
 import { AmenityIcon, BreadcrumbChevron } from '@/components/icons';
+import { FaqList } from '@/components/faq-list';
 import { SaveButton } from '@/components/save-button';
 import { ShareButton } from '@/components/share-button';
 import { PropertyGallery } from '@/components/property-gallery';
@@ -1126,6 +1127,38 @@ export default async function PropertyPage({
                 </>
               )}
             </section>
+
+            {/*
+              ── الأسئلة الشائعة ───────────────────────────────────────────────────
+
+              Two FAQs, in Bashar's order (2026-09-28): what the PARTNER answered about this
+              listing, then what SAFRA answers about itself. That order is the point — a reader
+              on a property page is asking about the property, and SAFRA's own «how do I cancel»
+              is the follow-up rather than the lead.
+
+              **Each section draws only if it has something to say.** An answered question is the
+              only thing that reaches `faq`, so an empty array is «this partner has answered
+              nothing» and no heading appears over it. A heading with nothing under it reads as a
+              refusal to answer, which is worse than the section's absence.
+
+              **`<details>` rather than state.** The whole interaction is «show me the answer»,
+              which the browser already does — with keyboard support, with find-in-page able to
+              open a closed one, and with no hydration to go wrong. The only thing added is the
+              chevron rotating, and `group-open:` drives that from the element's own state.
+            */}
+            {property.faq.length > 0 ? (
+              <section id="faq" className="scroll-mt-28">
+                <h2 className="font-display text-xl text-text">{t('faqTitle')}</h2>
+                <FaqList items={property.faq} locale={locale} />
+              </section>
+            ) : null}
+
+            {property.generalFaq.length > 0 ? (
+              <section id="faq-general" className="scroll-mt-28">
+                <h2 className="font-display text-xl text-text">{t('faqGeneralTitle')}</h2>
+                <FaqList items={property.generalFaq} locale={locale} />
+              </section>
+            ) : null}
           </div>
 
           {/* ── Booking panel ─────────────────────────────────────────────────── */}

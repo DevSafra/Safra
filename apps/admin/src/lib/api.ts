@@ -2651,3 +2651,54 @@ export async function getOperatingSettings(): Promise<Record<string, unknown>> {
     return {};
   }
 }
+
+/* ── الأسئلة الشائعة (Bashar, 2026-09-28) ──────────────────────────────────────────────── */
+
+/**
+ * A question SAFRA asks every partner about their listing.
+ *
+ * `answers` is the count of listings that have answered it, and it is on the row for the same
+ * reason the amenity's `units` is: it turns «why can I not delete this» into something the screen
+ * already told the reader. The delete refuses on it.
+ */
+const faqQuestionRowSchema = z.object({
+  id: z.string(),
+  questionAr: z.string(),
+  questionEn: z.string().nullable(),
+  questionDe: z.string().nullable(),
+  /** Blocks SUBMISSION while unanswered; never un-publishes a listing that predates it. */
+  isRequired: z.boolean(),
+  /** Retired: no longer asked of new listings, and answers already given keep rendering. */
+  isActive: z.boolean(),
+  position: z.number(),
+  answers: z.number(),
+});
+
+const generalFaqRowSchema = z.object({
+  id: z.string(),
+  questionAr: z.string(),
+  questionEn: z.string().nullable(),
+  questionDe: z.string().nullable(),
+  answerAr: z.string(),
+  answerEn: z.string().nullable(),
+  answerDe: z.string().nullable(),
+  isActive: z.boolean(),
+  position: z.number(),
+});
+
+export type FaqQuestionRow = z.infer<typeof faqQuestionRowSchema>;
+export type GeneralFaqRow = z.infer<typeof generalFaqRowSchema>;
+
+export async function getFaqQuestions() {
+  return staffFetch(
+    '/admin/faq/questions',
+    z.object({ questions: z.array(faqQuestionRowSchema) }),
+  );
+}
+
+export async function getGeneralFaq() {
+  return staffFetch(
+    '/admin/faq/general',
+    z.object({ entries: z.array(generalFaqRowSchema) }),
+  );
+}

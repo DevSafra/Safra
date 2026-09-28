@@ -63,6 +63,10 @@ const NO_CITY: readonly { readonly route: RegExp; readonly why: string }[] = [
     route: /admin\/catalogue/,
     why: 'كتالوج المنصّة — amenities, cancellation policies and partner types are platform-wide reference data with no geography: an amenity is not a Damascus amenity',
   },
+  {
+    route: /admin\/faq/,
+    why: 'الأسئلة الشائعة — the questions SAFRA asks of every listing and the answers SAFRA gives about itself are platform-wide reference data on the same footing as كتالوج المنصّة. «Is breakfast included» is not a Damascus question, and a city-scoped operator who could rewrite what every listing in the country is asked would have a wider reach than their scope, not a narrower one',
+  },
   { route: /admin\/cities/, why: 'geo — the cities themselves' },
   { route: /admin\/geo/, why: 'geo' },
   {

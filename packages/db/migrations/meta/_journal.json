@@ -575,6 +575,13 @@
       "when": 1790400000000,
       "tag": "0081_landmark_kinds",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1790800000000,
+      "tag": "0082_property_faq",
+      "breakpoints": true
     }
   ]
 }

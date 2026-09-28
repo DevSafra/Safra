@@ -271,6 +271,11 @@ export const de = {
     '{count} Datensätze verweisen darauf, daher ist Löschen nicht möglich — stattdessen deaktivieren: der Eintrag verschwindet aus den Auswahllisten und alles Bestehende bleibt gültig.',
   'catalogue.code_format':
     'Ein Code besteht aus lateinischen Kleinbuchstaben, Ziffern und Bindestrichen, z. B. ev-charger.',
+  'faq.not_found': 'Zu dieser Kennung gibt es keine Frage.',
+  'faq.question_unavailable':
+    'Diese Frage wird nicht mehr gestellt und kann nicht beantwortet werden.',
+  'faq.answer_required':
+    'Beantworten Sie die Pflichtfragen, bevor Sie das Inserat zur Prüfung einreichen.',
   'geo.category_in_use':
     'Diese Kategorie ist {n} Städten zugeordnet — deaktivieren statt entfernen.',
   'geo.city_in_use':

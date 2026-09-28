@@ -567,6 +567,44 @@ export const ar = {
       /* One sentence, used by all three: the row comes back exactly as it was. */
       reinstateHint: 'إضافة المعرّف نفسه بعد الحذف تُعيد السجل بدل رفضه.',
 
+      // ── الأسئلة الشائعة (Bashar, 2026-09-28) ───────────────────────────────
+      /*
+        Two sets on one screen, and the copy keeps them apart deliberately: the first is a
+        question SAFRA asks and the PARTNER answers on their own listing; the second is a
+        question SAFRA asks and answers itself. An operator who confuses them publishes an
+        answer in somebody else's voice.
+      */
+      faqTitle: 'أسئلة يجيب عنها الشريك',
+      faqNote:
+        'أسئلة تُطرح على كل شريك عن إعلانه، وتظهر إجاباتهم في صفحة العقار تحت تقييمات الضيوف. السؤال الإلزامي يمنع إرسال الإعلان للمراجعة قبل الإجابة عليه، ولا يؤثر على إعلان منشور سابقاً.',
+      faqAdd: 'سؤال جديد',
+      faqEmpty: 'لا توجد أسئلة بعد.',
+      faqColQuestion: 'السؤال',
+      faqColRequired: 'إلزامي',
+      faqColAnswers: 'إجابات',
+      faqRequired: 'إلزامي',
+      faqOptional: 'اختياري',
+      faqQuestionAr: 'السؤال بالعربية',
+      faqQuestionEn: 'السؤال بالإنجليزية',
+      faqQuestionDe: 'السؤال بالألمانية',
+      faqRequiredLabel: 'الإجابة إلزامية قبل إرسال الإعلان للمراجعة',
+      faqPosition: 'الترتيب',
+      /* Said once, because the alternative to deleting is the one operators reach for least. */
+      faqRetireHint:
+        'إيقاف السؤال يوقف طرحه على الإعلانات الجديدة ويُبقي الإجابات المنشورة كما هي. الحذف متاح فقط قبل أن يجيب عنه أحد.',
+
+      faqGeneralTitle: 'أسئلة تجيب عنها سفرة',
+      faqGeneralNote:
+        'أسئلة وإجابات من سفرة نفسها، تظهر في أسفل كل صفحة عقار تحت أسئلة الشريك. لا يستطيع الشريك تعديلها.',
+      faqGeneralAdd: 'سؤال وجواب جديد',
+      faqGeneralEmpty: 'لا توجد أسئلة عامة بعد.',
+      faqAnswerAr: 'الجواب بالعربية',
+      faqAnswerEn: 'الجواب بالإنجليزية',
+      faqAnswerDe: 'الجواب بالألمانية',
+      /* Arabic is the source language everywhere on this platform; the other two may lag. */
+      faqLocaleHint:
+        'العربية مطلوبة. إن تُركت الإنجليزية أو الألمانية فارغة يُعرض النص العربي.',
+
       // ── الخدمات ────────────────────────────────────────────────────────────
       amenitiesTitle: 'الخدمات والمرافق',
       amenitiesNote:

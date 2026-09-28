@@ -12,6 +12,7 @@ import {
   listingGaps,
   usesStarRating,
   type PropertyCreateInput,
+  type PropertyFaqAnswersInput,
   type PropertyUpdateInput,
   type UnitCreateInput,
   type UnitUpdateInput,
@@ -1072,6 +1073,46 @@ export class PropertiesService {
 
     if (gaps[0]) throw badRequest(LISTING_READINESS_ERROR[gaps[0]]);
 
+    /*
+      ## The required FAQ answers, and why this is NOT a fifth readiness check
+
+      `LISTING_READINESS_CHECKS` warns that a fifth condition enforced outside it is how a partner
+      comes to close every gap their card shows and be refused for something nobody told them
+      about. That warning is honoured here by the FORM rather than by the model: the edit screen
+      marks a required question and refuses to submit with one blank, so the partner meets this
+      before the API does.
+
+      It stays outside the readiness model for two reasons the model itself makes:
+
+      - **Its facts do not come from the listing.** The other four are derived from this property's
+        own rows — units, coordinates, images, description — and only the partner can change them.
+        Whether a question is required is an ADMIN decision that can change under a listing nobody
+        touched, which is a different kind of fact.
+      - **`LISTING_READINESS_COST` has no level for it.** `invisible`, `reach` and `quality`
+        describe what a gap costs a listing in the market; an unanswered question costs none of
+        them. Inventing a fourth level to fit would change the meaning of `worstCost` on every
+        card in two applications.
+
+      If Bashar wants it on the cards, it belongs in the contract as a real fifth check with a cost
+      level chosen deliberately — not smuggled in as one here.
+    */
+    const unanswered = await this.db.execute<{ missing: number }>(sql`
+      SELECT count(*)::int AS missing
+        FROM property_faq_questions q
+       WHERE q.deleted_at IS NULL AND q.is_active AND q.is_required
+         AND NOT EXISTS (
+           SELECT 1 FROM property_faq_answers a
+            WHERE a.question_id = q.id
+              AND a.property_id = ${property.id}
+              AND a.deleted_at IS NULL
+              AND btrim(a.answer_ar) <> ''
+         )
+    `);
+
+    if (Number(unanswered.rows[0]?.missing ?? 0) > 0) {
+      throw badRequest(ERROR.FAQ_ANSWER_REQUIRED);
+    }
+
     await this.db.transaction(async (tx) => {
       await tx
         .update(schema.properties)
@@ -1328,6 +1369,112 @@ export class PropertiesService {
    * partner is reported as "not found" rather than "forbidden" — a 403 would
    * confirm that reference exists, and references are sequential.
    */
+  /* ── الأسئلة الشائعة: the questions SAFRA asks, and this listing's answers ─────────────── */
+
+  /**
+   * Every question a partner is being asked, with what this listing has already answered.
+   *
+   * Retired questions are included ONLY where this listing already answered one — the answer still
+   * renders on the public page, so the partner must be able to correct it. A retired question with
+   * no answer is not offered: SAFRA stopped asking.
+   *
+   * The property is resolved through `findOwned`, so «read the FAQ of somebody else's listing»
+   * answers exactly as «that listing does not exist» does.
+   */
+  async faqForOwn(claims: AccessTokenClaims | undefined, reference: string) {
+    const partnerId = requirePartnerId(claims, P.PROPERTY_MANAGE_OWN);
+    const property = await this.findOwned(partnerId, reference);
+
+    const rows = await this.db.execute<{
+      id: string;
+      question_ar: string;
+      question_en: string | null;
+      question_de: string | null;
+      is_required: boolean;
+      is_active: boolean;
+      position: number;
+      answer_ar: string | null;
+      answer_en: string | null;
+      answer_de: string | null;
+    }>(sql`
+      SELECT q.id, q.question_ar, q.question_en, q.question_de,
+             q.is_required, q.is_active, q.position,
+             a.answer_ar, a.answer_en, a.answer_de
+        FROM property_faq_questions q
+        LEFT JOIN property_faq_answers a
+               ON a.question_id = q.id
+              AND a.property_id = ${property.id}
+              AND a.deleted_at IS NULL
+       WHERE q.deleted_at IS NULL
+         AND (q.is_active OR a.id IS NOT NULL)
+       ORDER BY q.position, q.created_at
+    `);
+
+    return {
+      questions: rows.rows.map((r) => ({
+        id: String(r.id),
+        questionAr: String(r.question_ar),
+        questionEn: r.question_en,
+        questionDe: r.question_de,
+        isRequired: r.is_required === true,
+        isActive: r.is_active === true,
+        answerAr: r.answer_ar,
+        answerEn: r.answer_en,
+        answerDe: r.answer_de,
+      })),
+    };
+  }
+
+  /**
+   * Save this listing's answers.
+   *
+   * Editable at EVERY status, deliberately (Bashar, 2026-09-28) — answers sit with prices, the
+   * calendar and photographs on the operational side of `STRUCTURALLY_EDITABLE` rather than with
+   * the fields §8.1 freezes. A wrong answer on a live listing is a thing the partner must be able
+   * to correct in the minute they notice it, not after a review cycle that takes the listing out
+   * of search meanwhile.
+   *
+   * One statement per answer inside one transaction, and each one names the question AND the
+   * property: a caller who posts somebody else's `questionId` writes nothing, because the
+   * `INSERT … SELECT` finds no active question to join, and a caller who posts somebody else's
+   * property never reaches here at all.
+   */
+  async saveFaqAnswers(
+    claims: AccessTokenClaims | undefined,
+    reference: string,
+    input: PropertyFaqAnswersInput,
+  ) {
+    const partnerId = requirePartnerId(claims, P.PROPERTY_MANAGE_OWN);
+    const property = await this.findOwned(partnerId, reference);
+
+    await this.db.transaction(async (tx) => {
+      for (const answer of input.answers) {
+        /*
+          `INSERT … SELECT` rather than `VALUES`: the SELECT is what proves the question is real
+          and still asked. A `VALUES` insert would take any UUID the caller sent and lean on the
+          foreign key, which accepts a RETIRED question — answering something SAFRA stopped asking.
+        */
+        const written = await tx.execute<{ id: string }>(sql`
+          INSERT INTO property_faq_answers (property_id, question_id, answer_ar, answer_en, answer_de)
+          SELECT ${property.id}, q.id, ${answer.answerAr},
+                 ${answer.answerEn ?? null}, ${answer.answerDe ?? null}
+            FROM property_faq_questions q
+           WHERE q.id = ${answer.questionId} AND q.deleted_at IS NULL AND q.is_active
+          ON CONFLICT (property_id, question_id) WHERE deleted_at IS NULL
+          DO UPDATE SET answer_ar = EXCLUDED.answer_ar,
+                        answer_en = EXCLUDED.answer_en,
+                        answer_de = EXCLUDED.answer_de,
+                        updated_at = now()
+          RETURNING id
+        `);
+
+        if (written.rows.length === 0) throw badRequest(ERROR.FAQ_QUESTION_UNAVAILABLE);
+      }
+    });
+
+    return { reference, saved: input.answers.length };
+  }
+
   private async findOwned(partnerId: string, reference: string) {
     const property = await this.db.query.properties.findFirst({
       where: and(
