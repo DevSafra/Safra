@@ -180,3 +180,74 @@ for (const surface of SURFACES) {
     ).toEqual([]);
   });
 }
+
+/**
+ * The breadcrumb chevron points the way the reader reads — measured as a SHAPE on screen.
+ *
+ * Same family of defect as the sweep above: the string is not where the fault lives. A separator
+ * was `←` because `‹`/`›` carry Unicode's `Bidi_Mirrored` property and flip inside an RTL
+ * container — so the two obvious spellings each fail, one silently. The drawing that replaced them
+ * takes its direction from the DOCUMENT, and the only place that resolves is a laid-out page.
+ *
+ * It reads the path's endpoints and apex through `getScreenCTM()` rather than asserting a class or
+ * a `scale` value, so it still holds if the flip moves to a transform, a rotate, or a second path.
+ * What is being protected is where the chevron POINTS, and nothing else is allowed to satisfy it.
+ *
+ * Both directions are checked because fixing one and leaving the other is exactly how this arrived:
+ * both breadcrumbs hardcoded `←` regardless of locale, so English and German pointed backwards
+ * against their own text for as long as those locales have existed.
+ */
+const CHEVRON_APEX = () => {
+  const navs: HTMLElement[] = Array.from(document.querySelectorAll('nav'));
+  const nav = navs.find((n) => n.querySelector('svg path') !== null);
+  const path: Element | null = nav?.querySelector('svg path') ?? null;
+  if (!(path instanceof SVGPathElement)) return null;
+
+  const ctm = path.getScreenCTM();
+  if (!ctm) return null;
+
+  const total = path.getTotalLength();
+  const at = (l: number) => {
+    const p = path.getPointAtLength(l).matrixTransform(ctm);
+    return p.x;
+  };
+
+  // A chevron is two arms meeting at a middle vertex: the apex is the midpoint of the outline.
+  return { apex: at(total / 2), ends: (at(0) + at(total)) / 2 };
+};
+
+for (const { locale, path, reads } of [
+  { locale: 'ar', path: '/ar/property/qasr-al-sharq-malki', reads: 'left' },
+  { locale: 'en', path: '/en/property/qasr-al-sharq-malki', reads: 'right' },
+  { locale: 'de', path: '/de/property/qasr-al-sharq-malki', reads: 'right' },
+  { locale: 'ar', path: '/ar/city/damascus', reads: 'left' },
+  { locale: 'en', path: '/en/city/damascus', reads: 'right' },
+] as const) {
+  test(`the breadcrumb chevron on ${path} points ${reads}`, async ({ browser }) => {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
+    const page = await context.newPage();
+
+    try {
+      const response = await page.goto('http://localhost:3000' + path, {
+        waitUntil: 'domcontentloaded',
+        timeout: 25_000,
+      });
+      expect(response?.status(), `${path} should be reachable`).toBeLessThan(400);
+
+      await page.waitForTimeout(300);
+      const measured = await page.evaluate(CHEVRON_APEX);
+
+      expect(measured, `${path} should draw a breadcrumb chevron`).not.toBeNull();
+
+      const pointsLeft = measured!.apex < measured!.ends;
+      expect(
+        pointsLeft ? 'left' : 'right',
+        `On ${locale} the breadcrumb runs ${reads === 'left' ? 'right-to-left' : 'left-to-right'}, ` +
+          'so the chevron between two crumbs must point that way. It takes its direction from the ' +
+          'document — check the `ltr:` variant on `BreadcrumbChevron` still reaches it.',
+      ).toBe(reads);
+    } finally {
+      await context.close();
+    }
+  });
+}

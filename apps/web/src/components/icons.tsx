@@ -62,6 +62,33 @@ export function GuestsIcon() {
   );
 }
 
+/* ── Breadcrumb ──────────────────────────────────────────────────────────── */
+
+/**
+ * The step between two crumbs, pointing the way the reader reads.
+ *
+ * Drawn rather than written, and both halves of that have a scar behind them. The design asks for
+ * a tailless chevron, but `‹` and `›` carry Unicode's `Bidi_Mirrored` property: a `‹` in the
+ * source renders as `›` inside an RTL container, so the code says the opposite of the screen and
+ * the next person to read it "fixes" it back. `table-pagination.tsx` documents that trap and
+ * dodged it by settling for `←` — which is the other half: a Unicode arrow standing in for an
+ * icon, arriving at a weight this design did not choose, beside type it does not match. A path
+ * is subject to neither.
+ *
+ * **The direction comes from the DOCUMENT, not from a prop.** A left-pointing chevron mirrored by
+ * `ltr:-scale-x-100` cannot disagree with the page it sits on. A `locale` argument can, and did:
+ * both breadcrumbs hardcoded `←` regardless of locale, so English and German read right-to-left
+ * while their own text read left-to-right. `arrows.ts` exists because that choice was wrong in
+ * nine places at once; this is the version with nothing left to get wrong.
+ */
+export function BreadcrumbChevron() {
+  return (
+    <svg {...ICON} className="ltr:-scale-x-100">
+      <path d="M14.5 6.5 9 12l5.5 5.5" />
+    </svg>
+  );
+}
+
 /* ── What SAFRA is answerable for ────────────────────────────────────────── */
 
 /** A shield with a check: nothing is listed before it has been verified. */

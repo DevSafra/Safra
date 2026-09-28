@@ -8,7 +8,7 @@ import { confirmationWindowLabel } from '@/lib/operating-rules';
 import { isLocale, routing, type Locale } from '@/i18n/routing';
 import { MAX_BASKET_ROOMS } from '@/lib/basket-limits';
 import { readableDate, readableMonth } from '@/lib/readable-date';
-import { AmenityIcon } from '@/components/icons';
+import { AmenityIcon, BreadcrumbChevron } from '@/components/icons';
 import { SaveButton } from '@/components/save-button';
 import { ShareButton } from '@/components/share-button';
 import { PropertyGallery } from '@/components/property-gallery';
@@ -486,7 +486,10 @@ export default async function PropertyPage({
       available={rooms}
     >
       <article className="mx-auto max-w-7xl px-4 py-8">
-        <nav aria-label={tnav('breadcrumb')} className="text-sm text-faint">
+        <nav
+          aria-label={tnav('breadcrumb')}
+          className="flex flex-wrap items-center text-sm text-faint"
+        >
           {/* Both breadcrumb links are controls — see the note on the city page. */}
           <Link
             href={`/${locale}`}
@@ -494,8 +497,8 @@ export default async function PropertyPage({
           >
             {tc('backHome')}
           </Link>
-          <span aria-hidden className="mx-2">
-            ←
+          <span aria-hidden className="mx-2 inline-flex items-center">
+            <BreadcrumbChevron />
           </span>
           <Link
             href={`/${locale}/city/${property.city.slug}`}
@@ -503,8 +506,8 @@ export default async function PropertyPage({
           >
             {cityName}
           </Link>
-          <span aria-hidden className="mx-2">
-            ←
+          <span aria-hidden className="mx-2 inline-flex items-center">
+            <BreadcrumbChevron />
           </span>
           <span className="text-muted">{name}</span>
         </nav>

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 
+import { BreadcrumbChevron } from '@/components/icons';
 import { PropertyCard } from '@/components/property-card';
 import { SearchForm } from '@/components/search-form';
 import { isLocale, routing, type Locale } from '@/i18n/routing';
@@ -183,7 +184,10 @@ export default async function CityPage({
           />
         )}
         <div className="relative mx-auto max-w-7xl px-4 py-14 sm:py-20">
-          <nav aria-label={tnav('breadcrumb')} className="text-sm text-faint">
+          <nav
+            aria-label={tnav('breadcrumb')}
+            className="flex flex-wrap items-center text-sm text-faint"
+          >
             {/*
               A breadcrumb link is a CONTROL, so it carries the 40px floor below `lg`.
 
@@ -198,8 +202,8 @@ export default async function CityPage({
             >
               {t('backHome')}
             </Link>
-            <span aria-hidden className="mx-2">
-              ←
+            <span aria-hidden className="mx-2 inline-flex items-center">
+              <BreadcrumbChevron />
             </span>
             <span className="text-muted">{name}</span>
           </nav>
