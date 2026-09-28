@@ -27,6 +27,22 @@ import { z } from 'zod';
  * Arabic optional would mean a listing whose FAQ is blank for the majority of readers.
  */
 
+/**
+ * The most FAQ entries a public property page will ever carry, per section.
+ *
+ * ## Why a hard cap when a bounds test already exists
+ *
+ * `catalogue-bounds.integration.test.ts` fails at 40 questions and names the work, which is the
+ * ALARM. This is the BACKSTOP, and the two are deliberately different numbers: the alarm fires
+ * first, so a page is never silently truncated before somebody has been told the set outgrew the
+ * screen. Past that, the page stays finite whatever anybody does to the table.
+ *
+ * Without it the payload is unbounded by construction — every answered question, in three
+ * languages, on a page rule 3 gives a 200ms p95 and a 2s load budget. Nothing else caps it: the
+ * contract limits one REQUEST to 100 answers, and an admin creates questions without limit.
+ */
+export const PUBLIC_FAQ_LIMIT = 50;
+
 /** A question a person reads. Long enough for a real sentence, short enough to stay a question. */
 const questionText = z.string().trim().min(3).max(300);
 

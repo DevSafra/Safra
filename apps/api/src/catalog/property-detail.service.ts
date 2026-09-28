@@ -6,7 +6,7 @@ import type { Database } from '@safra/db';
 import { DATABASE } from '../database/database.module.js';
 import { imageIsPublished } from '../storage/image-visibility.js';
 import { SettingsService } from '../settings/settings.service.js';
-import { ERROR, publicDistanceMetres } from '@safra/contracts';
+import { ERROR, PUBLIC_FAQ_LIMIT, publicDistanceMetres } from '@safra/contracts';
 import { notFound } from '../common/errors/app-error.js';
 import { publicCoordinate } from './public-location.js';
 
@@ -207,6 +207,7 @@ export class PropertyDetailService {
          AND a.deleted_at IS NULL
          AND btrim(a.answer_ar) <> ''
        ORDER BY q.position, q.created_at
+       LIMIT ${PUBLIC_FAQ_LIMIT}
     `);
 
     return rows.rows.map((r) => ({
@@ -236,6 +237,7 @@ export class PropertyDetailService {
         FROM general_faq_entries
        WHERE deleted_at IS NULL AND is_active
        ORDER BY position, created_at
+       LIMIT ${PUBLIC_FAQ_LIMIT}
     `);
 
     return rows.rows.map((r) => ({
