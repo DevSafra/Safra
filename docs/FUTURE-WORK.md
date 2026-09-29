@@ -150,6 +150,63 @@ deleting it; the reason something was blocked is often the reason it comes back.
 >
 > **Measured at HEAD:** `pnpm verify` 297 files, **4,354 tests**, 0 failed, 0 skipped.
 
+> ### Site-wide SEO and جروبات imagery — DONE 2026-09-29
+>
+> **Status:** **DONE 2026-09-29** · **Asked for by Bashar** the same day, after O-seo-1 closed
+>
+> Three things, all of which O-seo-1 surfaced as adjacent gaps and Bashar then asked for.
+>
+> **1. Structured data.** `apps/web/src/lib/structured-data.ts` builds schema.org graphs as PURE
+> functions — page data in, JSON-LD out — which is what makes the privacy rule testable:
+> `structured-data.test.ts` WALKS the produced object for `geo`, `latitude`, `streetAddress` and
+> `postalCode` rather than grepping a component, so a builder that grows one next year fails
+> without anybody remembering a list. Watched to fail: adding `geo` to `lodgingGraph` turned it red.
+> Shipped on property (`LodgingBusiness` + `FAQPage` + breadcrumb), city (`TouristDestination`),
+> landmark (`TouristAttraction`) and group trip (`TouristTrip`) pages.
+>
+> - **A stay publishes no location at all.** `lodgingGraph` has no PARAMETER for a coordinate or a
+>   street, so the call site could not leak one if it tried. `addressLocality` is the city.
+> - **The landmark is the one documented exception** and its coordinate is authored by staff, drawn
+>   on a map, and already the origin of every public distance.
+> - **A stay publishes no offer**: a price depends on dates and unit, and naming one would be a
+>   figure most arrivals never see. A TRIP does, because a trip has one price.
+> - **A trip publishes no `availability`** — announcing is not selling, and the graph must not tell
+>   Google there are seats. Held by a test.
+> - **Escaped against breakout**: every `<` becomes `\u003c`, so a value cannot close the script
+>   element. Tested with `</script><img onerror=…>` as a trip name.
+>
+> **2. `metadataBase`.** Set once in the locale layout from `siteOrigin()`, so every relative
+> canonical and `hreflang` on the site resolves absolute — including on pages nobody has written
+> yet. A base assembled per page is a base somebody forgets on page nine. `sitemap.ts` now shares
+> that helper instead of recomputing the origin with its own trailing-slash rule.
+>
+> **3. جروبات cover photographs.** `0084_group_trip_cover.sql` adds seven columns and a CHECK that
+> makes «alt text for a photograph that is not there» unrepresentable (probed live, both
+> directions). One cover per trip as COLUMNS rather than a table, because a column cannot hold two.
+> The console uploads through `ImageService.process` — the same call the city hero makes — and the
+> alt text travels on the ordinary update, where a translator looks, which is the lesson
+> `city_images` learnt by shipping every city photograph with an empty `alt`.
+>
+> **Two defects found by OPENING the screen, neither of which any test would have caught:**
+>
+> - **`group-trips/*` was not in the media bucket's anonymous-read policy.** The upload succeeded,
+>   the object was in the bucket, the row carried the key and the rendered widths, the URL the page
+>   built was correct — and the browser drew nothing, `naturalWidth` zero. `bootstrap-media.ts`
+>   predicts this failure in its own comment and it happened anyway, on the day it was written.
+>   Fixed there and in `media-policy.integration.test.ts`; verified both ways — `group-trips/` 200,
+>   `identity/` `disputes/` `exports/` `incoming/` and bucket listing all still 403.
+> - **The console built the media URL in a CLIENT component**, where `NEXT_PUBLIC_MEDIA_URL` is a
+>   build-time inline — so a console built without it silently falls back to the API's local-disk
+>   route and 404s every preview. Now resolved server-side in the page and handed down, which is
+>   what كتالوج المنصّة already does and says why.
+>
+> **And one gap the feature needed:** no write on the trips controller purged the customer app's
+> cache, so a published trip or a new cover sat behind the old view for up to five minutes — the
+> complaint Bashar made about a city photograph on 2026-09-13. All five writes now purge, and the
+> customer reads carry `CATALOGUE_TAG` so the existing route reaches them.
+>
+> **Scope held:** announcement-based still. No booking engine, no seats, no payment, no refunds.
+
 > ### O-seo-1 — 125 sitemap entries led a crawler to a `noindex` page — RESOLVED 2026-09-28
 >
 > **Status:** **RESOLVED 2026-09-28** · **Severity:** Medium · **Decision:** Bashar, option 1 ·
