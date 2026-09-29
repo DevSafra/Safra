@@ -70,9 +70,15 @@ test('a real path still resolves, however it is spelt', async ({ request }) => {
     { path: '/ar/city/damascus', expected: [200], why: 'a real city' },
     { path: '/ar/city/dam%61scus', expected: [200], why: 'the same city, a as %61' },
     {
+      /*
+        200 since 2026-09-28, and the change is the point. This route was a 307 into `/search` and
+        that forwarded a crawler to a `noindex` page — O-seo-1. It is a rendered destination page
+        now, so «a landmark answers on its own address» is the assertion, and a future change that
+        turns it back into a redirect fails here as well as in `sitemap.spec.ts`.
+      */
       path: '/ar/landmark/umayyad-mosque',
-      expected: [307],
-      why: 'a landmark redirects into search',
+      expected: [200],
+      why: 'a landmark is a page of its own, not a redirect',
     },
     { path: '/ar/no-such-page', expected: [404], why: 'an ordinary unmatched path' },
     { path: '/ar/account', expected: [307], why: 'a protected page still redirects' },

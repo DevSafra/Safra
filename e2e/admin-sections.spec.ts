@@ -148,8 +148,13 @@ test.describe('every admin section the design specifies', () => {
       measured to, and they shipped as seed data — so adding one was a code change and a
       deployment. Bashar closed that the same day he approved the map work. It sits directly
       under الفئات because a landmark is geography, like a city and its category.
+
+      26 since 2026-09-28: جروبات. SAFRA's own group trips, authored by staff and announced on the
+      customer site — «only the admin can create a group trip for this». It is a registry rather
+      than a catalogue panel because a trip has a LIFE: drafted, announced, eventually archived,
+      and the list grows with time instead of being bounded by the business.
     */
-    expect(hrefs.length).toBe(25);
+    expect(hrefs.length).toBe(26);
 
     for (const href of hrefs) {
       const response = await page.goto(href);
