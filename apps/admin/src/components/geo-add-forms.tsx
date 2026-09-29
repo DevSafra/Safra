@@ -276,7 +276,8 @@ function AddForm({
             label={label}
             onClick={() => setOpen(!open)}
             expanded={open}
-            attribute="data-geo-"
+            attribute="data-geo-add"
+            attributeValue={marker}
           />
         </span>
       </div>

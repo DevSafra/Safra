@@ -27,6 +27,7 @@ export function AddButton({
   onClick,
   expanded,
   attribute,
+  attributeValue,
 }: {
   readonly label: string;
   readonly onClick: () => void;
@@ -34,13 +35,33 @@ export function AddButton({
   readonly expanded?: boolean | undefined;
   /** A `data-*` name the browser sweep uses to find this one button. */
   readonly attribute?: string | undefined;
+  /**
+   * That attribute's VALUE, where the sweep distinguishes several buttons of the same kind.
+   *
+   * كتالوج المنصّة's geography panels draw three add buttons on one screen and `geo.spec.ts` finds
+   * each by `[data-geo-add="country"]`. Collapsing this to a bare presence flag — which is what
+   * this component shipped with on 2026-09-28 — rendered `data-geo-="true"`: an invalid attribute
+   * name AND the wrong value, so all three buttons became unfindable. Nothing caught it because
+   * the refactor's verification ran the specs it had changed and not the one that named them.
+   */
+  readonly attributeValue?: string | undefined;
 }) {
+  /*
+    Built as a TYPED record rather than spread inline. A computed key whose value is a
+    `string | true` union makes TypeScript infer an error type for the spread, which the
+    `no-unsafe-assignment` rule then refuses — and the build emits no standalone output at all,
+    so the symptom is a server that will not start rather than a message about this line.
+  */
+  const marker: Record<string, string | true> = attribute
+    ? { [attribute]: attributeValue ?? true }
+    : {};
+
   return (
     <button
       type="button"
       onClick={onClick}
       {...(expanded === undefined ? {} : { 'aria-expanded': expanded })}
-      {...(attribute ? { [attribute]: true } : {})}
+      {...marker}
       className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1.5 text-13 font-bold text-gold-read transition-[background-color,border-color,transform] duration-150 ease-out hover:bg-[rgba(var(--goldA),0.08)] active:scale-[0.97] lg:min-h-0"
     >
       {label}
