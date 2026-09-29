@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { GROUP_TRIP_STATUSES } from '@safra/contracts';
 import { statusTone, useConfirm } from '@safra/ui';
@@ -41,6 +41,8 @@ import { apiErrorOf, label, t } from '@/lib/strings';
  */
 const NO_CURRENCY = '';
 
+export type TripWithCover = GroupTripRow & { readonly coverUrl: string | null };
+
 export function GroupTripManager({
   trips,
   cities,
@@ -51,7 +53,12 @@ export function GroupTripManager({
   capped,
   size,
 }: {
-  readonly trips: readonly GroupTripRow[];
+  /*
+    `coverUrl` is resolved by the PAGE, server-side. A client component cannot build it: it would
+    read `NEXT_PUBLIC_MEDIA_URL` from a build-time inline, which is empty in any console built
+    without that variable and silently 404s every preview.
+  */
+  readonly trips: readonly TripWithCover[];
   readonly cities: readonly { readonly slug: string; readonly nameAr: string }[];
   readonly currencies: readonly { readonly code: string }[];
   readonly page: number;
@@ -198,7 +205,7 @@ function GroupTripForm({
   currencies,
   onClose,
 }: {
-  readonly trip?: GroupTripRow | undefined;
+  readonly trip?: TripWithCover | undefined;
   readonly cities: readonly { readonly slug: string; readonly nameAr: string }[];
   readonly currencies: readonly { readonly code: string }[];
   readonly onClose: () => void;
@@ -226,9 +233,14 @@ function GroupTripForm({
     trip?.seats === null || trip === undefined ? '' : String(trip.seats),
   );
   const [status, setStatus] = useState(trip?.status ?? 'draft');
+  const [coverAltAr, setCoverAltAr] = useState(trip?.cover?.alt.ar ?? '');
+  const [coverAltEn, setCoverAltEn] = useState(trip?.cover?.alt.en ?? '');
+  const [coverAltDe, setCoverAltDe] = useState(trip?.cover?.alt.de ?? '');
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   async function save(): Promise<void> {
     setBusy(true);
@@ -253,6 +265,17 @@ function GroupTripForm({
         currencyCode: currencyCode || null,
         seats: seats ? Number(seats) : null,
         ...(trip ? { status } : {}),
+        /*
+          Only when editing. A create has no row yet, so it can have no cover and therefore no alt
+          text — and the create schema does not accept the keys, which `.strict()` would reject.
+        */
+        ...(trip
+          ? {
+              coverAltAr: coverAltAr || null,
+              coverAltEn: coverAltEn || null,
+              coverAltDe: coverAltDe || null,
+            }
+          : {}),
       };
 
       const response = await fetch(
@@ -276,6 +299,81 @@ function GroupTripForm({
       setError(t.errors.unreachable);
     } finally {
       setBusy(false);
+    }
+  }
+
+  /**
+   * Uploads the bytes and refreshes, rather than staging them until save.
+   *
+   * The photograph is not a form FIELD — it is an object in a store with its own endpoint, and
+   * holding it in memory until somebody presses «حفظ» would mean a ten-megabyte file lost to a
+   * mistyped date. Same shape as the city hero upload, for the same reason.
+   */
+  async function uploadCover(chosen: File): Promise<void> {
+    if (!trip) return;
+
+    setUploading(true);
+    setError(null);
+
+    try {
+      const body = new FormData();
+
+      body.append('file', chosen);
+
+      const response = await fetch(
+        `/api/group-trips/${encodeURIComponent(trip.slug)}/cover`,
+        { method: 'POST', body },
+      );
+
+      if (!response.ok) {
+        setError(apiErrorOf(await response.json().catch(() => null)));
+
+        return;
+      }
+
+      router.refresh();
+    } catch {
+      setError(t.errors.unreachable);
+    } finally {
+      setUploading(false);
+      /* So choosing the SAME file again still fires a change event. */
+      if (fileInput.current) fileInput.current.value = '';
+    }
+  }
+
+  async function removeCover(): Promise<void> {
+    if (!trip?.cover) return;
+
+    const go = await ask({
+      title: c.coverRemove,
+      message: c.coverRemoveConfirm,
+      confirmLabel: t.sections.dialog.confirm,
+      cancelLabel: t.sections.dialog.cancel,
+      tone: 'danger',
+    });
+
+    if (!go) return;
+
+    setUploading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        `/api/group-trips/${encodeURIComponent(trip.slug)}/cover`,
+        { method: 'DELETE' },
+      );
+
+      if (!response.ok) {
+        setError(apiErrorOf(await response.json().catch(() => null)));
+
+        return;
+      }
+
+      router.refresh();
+    } catch {
+      setError(t.errors.unreachable);
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -413,6 +511,94 @@ function GroupTripForm({
           </SelectField>
         ) : null}
       </Row>
+
+      {/*
+        The photograph.
+
+        Only for a trip that EXISTS: an upload needs a slug to file the object under, and a control
+        that looks available before the row is saved is the «built, green, connected to nothing»
+        shape — so the placeholder says what to do instead rather than offering a button that
+        cannot work.
+      */}
+      <div className="mt-5 rounded-lg border border-line bg-bg2 p-4">
+        <h3 className="text-14 font-bold text-text">{c.cover}</h3>
+        <p className="mt-1 text-13 text-muted">{c.coverNote}</p>
+
+        {!trip ? (
+          <p className="mt-3 text-13 text-faint">{c.coverSaveFirst}</p>
+        ) : (
+          <>
+            <div className="mt-3 flex flex-wrap items-start gap-4">
+              {trip.cover && trip.coverUrl ? (
+                /*
+                  400 and WebP: this is a 160px preview in a form, and asking for the 1600 variant
+                  would pull a megabyte into the console to draw a thumbnail. The width comes from
+                  `variantWidths`, so it is one that was actually rendered.
+                */
+                <img
+                  src={trip.coverUrl ?? ''}
+                  alt=""
+                  className="h-24 w-40 rounded-lg border border-line object-cover"
+                />
+              ) : (
+                <p className="text-13 text-faint">{c.coverNone}</p>
+              )}
+
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-3.5 text-13 font-bold text-text transition-colors hover:border-gold/60 lg:min-h-0 lg:py-1.5">
+                  {uploading
+                    ? c.coverUploading
+                    : trip.cover
+                      ? c.coverReplace
+                      : c.coverUpload}
+                  <input
+                    ref={fileInput}
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    disabled={uploading}
+                    onChange={(event) => {
+                      const chosen = event.target.files?.[0];
+
+                      if (chosen) void uploadCover(chosen);
+                    }}
+                  />
+                </label>
+
+                {trip.cover ? (
+                  <button
+                    type="button"
+                    disabled={uploading}
+                    onClick={() => void removeCover()}
+                    className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-3.5 text-13 text-bad transition-colors hover:border-bad/60 disabled:opacity-50 lg:min-h-0 lg:py-1.5"
+                  >
+                    {uploading ? c.coverRemoving : c.coverRemove}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            {/*
+              Alt text, only once there is a photograph to describe — and saved with «حفظ» like
+              every other word on this form, because that is what it is. The CHECK constraint
+              refuses alt text with no picture, so offering the fields first would offer a save
+              that fails.
+            */}
+            {trip.cover ? (
+              <Row>
+                <Field label={c.coverAltAr} value={coverAltAr} onChange={setCoverAltAr} />
+                <Field label={c.coverAltEn} value={coverAltEn} onChange={setCoverAltEn} />
+                <Field
+                  label={c.coverAltDe}
+                  value={coverAltDe}
+                  onChange={setCoverAltDe}
+                  hint={c.coverAltHint}
+                />
+              </Row>
+            ) : null}
+          </>
+        )}
+      </div>
 
       <Actions
         busy={busy}

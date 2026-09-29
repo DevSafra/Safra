@@ -2730,6 +2730,25 @@ const groupTripRowSchema = z.object({
   currencyCode: z.string().nullable(),
   seats: z.number().nullable(),
   status: z.string(),
+  /*
+    The cover, or null. `.nullable()` and never `.default(null)`: a default would invent «no
+    photograph» for a field the API stopped sending, and the console would show an upload button
+    over a trip that already has one.
+  */
+  cover: z
+    .object({
+      fileKey: z.string(),
+      /* What was actually rendered — `mediaUrl` picks from these and never guesses a width. */
+      variantWidths: z.array(z.number()),
+      width: z.number().nullable(),
+      height: z.number().nullable(),
+      alt: z.object({
+        ar: z.string().nullable(),
+        en: z.string().nullable(),
+        de: z.string().nullable(),
+      }),
+    })
+    .nullable(),
 });
 
 export type GroupTripRow = z.infer<typeof groupTripRowSchema>;

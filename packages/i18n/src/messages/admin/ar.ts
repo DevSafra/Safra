@@ -479,6 +479,23 @@ export const ar = {
       publishHint: 'الرحلة لا تظهر على الموقع إلا في حالة «منشورة».',
       deleteHint: 'الحذف متاح فقط لرحلة لم تُنشر بعد. الرحلة المنشورة تُؤرشف بدل حذفها.',
       onRequest: 'عند الطلب',
+      /* The cover photograph (Bashar, 2026-09-29). */
+      cover: 'صورة الرحلة',
+      coverNote:
+        'تظهر في قائمة جروبات وعلى صفحة الرحلة وفي معاينة الرابط عند مشاركته. الأفضل صورة عريضة لا يقل عرضها عن 1600 بكسل.',
+      coverUpload: 'اختر صورة',
+      coverReplace: 'استبدل الصورة',
+      coverUploading: 'جارٍ الرفع…',
+      coverRemove: 'حذف الصورة',
+      coverRemoving: 'جارٍ الحذف…',
+      coverRemoveConfirm: 'حذف صورة الرحلة؟ ستظهر الرحلة بلا صورة حتى تُرفع غيرها.',
+      coverNone: 'لا صورة بعد.',
+      coverSaveFirst: 'احفظ الرحلة أولاً، ثم أضف صورتها.',
+      coverAltAr: 'وصف الصورة بالعربية',
+      coverAltEn: 'وصف الصورة بالإنجليزية',
+      coverAltDe: 'وصف الصورة بالألمانية',
+      coverAltHint:
+        'يُقرأ بصوت عالٍ لمن لا يرى الصورة. اتركه فارغاً إن كانت الصورة زخرفية لا تضيف معنى فوق العنوان.',
     },
 
     landmarks: {
@@ -4033,6 +4050,8 @@ export const ar = {
     'group_trip.created': 'إضافة رحلة جماعية',
     'group_trip.updated': 'تعديل رحلة جماعية',
     'group_trip.deleted': 'حذف رحلة جماعية',
+    'group_trip.cover_uploaded': 'رفع صورة رحلة جماعية',
+    'group_trip.cover_removed': 'حذف صورة رحلة جماعية',
     'amenity.created': 'إضافة خدمة',
     'amenity.updated': 'تعديل خدمة',
     'amenity.deleted': 'حذف خدمة',

@@ -1,3 +1,5 @@
+import { mediaBase, mediaUrl } from '@safra/session';
+
 import { getGeography, getGroupTrips } from '@/lib/api';
 import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
 import { GroupTripManager } from '@/components/group-trip-manager';
@@ -59,7 +61,29 @@ export default async function GroupTripsPage({
           <p className="text-14 text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <GroupTripManager
-            trips={result.items}
+            /*
+              The cover's ADDRESS is resolved here, server-side, and handed down.
+
+              `GroupTripManager` is a client component, and `process.env['NEXT_PUBLIC_MEDIA_URL']`
+              inside one is inlined at BUILD time — so a console built without that variable ships
+              a bundle that silently falls back to the API's local-disk media route and 404s every
+              preview. Only a server that has READ the configuration can turn a key into a URL,
+              which is the same reason كتالوج المنصّة builds its city photographs in its own page.
+            */
+            trips={result.items.map((trip) => ({
+              ...trip,
+              coverUrl: trip.cover
+                ? mediaUrl(
+                    mediaBase({
+                      NEXT_PUBLIC_MEDIA_URL: process.env['NEXT_PUBLIC_MEDIA_URL'],
+                      API_URL: process.env['API_URL'],
+                    }),
+                    trip.cover,
+                    400,
+                    'webp',
+                  )
+                : null,
+            }))}
             cities={geography.cities.map((city) => ({
               slug: city.slug,
               nameAr: city.nameAr,
