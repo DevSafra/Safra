@@ -150,6 +150,49 @@ deleting it; the reason something was blocked is often the reason it comes back.
 >
 > **Measured at HEAD:** `pnpm verify` 297 files, **4,354 tests**, 0 failed, 0 skipped.
 
+> ### جروبات — announcement-based implementation COMPLETE 2026-09-29
+>
+> **Status:** **COMPLETE** · **Approved by Bashar 2026-09-29**, twice: the announcement shape, and
+> then the two completeness improvements that closed it.
+>
+> **Two improvements, both asked for by name:**
+>
+> 1. **A trip cannot be announced without a photograph.** Guarded at the publish TRANSITION rather
+>    than on the state, so rows that predate the column stay editable — a rule that made an older
+>    announcement uneditable would arrive as an obstruction rather than as a standard. The same
+>    half of the readiness philosophy `submitForReview` occupies; `readiness.ts` says in its own
+>    opening that it is «not validation» and exists to SHOW gaps on things already live. **And the
+>    back door is closed**: a published trip may not have its photograph removed, because publish
+>    WITH one then delete reaches by two legal steps the state one illegal step cannot. Replacing is
+>    unaffected. The console says the requirement where the choice is made and does NOT disable the
+>    option — the endpoint is the control.
+> 2. **The enquiry names its trip.** «استفسر عن هذه الرحلة» carries the SLUG, and الدعم resolves it
+>    against a PUBLISHED trip and builds the sentence from the database's own title. The query
+>    chooses WHICH known trip and supplies no words — the rule `returnHref` states for the console's
+>    back control. A draft's slug, an unknown one, a URL, a traversal and a script tag all prefill
+>    nothing; verified in a browser, and the script tag is not reflected anywhere in the document.
+>    The slug survives the sign-in redirect, so arriving signed-out does not lose the trip.
+>
+> **Both watched to fail.** Removing the two guards turned exactly the two cases red and nothing
+> else. The enquiry pair is asserted together: a prefill that works AND a crafted slug that prefills
+> nothing, because the half that silently breaks is the second.
+>
+> **Two defects found while doing it, neither in scope and both fixed:**
+>
+> - **`pnpm db:testbed` failed outright** on any database holding a partner's FAQ answer —
+>   `property_faq_answers` carries a foreign key to `properties` and was never added to the seed's
+>   cleanup when the FAQ shipped on 2026-09-28.
+> - **جروبات had no fixture at all.** `sitemap.spec.ts` and the new enquiry assertion both depended
+>   on a trip existing, and both passed only because rows were in the development database BY HAND.
+>   On a clean volume the first CI run would have failed with no relationship to the change that
+>   triggered it. The testbed now seeds one published trip with a real cover object under
+>   `group-trips/`, which also exercises the anonymous-read grant nothing else here touches.
+>
+> **Scope, confirmed and unchanged:** public discovery, cover imagery, structured trip information,
+> the enquiry workflow and search-engine indexing — and NOT seat reservations, payments, booking or
+> refunds. The booking version stays deferred until demand data justifies it; the `TouristTrip`
+> graph deliberately asserts no availability so nothing in the markup promises otherwise.
+
 > ### Site-wide SEO and جروبات imagery — DONE 2026-09-29
 >
 > **Status:** **DONE 2026-09-29** · **Asked for by Bashar** the same day, after O-seo-1 closed
