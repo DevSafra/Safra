@@ -19,6 +19,7 @@ type PublicTripRow = {
   readonly description_en: string | null;
   readonly description_de: string | null;
   readonly city_slug: string;
+  readonly country_code: string;
   readonly city_name_ar: string;
   readonly city_name_en: string;
   readonly city_name_de: string;
@@ -27,6 +28,13 @@ type PublicTripRow = {
   readonly price_from: string | null;
   readonly currency_code: string | null;
   readonly seats: number | null;
+  readonly cover_file_key: string | null;
+  readonly cover_variant_widths: number[] | null;
+  readonly cover_width: number | null;
+  readonly cover_height: number | null;
+  readonly cover_alt_ar: string | null;
+  readonly cover_alt_en: string | null;
+  readonly cover_alt_de: string | null;
 };
 
 /**
@@ -61,13 +69,17 @@ export class PublicGroupTripsService {
       SELECT g.slug, g.title_ar, g.title_en, g.title_de,
              g.summary_ar, g.summary_en, g.summary_de,
              NULL::text AS description_ar, NULL::text AS description_en, NULL::text AS description_de,
-             c.slug AS city_slug, c.name_ar AS city_name_ar,
+             c.slug AS city_slug, co.code AS country_code,
+             c.name_ar AS city_name_ar,
              c.name_en AS city_name_en, c.name_de AS city_name_de,
              g.starts_on::text, g.ends_on::text,
              g.price_from::text, cur.code AS currency_code,
-             g.seats
+             g.seats,
+             g.cover_file_key, g.cover_variant_widths, g.cover_width, g.cover_height,
+             g.cover_alt_ar, g.cover_alt_en, g.cover_alt_de
         FROM group_trips g
         JOIN cities c ON c.id = g.city_id
+        JOIN countries co ON co.id = c.country_id
         LEFT JOIN currencies cur ON cur.id = g.currency_id
        WHERE g.deleted_at IS NULL AND g.status = 'published'
        ORDER BY (g.ends_on < current_date), g.starts_on, g.created_at
@@ -82,13 +94,17 @@ export class PublicGroupTripsService {
       SELECT g.slug, g.title_ar, g.title_en, g.title_de,
              g.summary_ar, g.summary_en, g.summary_de,
              g.description_ar, g.description_en, g.description_de,
-             c.slug AS city_slug, c.name_ar AS city_name_ar,
+             c.slug AS city_slug, co.code AS country_code,
+             c.name_ar AS city_name_ar,
              c.name_en AS city_name_en, c.name_de AS city_name_de,
              g.starts_on::text, g.ends_on::text,
              g.price_from::text, cur.code AS currency_code,
-             g.seats
+             g.seats,
+             g.cover_file_key, g.cover_variant_widths, g.cover_width, g.cover_height,
+             g.cover_alt_ar, g.cover_alt_en, g.cover_alt_de
         FROM group_trips g
         JOIN cities c ON c.id = g.city_id
+        JOIN countries co ON co.id = c.country_id
         LEFT JOIN currencies cur ON cur.id = g.currency_id
        WHERE g.slug = ${slug} AND g.deleted_at IS NULL AND g.status = 'published'
     `);
@@ -118,6 +134,8 @@ function toPublic(row: PublicTripRow) {
     },
     city: {
       slug: row.city_slug,
+      /* For the trip's schema.org address. An INNER join: a city without a country is not a row. */
+      countryCode: row.country_code,
       name: { ar: row.city_name_ar, en: row.city_name_en, de: row.city_name_de },
     },
     startsOn: row.starts_on,
@@ -126,5 +144,23 @@ function toPublic(row: PublicTripRow) {
     priceFrom: row.price_from,
     currencyCode: row.currency_code,
     seats: row.seats === null ? null : Number(row.seats),
+    /*
+      One object or null — never a key with a null file alongside a width.
+
+      The CHECK in `0084_group_trip_cover.sql` already makes the half-filled row unrepresentable;
+      collapsing it here means a consumer cannot express «render the cover» without having the one
+      thing it needs. `variantWidths` is the rendered set, so `mediaUrl` never asks for a size
+      nobody made.
+    */
+    cover:
+      row.cover_file_key === null
+        ? null
+        : {
+            fileKey: row.cover_file_key,
+            variantWidths: row.cover_variant_widths ?? [],
+            width: row.cover_width,
+            height: row.cover_height,
+            alt: { ar: row.cover_alt_ar, en: row.cover_alt_en, de: row.cover_alt_de },
+          },
   };
 }

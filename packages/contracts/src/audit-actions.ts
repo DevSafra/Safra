@@ -326,6 +326,8 @@ export const AUDIT_ACTIONS = [
   'group_trip.created',
   'group_trip.updated',
   'group_trip.deleted',
+  'group_trip.cover_uploaded',
+  'group_trip.cover_removed',
   /*
     SAFRA's own treasury (Bashar, 2026-09-05). Every step of both lifecycles — the destination and
     the transfer — because this is the money the platform keeps, and «who sent SAFRA's revenue

@@ -589,6 +589,13 @@
       "when": 1791200000000,
       "tag": "0083_group_trips",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1791600000000,
+      "tag": "0084_group_trip_cover",
+      "breakpoints": true
     }
   ]
 }

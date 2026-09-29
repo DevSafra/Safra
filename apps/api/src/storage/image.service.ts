@@ -144,7 +144,7 @@ export class ImageService {
    * is later rendered.
    */
   keyFor(context: {
-    kind: 'properties' | 'cities' | 'ads' | 'disputes';
+    kind: 'properties' | 'cities' | 'ads' | 'disputes' | 'group-trips';
     owner: string;
   }): string {
     return `${context.kind}/${context.owner}/${randomUUID()}`;
@@ -226,7 +226,7 @@ export class ImageService {
      * `cities/damascus`. Kept generic so a city image is not filed under
      * `properties/` — storage layout should describe what it holds.
      */
-    context: { kind: 'properties' | 'cities'; owner: string },
+    context: { kind: 'properties' | 'cities' | 'group-trips'; owner: string },
   ): Promise<ProcessedImage> {
     await this.inspect(buffer);
 

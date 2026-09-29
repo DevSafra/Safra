@@ -10,6 +10,7 @@ import {
 } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
+import { ImageService } from '../storage/image.service.js';
 import { DATABASE } from '../database/database.module.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
@@ -33,6 +34,18 @@ export interface GroupTripRow {
   readonly currencyCode: string | null;
   readonly seats: number | null;
   readonly status: string;
+  /** The cover photograph, or null. Never a key without its rendered widths — see the schema. */
+  readonly cover: {
+    readonly fileKey: string;
+    readonly variantWidths: readonly number[];
+    readonly width: number | null;
+    readonly height: number | null;
+    readonly alt: {
+      readonly ar: string | null;
+      readonly en: string | null;
+      readonly de: string | null;
+    };
+  } | null;
 }
 
 type TripSqlRow = {
@@ -54,6 +67,13 @@ type TripSqlRow = {
   readonly currency_code: string | null;
   readonly seats: number | null;
   readonly status: string;
+  readonly cover_file_key: string | null;
+  readonly cover_variant_widths: number[] | null;
+  readonly cover_width: number | null;
+  readonly cover_height: number | null;
+  readonly cover_alt_ar: string | null;
+  readonly cover_alt_en: string | null;
+  readonly cover_alt_de: string | null;
 };
 
 /**
@@ -84,6 +104,7 @@ export class GroupTripsService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly audit: AuditService,
+    private readonly images: ImageService,
   ) {}
 
   /** The console registry: every trip, newest first, paged. */
@@ -102,7 +123,9 @@ export class GroupTripsService {
                c.slug AS city_slug, c.name_ar AS city_name_ar,
                g.starts_on::text, g.ends_on::text,
                g.price_from::text, cur.code AS currency_code,
-               g.seats, g.status::text AS status
+               g.seats, g.status::text AS status,
+               g.cover_file_key, g.cover_variant_widths, g.cover_width, g.cover_height,
+               g.cover_alt_ar, g.cover_alt_en, g.cover_alt_de
         ${fromWhere}
         ORDER BY g.starts_on DESC, g.created_at DESC
         LIMIT ${query.limit} OFFSET ${(query.page - 1) * query.limit}
@@ -199,6 +222,15 @@ export class GroupTripsService {
           currency_id    = ${currencyId},
           seats          = ${input.seats === undefined ? before.seats : (input.seats ?? null)},
           status         = ${status}::group_trip_status,
+          /*
+            Absent leaves it alone; an explicit null clears it. A nullish-coalesce against the
+            previous value cannot say both — it would turn «clear this alt» into «keep the old
+            one», which is the bug the optional() contract helper was fixed for on 2026-09-28.
+            (No backticks in here: they would close the surrounding SQL template.)
+          */
+          cover_alt_ar   = ${input.coverAltAr === undefined ? sql`cover_alt_ar` : input.coverAltAr},
+          cover_alt_en   = ${input.coverAltEn === undefined ? sql`cover_alt_en` : input.coverAltEn},
+          cover_alt_de   = ${input.coverAltDe === undefined ? sql`cover_alt_de` : input.coverAltDe},
           /* Stamped the FIRST time it goes public, so «when was this announced» survives an archive. */
           published_at   = CASE WHEN ${status} = 'published' AND published_at IS NULL
                                 THEN now() ELSE published_at END,
@@ -256,7 +288,9 @@ export class GroupTripsService {
              c.slug AS city_slug, c.name_ar AS city_name_ar,
              g.starts_on::text, g.ends_on::text,
              g.price_from::text, cur.code AS currency_code,
-             g.seats, g.status::text AS status
+             g.seats, g.status::text AS status,
+             g.cover_file_key, g.cover_variant_widths, g.cover_width, g.cover_height,
+             g.cover_alt_ar, g.cover_alt_en, g.cover_alt_de
         FROM group_trips g
         JOIN cities c ON c.id = g.city_id
         LEFT JOIN currencies cur ON cur.id = g.currency_id
@@ -268,6 +302,124 @@ export class GroupTripsService {
     if (!row) throw notFound(ERROR.GROUP_TRIP_NOT_FOUND);
 
     return toRow(row);
+  }
+
+  /**
+   * The cover photograph (Bashar, 2026-09-29: «Add a cover image to every Group Trip»).
+   *
+   * ## The bytes and the words are different endpoints, deliberately
+   *
+   * This writes `cover_file_key`, the dimensions and the rendered widths — the worker's facts,
+   * which no form may edit, because a form that can change them is a form that can make a row
+   * describe an object that is not there. The ALT TEXT travels on `update` with the rest of the
+   * trip's words, which is where a translator looks for it. `city-images.controller.ts` draws the
+   * same line and gives the same reason.
+   *
+   * ## Replacing is an overwrite, and the old object is left behind
+   *
+   * Same as every other image in this system (P-003): the bytes stay in the store while only the
+   * pointer moves. An `images.remove()` here would delete an object a soft-deleted row elsewhere
+   * might still name, and storage is cheap next to a broken photograph.
+   */
+  async setCover(
+    actor: AccessTokenClaims | undefined,
+    slug: string,
+    buffer: Buffer,
+  ): Promise<GroupTripRow> {
+    const found = await this.db.execute<{ slug: string }>(
+      sql`SELECT slug FROM group_trips WHERE slug = ${slug} AND deleted_at IS NULL`,
+    );
+    const trip = found.rows[0];
+
+    if (!trip) throw notFound(ERROR.GROUP_TRIP_NOT_FOUND);
+
+    /*
+      Decoded, resized, re-encoded, EXIF stripped — the same call the city hero makes.
+
+      `owner` is the slug the DATABASE answered with, not the one the request carried. They are
+      equal here by the WHERE clause above, so this changes no behaviour today; it is written this
+      way because the value becomes a storage PATH, and «the path is built from a value the server
+      resolved» is a property worth holding true by construction rather than by an argument about a
+      predicate three lines up. `group-trips/*` is anonymously readable, which is what makes the
+      distinction worth the word.
+    */
+    const processed = await this.images.process(buffer, {
+      kind: 'group-trips',
+      owner: trip.slug,
+    });
+
+    const widths = [...new Set(processed.variants.map((v) => v.width))];
+
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        UPDATE group_trips SET
+          cover_file_key = ${processed.fileKey},
+          /*
+            sql.param, because a bare JS array inside a template expands to a TUPLE — the
+            interpolation becomes ($1, $2, $3) and Postgres answers «cannot cast type record to
+            integer[]». One bound parameter, which node-postgres serialises as an array literal.
+          */
+          cover_variant_widths = ${sql.param(widths)}::integer[],
+          cover_width = ${processed.width},
+          cover_height = ${processed.height},
+          updated_at = now()
+        WHERE slug = ${slug} AND deleted_at IS NULL
+      `);
+
+      /*
+        Through the service's own helper, which deliberately sends NO `subjectId`: a trip is
+        identified by its slug and `audit_log.subject_id` is a uuid column, so naming it there is
+        a 22P02 at write time. The slug travels in the payload, where سجل التدقيق reads it.
+      */
+      await this.record(tx, actor, 'group_trip.cover_uploaded', undefined, {
+        slug,
+        width: processed.width,
+        height: processed.height,
+      });
+    });
+
+    return this.bySlug(slug);
+  }
+
+  /**
+   * Removes the cover, and every column that describes it in the same statement.
+   *
+   * Clearing the key alone would leave alt text and a width behind — which the CHECK constraint
+   * refuses outright, so this is not a tidiness argument: a partial clear fails loudly. Writing
+   * all seven columns is the only shape the table accepts, which is the point of the constraint.
+   */
+  async removeCover(
+    actor: AccessTokenClaims | undefined,
+    slug: string,
+  ): Promise<GroupTripRow> {
+    const found = await this.db.execute<{ cover_file_key: string | null }>(
+      sql`SELECT cover_file_key FROM group_trips
+          WHERE slug = ${slug} AND deleted_at IS NULL`,
+    );
+
+    const row = found.rows[0];
+
+    if (!row) throw notFound(ERROR.GROUP_TRIP_NOT_FOUND);
+    if (row.cover_file_key === null) throw notFound(ERROR.IMAGE_NOT_FOUND);
+
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        UPDATE group_trips SET
+          cover_file_key = NULL,
+          cover_variant_widths = '{}',
+          cover_width = NULL,
+          cover_height = NULL,
+          cover_alt_ar = NULL,
+          cover_alt_en = NULL,
+          cover_alt_de = NULL,
+          updated_at = now()
+        WHERE slug = ${slug} AND deleted_at IS NULL
+      `);
+
+      await this.record(tx, actor, 'group_trip.cover_removed', { slug }, undefined);
+    });
+
+    return this.bySlug(slug);
   }
 
   /* ── Internals ────────────────────────────────────────────────────────── */
@@ -356,5 +508,15 @@ function toRow(row: TripSqlRow): GroupTripRow {
     currencyCode: row.currency_code,
     seats: row.seats === null ? null : Number(row.seats),
     status: row.status,
+    cover:
+      row.cover_file_key === null
+        ? null
+        : {
+            fileKey: row.cover_file_key,
+            variantWidths: row.cover_variant_widths ?? [],
+            width: row.cover_width,
+            height: row.cover_height,
+            alt: { ar: row.cover_alt_ar, en: row.cover_alt_en, de: row.cover_alt_de },
+          },
   };
 }

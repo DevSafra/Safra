@@ -145,6 +145,23 @@ export const groupTripUpdateSchema = z
      * to everybody who bookmarked or shared the old one.
      */
     status: z.enum(GROUP_TRIP_STATUSES).optional(),
+    /**
+     * What the cover photograph SAYS, in each language it serves.
+     *
+     * Here rather than on the upload endpoint, for the reason `city_images` learnt the hard way:
+     * every city photograph the platform ever served went out with an EMPTY alt because the
+     * columns existed and nothing could write them. Alt text is COPY — it belongs beside the title
+     * and the summary, where a translator looks, not attached to a multipart byte upload nobody
+     * revisits.
+     *
+     * `optional()` maps a present-but-null to null and an ABSENT key to undefined, so «clear the
+     * alt» and «do not touch the alt» stay different requests. A decorative cover legitimately has
+     * none; the CHECK constraint only forbids alt text with no picture, never a picture with no
+     * alt.
+     */
+    coverAltAr: optional(300),
+    coverAltEn: optional(300),
+    coverAltDe: optional(300),
   })
   .strict()
   .refine(

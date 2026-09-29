@@ -1,3 +1,4 @@
+import sharp from 'sharp';
 import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -5,6 +6,7 @@ import { ERROR, PUBLIC_GROUP_TRIPS_LIMIT } from '@safra/contracts';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
+import { ImageService } from '../storage/image.service.js';
 import { GroupTripsService } from './group-trips.service.js';
 import { PublicGroupTripsService } from '../catalog/group-trips.service.js';
 import { codeOf } from '../common/errors/app-error.js';
@@ -28,7 +30,27 @@ const describeIfDb = DATABASE_URL ? describe : describe.skip;
 describeIfDb('group trips', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   const db: Database = harness.db;
-  const console_ = new GroupTripsService(db, new AuditService(db));
+
+  /*
+    What reached storage, so «the object is written before the row points at it» can be asserted
+    rather than assumed. The same fake `ad-creative.integration.test.ts` uses, for the same reason:
+    the real `StorageService` talks to S3, and a test that needs a bucket is a test nobody runs.
+  */
+  const stored: { key: string; bytes: number }[] = [];
+  const storage = {
+    put: (key: string, body: Buffer) => {
+      stored.push({ key, bytes: body.length });
+
+      return Promise.resolve();
+    },
+    publicUrl: (key: string) => `https://media.test/${key}`,
+  };
+
+  const console_ = new GroupTripsService(
+    db,
+    new AuditService(db),
+    new ImageService(storage as never),
+  );
   const publicTrips = new PublicGroupTripsService(db);
 
   let citySlug = '';
@@ -215,6 +237,148 @@ describeIfDb('group trips', () => {
     await console_.update(admin(), 'a-few-2', { status: 'published' });
 
     expect((await publicTrips.list()).items).toHaveLength(2);
+  });
+
+  /* ── The cover photograph (Bashar, 2026-09-29) ──────────────────────────── */
+
+  /**
+   * A real encode, not a stub.
+   *
+   * `ImageService.process` DECODES before it re-encodes — that is the whole point of the inspect
+   * step — so a `Buffer.from('not an image')` would exercise the rejection path and prove nothing
+   * about the success one. 1600x900 so the renderer produces all three widths and the test can
+   * assert the set rather than a single number.
+   */
+  const photograph = (): Promise<Buffer> =>
+    sharp({
+      create: {
+        width: 1600,
+        height: 900,
+        channels: 3,
+        background: { r: 20, g: 30, b: 60 },
+      },
+    })
+      .png()
+      .toBuffer();
+
+  it('records the cover with the widths that were actually rendered', async () => {
+    await console_.create(admin(), draft('with-cover'));
+
+    const before = stored.length;
+    const row = await console_.setCover(admin(), 'with-cover', await photograph());
+
+    expect(row.cover, 'the trip should come back carrying its cover').not.toBeNull();
+    expect(row.cover?.width).toBe(1600);
+    expect(row.cover?.height).toBe(900);
+
+    /*
+      The widths are asserted as a SET against what the encoder produced, never a hard-coded list:
+      `mediaUrl` picks the nearest of these, so a row claiming a width nobody rendered is a 404 in
+      an `<img>` — the exact failure `variant_widths` exists to prevent.
+    */
+    expect([...(row.cover?.variantWidths ?? [])].sort((a, b) => a - b)).toEqual([
+      400, 800, 1600,
+    ]);
+
+    /* The objects reach storage before the row points at them. Two formats per width. */
+    expect(stored.length - before).toBe(6);
+    expect(stored.every((one) => one.key.startsWith('group-trips/with-cover/'))).toBe(
+      true,
+    );
+  });
+
+  it('shows the cover to the public only once the trip is published', async () => {
+    await console_.create(admin(), draft('cover-public'));
+    await console_.setCover(admin(), 'cover-public', await photograph());
+
+    /* A draft is invisible whole — cover included. */
+    expect((await publicTrips.list()).items).toHaveLength(0);
+
+    await console_.update(admin(), 'cover-public', { status: 'published' });
+
+    const listed = (await publicTrips.list()).items[0];
+    const detail = await publicTrips.bySlug('cover-public');
+
+    /*
+      BOTH read paths, because they are separate SELECTs. The list query and the detail query were
+      written apart and the list one nearly shipped without the cover columns — a card with no
+      photograph beside a page with one, which is the shape «every instance of the same shape»
+      exists to catch.
+    */
+    expect(listed?.cover?.fileKey, 'the LIST must carry the cover').toBeTruthy();
+    expect(detail.cover?.fileKey, 'the DETAIL must carry the cover').toBeTruthy();
+    expect(detail.cover?.variantWidths).toContain(1600);
+  });
+
+  /* The opposite control: without it, «the cover appears» would pass if it never disappeared. */
+  it('clears every cover column when the photograph is removed', async () => {
+    await console_.create(admin(), draft('cover-gone'));
+    await console_.setCover(admin(), 'cover-gone', await photograph());
+    await console_.update(admin(), 'cover-gone', { coverAltAr: 'وصف' });
+
+    const cleared = await console_.removeCover(admin(), 'cover-gone');
+
+    expect(cleared.cover).toBeNull();
+
+    /*
+      Read from the COLUMNS rather than the mapper, because the mapper collapses the whole group to
+      null the moment the key is gone — so it would report success over a row still carrying an alt
+      text and a width. That row is what the CHECK constraint forbids, and this is the assertion
+      that the delete writes all seven columns rather than one.
+    */
+    const raw = await db.execute<{
+      k: string | null;
+      w: number | null;
+      h: number | null;
+      a: string | null;
+      widths: number[];
+    }>(sql`
+      SELECT cover_file_key AS k, cover_width AS w, cover_height AS h,
+             cover_alt_ar AS a, cover_variant_widths AS widths
+        FROM group_trips WHERE slug = 'cover-gone'
+    `);
+
+    expect(raw.rows[0]).toEqual({ k: null, w: null, h: null, a: null, widths: [] });
+  });
+
+  it('refuses to remove a cover that is not there', async () => {
+    await console_.create(admin(), draft('no-cover'));
+
+    await expect(console_.removeCover(admin(), 'no-cover')).rejects.toSatisfy(
+      (error: unknown) => codeOf(error) === ERROR.IMAGE_NOT_FOUND,
+    );
+  });
+
+  /**
+   * Alt text travels on `update`, and ABSENT is not the same request as NULL.
+   *
+   * This is the defect the `optional()` contract helper carried until 2026-09-28: absent mapped to
+   * null, so a PATCH that mentioned only the title wiped every other translated field. A cover
+   * with alt text in three languages is exactly where that would be expensive and silent.
+   */
+  it('keeps an untouched alt text and clears an explicitly null one', async () => {
+    await console_.create(admin(), draft('alt-merge'));
+    await console_.setCover(admin(), 'alt-merge', await photograph());
+    await console_.update(admin(), 'alt-merge', {
+      coverAltAr: 'سوق قديم',
+      coverAltEn: 'An old souq',
+    });
+
+    /* A save that mentions neither must leave both standing. */
+    await console_.update(admin(), 'alt-merge', { titleAr: 'عنوان جديد' });
+
+    const kept = await console_.bySlug('alt-merge');
+
+    expect(kept.cover?.alt.ar).toBe('سوق قديم');
+    expect(kept.cover?.alt.en).toBe('An old souq');
+
+    /* An explicit null is «this picture is decorative», and must actually clear it. */
+    await console_.update(admin(), 'alt-merge', { coverAltEn: null });
+
+    const after = await console_.bySlug('alt-merge');
+
+    expect(after.cover?.alt.ar, 'the Arabic alt was not mentioned').toBe('سوق قديم');
+    expect(after.cover?.alt.en, 'the English alt was explicitly cleared').toBeNull();
   });
 
   it('keeps a price and its currency together through an update', async () => {

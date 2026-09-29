@@ -89,14 +89,28 @@ export const groupTrips = pgTable(
     /** How many people are going, when that is known. A statement, not an inventory. */
     seats: integer('seats'),
     /*
-     No cover image in this version, and the column is absent rather than nullable-and-unused.
+      The cover photograph (Bashar, 2026-09-29: «I do not want Group Trips displayed as text-only
+      content»). The previous version of this file refused a column that nothing could fill —
+      «a column nothing can fill reads as coverage and changes nothing» — and said it would arrive
+      WITH the pipeline. It has: the console uploads through `ImageService.process`, the same call
+      the city hero uses, so these are filled by the same code that fills `city_images`.
 
-      A photograph on this page needs the variant pipeline `property_images` runs: `mediaUrl`
-      builds its URL from the widths that were actually RENDERED, so a bare object key produces a
-      request for a variant nobody made and a 404 in its place. A column nothing can fill is the
-      shape `catalogue.ts` refuses for `partner_types.capabilities` — it reads as coverage and
-      changes nothing. It arrives with the pipeline, together.
-     */
+      ONE cover, as columns rather than a `group_trip_images` table: a trip announces itself with a
+      single picture, and a table would make «two covers» representable and then need a rule to
+      forbid it. `variantWidths` is what was actually RENDERED — `mediaUrl` picks from it, so a
+      guess here is a 404 — and `width`/`height` let a card reserve its box before the bytes land,
+      which is the difference between a list that loads and a list that jumps.
+
+      A CHECK in `0084_group_trip_cover.sql` refuses metadata without a key, so «alt text for a
+      photograph that is not there» is unrepresentable rather than merely discouraged.
+    */
+    coverFileKey: text('cover_file_key'),
+    coverVariantWidths: integer('cover_variant_widths').array().notNull().default([]),
+    coverWidth: integer('cover_width'),
+    coverHeight: integer('cover_height'),
+    coverAltAr: text('cover_alt_ar'),
+    coverAltEn: text('cover_alt_en'),
+    coverAltDe: text('cover_alt_de'),
     status: groupTripStatus('status').notNull().default('draft'),
     /** When it first became public, so «newly announced» is answerable later. */
     publishedAt: timestamp('published_at', { withTimezone: true }),
