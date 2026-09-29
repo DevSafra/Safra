@@ -87,6 +87,19 @@ function readOnlyPolicy(bucket: string): string {
             a property exists on them.
           */
           `arn:aws:s3:::${bucket}/basemap/*`,
+          /*
+            `group-trips/*` joined on 2026-09-29, with the cover photographs جروبات announces trips
+            with. It produced the silent 403 this comment predicts, on the day it was written: the
+            console upload succeeded, the object was in the bucket, the row carried the key and the
+            rendered widths, the URL the page built was correct — and the browser drew nothing,
+            `naturalWidth` zero, no error in the console beyond a line nobody would connect to a
+            bucket policy. Found by opening the screen rather than by any test.
+
+            Safe to publish, and that is the question this list exists to make somebody answer:
+            these are marketing photographs a staff member uploads for a public announcement page.
+            Nothing here is customer content, and nothing here is a document.
+          */
+          `arn:aws:s3:::${bucket}/group-trips/*`,
         ],
       },
     ],
@@ -141,7 +154,8 @@ async function main(): Promise<void> {
   );
 
   console.log(
-    `Anonymous read enabled for ${bucket}: properties/*, ads/*, cities/*, basemap/*. ` +
+    `Anonymous read enabled for ${bucket}: properties/*, ads/*, cities/*, basemap/*, ` +
+      `group-trips/*. ` +
       `Identity documents and dispute evidence stay private.`,
   );
 }
