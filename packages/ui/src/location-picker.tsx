@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type * as MapLibre from 'maplibre-gl';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 
 import { guestAreaData, type GuestArea } from './guest-area.js';
@@ -287,7 +286,7 @@ export function LocationPicker({
             },
             layers: basemaps.layers('protomaps', basemaps.namedFlavor('light'), {
               lang: 'ar',
-            }) as MapLibre.LayerSpecification[],
+            }),
           },
           center: opening.current.centre,
           zoom: opening.current.zoom,

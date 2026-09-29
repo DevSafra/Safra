@@ -92,7 +92,7 @@ export function basemapStyle(
     },
     layers: basemaps.layers('protomaps', flavour, {
       lang: locale,
-    }) as MapLibre.LayerSpecification[],
+    }),
   };
 }
 

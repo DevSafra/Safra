@@ -299,7 +299,7 @@ export function PropertyMap({
           },
           layers: basemaps.layers('protomaps', flavour, {
             lang: locale,
-          }) as MapLibre.LayerSpecification[],
+          }),
         },
         center: [Number(longitude), Number(latitude)],
         zoom: PUBLIC_MAP_ZOOM,
