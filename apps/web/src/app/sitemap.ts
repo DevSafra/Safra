@@ -2,6 +2,7 @@ import type { MetadataRoute } from 'next';
 
 import { getCities, getLandmarks } from '@/lib/catalog';
 import { getGroupTrips } from '@/lib/group-trips';
+import { siteOrigin } from '@/lib/site-url';
 import { routing } from '@/i18n/routing';
 
 /**
@@ -42,10 +43,7 @@ import { routing } from '@/i18n/routing';
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = (process.env['NEXT_PUBLIC_SITE_URL'] ?? 'http://localhost:3000').replace(
-    /\/+$/,
-    '',
-  );
+  const base = siteOrigin();
 
   const cities = await getCities();
 

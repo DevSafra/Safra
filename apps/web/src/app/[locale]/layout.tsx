@@ -11,6 +11,7 @@ import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 import { ThemeScript } from '@/components/theme-script';
 import { ThemeKeeper } from '@/components/theme-keeper';
+import { siteUrl } from '@/lib/site-url';
 
 import '../globals.css';
 
@@ -33,6 +34,17 @@ export async function generateMetadata({
   const title = `${t('name')} | ${t('latin')}`;
 
   return {
+    /*
+      The origin every relative URL in every page's metadata resolves against.
+
+      Without it Next emits `<link rel="canonical" href="/ar/city/damascus">`, and a RELATIVE
+      canonical is a weak one: it cannot distinguish `https://safra.sy/ar/…` from an apex/www
+      variant, an http mirror, or a staging host that got crawled — which is the whole class of
+      duplicate-address problem the tag exists to close. Setting it HERE makes every page absolute
+      at once, including pages nobody has written yet; a base assembled per page is a base somebody
+      forgets on page nine.
+    */
+    metadataBase: siteUrl(),
     title: { default: title, template: `%s · ${t('name')}` },
     description: home('heroPromise'),
     // §5.4 targets SEO, so each page declares its language alternates explicitly
