@@ -817,6 +817,21 @@ const FIXTURE_IMAGE_KEYS = [
 const FIXTURE_IMAGE_SIZE = { width: 1600, height: 1067 };
 
 /**
+ * جروبات's fixture cover, under `group-trips/` rather than borrowed from `properties/`.
+ *
+ * It could have reused a property photograph's key — the object exists and that prefix is public
+ * — and it would have rendered perfectly while filing a trip's cover under listings. Storage
+ * layout describes what it holds (`ImageService.keyFor` says so), and a fixture that lies about
+ * that is a fixture somebody later reads as a bug. It also means the testbed exercises the
+ * anonymous-read grant `group-trips/*` received on 2026-09-29, which nothing else here does.
+ *
+ * Deliberately NOT added to `FIXTURE_IMAGE_KEYS`: those three are consumed by
+ * `index % borrowedImages.length`, so a fourth would silently redistribute every property's
+ * photographs and break specs with no relationship to this change.
+ */
+const TRIP_COVER_KEY = 'group-trips/testbed/fixture-trip-cover';
+
+/**
  * The VARIANTS, because nothing ever asks for the original.
  *
  * `ImageService.publicUrl` composes `{fileKey}-{width}.{format}`, so a browser asks for
@@ -871,8 +886,9 @@ async function seedFixturePhotographs(): Promise<
 
   let objects = 0;
 
-  for (const [index, key] of FIXTURE_IMAGE_KEYS.entries()) {
-    const ground = grounds[index] ?? grounds[0]!;
+  for (const [index, key] of [...FIXTURE_IMAGE_KEYS, TRIP_COVER_KEY].entries()) {
+    /* A fourth ground for the trip cover, so it is distinguishable from the three listings. */
+    const ground = grounds[index] ?? { r: 34, g: 60, b: 98 };
 
     for (const width of FIXTURE_VARIANT_WIDTHS) {
       const height = Math.round(
@@ -914,7 +930,27 @@ async function seedFixturePhotographs(): Promise<
       `(${String(written.length)} photographs × ${String(FIXTURE_VARIANT_WIDTHS.length)} widths × 2 formats).`,
   );
 
-  return written;
+  /*
+    The LISTING photographs only. The trip cover was uploaded in the same loop because it wants the
+    same widths and formats, but it must not enter this array: its consumer indexes with
+    `index % borrowedImages.length`, so a fourth entry would redistribute every property's
+    photographs and break specs that have nothing to do with جروبات.
+  */
+  return written.filter((one) => one.fileKey !== TRIP_COVER_KEY);
+}
+
+/** The trip cover's row shape, or null when storage is not configured. */
+function tripCoverRow(
+  uploaded: boolean,
+): { fileKey: string; width: number; height: number; variantWidths: number[] } | null {
+  return uploaded
+    ? {
+        fileKey: TRIP_COVER_KEY,
+        width: FIXTURE_IMAGE_SIZE.width,
+        height: FIXTURE_IMAGE_SIZE.height,
+        variantWidths: FIXTURE_VARIANT_WIDTHS,
+      }
+    : null;
 }
 
 /**
@@ -1560,6 +1596,15 @@ async function build(db: Seeder): Promise<void> {
   await db.execute(sql`DELETE FROM favourites WHERE property_id IN (
     SELECT id FROM properties WHERE partner_id IN (${testbedPartners}))
     OR customer_profile_id IN (${testbedProfiles})`);
+  /*
+    The FAQ answers a partner wrote (2026-09-28). They carry a foreign key to `properties` and were
+    never added here, so `pnpm db:testbed` failed outright the first time a seeded listing had an
+    answer — «violates foreign key constraint property_faq_answers_property_id_properties_id_fk»,
+    which names the table but reads as a seed that is simply broken. The QUESTIONS are platform
+    reference data written by staff and are deliberately left alone.
+  */
+  await db.execute(sql`DELETE FROM property_faq_answers WHERE property_id IN (
+    SELECT id FROM properties WHERE partner_id IN (${testbedPartners}))`);
   await db.execute(sql`DELETE FROM properties WHERE partner_id IN (${testbedPartners})`);
 
   /*
@@ -2279,7 +2324,64 @@ async function build(db: Seeder): Promise<void> {
     of them. Before `report`, so the self-check can hold it to account.
   */
   await accruePayouts(db);
+  await groupTrips(db, tripCoverRow(borrowedImages.length > 0));
   await report(db);
+}
+
+/**
+ * جروبات — one announced trip, so the feature has a fixture instead of whatever a developer left.
+ *
+ * ## Why this is here at all
+ *
+ * It was not, and two specs already depended on a trip existing: `sitemap.spec.ts` asserts at
+ * least one group-trip detail URL reaches the document, and `customer-review.spec.ts` now asserts
+ * the enquiry link prefills from a published trip. Both passed only because rows happened to be in
+ * the development database by hand. On a fresh `db:testbed` there were none, so the first CI run
+ * on a clean volume would have failed with no relationship to the change that triggered it.
+ *
+ * ## Published WITH a cover, because that is the only published state the product allows
+ *
+ * Since 2026-09-29 a trip cannot be announced without a photograph, so a seeded published trip
+ * without one would describe a state the service refuses to produce — the exact «fixture that
+ * lies» this file's `selfCheck` exists to catch. When storage is not configured the trip is seeded
+ * as a DRAFT instead, which is a state the product does allow.
+ */
+async function groupTrips(
+  db: Seeder,
+  cover: {
+    fileKey: string;
+    width: number;
+    height: number;
+    variantWidths: number[];
+  } | null,
+): Promise<void> {
+  const status = cover ? 'published' : 'draft';
+
+  await db.execute(sql`
+    INSERT INTO group_trips (
+      slug, city_id, title_ar, title_en, summary_ar, summary_en,
+      description_ar, description_en, starts_on, ends_on, seats, status, published_at,
+      cover_file_key, cover_variant_widths, cover_width, cover_height, cover_alt_ar
+    )
+    SELECT 'coastal-syria-spring', c.id,
+           'جولة الساحل السوري', 'Syrian Coast Tour',
+           'سبعة أيام بين اللاذقية وطرطوس وصافيتا، بمرافقة مرشد من سفرة.',
+           'Seven days between Latakia, Tartus and Safita with a SAFRA guide.',
+           'رحلة جماعية تنظّمها سفرة على الساحل السوري، بإقامة ونقل مُرتّبين سلفاً.',
+           'A SAFRA-run group trip along the Syrian coast, with stays and transport arranged.',
+           current_date + 120, current_date + 127, 18,
+           ${status}::group_trip_status,
+           ${cover ? sql`now()` : sql`NULL`},
+           ${cover?.fileKey ?? null},
+           ${cover ? sql`${sql.param(cover.variantWidths)}::integer[]` : sql`'{}'::integer[]`},
+           ${cover?.width ?? null}, ${cover?.height ?? null},
+           ${cover ? 'ساحل سوري عند الغروب' : null}
+      FROM cities c
+     WHERE c.slug = 'latakia' AND c.deleted_at IS NULL
+    ON CONFLICT DO NOTHING
+  `);
+
+  console.log(`  one group trip seeded (${status}).`);
 }
 
 /**
