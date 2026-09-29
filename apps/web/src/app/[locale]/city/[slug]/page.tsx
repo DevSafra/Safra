@@ -4,13 +4,16 @@ import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 
 import { BreadcrumbChevron } from '@/components/icons';
+import { JsonLd } from '@/components/json-ld';
 import { PropertyCard } from '@/components/property-card';
 import { SearchForm } from '@/components/search-form';
 import { isLocale, routing, type Locale } from '@/i18n/routing';
 import { getCities, getCity, getPropertyTypes } from '@/lib/catalog';
 import { localisedDescription, localisedName, localisedText } from '@/lib/localise';
 import { imageUrl as cityImageUrl } from '@/lib/property';
+import { breadcrumbGraph, cityGraph } from '@/lib/structured-data';
 import { searchSafely } from '@/lib/api';
+import { siteOrigin } from '@/lib/site-url';
 import { addDays, todayInDamascus } from '@/lib/settings';
 
 /**
@@ -144,8 +147,33 @@ export default async function CityPage({
   /* Hero first, then the first by sort order — the API already returns them in that order. */
   const hero = city.images[0] ?? null;
 
+  /*
+    A `TouristDestination`, which says what this page is FOR rather than merely that it names a
+    place. No coordinate: the city holds a nullable one that operations have not filled for most
+    rows, and a fabricated centroid is worse than none. The stays below carry no graph — each has
+    a page of its own that describes it properly.
+  */
+  const origin = siteOrigin();
+  const graphs = [
+    cityGraph({
+      name,
+      description,
+      url: `${origin}/${locale}/city/${city.slug}`,
+      countryCode: city.country.code,
+      images: hero ? [cityImageUrl(hero, 1600, 'webp')] : [],
+    }),
+    breadcrumbGraph([
+      { name: t('backHome'), url: `${origin}/${locale}` },
+      { name, url: `${origin}/${locale}/city/${city.slug}` },
+    ]),
+  ];
+
   return (
     <>
+      {graphs.map((graph, index) => (
+        <JsonLd key={index} graph={graph} />
+      ))}
+
       {/*
         §5.4's «أول ثلثها صور عالية الجودة» — the photograph if the city has one.
 

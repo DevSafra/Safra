@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { SIDEBAR_SCRIPT } from '@safra/ui';
 
 import { THEME_SCRIPT } from '@/lib/theme-script';
+import { nonceFrom } from '@/lib/csp-nonce';
 
 /**
  * Applies the saved theme BEFORE first paint.
@@ -34,11 +35,4 @@ export async function ThemeScript() {
       dangerouslySetInnerHTML={{ __html: `${THEME_SCRIPT}${SIDEBAR_SCRIPT}` }}
     />
   );
-}
-
-/** Pulls `'nonce-…'` out of the policy. Returns null when there is none to find. */
-function nonceFrom(csp: string | null): string | null {
-  const match = csp ? /'nonce-([^']+)'/.exec(csp) : null;
-
-  return match?.[1] ?? null;
 }

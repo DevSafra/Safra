@@ -4,12 +4,15 @@ import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 
 import { BreadcrumbChevron } from '@/components/icons';
+import { JsonLd } from '@/components/json-ld';
 import { PropertyCard } from '@/components/property-card';
 import { addDays, todayInDamascus } from '@/lib/settings';
 import { getCity, getLandmark, getLandmarks } from '@/lib/catalog';
 import { isLocale, routing, type Locale } from '@/i18n/routing';
 import { localisedName, localisedText } from '@/lib/localise';
+import { breadcrumbGraph, landmarkGraph } from '@/lib/structured-data';
 import { searchSafely } from '@/lib/api';
+import { siteOrigin } from '@/lib/site-url';
 
 /**
  * «إقامات قرب الجامع الأموي» — a landmark as a destination page.
@@ -94,6 +97,8 @@ async function resolve(slug: string, locale: Locale) {
       sentence intact during that failure instead of leaving a hole in the middle of it.
     */
     cityName: city ? localisedName(city, locale) : landmark.citySlug,
+    /* For the schema.org address. Empty rather than guessed when the reference read failed. */
+    countryCode: city?.country.code ?? '',
     name: localisedText(landmark.name, locale) || landmark.slug,
     siblings: siblings.filter((one) => one.slug !== landmark.slug),
   };
@@ -160,7 +165,7 @@ export default async function LandmarkPage({
   /* Unknown, retired, or a city nobody publishes any more — all the same answer. */
   if (!resolved) notFound();
 
-  const { landmark, cityName, name, siblings } = resolved;
+  const { landmark, cityName, countryCode, name, siblings } = resolved;
 
   const t = await getTranslations('landmark');
   const tnav = await getTranslations('nav');
@@ -215,8 +220,38 @@ export default async function LandmarkPage({
 
   const kind = localisedText(landmark.kindName, locale);
 
+  /*
+    What a crawler is told about this page, over and above the prose.
+
+    A landmark is the ONE surface where SAFRA publishes a coordinate, and it is the deliberate
+    exception `structured-data.ts` argues: this position is authored by staff, drawn on a map and
+    used as the origin of every public distance. It is not a property's location and is not derived
+    from one. The stays below carry no graph of their own — each has its own page that describes it
+    properly, and repeating them here would be one page claiming to be thirty.
+  */
+  const origin = siteOrigin();
+  const graphs = [
+    landmarkGraph({
+      name,
+      url: `${origin}/${locale}/landmark/${landmark.slug}`,
+      cityName,
+      countryCode,
+      latitude: landmark.latitude,
+      longitude: landmark.longitude,
+    }),
+    breadcrumbGraph([
+      { name: tnav('home'), url: `${origin}/${locale}` },
+      { name: cityName, url: `${origin}/${locale}/city/${landmark.citySlug}` },
+      { name, url: `${origin}/${locale}/landmark/${landmark.slug}` },
+    ]),
+  ];
+
   return (
     <>
+      {graphs.map((graph, index) => (
+        <JsonLd key={index} graph={graph} />
+      ))}
+
       {/*
         The city page's hero, minus the photograph: a landmark carries coordinates and a name, and
         no image pipeline of its own. The gradient is that page's own fallback rather than a new
