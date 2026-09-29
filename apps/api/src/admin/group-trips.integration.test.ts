@@ -129,6 +129,39 @@ describeIfDb('group trips', () => {
     ...over,
   });
 
+  /**
+   * A real encode, not a stub.
+   *
+   * `ImageService.process` DECODES before it re-encodes — that is the whole point of the inspect
+   * step — so a `Buffer.from('not an image')` would exercise the rejection path and prove nothing
+   * about the success one. 1600x900 so the renderer produces all three widths and the test can
+   * assert the set rather than a single number.
+   */
+  const photograph = (): Promise<Buffer> =>
+    sharp({
+      create: {
+        width: 1600,
+        height: 900,
+        channels: 3,
+        background: { r: 20, g: 30, b: 60 },
+      },
+    })
+      .png()
+      .toBuffer();
+
+  /**
+   * Announces a trip the way the product requires since 2026-09-29: with a photograph.
+   *
+   * A helper rather than two lines repeated in every case, because the two lines are ONE fact —
+   * «publishing a trip means it has a cover» — and a case that spelt them out separately would
+   * read as though the photograph were incidental to what it was testing. The cases that are
+   * ABOUT the rule call `update` directly, so this cannot hide the thing they assert.
+   */
+  const publish = async (slug: string): Promise<void> => {
+    await console_.setCover(admin(), slug, await photograph());
+    await console_.update(admin(), slug, { status: 'published' });
+  };
+
   it('is invisible to the public until it is published', async () => {
     await console_.create(admin(), draft('invisible-trip'));
 
@@ -137,7 +170,7 @@ describeIfDb('group trips', () => {
     );
     expect((await publicTrips.list()).items).toHaveLength(0);
 
-    await console_.update(admin(), 'invisible-trip', { status: 'published' });
+    await publish('invisible-trip');
 
     expect((await publicTrips.bySlug('invisible-trip')).slug).toBe('invisible-trip');
     expect((await publicTrips.list()).items).toHaveLength(1);
@@ -149,7 +182,7 @@ describeIfDb('group trips', () => {
   */
   it('an archived trip leaves the public list again', async () => {
     await console_.create(admin(), draft('archivable'));
-    await console_.update(admin(), 'archivable', { status: 'published' });
+    await publish('archivable');
     expect((await publicTrips.list()).items).toHaveLength(1);
 
     await console_.update(admin(), 'archivable', { status: 'archived' });
@@ -188,7 +221,7 @@ describeIfDb('group trips', () => {
 
   it('refuses to delete a trip that was ever published, and allows a draft', async () => {
     await console_.create(admin(), draft('published-once'));
-    await console_.update(admin(), 'published-once', { status: 'published' });
+    await publish('published-once');
 
     await expect(console_.remove(admin(), 'published-once')).rejects.toThrow();
 
@@ -199,14 +232,14 @@ describeIfDb('group trips', () => {
 
   it('stamps published_at once and keeps it across an archive', async () => {
     await console_.create(admin(), draft('stamped'));
-    await console_.update(admin(), 'stamped', { status: 'published' });
+    await publish('stamped');
 
     const first = await db.execute<{ at: string }>(
       sql`SELECT published_at::text AS at FROM group_trips WHERE slug = 'stamped'`,
     );
 
     await console_.update(admin(), 'stamped', { status: 'archived' });
-    await console_.update(admin(), 'stamped', { status: 'published' });
+    await publish('stamped');
 
     const again = await db.execute<{ at: string }>(
       sql`SELECT published_at::text AS at FROM group_trips WHERE slug = 'stamped'`,
@@ -232,34 +265,14 @@ describeIfDb('group trips', () => {
   /* The control for the cap: a small set comes back whole, so «at most N» is not «almost none». */
   it('shows every trip when there are few', async () => {
     await console_.create(admin(), draft('a-few-1'));
-    await console_.update(admin(), 'a-few-1', { status: 'published' });
+    await publish('a-few-1');
     await console_.create(admin(), draft('a-few-2'));
-    await console_.update(admin(), 'a-few-2', { status: 'published' });
+    await publish('a-few-2');
 
     expect((await publicTrips.list()).items).toHaveLength(2);
   });
 
   /* ── The cover photograph (Bashar, 2026-09-29) ──────────────────────────── */
-
-  /**
-   * A real encode, not a stub.
-   *
-   * `ImageService.process` DECODES before it re-encodes — that is the whole point of the inspect
-   * step — so a `Buffer.from('not an image')` would exercise the rejection path and prove nothing
-   * about the success one. 1600x900 so the renderer produces all three widths and the test can
-   * assert the set rather than a single number.
-   */
-  const photograph = (): Promise<Buffer> =>
-    sharp({
-      create: {
-        width: 1600,
-        height: 900,
-        channels: 3,
-        background: { r: 20, g: 30, b: 60 },
-      },
-    })
-      .png()
-      .toBuffer();
 
   it('records the cover with the widths that were actually rendered', async () => {
     await console_.create(admin(), draft('with-cover'));
@@ -280,9 +293,17 @@ describeIfDb('group trips', () => {
       400, 800, 1600,
     ]);
 
-    /* The objects reach storage before the row points at them. Two formats per width. */
-    expect(stored.length - before).toBe(6);
-    expect(stored.every((one) => one.key.startsWith('group-trips/with-cover/'))).toBe(
+    /*
+      The objects reach storage before the row points at them. Two formats per width.
+
+      Sliced from `before` rather than read whole: `stored` is shared across the file and other
+      cases upload photographs of their own, so `stored.every(...)` asserts something about THEIR
+      keys too — which is how this read green until a helper started publishing with a cover.
+    */
+    const written = stored.slice(before);
+
+    expect(written).toHaveLength(6);
+    expect(written.every((one) => one.key.startsWith('group-trips/with-cover/'))).toBe(
       true,
     );
   });
@@ -379,6 +400,96 @@ describeIfDb('group trips', () => {
 
     expect(after.cover?.alt.ar, 'the Arabic alt was not mentioned').toBe('سوق قديم');
     expect(after.cover?.alt.en, 'the English alt was explicitly cleared').toBeNull();
+  });
+
+  /* ── A published trip always has a photograph (Bashar, 2026-09-29) ───────── */
+
+  it('refuses to publish a trip that has no photograph', async () => {
+    await console_.create(admin(), draft('needs-a-picture'));
+
+    await expect(
+      console_.update(admin(), 'needs-a-picture', { status: 'published' }),
+    ).rejects.toSatisfy(
+      (error: unknown) => codeOf(error) === ERROR.GROUP_TRIP_COVER_REQUIRED,
+    );
+
+    /*
+      The control, and it is the half that matters: without it «refuses to publish» would pass just
+      as happily if publishing were broken for every trip. Same input, one photograph added.
+    */
+    await console_.setCover(admin(), 'needs-a-picture', await photograph());
+
+    expect(
+      (await console_.update(admin(), 'needs-a-picture', { status: 'published' })).slug,
+    ).toBe('needs-a-picture');
+  });
+
+  /* A draft is a work in progress and is held to nothing — `readiness.ts` says so in its own words. */
+  it('lets a draft be saved and edited with no photograph', async () => {
+    await console_.create(admin(), draft('still-drafting'));
+
+    expect(
+      (await console_.update(admin(), 'still-drafting', { titleAr: 'عنوان' })).slug,
+    ).toBe('still-drafting');
+  });
+
+  /**
+   * The back door.
+   *
+   * Guarding only the publish transition would let two legal steps reach the state one illegal step
+   * cannot: publish WITH a photograph, then delete it. Mutation: drop the status check in
+   * `removeCover` and this goes green while the public page renders a text-only trip.
+   */
+  it('refuses to remove the photograph of a published trip', async () => {
+    await console_.create(admin(), draft('published-with-art'));
+    await console_.setCover(admin(), 'published-with-art', await photograph());
+    await console_.update(admin(), 'published-with-art', { status: 'published' });
+
+    await expect(console_.removeCover(admin(), 'published-with-art')).rejects.toSatisfy(
+      (error: unknown) => codeOf(error) === ERROR.GROUP_TRIP_COVER_REQUIRED,
+    );
+
+    /* Archived, it is in front of nobody — so the photograph may go. */
+    await console_.update(admin(), 'published-with-art', { status: 'archived' });
+
+    expect((await console_.removeCover(admin(), 'published-with-art')).cover).toBeNull();
+  });
+
+  /*
+    Replacing is not removing. A published trip must always HAVE a photograph, not keep its first
+    one for ever — and `setCover` overwrites without passing through the removal guard.
+  */
+  it('lets a published trip swap its photograph', async () => {
+    await console_.create(admin(), draft('swap-art'));
+    await console_.setCover(admin(), 'swap-art', await photograph());
+    await console_.update(admin(), 'swap-art', { status: 'published' });
+
+    const first = (await console_.bySlug('swap-art')).cover?.fileKey;
+    const second = (await console_.setCover(admin(), 'swap-art', await photograph()))
+      .cover?.fileKey;
+
+    expect(second).toBeTruthy();
+    expect(second).not.toBe(first);
+  });
+
+  /*
+    Rows that predate the column stay editable. The rule guards the DOOR, not the state: holding
+    every published trip to it on every save would make an older announcement uneditable, which is
+    a rule arriving as an obstruction. Written with raw SQL because the service cannot produce this
+    row any more — which is the point.
+  */
+  it('still lets an older published trip without a photograph be edited', async () => {
+    await db.execute(sql`
+      INSERT INTO group_trips (slug, city_id, title_ar, summary_ar, description_ar,
+                               starts_on, ends_on, status, published_at)
+      SELECT 'legacy-trip', c.id, 'رحلة قديمة', 'سطر.', 'وصف كافٍ.',
+             '2027-05-01', '2027-05-07', 'published', now()
+        FROM cities c WHERE c.slug = ${citySlug}
+    `);
+
+    expect(
+      (await console_.update(admin(), 'legacy-trip', { titleAr: 'رحلة محدّثة' })).slug,
+    ).toBe('legacy-trip');
   });
 
   it('keeps a price and its currency together through an update', async () => {

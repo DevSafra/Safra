@@ -494,6 +494,8 @@ export const ar = {
       coverAltAr: 'وصف الصورة بالعربية',
       coverAltEn: 'وصف الصورة بالإنجليزية',
       coverAltDe: 'وصف الصورة بالألمانية',
+      /* Said where the choice is made, so the rule is met before the API has to refuse it. */
+      coverNeededToPublish: 'لا يمكن نشر الرحلة قبل رفع صورتها.',
       coverAltHint:
         'يُقرأ بصوت عالٍ لمن لا يرى الصورة. اتركه فارغاً إن كانت الصورة زخرفية لا تضيف معنى فوق العنوان.',
     },

@@ -249,6 +249,8 @@ export const en = {
   'group_trip.price_needs_currency':
     'Give a currency with the price, or leave both empty.',
   'group_trip.dates_order': 'The end date must not fall before the start date.',
+  'group_trip.cover_required':
+    'A trip cannot be published without a photograph, and a published trip cannot lose the one it has.',
   'geo.category_in_use':
     'That category is filed against {n} cities — deactivate it instead of removing it.',
   'geo.city_in_use':

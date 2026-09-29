@@ -402,6 +402,14 @@ export const ERROR = {
   /* The pair the database also enforces, so a form can name the field rather than show a 500. */
   GROUP_TRIP_PRICE_NEEDS_CURRENCY: 'group_trip.price_needs_currency',
   GROUP_TRIP_DATES_ORDER: 'group_trip.dates_order',
+  /*
+    A trip may not GO PUBLIC without a photograph (Bashar, 2026-09-29), and may not lose one while
+    it is public. The same philosophy `readiness.ts` states: a draft is a work in progress and is
+    held to nothing, and the moment of PUBLISHING is where a standard is applied — which is exactly
+    what `submitForReview` does for a listing. Readiness itself is about SHOWING gaps on things
+    already live; this is the other half, the refusal at the door.
+  */
+  GROUP_TRIP_COVER_REQUIRED: 'group_trip.cover_required',
   SETTING_VALUE_FLAT_OR_PERCENT: 'setting.value_flat_or_percent',
   SETTING_VALUE_SANCTIONS_POLICY: 'setting.value_sanctions_policy',
   SETTING_VALUE_PERCENT_RANGE: 'setting.value_percent_range',

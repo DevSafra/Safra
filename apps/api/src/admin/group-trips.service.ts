@@ -203,6 +203,26 @@ export class GroupTripsService {
     const currencyId = await this.currencyId(currencyCode);
     const status = input.status ?? before.status;
 
+    /*
+      A trip may not GO PUBLIC without a photograph (Bashar, 2026-09-29).
+      «I do not want Group Trips displayed as text-only content.»
+
+      The TRANSITION is what is guarded, not the state. Holding every published trip to this on
+      every save would make the rows that predate the column uneditable — an operator fixing a typo
+      on a trip announced last month would be told to upload a photograph first, which is a rule
+      arriving as an obstruction rather than as a standard. Guarding the door instead means the
+      requirement applies to everything announced from now on, and an older trip is brought up to it
+      the next time somebody deliberately re-publishes it.
+
+      This is the `submitForReview` half of the readiness philosophy, not the readiness-check half:
+      `readiness.ts` says in its own opening that it is «not validation» and exists to SHOW gaps on
+      things already live, while the moment a thing goes in front of a guest is where a standard is
+      applied. A draft is still held to nothing.
+    */
+    const goingPublic = status === 'published' && before.status !== 'published';
+
+    if (goingPublic && !before.cover) throw badRequest(ERROR.GROUP_TRIP_COVER_REQUIRED);
+
     await this.db.transaction(async (tx) => {
       await tx.execute(sql`
         UPDATE group_trips SET
@@ -392,8 +412,11 @@ export class GroupTripsService {
     actor: AccessTokenClaims | undefined,
     slug: string,
   ): Promise<GroupTripRow> {
-    const found = await this.db.execute<{ cover_file_key: string | null }>(
-      sql`SELECT cover_file_key FROM group_trips
+    const found = await this.db.execute<{
+      cover_file_key: string | null;
+      status: string;
+    }>(
+      sql`SELECT cover_file_key, status::text AS status FROM group_trips
           WHERE slug = ${slug} AND deleted_at IS NULL`,
     );
 
@@ -401,6 +424,18 @@ export class GroupTripsService {
 
     if (!row) throw notFound(ERROR.GROUP_TRIP_NOT_FOUND);
     if (row.cover_file_key === null) throw notFound(ERROR.IMAGE_NOT_FOUND);
+
+    /*
+      Both directions of the pair. Guarding only the publish transition would leave the back door
+      open: announce a trip WITH a photograph, then delete it, and the result is the published
+      text-only trip the rule exists to prevent — reached by two legal steps instead of one.
+
+      Replacing a cover is unaffected: `setCover` overwrites and never passes through this path. So
+      the rule reads «a published trip always has a photograph», which is the thing meant, rather
+      than «a trip needs one at the instant it is published», which is the thing a single guard
+      would have said.
+    */
+    if (row.status === 'published') throw badRequest(ERROR.GROUP_TRIP_COVER_REQUIRED);
 
     await this.db.transaction(async (tx) => {
       await tx.execute(sql`

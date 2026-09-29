@@ -282,6 +282,8 @@ export const de = {
   'group_trip.price_needs_currency':
     'Geben Sie eine Währung zum Preis an, oder lassen Sie beide Felder leer.',
   'group_trip.dates_order': 'Das Enddatum darf nicht vor dem Startdatum liegen.',
+  'group_trip.cover_required':
+    'Eine Reise kann ohne Foto nicht veröffentlicht werden, und eine veröffentlichte Reise kann ihr Foto nicht verlieren.',
   'geo.category_in_use':
     'Diese Kategorie ist {n} Städten zugeordnet — deaktivieren statt entfernen.',
   'geo.city_in_use':

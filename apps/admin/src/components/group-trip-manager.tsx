@@ -501,7 +501,14 @@ function GroupTripForm({
             label={c.status}
             value={status}
             onChange={setStatus}
-            hint={c.publishHint}
+            /*
+              The requirement is stated where the choice is made, not only when the save fails.
+
+              The «منشورة» option is NOT disabled: the endpoint is the control, and a disabled
+              option teaches the rule to whoever can see it while telling somebody who edits the
+              DOM nothing. This says what will happen; the API decides whether it does.
+            */
+            hint={trip?.cover ? c.publishHint : c.coverNeededToPublish}
           >
             {GROUP_TRIP_STATUSES.map((one) => (
               <option key={one} value={one}>
