@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { CATALOGUE_TAG } from '@safra/contracts';
+
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
 
 const translated = z.object({
@@ -24,12 +26,32 @@ const groupTripSchema = z.object({
   summary: translated,
   /* Null on the LIST, which does not select it — a card shows a summary, not an essay. */
   description: translated,
-  city: z.object({ slug: z.string(), name: translated }),
+  city: z.object({ slug: z.string(), countryCode: z.string(), name: translated }),
   startsOn: z.string(),
   endsOn: z.string(),
   priceFrom: z.string().nullable(),
   currencyCode: z.string().nullable(),
   seats: z.number().nullable(),
+  /**
+   * The cover photograph, or null for a trip nobody has illustrated yet.
+   *
+   * `.nullable()` and NOT `.default(null)`, for the reason recorded across this codebase: a
+   * default invents a plausible value for a field the API stopped sending, and «no photograph» is
+   * a state this page draws deliberately rather than a gap to paper over.
+   *
+   * `variantWidths` is the set that was actually RENDERED. `imageUrl` picks the nearest from it,
+   * so a width invented here is a 404 in an `<img>` — which is why the API sends what the encoder
+   * produced rather than a constant both sides would have to keep in step.
+   */
+  cover: z
+    .object({
+      fileKey: z.string(),
+      variantWidths: z.array(z.number()),
+      width: z.number().nullable(),
+      height: z.number().nullable(),
+      alt: translated,
+    })
+    .nullable(),
 });
 
 export type GroupTrip = z.infer<typeof groupTripSchema>;
@@ -47,7 +69,13 @@ export async function getGroupTrips(): Promise<GroupTrip[]> {
   try {
     const response = await fetch(`${API_URL}/api/v1/group-trips`, {
       headers: { Accept: 'application/json' },
-      next: { revalidate: 300, tags: ['group-trips'] },
+      /*
+        Both tags. `group-trips` names this list for anything that ever wants to purge only it;
+        `CATALOGUE_TAG` is what the console's existing revalidation fans out, so publishing a trip
+        or uploading its cover reaches the site at once instead of five minutes later — the exact
+        complaint Bashar made about a city photograph on 2026-09-13.
+      */
+      next: { revalidate: 300, tags: ['group-trips', CATALOGUE_TAG] },
     });
 
     if (!response.ok) return [];
@@ -65,7 +93,13 @@ export async function getGroupTrip(slug: string): Promise<GroupTrip | null> {
       `${API_URL}/api/v1/group-trips/${encodeURIComponent(slug)}`,
       {
         headers: { Accept: 'application/json' },
-        next: { revalidate: 300, tags: ['group-trips'] },
+        /*
+        Both tags. `group-trips` names this list for anything that ever wants to purge only it;
+        `CATALOGUE_TAG` is what the console's existing revalidation fans out, so publishing a trip
+        or uploading its cover reaches the site at once instead of five minutes later — the exact
+        complaint Bashar made about a city photograph on 2026-09-13.
+      */
+        next: { revalidate: 300, tags: ['group-trips', CATALOGUE_TAG] },
       },
     );
 

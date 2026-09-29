@@ -4,9 +4,13 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 
 import { BreadcrumbChevron } from '@/components/icons';
+import { JsonLd } from '@/components/json-ld';
 import { formatMoney, localisedText } from '@/lib/localise';
 import { getGroupTrip, hasFinished, nightsBetween } from '@/lib/group-trips';
 import { isLocale, routing } from '@/i18n/routing';
+import { breadcrumbGraph, tripGraph } from '@/lib/structured-data';
+import { imageUrl } from '@/lib/property';
+import { siteOrigin } from '@/lib/site-url';
 import { readableDate } from '@/lib/readable-date';
 
 /**
@@ -40,14 +44,52 @@ export async function generateMetadata({
 
   if (!trip) return { robots: { index: false } };
 
+  const title = localisedText(trip.title, locale);
+  const description = localisedText(trip.summary, locale);
+
+  /*
+    The cover, for the card a link turns into when somebody pastes it into WhatsApp or Telegram
+    (Bashar, 2026-09-29: «in social sharing previews where applicable»).
+
+    WEBP rather than AVIF, and 1600 rather than the card's 400: scrapers want a wide image and
+    WebP is the widest-supported format this pipeline produces. `imageUrl` returns an absolute URL
+    already — it is built from `NEXT_PUBLIC_MEDIA_URL`, the object store's own origin — so this one
+    does not pass through `metadataBase`, and it must not: the image is not served from the site.
+
+    A trip with no cover sends no `images` key at all rather than a placeholder. A link that
+    previews a generic graphic is worse than one that previews none: it looks like the content, and
+    it is not.
+  */
+  const cover = trip.cover
+    ? {
+        images: [
+          {
+            url: imageUrl(trip.cover, 1600, 'webp'),
+            ...(trip.cover.width !== null && trip.cover.height !== null
+              ? { width: trip.cover.width, height: trip.cover.height }
+              : {}),
+            alt: localisedText(trip.cover.alt, locale) || title,
+          },
+        ],
+      }
+    : {};
+
   return {
-    title: localisedText(trip.title, locale),
-    description: localisedText(trip.summary, locale),
+    title,
+    description,
     alternates: {
       canonical: `/${locale}/groups/${slug}`,
       languages: Object.fromEntries(
         routing.locales.map((l) => [l, `/${l}/groups/${slug}`]),
       ),
+    },
+    openGraph: { title, description, type: 'article', ...cover },
+    /* Without this a large photograph is cropped to a 120px square thumbnail on X. */
+    twitter: {
+      card: trip.cover ? 'summary_large_image' : 'summary',
+      title,
+      description,
+      ...cover,
     },
   };
 }
@@ -75,8 +117,41 @@ export default async function GroupTripPage({
   const nights = nightsBetween(trip.startsOn, trip.endsOn);
   const finished = hasFinished(trip.endsOn);
 
+  /*
+    A `TouristTrip` — dates, a destination and, when there is one, a price with its currency.
+
+    Deliberately NO `availability` and no seat count in the offer: this version announces trips and
+    does not sell them, so a graph implying a bookable inventory would assert to Google the booking
+    engine the product decision defers. `structured-data.test.ts` holds that.
+  */
+  const origin = siteOrigin();
+  const graphs = [
+    tripGraph({
+      name: title,
+      description: summary,
+      url: `${origin}/${locale}/groups/${trip.slug}`,
+      cityName: city,
+      countryCode: trip.city.countryCode,
+      startsOn: trip.startsOn,
+      endsOn: trip.endsOn,
+      images: trip.cover ? [imageUrl(trip.cover, 1600, 'webp')] : [],
+      priceFrom:
+        trip.priceFrom && trip.currencyCode
+          ? { amount: trip.priceFrom, currency: trip.currencyCode }
+          : null,
+    }),
+    breadcrumbGraph([
+      { name: t('title'), url: `${origin}/${locale}/groups` },
+      { name: title, url: `${origin}/${locale}/groups/${trip.slug}` },
+    ]),
+  ];
+
   return (
     <article className="mx-auto max-w-4xl px-4 py-8">
+      {graphs.map((graph, index) => (
+        <JsonLd key={index} graph={graph} />
+      ))}
+
       {/* The same breadcrumb shape the property page uses — one chevron, drawn, following the page. */}
       <nav
         aria-label={t('title')}
@@ -93,6 +168,37 @@ export default async function GroupTripPage({
         </span>
         <span className="text-muted">{title}</span>
       </nav>
+
+      {/*
+        The photograph, between the breadcrumb and the title.
+
+        `loading="eager"` and `fetchPriority="high"`, deliberately against the card's lazy default:
+        this is the LARGEST element above the fold, so it IS the LCP, and a lazily-loaded LCP is
+        the classic way to lose a second on a slow connection — the audience this product is built
+        for. 16:9 rather than the card's 3:2 because 3:2 at this width is 597px of photograph
+        before the reader reaches the trip's name.
+
+        No ornament fallback here. On the card the band holds the grid's rhythm and must be filled;
+        on a page of its own, an empty decorative box above the title is furniture.
+      */}
+      {trip.cover ? (
+        <div className="mt-6 aspect-[16/9] overflow-hidden rounded-card border border-line bg-band">
+          <picture>
+            <source srcSet={imageUrl(trip.cover, 1600, 'avif')} type="image/avif" />
+            <source srcSet={imageUrl(trip.cover, 1600, 'webp')} type="image/webp" />
+            <img
+              src={imageUrl(trip.cover, 1600, 'webp')}
+              alt={localisedText(trip.cover.alt, locale)}
+              {...(trip.cover.width !== null && trip.cover.height !== null
+                ? { width: trip.cover.width, height: trip.cover.height }
+                : {})}
+              className="size-full object-cover"
+              loading="eager"
+              fetchPriority="high"
+            />
+          </picture>
+        </div>
+      ) : null}
 
       <header className="mt-6">
         <div className="flex flex-wrap items-center gap-2">
