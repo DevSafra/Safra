@@ -875,6 +875,7 @@
     "about": "Über diese Reise",
     "enquire": "Zu dieser Reise anfragen",
     "enquireNote": "Melden Sie sich an, um eine Anfrage zu stellen; das SAFRA-Team antwortet Ihnen.",
+    "enquiryPrefill": "Anfrage zur Reise „{title}“ (Kennung: {reference}).\n\n",
     "backToList": "Alle Reisen",
     "labelDates": "Termine",
     "labelDuration": "Dauer",

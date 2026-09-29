@@ -24,11 +24,20 @@ import type { Locale } from '@/i18n/routing';
 export function SupportForm({
   locale,
   reference,
+  initialBody,
   labels,
 }: {
   readonly locale: Locale;
   /** Absent when opening; present when replying to that ticket. */
   readonly reference?: string;
+  /**
+   * What the box already says when the reader arrives from somewhere that knows why.
+   *
+   * Editable, not fixed: it is the first line of THEIR message, not a label attached to it, so
+   * somebody who wants to write something else can simply delete it. The caller resolves it
+   * server-side — see the support page — and no value from the request reaches this prop.
+   */
+  readonly initialBody?: string | undefined;
   readonly labels: {
     readonly field: string;
     readonly hint?: string;
@@ -38,7 +47,7 @@ export function SupportForm({
   };
 }) {
   const router = useRouter();
-  const [body, setBody] = useState('');
+  const [body, setBody] = useState(initialBody ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

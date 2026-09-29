@@ -875,6 +875,7 @@
     "about": "About this trip",
     "enquire": "Ask about this trip",
     "enquireNote": "Sign in to open an enquiry and the SAFRA team will reply.",
+    "enquiryPrefill": "Enquiry about the trip “{title}” (reference: {reference}).\n\n",
     "backToList": "All trips",
     "labelDates": "Dates",
     "labelDuration": "Duration",

@@ -5,6 +5,8 @@ import { getTranslations } from 'next-intl/server';
 import { AccountShell } from '@/components/account-shell';
 import { SupportForm } from '@/components/support-forms';
 import { getAccountSummary, getMySupportTickets } from '@/lib/account';
+import { getGroupTrip } from '@/lib/group-trips';
+import { localisedText } from '@/lib/localise';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
 import { ltrIsolate } from '@/lib/bidi';
 
@@ -28,18 +30,54 @@ export default async function AccountSupportPage({
   params: Promise<{ locale: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const query = await searchParams;
+
+  /**
+   * «استفسر عن هذه الرحلة» — which trip the reader came from (Bashar, 2026-09-29).
+   *
+   * Two guards, and they do different jobs:
+   *
+   * 1. The SHAPE is checked before the value goes anywhere near the sign-in redirect, because
+   *    `requireSignedIn` interpolates its argument into `?next=` and its own docblock says a path
+   *    taken from a request is how that becomes an open redirect. A slug that cannot express a
+   *    scheme, a host or a slash cannot express one there either.
+   * 2. The value is then RESOLVED against a published trip, and every word of the prefill comes
+   *    from that row. Nothing the reader typed reaches the textarea — the query chooses WHICH
+   *    known trip and nothing else, which is the rule `returnHref` states for the console's back
+   *    control. An unknown slug prefills nothing and says nothing about why.
+   */
+  const asked = typeof query['trip'] === 'string' ? query['trip'] : '';
+  const tripSlug =
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(asked) && asked.length <= 80 ? asked : '';
+
   const { locale: requested } = await params;
-  const { locale } = await requireAccount(requested, '/support');
+  /* The slug travels through sign-in, so arriving signed-out does not lose the trip. */
+  const { locale } = await requireAccount(
+    requested,
+    tripSlug ? `/support?trip=${encodeURIComponent(tripSlug)}` : '/support',
+  );
 
   const summaryRead = await getAccountSummary();
   const summary =
     summaryRead === 'failed' || summaryRead === 'unauthenticated' ? null : summaryRead;
 
-  const query = await searchParams;
   const cursor = typeof query['cursor'] === 'string' ? query['cursor'] : '';
 
   const t = await getTranslations('account');
+  const tg = await getTranslations('groups');
   const tickets = await getMySupportTickets(cursor || undefined);
+
+  /*
+    `getGroupTrip` answers only for a PUBLISHED trip, so a draft's slug prefills nothing — the same
+    answer a slug nobody ever used gets, which is what keeps an unannounced trip unannounced.
+  */
+  const trip = tripSlug ? await getGroupTrip(tripSlug) : null;
+  const prefill = trip
+    ? tg('enquiryPrefill', {
+        title: localisedText(trip.title, locale),
+        reference: trip.slug,
+      })
+    : '';
 
   return (
     <AccountShell
@@ -55,6 +93,7 @@ export default async function AccountSupportPage({
         <div className="mt-3">
           <SupportForm
             locale={locale}
+            initialBody={prefill}
             labels={{
               field: t('supportBodyLabel'),
               hint: t('supportBodyHint'),

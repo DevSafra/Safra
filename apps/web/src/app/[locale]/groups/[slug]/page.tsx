@@ -275,8 +275,18 @@ export default async function GroupTripPage({
       <section className="mt-8 rounded-card border border-line bg-card p-5">
         <h2 className="font-display text-lg text-text">{t('enquire')}</h2>
         <p className="mt-2 text-sm text-muted">{t('enquireNote')}</p>
+        {/*
+          The trip travels with the reader (Bashar, 2026-09-29), so support staff know which
+          announcement produced the enquiry instead of opening with «which trip?».
+
+          The SLUG, not the title: it is the trip's public identifier, it is what the URL already
+          says, and it survives a retitle. The support page resolves it against a published trip
+          and builds the sentence from the DATABASE's own words — the query only chooses WHICH
+          known trip, exactly as `returnHref` limits a console back link to choosing which page of
+          a known list. A crafted value resolves to nothing and prefills nothing.
+        */}
         <Link
-          href={`/${locale}/account/support`}
+          href={`/${locale}/account/support?trip=${encodeURIComponent(trip.slug)}`}
           className="btn-gold mt-4 inline-flex min-h-10 cursor-pointer items-center rounded-lg px-4 text-sm font-bold"
         >
           {t('enquire')}

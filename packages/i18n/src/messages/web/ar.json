@@ -875,6 +875,7 @@
     "about": "عن الرحلة",
     "enquire": "استفسر عن هذه الرحلة",
     "enquireNote": "سجّل الدخول لفتح استفسار، وسيصلك ردّ من فريق سفرة.",
+    "enquiryPrefill": "استفسار عن رحلة «{title}» (المعرّف: {reference}).\n\n",
     "backToList": "كل الرحلات",
     "labelDates": "التواريخ",
     "labelDuration": "المدة",

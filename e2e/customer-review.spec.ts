@@ -151,6 +151,40 @@ test.describe('writing a review', () => {
         '/en',
       );
     }
+
+    /*
+      «استفسر عن هذه الرحلة» arrives at الدعم knowing which trip (Bashar, 2026-09-29).
+
+      Asserted on the SAME session for the reason every block above gives: a test of its own means
+      a second sign-in, and the login budget is the suite's binding constraint.
+
+      The value of the check is the PAIR. A prefill that works proves the support staff get the
+      reference; a crafted slug that prefills nothing proves the query only ever CHOOSES a known
+      trip rather than supplying words. One without the other proves half of it — and the half
+      that silently breaks is the second.
+    */
+    const enquiry = async (trip: string): Promise<string> => {
+      await page.goto(`/en/account/support?trip=${encodeURIComponent(trip)}`);
+
+      return page.locator('textarea').first().inputValue();
+    };
+
+    /* The published fixture trip. Its own title and slug, from the database. */
+    expect(await enquiry('coastal-syria-spring')).toContain('coastal-syria-spring');
+
+    /*
+      And nothing else does. An unknown slug, a URL, a traversal and a script tag all prefill
+      NOTHING rather than prefilling themselves — `getGroupTrip` answers only for a published trip,
+      so a draft's slug is as silent as a slug nobody ever used.
+    */
+    for (const crafted of [
+      'no-such-trip',
+      'https://evil.example/x',
+      '../../evil',
+      '<script>alert(1)</script>',
+    ]) {
+      expect(await enquiry(crafted), `${crafted} must prefill nothing`).toBe('');
+    }
   });
 
   /** Anonymous visitors are bounced to sign-in, exactly as they are off `/account`. */
