@@ -150,10 +150,17 @@ deleting it; the reason something was blocked is often the reason it comes back.
 >
 > **Measured at HEAD:** `pnpm verify` 297 files, **4,354 tests**, 0 failed, 0 skipped.
 
-> ### جروبات — announcement-based implementation COMPLETE 2026-09-29
+> ### جروبات — CLOSED 2026-09-29. The initiative is finished, not paused.
 >
-> **Status:** **COMPLETE** · **Approved by Bashar 2026-09-29**, twice: the announcement shape, and
-> then the two completeness improvements that closed it.
+> **Status:** **CLOSED** · **Bashar, 2026-09-29:** _«Please mark Group Trips as fully complete and
+> closed.»_ He approved the announcement shape, the cover-image requirement, the enquiry prefill,
+> the structured data, the sitemap integration, the SEO improvements and the privacy-preserving
+> design decisions.
+>
+> **Nothing about this is awaiting engineering.** The excluded scope — a booking engine, seat
+> management, payment, refund and cancellation flows, multi-image galleries and itinerary engines —
+> is _«intentionally deferred pending real demand evidence»_. The trigger is usage data from the
+> enquiry inbox. Anyone reopening this should read that sentence first: it is a decision, not a gap.
 >
 > **Two improvements, both asked for by name:**
 >
@@ -1688,6 +1695,28 @@ unblocks four items; the second is the only one whose clock you do not control.
 ## 4. Must-have blockers
 
 ### M-1 — No deployment target exists
+
+> **Decision package prepared 2026-09-29, at Bashar's request:**
+> <https://claude.ai/code/artifact/13be1a21-4469-49f1-92bb-8105c5ae0943>
+>
+> Four options across the eight dimensions he named — operational complexity, security, compliance,
+> GDPR, backup and recovery, monitoring, scalability and monthly cost — with the recommendation
+> (an EU-owned managed platform), the three sub-decisions that ride with it, and what each of the
+> six gated blockers costs once he chooses. **It is a decision document, not a plan to implement.**
+>
+> **The finding that reorders the options, and it is recent enough that nobody should work from
+> memory on it:** comprehensive US sanctions on Syria ended with EO 14312 (June 2025), the Caesar
+> Act was repealed in the FY2026 NDAA (18 December 2025), and **Syria's State Sponsor of Terrorism
+> designation was rescinded on 24 August 2026**. Syria nevertheless **remains in EAR Country Group
+> E:1** — anti-terrorism controls, a 10% de minimis threshold, licence exception SPP — because BIS
+> has not yet amended the regulations. For a booking platform, which is EAR99 rather than
+> controlled dual-use technology, **hosting is no longer the constraint; list-based SCREENING is**,
+> which makes blocker 3 the compliance item that carries real risk and it is gated by nothing.
+>
+> **The one thing that could still invalidate a choice after the fact:** a provider's own
+> acceptable-use position on Syria-facing business, which lags the law — Microsoft still lists
+> Azure as unavailable in Syria. Ask the shortlisted provider's compliance desk in writing before
+> signing.
 
 **Status:** blocked · **Owner:** Platform engineering + Bashar (decision)
 
