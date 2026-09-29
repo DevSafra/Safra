@@ -65,8 +65,7 @@
       "js-yaml@4": ">=4.3.1",
       "nanoid@3": ">=3.3.17",
       "qs": ">=6.16.0",
-      "nodemailer": ">=9.1.1 <10",
-      "multer": ">=2.3.0"
+      "multer": ">=2.4.0"
     },
     "auditConfig": {
       "ignoreGhsas": [
