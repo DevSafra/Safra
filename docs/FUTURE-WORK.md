@@ -467,7 +467,7 @@ launch; `O-sec-7` should not wait for one either.
 | --- | -------------------------------------------------- | ------------------- | ---------- |
 | 1   | Deployment target selection                        | Bashar              | —          |
 | 2   | Backup implementation and a verified restore drill | Infrastructure      | yes        |
-| 3   | Sanctions feed activation                          | Compliance + vendor | no         |
+| 3   | Sanctions feed activation ²                        | Compliance + vendor | no         |
 | 4   | Malware scanning for uploaded identity documents   | Bashar              | yes        |
 | 5   | External penetration test                          | Bashar              | yes        |
 | 6   | Retention / erasure policy reconciliation          | Legal               | no         |
@@ -487,6 +487,16 @@ request paths, a per-account rate limiter that could be bypassed and aimed with 
 idempotency claim that stayed held for 24 hours after a failure. See
 `docs/load-test-results-2026-08-20.md` and `S-3`. **It also produced one new item needing Bashar's
 decision: `O-sec-3`** — an attacked egress address cannot sign in at all.
+
+**² Blocker 3 blocks nothing while the policy is `advisory` — verified against the code
+2026-09-30.** `compliance.sanctions_screening` is seeded `advisory`, and
+`DEFAULT_SANCTIONS_POLICY` falls back to the same value, so screening runs and is recorded but
+gates neither partner approval nor payout; the seven-day `MAX_SNAPSHOT_AGE_DAYS` refusal only
+stops onboarding under `required`. That is Bashar's decision of 2026-08-21 (see `M-2`). It stays
+on this list because he named it among the remaining work on 2026-09-09, and because the feed is
+what makes switching to `required` possible at all. **The moment the policy becomes `required`,
+this is a hard launch blocker again** — with no feed, onboarding stops a week after the last
+manual import.
 
 ### Payout accounts — the lifecycle, closed 2026-09-04
 
