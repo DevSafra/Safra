@@ -413,7 +413,9 @@ function Value({
   display: Exclude<SettingDisplay, { kind: 'json' | 'routing' }>;
 }) {
   if (display.kind === 'missing') {
-    return <span className="text-14 text-faint">{t.admin.noData}</span>;
+    return (
+      <span className="text-14 font-semibold text-warn-ink">{t.admin.invalidValue}</span>
+    );
   }
 
   if (display.kind === 'flag') {

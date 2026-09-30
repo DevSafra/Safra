@@ -57,7 +57,7 @@ export function amount(value: string | null | undefined, currency: string): stri
 
   const parsed = Number(value);
 
-  if (!Number.isFinite(parsed)) return '—';
+  if (!Number.isFinite(parsed)) return t.dashboard.unreadable;
 
   const scale = currencyDecimals(currency);
   const money = parsed.toLocaleString(ARABIC_WESTERN_DIGITS, {

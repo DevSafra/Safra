@@ -123,7 +123,7 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
             }}
             className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2.5 text-14 text-text"
           >
-            <option value="">—</option>
+            <option value="">{t.admin.choose}</option>
             {targets.map((target) => (
               <option key={target.ref} value={target.ref}>
                 {target.name}

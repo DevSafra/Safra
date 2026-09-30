@@ -216,8 +216,9 @@ export default async function PayoutPage({
 
                       A line read «$613.80 owed» on a booking whose guest had been refunded $330,
                       and no screen said so. Amber where there IS a refund, because that is the
-                      row a finance reader needs to look at twice; an em dash where there is none,
-                      so «nothing refunded» is legible as a fact rather than as a blank cell.
+                      row a finance reader needs to look at twice; the zero, in the table's own colour, where there
+                      is none, because «nothing refunded» is a fact (Bashar, 2026-09-30) and a figure
+                      is never the faintest text on a screen.
                     */}
                     <Td>
                       {Number(booking.refunded) > 0 ? (
@@ -225,7 +226,7 @@ export default async function PayoutPage({
                           {amount(booking.refunded, payout.currencyCode)}
                         </Ltr>
                       ) : (
-                        <span className="text-faint">—</span>
+                        <Ltr>{amount(booking.refunded, payout.currencyCode)}</Ltr>
                       )}
                     </Td>
                   </tr>

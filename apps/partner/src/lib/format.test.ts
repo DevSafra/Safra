@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { t } from '@/lib/strings';
+
 import { amount, count, marketToday } from './format';
 
 /**
@@ -92,12 +94,19 @@ describe('count', () => {
  * damaging than an absent one.
  */
 describe('amount', () => {
-  it.each<string | null | undefined>([null, undefined, 'not-a-number', ''])(
+  it.each<string | null | undefined>([null, undefined, ''])(
     'renders %j as a dash',
     (value) => {
       expect(amount(value, 'USD')).toBe('—');
     },
   );
+
+  /* A stored amount that is not a number is a fault, not an absence, so it must not look like one. */
+  it('says a nonsense amount cannot be read, rather than showing it as empty', () => {
+    expect(t.dashboard.unreadable, 'the catalogue key exists').toMatch(/\S/);
+    expect(amount('not-a-number', 'USD')).toBe(t.dashboard.unreadable);
+    expect(t.dashboard.unreadable).not.toBe('—');
+  });
 
   it('renders a real amount with its symbol', () => {
     expect(amount('65.00', 'USD')).toContain('65.00');

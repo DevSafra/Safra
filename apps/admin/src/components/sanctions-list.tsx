@@ -145,7 +145,9 @@ export function SanctionsList({ status }: { readonly status: SanctionsStatus }) 
           <Fact label={c.sanctionsEntries} value={count(status.entryCount)} />
           <Fact
             label={c.sanctionsFetched}
-            value={status.fetchedAt ? shortDateTime(status.fetchedAt) : '—'}
+            value={
+              status.fetchedAt ? shortDateTime(status.fetchedAt) : c.sanctionsNeverFetched
+            }
           />
           <Fact
             label={c.sanctionsAge}

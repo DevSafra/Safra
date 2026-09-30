@@ -36,7 +36,7 @@ export function money(amount: string | null | undefined, decimals = 2): string {
 
   const value = Number(amount);
 
-  if (!Number.isFinite(value)) return t.admin.noData;
+  if (!Number.isFinite(value)) return t.admin.unreadable;
 
   return value.toLocaleString(ARABIC_WESTERN_DIGITS, {
     minimumFractionDigits: decimals,
@@ -72,7 +72,7 @@ export function rate(value: string | null | undefined): string {
 
   const parsed = Number(value);
 
-  if (!Number.isFinite(parsed)) return t.admin.noData;
+  if (!Number.isFinite(parsed)) return t.admin.unreadable;
 
   return parsed.toLocaleString(ARABIC_WESTERN_DIGITS, {
     minimumFractionDigits: 0,
@@ -89,7 +89,7 @@ export function rate(value: string | null | undefined): string {
 export function percent(value: string): string {
   const parsed = Number(value);
 
-  if (!Number.isFinite(parsed)) return t.admin.noData;
+  if (!Number.isFinite(parsed)) return t.admin.unreadable;
 
   return `${parsed.toLocaleString(ARABIC_WESTERN_DIGITS, { maximumFractionDigits: 1 })}${t.percentSign}`;
 }

@@ -203,7 +203,7 @@ const COLUMNS = [
     key: 'city',
     header: t.sections.coupons.colCity,
     render: (row: CouponPartner) => (
-      <span className="text-text2">{row.city ?? t.admin.noData}</span>
+      <span className="text-text2">{row.city ?? t.admin.notSet}</span>
     ),
   },
   {

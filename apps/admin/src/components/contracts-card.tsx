@@ -124,8 +124,7 @@ function statusLabel(contract: ContractItem): string {
   */
   if (contract.status === 'draft') return t.sections.contracts.draft;
 
-  if (contract.daysToExpiry === null)
-    return fill(t.sections.contracts.validUntil, { date: '—' });
+  if (contract.daysToExpiry === null) return t.sections.contracts.noExpiry;
   if (contract.daysToExpiry < 0) return t.sections.contracts.expired;
 
   /* Inside 60 days the message becomes a countdown, which is what prompts a renewal. */

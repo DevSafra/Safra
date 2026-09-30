@@ -106,7 +106,7 @@ export function GroupTripManager({
     {
       key: 'seats',
       header: c.colSeats,
-      render: (row) => <span className="text-text2">{row.seats ?? '—'}</span>,
+      render: (row) => <span className="text-text2">{row.seats ?? t.admin.notSet}</span>,
     },
     {
       key: 'status',

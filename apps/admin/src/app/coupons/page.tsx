@@ -198,7 +198,7 @@ const columns = (back: string): readonly AdminColumn<CouponItem>[] => [
     render: (row) => (
       <Ltr className="text-muted">
         {row.minBookingAmount === null
-          ? t.admin.noData
+          ? t.sections.coupons.noMinimum
           : amount(row.minBookingAmount, row.currency ?? DEFAULT_MONEY_CURRENCY)}
       </Ltr>
     ),

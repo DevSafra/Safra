@@ -70,6 +70,7 @@
     "partnersTitle": "Für Partner",
     "partnersSubtitle": "Listen Sie Ihr Hotel oder Ihr Haus auf SAFRA",
     "partnersBody": "Ein kostenloses Verwaltungs-Dashboard, Kalender und Preise in Ihrer Hand, regelmäßige Überweisungen und nur {rate} Provision von Ihren Auszahlungen.",
+    "partnersBodyNoRate": "Ein kostenloses Verwaltungs-Dashboard, Kalender und Preise in Ihrer Hand und regelmäßige Überweisungen.",
     "partnersCta": "Als Partner registrieren"
   },
   "search": {

@@ -61,7 +61,7 @@ export function CountryRows({
           >
             <span className="font-bold text-text">{row.nameAr}</span>
             <span className="text-13 text-faint">
-              {row.currencyCode ?? t.admin.noData} ·{' '}
+              {row.currencyCode ?? t.admin.notSet} ·{' '}
               {plural(c.activeCitiesShort, { n: row.activeCities })}
             </span>
             <span className="ms-auto flex items-center gap-2">

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { amount, dateRange, money, rate, shortDate } from './format';
+import { t } from '@/lib/strings';
+
+import { amount, dateRange, money, percent, rate, shortDate } from './format';
 
 /**
  * The separator `dateRange` writes inside a date: a `U+002D` hyphen fenced by `U+2060` WORD
@@ -151,9 +153,17 @@ describe('rate', () => {
     expect(rate('0.85000000')).toBe('0.85');
   });
 
-  it('reports a dash for nothing, and for nonsense', () => {
+  /*
+    Two different facts, so two different renderings (Bashar, 2026-09-30): nothing stored is a
+    muted dash; a stored value that is not a number is a FAULT, and a dash would hide it.
+  */
+  it('reports a dash for nothing, and says a nonsense value cannot be read', () => {
     expect(rate(null)).toBe('—');
-    expect(rate('not-a-rate')).toBe('—');
+    expect(t.admin.unreadable, 'the catalogue key exists').toMatch(/\S/);
+    expect(rate('not-a-rate')).toBe(t.admin.unreadable);
+    expect(money('not-money')).toBe(t.admin.unreadable);
+    expect(percent('not-a-percent')).toBe(t.admin.unreadable);
+    expect(t.admin.unreadable).not.toBe(t.admin.noData);
   });
 });
 

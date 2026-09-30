@@ -110,7 +110,7 @@ export function PartnerSuspension({
               </dt>
               {/* Null only for a suspension predating the column — say so rather than blank. */}
               <dd className="mt-0.5 text-14 text-text">
-                {suspension.reason ?? t.admin.noData}
+                {suspension.reason ?? t.admin.notRecorded}
               </dd>
             </div>
 

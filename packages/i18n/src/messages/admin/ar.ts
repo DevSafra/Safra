@@ -272,6 +272,16 @@ export const ar = {
     pendingPartnersNote: 'لا يُنشر أي عقار قبل التحقق من الوثائق والصور والعنوان (P-002)',
     recentActivity: 'سجل التدقيق: آخر العمليات',
     noData: '—',
+    /** An optional value nobody has set: a trip's seats, a partner's city. Unlike `noData`, it names what the gap is. */
+    notSet: 'غير محدد',
+    /** A value that should exist and was never recorded, e.g. a reason from before the column. */
+    notRecorded: 'غير مسجَّل',
+    /** A stored figure that is not a number. Distinct from empty, because it is a fault. */
+    unreadable: 'غير مقروء',
+    /** A setting whose stored value fails its own schema. */
+    invalidValue: 'قيمة غير صالحة',
+    /** The empty first option of a select that needs a choice. */
+    choose: 'اختر…',
     today: 'اليوم',
     /*
       A boolean in a payload. `String(value)` printed `true`/`false` under «قبل» and «بعد» on سجل
@@ -1725,6 +1735,7 @@ export const ar = {
       hint: 'منفصلة تماماً عن بطاقات الهدايا · أنواعها: أول حجز، موسمية، مدينة، شريك، حملة تسويقية',
       colDiscount: 'الخصم',
       colMin: 'حد أدنى',
+      noMinimum: 'بلا حد أدنى',
       colUsage: 'الاستخدام',
       colPeriod: 'الفترة',
     },
@@ -2713,6 +2724,7 @@ export const ar = {
       signedOn: 'وُقِّع {date}',
       uploadedBy: 'رُفِع {date} بواسطة {who}',
       validUntil: 'ساري حتى {date}',
+      noExpiry: 'ساري بلا تاريخ انتهاء',
       expiringIn:
         'ينتهي خلال {days, plural, zero {اليوم} one {يوم واحد} two {يومين} few {# أيام} many {# يوماً} other {# يوم}}',
       expired: 'منتهٍ',
@@ -3013,6 +3025,7 @@ export const ar = {
         'يُفحص كل شريك قبل التوثيق مقابل القائمة الأوروبية الموحّدة. إن تجاوز عمر القائمة الحدّ المسموح تتوقّف عملية التوثيق. الفحص مقابل قائمة لا يمكن إثبات حداثتها يبدو التزاماً ولا يوفّره.',
       sanctionsEntries: 'عدد المُدرَجين',
       sanctionsFetched: 'تاريخ الاستيراد',
+      sanctionsNeverFetched: 'لم تُستورد بعد',
       sanctionsAge: 'عمر القائمة',
       sanctionsAgeDays:
         '{n, plural, zero {اليوم} one {يوم واحد} two {يومان} few {# أيام} many {# يوماً} other {# يوم}}',

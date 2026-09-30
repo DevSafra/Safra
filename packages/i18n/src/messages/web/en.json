@@ -70,6 +70,7 @@
     "partnersTitle": "For partners",
     "partnersSubtitle": "List your hotel or home on SAFRA",
     "partnersBody": "A free management dashboard, your calendar and prices in your hands, regular transfers, and only {rate} commission deducted from your payouts.",
+    "partnersBodyNoRate": "A free management dashboard, your calendar and prices in your hands, and regular transfers.",
     "partnersCta": "Register as a partner"
   },
   "search": {

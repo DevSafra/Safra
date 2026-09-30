@@ -302,7 +302,7 @@ function Kpis({
       >
         <Kpi
           label={t.dashboard.kpiViolations}
-          value={violations.open > 0 ? count(violations.open) : t.dashboard.noData}
+          value={count(violations.open)}
           /*
             `text-bad` only when there is something open. A permanently red card is a notification
             nobody reads after the first week, and zero open violations is good news rather than a

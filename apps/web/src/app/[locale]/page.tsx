@@ -23,7 +23,7 @@ import {
   type PropertyType,
 } from '@/lib/catalog';
 import { searchSafely } from '@/lib/api';
-import { formatCustomerFee, todayInDamascus } from '@/lib/settings';
+import { formatCustomerFee, partnerRate, todayInDamascus } from '@/lib/settings';
 import { dayAfter, night, retryFrom } from '@/lib/bookable-night';
 import { dynamicMessage } from '@/lib/dynamic-message';
 import { ORNAMENT_BRAND, ORNAMENT_CRESCENT, ORNAMENT_STAR } from '@safra/ui';
@@ -513,11 +513,14 @@ export default async function HomePage({
                 {/*
                   The commission comes from settings, never a hardcoded string. The super admin
                   edits it from the Rules Engine page (P-005), and this text has to follow
-                  whatever they set.
+                  whatever they set. With no rate configured the sentence drops its commission
+                  clause rather than printing a dash where a percentage belongs.
                 */}
-                {t('partnersBody', {
-                  rate: formatCustomerFee(settings, 'partnerRate', locale),
-                })}
+                {partnerRate(settings) === null
+                  ? t('partnersBodyNoRate')
+                  : t('partnersBody', {
+                      rate: formatCustomerFee(settings, 'partnerRate', locale),
+                    })}
               </p>
             </div>
 

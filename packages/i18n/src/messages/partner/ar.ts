@@ -559,6 +559,8 @@ export const ar = {
     kpiResponseSample:
       'عن {n, plural, one {حجز واحد} two {حجزين} few {# حجوزات} many {# حجزًا} other {# حجز}} خلال 90 يومًا',
     noData: '—',
+    /** A stored figure that is not a number: a fault, not an empty value. */
+    unreadable: 'غير مقروء',
     noDataYet: 'لا بيانات بعد',
 
     /** طلبات حجز بانتظار ردك — the queue with the clock and the fine attached. */
