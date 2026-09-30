@@ -57,7 +57,16 @@ function nestDecoratorMetadata(): Plugin {
  * date range that overflowed its column.
  */
 function resolveAppAlias(source: string, importer: string | undefined): string {
-  const app = importer?.includes(`${'/apps/web/'}`) ? 'web' : 'admin';
+  /*
+    Three apps, not two. The partner portal was added after this was written and fell through to
+    `admin`, so every partner module importing `@/lib/strings` was tested against the CONSOLE's
+    catalogue: a partner-only key read as `undefined` on both sides of an assertion and passed.
+  */
+  const app = importer?.includes('/apps/web/')
+    ? 'web'
+    : importer?.includes('/apps/partner/')
+      ? 'partner'
+      : 'admin';
   const base = fileURLToPath(new URL(`./apps/${app}/src/`, import.meta.url));
   const target = `${base}${source}`;
 
