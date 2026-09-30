@@ -12,7 +12,7 @@ import { expect, test } from '@playwright/test';
  * `coastal-syria-spring` is the testbed's trip, seeded by `seed-testbed.ts`.
  */
 const BASE = 'http://localhost:3000';
-const WIDTHS = [390, 768, 1024, 1440];
+const WIDTHS = [390, 640, 768, 1024, 1440];
 
 for (const locale of ['ar', 'en']) {
   for (const width of WIDTHS) {
@@ -30,16 +30,25 @@ for (const locale of ['ar', 'en']) {
           const lineHeight = parseFloat(getComputedStyle(node).lineHeight);
           const box = node.getBoundingClientRect();
           const cell = node.closest('dd')!.parentElement!.getBoundingClientRect();
+          /*
+            The TEXT, not the element. A date line is a grid item as wide as its column whatever
+            it holds, and `nowrap` text overflows that box rather than widening it — so measuring
+            the box reported 0 while «2027» was painted over the next column's «7 ليالٍ».
+          */
+          const range = document.createRange();
+          range.selectNodeContents(node.lastChild!);
+          const text = range.getBoundingClientRect();
           return {
             text: node.textContent ?? '',
             lines: Math.round(box.height / lineHeight),
-            outside: Math.max(cell.left - box.left, box.right - cell.right),
+            outside: Math.round(Math.max(cell.left - text.left, text.right - cell.right)),
           };
         }),
       );
 
       for (const line of lines) {
         expect(line.text, 'a date line carries a day number').toMatch(/\d/);
+        expect(line.text, 'a date line carries its year').toMatch(/\b20\d\d\b/);
         expect(line.lines, `«${line.text}» broke across lines`).toBe(1);
         expect(
           line.outside,

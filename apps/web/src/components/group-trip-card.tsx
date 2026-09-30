@@ -4,7 +4,7 @@ import { OrnamentField } from '@/components/ornament';
 import { formatMoney, localisedText } from '@/lib/localise';
 import { imageUrl } from '@/lib/property';
 import { hasFinished, nightsBetween, type GroupTrip } from '@/lib/group-trips';
-import { readableDate } from '@/lib/readable-date';
+import { readableDateWithYear } from '@/lib/readable-date';
 import type { Locale } from '@/i18n/routing';
 
 /**
@@ -110,7 +110,9 @@ export function GroupTripCard({
           <p className="line-clamp-2 text-sm leading-relaxed text-muted">{summary}</p>
 
           <p className="mt-auto flex flex-wrap items-baseline gap-x-3 gap-y-1 pt-2 text-13 text-faint">
-            <span>{readableDate(trip.startsOn, locale)}</span>
+            <span className="whitespace-nowrap">
+              {readableDateWithYear(trip.startsOn, locale)}
+            </span>
             {nights > 0 ? <span>{labels.nights(nights)}</span> : null}
             {trip.seats !== null ? <span>{labels.seats(trip.seats)}</span> : null}
           </p>

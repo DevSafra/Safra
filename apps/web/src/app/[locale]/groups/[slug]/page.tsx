@@ -11,7 +11,7 @@ import { isLocale, routing } from '@/i18n/routing';
 import { breadcrumbGraph, tripGraph } from '@/lib/structured-data';
 import { imageUrl } from '@/lib/property';
 import { siteOrigin } from '@/lib/site-url';
-import { readableDate } from '@/lib/readable-date';
+import { readableDateWithYear } from '@/lib/readable-date';
 
 /**
  * One announced trip.
@@ -227,19 +227,24 @@ export default async function GroupTripPage({
 
       {/*
         The facts, as a definition list rather than a row of cards: four short values do not each
-        need a container, and `dl` is what they are. `sm:grid-cols-4` collapses to one column on a
-        phone, where four columns of Arabic would be unreadable.
+        need a container, and `dl` is what they are. It collapses to one column on a phone, where
+        four columns of Arabic would be unreadable.
+
+        The dates take the width they need and the other three share what is left. Four EQUAL
+        columns gave «الأربعاء، 27 كانون الثاني 2027» about 140px at 640–768px, and a date that
+        must not wrap then painted over «7 ليالٍ» beside it; the other three are short enough to
+        give up the room.
       */}
-      <dl className="mt-6 grid gap-4 rounded-card border border-line bg-card p-5 sm:grid-cols-4">
+      <dl className="mt-6 grid gap-4 rounded-card border border-line bg-card p-5 sm:grid-cols-[max-content_repeat(3,minmax(0,1fr))]">
         <div>
           <dt className="text-13 text-faint">{t('labelDates')}</dt>
           <dd className="mt-1 text-14 text-text">
             <DateSpan
-              from={readableDate(trip.startsOn, locale)}
-              to={readableDate(trip.endsOn, locale)}
+              from={readableDateWithYear(trip.startsOn, locale)}
+              to={readableDateWithYear(trip.endsOn, locale)}
               sentence={t('dates', {
-                from: readableDate(trip.startsOn, locale),
-                to: readableDate(trip.endsOn, locale),
+                from: readableDateWithYear(trip.startsOn, locale),
+                to: readableDateWithYear(trip.endsOn, locale),
               })}
             />
           </dd>

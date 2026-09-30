@@ -11,7 +11,7 @@ import { AdminTable, StatusPill, type AdminColumn } from '@/components/admin-tab
 import { Actions, Field, Panel, Prose, Row, SelectField } from '@/components/geo-form';
 import { TablePagination } from '@/components/table-pagination';
 import type { GroupTripRow } from '@/lib/api';
-import { amount } from '@/lib/format';
+import { amount, dateRange } from '@/lib/format';
 import { apiErrorOf, label, t } from '@/lib/strings';
 
 /**
@@ -89,9 +89,7 @@ export function GroupTripManager({
       key: 'dates',
       header: c.colDates,
       render: (row) => (
-        <span className="whitespace-nowrap text-text2">
-          {row.startsOn} ← {row.endsOn}
-        </span>
+        <span className="text-text2">{dateRange(row.startsOn, row.endsOn)}</span>
       ),
     },
     {

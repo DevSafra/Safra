@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { readableDate } from './readable-date.js';
+import { readableDate, readableDateWithYear } from './readable-date.js';
 
 describe('a stay date as a person reads it', () => {
   it('names the weekday and the month in the reader’s language', () => {
@@ -38,5 +38,50 @@ describe('a stay date as a person reads it', () => {
 
   it('returns an unparseable value unchanged rather than inventing a date', () => {
     expect(readableDate('not-a-date', 'ar')).toBe('not-a-date');
+  });
+});
+
+describe('a date that can be a year away', () => {
+  /*
+   * The reason the variant exists: without the year, a January trip this year and a January trip
+   * next year read as the same day. Asserted as «the two renderings differ» rather than only «2027
+   * appears», because the defect is the collision, and a year appended to one side only would
+   * pass a substring check.
+   */
+  it('tells January of one year from January of the next, in every locale', () => {
+    for (const locale of ['ar', 'en', 'de'] as const) {
+      const thisYear = readableDateWithYear('2026-01-27', locale);
+      const nextYear = readableDateWithYear('2027-01-27', locale);
+
+      expect(nextYear, locale).not.toBe(thisYear);
+      expect(nextYear, locale).toContain('2027');
+      expect(thisYear, locale).toContain('2026');
+    }
+  });
+
+  it('keeps everything readableDate says, and adds only the year', () => {
+    for (const locale of ['ar', 'en', 'de'] as const) {
+      const withYear = readableDateWithYear('2027-01-27', locale);
+
+      expect(withYear.replace(/[\s,.]*2027[\s,.]*$/, ''), locale).toBe(
+        readableDate('2027-01-27', locale).replace(/[\s,.]+$/, ''),
+      );
+    }
+    expect(readableDateWithYear('2027-01-27', 'ar')).not.toMatch(/[٠-٩]/);
+  });
+
+  it('does not slip a day, or a year, for a reader in a western timezone', () => {
+    const previous = process.env.TZ;
+
+    process.env.TZ = 'America/Los_Angeles';
+    try {
+      expect(readableDateWithYear('2027-01-01', 'en')).toBe('Fri, Jan 1, 2027');
+    } finally {
+      process.env.TZ = previous;
+    }
+  });
+
+  it('returns an unparseable value unchanged', () => {
+    expect(readableDateWithYear('not-a-date', 'ar')).toBe('not-a-date');
   });
 });

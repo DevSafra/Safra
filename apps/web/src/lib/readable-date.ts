@@ -24,6 +24,28 @@ import type { Locale } from '@/i18n/routing';
  * languages is a translation task nobody asked for and `Intl` already has them right.
  */
 export function readableDate(iso: string, locale: Locale): string {
+  return calendarDate(iso, locale, {});
+}
+
+/**
+ * `readableDate` with the year — «الأربعاء، 27 كانون الثاني 2027».
+ *
+ * For a date that can be more than a year away or already in the past, where «27 كانون الثاني»
+ * names two different days. A group trip is the case this exists for: trips are announced months
+ * ahead and stay listed after they end, so a January 2026 trip and a January 2027 trip rendered
+ * identically (Bashar, 2026-09-30: «The display should always be unambiguous»). A stay date on a
+ * property's booking card keeps `readableDate`, because it is weeks away at most and the year
+ * there would be noise.
+ */
+export function readableDateWithYear(iso: string, locale: Locale): string {
+  return calendarDate(iso, locale, { year: 'numeric' });
+}
+
+function calendarDate(
+  iso: string,
+  locale: Locale,
+  extra: Pick<Intl.DateTimeFormatOptions, 'year'>,
+): string {
   const at = new Date(`${iso}T00:00:00Z`);
 
   /* Unparseable in, unchanged out — never a date this invented. */
@@ -33,6 +55,7 @@ export function readableDate(iso: string, locale: Locale): string {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
+    ...extra,
     numberingSystem: 'latn',
     timeZone: 'UTC',
   }).format(at);
