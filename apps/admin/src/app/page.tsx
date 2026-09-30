@@ -613,7 +613,7 @@ function RecentActivity({ rows }: { rows: DashboardOverview['recentAudit'] }) {
             <span dir="ltr" className="text-sky">
               {row.at.slice(0, 16).replace('T', ' ')}
             </span>{' '}
-            · {row.actor ?? t.admin.systemActor} — {auditAction(row.action)}
+            · {row.actor ?? t.admin.systemActor}: {auditAction(row.action)}
           </p>
         ))}
       </div>

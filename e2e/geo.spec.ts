@@ -441,7 +441,7 @@ test('a city photograph can be described, made the hero, and removed', async ({
   const first = cards.first();
   const id = (await first.getAttribute('data-city-photograph')) ?? '';
 
-  await first.getByLabel(`${c.imageAlt} — ${c.nameAr}`).fill(alt);
+  await first.getByLabel(`${c.imageAlt}: ${c.nameAr}`).fill(alt);
   await page.locator(`[data-city-image-save="${id}"]`).click();
 
   /*
@@ -461,7 +461,7 @@ test('a city photograph can be described, made the hero, and removed', async ({
   await expect(
     page
       .locator(`[data-city-photograph="${id}"]`)
-      .getByLabel(`${c.imageAlt} — ${c.nameAr}`),
+      .getByLabel(`${c.imageAlt}: ${c.nameAr}`),
   ).toHaveValue(alt);
 
   /*

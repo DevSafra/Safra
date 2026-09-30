@@ -672,14 +672,14 @@ test.describe('honesty rules the design and the register require', () => {
       still matched.
 
       What is actually under test is that the ACTION resolved through the catalogue rather than
-      printing `staff.scope_changed`. So the assertion takes the segment before the separator and
-      leaves the subject — which is data, and may legitimately be an address — out of it.
+      printing `staff.scope_changed`. So the assertion reads the action's own text node, the
+      paragraph's first child, and leaves the subject — which is data, and may legitimately be an address — out of it.
     */
     const line = await page
       .getByRole('heading', { name: copy.activityWhat, level: 2 })
       .locator('xpath=following::p[1]')
-      .innerText();
-    const action = (line.split('—')[0] ?? line).trim();
+      .evaluate((p) => p.firstChild?.textContent ?? '');
+    const action = line.trim();
 
     console.log('action segment:', action);
     expect(action).not.toMatch(/\b[a-z_]+\.[a-z_]+\b/);
@@ -722,11 +722,11 @@ test.describe('honesty rules the design and the register require', () => {
     const line = await page
       .getByRole('heading', { name: t.sections.staff.activityWhat, level: 2 })
       .locator('xpath=following::p[1]')
-      .innerText();
+      .evaluate((p) => p.firstChild?.textContent ?? '');
 
     console.log('audit entry heading:', line);
 
-    const action = (line.split('—')[0] ?? line).trim();
+    const action = line.trim();
 
     expect(action).toMatch(/[\u0600-\u06FF]/);
     expect(action).not.toMatch(/\b[a-z_]+\.[a-z_]+\b/);

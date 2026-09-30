@@ -70,7 +70,7 @@ export function AuditEntryDetail({ entry }: { entry: AuditEntry }) {
             line it is what happened.
           */}
           {subject?.label ? (
-            <span className="text-text2">{` — ${subject.label}`}</span>
+            <span className="text-text2">{`: ${subject.label}`}</span>
           ) : null}
         </p>
 

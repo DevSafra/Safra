@@ -265,13 +265,13 @@ function CityForm({
   return (
     <Modal
       labelledBy="safra-geo-city-title"
-      title={`${c.editCity} — ${city.nameAr}`}
+      title={`${c.editCity}: ${city.nameAr}`}
       onClose={onClose}
       width="max-w-3xl"
     >
       <Panel
         headingId="safra-geo-city-title"
-        heading={`${c.editCity} — ${city.nameAr}`}
+        heading={`${c.editCity}: ${city.nameAr}`}
         marker={city.slug}
         attribute="data-city-form"
         bare
@@ -576,7 +576,7 @@ export function GeoCities({
                     type="button"
                     disabled={moving || at <= 0}
                     data-city-up={row.slug}
-                    aria-label={`${c.cityMoveUp} — ${row.nameAr}`}
+                    aria-label={`${c.cityMoveUp}: ${row.nameAr}`}
                     onClick={() => void move(row.slug, -1)}
                     className="cursor-pointer rounded-lg border border-line px-1.5 py-0.5 text-13 text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read disabled:cursor-not-allowed disabled:opacity-35"
                   >
@@ -586,7 +586,7 @@ export function GeoCities({
                     type="button"
                     disabled={moving || at < 0 || at >= cities.length - 1}
                     data-city-down={row.slug}
-                    aria-label={`${c.cityMoveDown} — ${row.nameAr}`}
+                    aria-label={`${c.cityMoveDown}: ${row.nameAr}`}
                     onClick={() => void move(row.slug, 1)}
                     className="cursor-pointer rounded-lg border border-line px-1.5 py-0.5 text-13 text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read disabled:cursor-not-allowed disabled:opacity-35"
                   >

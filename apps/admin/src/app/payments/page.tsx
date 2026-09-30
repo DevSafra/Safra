@@ -188,7 +188,7 @@ export default async function PaymentsPage({
               >
                 {t.sections.payments.payoutsLink}
               </Link>
-              {' — '}
+              {': '}
               {t.sections.payments.payoutsNote}
             </FootNote>
           </ConsolePanel>

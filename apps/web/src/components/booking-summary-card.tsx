@@ -297,7 +297,7 @@ export function BookingSummaryCard({
               </span>
               <button
                 type="button"
-                aria-label={`${copy.remove} — ${line.room.name}`}
+                aria-label={`${copy.remove}: ${line.room.name}`}
                 onClick={() => remove(line.room.unitId)}
                 className="-my-2 inline-flex min-h-10 cursor-pointer items-center text-13 text-muted underline underline-offset-2 transition-colors hover:text-bad lg:min-h-0"
               >

@@ -147,7 +147,7 @@ export function CityCategoryManager({
               type="button"
               disabled={moving || at <= 0}
               data-category-up={row.code}
-              aria-label={`${c.moveUp} — ${row.nameAr}`}
+              aria-label={`${c.moveUp}: ${row.nameAr}`}
               onClick={() => void move(row.code, -1)}
               className="cursor-pointer rounded-lg border border-line px-1.5 py-0.5 text-13 text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read disabled:cursor-not-allowed disabled:opacity-35"
             >
@@ -157,7 +157,7 @@ export function CityCategoryManager({
               type="button"
               disabled={moving || at < 0 || at >= categories.length - 1}
               data-category-down={row.code}
-              aria-label={`${c.moveDown} — ${row.nameAr}`}
+              aria-label={`${c.moveDown}: ${row.nameAr}`}
               onClick={() => void move(row.code, 1)}
               className="cursor-pointer rounded-lg border border-line px-1.5 py-0.5 text-13 text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold-read disabled:cursor-not-allowed disabled:opacity-35"
             >
@@ -401,13 +401,13 @@ function EditCategory({
     /* A popup, like every other edit on this screen and on المدن — Bashar, 2026-08-30. */
     <Modal
       labelledBy="safra-city-category-title"
-      title={`${c.editTitle} — ${category.nameAr}`}
+      title={`${c.editTitle}: ${category.nameAr}`}
       onClose={onClose}
       width="max-w-3xl"
     >
       <Panel
         headingId="safra-city-category-title"
-        heading={`${c.editTitle} — ${category.nameAr}`}
+        heading={`${c.editTitle}: ${category.nameAr}`}
         marker={category.code}
         attribute="data-category-form"
         bare

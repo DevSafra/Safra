@@ -599,7 +599,7 @@ function valueLine(setting: DisplayableSetting, alwaysUsd: boolean): string {
     case 'routing':
       return display.rows
         .map((row) => `${row.place}: ${row.providers.join(' · ')}`)
-        .join(' — ');
+        .join('؛ ');
     case 'json':
       return ltrIsolate(display.text);
     default:

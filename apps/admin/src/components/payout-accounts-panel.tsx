@@ -181,7 +181,7 @@ export function PayoutAccountsPanel({
                   {account.rejectedAt === null
                     ? c.rejectionReason
                     : fill(c.rejectedOn, { date: shortDateTime(account.rejectedAt) })}
-                  {account.rejectionReason ? ` — ${account.rejectionReason}` : ''}
+                  {account.rejectionReason ? `: ${account.rejectionReason}` : ''}
                 </div>
               ) : null}
             </div>

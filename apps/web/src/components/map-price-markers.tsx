@@ -153,7 +153,7 @@ export function MapPriceMarkers({
                 A screen reader gets what the dot cannot draw. A priced marker announces its
                 price as visible text; this one would otherwise announce nothing at all.
               */}
-              <span className="sr-only">{`${stay.name} — ${t('noPrice')}`}</span>
+              <span className="sr-only">{`${stay.name}: ${t('noPrice')}`}</span>
             </a>
           );
         }

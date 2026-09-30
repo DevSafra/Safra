@@ -359,18 +359,18 @@ function PhotographCard({
 
           <Row>
             <Field
-              label={`${c.imageAlt} — ${c.nameAr}`}
+              label={`${c.imageAlt}: ${c.nameAr}`}
               value={altAr}
               onChange={setAltAr}
               hint={c.imageAltHint}
             />
             <Field
-              label={`${c.imageAlt} — ${c.nameEn}`}
+              label={`${c.imageAlt}: ${c.nameEn}`}
               value={altEn}
               onChange={setAltEn}
             />
             <Field
-              label={`${c.imageAlt} — ${c.nameDe}`}
+              label={`${c.imageAlt}: ${c.nameDe}`}
               value={altDe}
               onChange={setAltDe}
             />
