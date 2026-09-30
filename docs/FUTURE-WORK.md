@@ -91,6 +91,26 @@ deleting it; the reason something was blocked is often the reason it comes back.
 
 ## 1. Where the project stands
 
+> ### Feature development closed, 2026-09-30
+>
+> **Bashar, 2026-09-30, confirmed complete:** Group Trips, FAQ, maps and landmarks, the readiness
+> and completeness workflows, the SEO landmark pages, structured data, and this register's
+> deployment-readiness backlog. In his words: «there is no remaining major application feature
+> area that justifies further expansion at this stage.»
+>
+> **The priority from here is production readiness, not features:** the hosting and region
+> decision (`M-1`), the infrastructure blockers that follow it (§1a: 2, 9, 10), and launch
+> preparation. A proposal for a new feature area is out of scope until he reopens it.
+>
+> Two last changes came with that statement: every Group Trip date now carries its year, on the
+> customer page, the trip card and the console (`readableDateWithYear`; the console uses its own
+> `dateRange`), so a January 2026 trip and a January 2027 trip can no longer read alike; and
+> user-facing copy no longer uses «—» (his standing rule of the same day; only the جروبات intro was
+> rewritten so far, the wider sweep awaits his decision).
+>
+> **Measured at HEAD:** `pnpm verify` 298 files, **4,384 tests**, 0 failed, 0 skipped;
+> `pnpm e2e` **572 passed, 1 failed, 2 skipped**; the failure is the known `detail-return` click timeout, which passes alone.
+
 > ### Backlog-closure pass, 2026-09-27
 >
 > Bashar asked for «ruthless closure of the existing backlog and existing findings» before starting
