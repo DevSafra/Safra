@@ -185,7 +185,7 @@ export const de = {
   'gift_card.code_invalid':
     'Dieser Geschenkkarten-Code ist ungültig. Bitte prüfen und erneut versuchen.',
   'ad.target_url_invalid':
-    'Dieser Link ist ungültig — er muss mit http oder https beginnen.',
+    'Dieser Link ist ungültig: Er muss mit http oder https beginnen.',
   'ad.window_order': 'Das Enddatum muss nach dem Startdatum liegen.',
   'ad.price_needs_currency':
     'Ein Preis benötigt eine Währung, und eine Währung einen Preis.',
@@ -215,10 +215,10 @@ export const de = {
   'gift_card.cancelled':
     'Diese Geschenkkarte wurde storniert. Bitte wenden Sie sich an den Support.',
   'gift_card.not_cancellable':
-    'Diese Karte kann nicht storniert werden — sie ist bereits eingelöst, abgelaufen oder storniert.',
+    'Diese Karte kann nicht storniert werden, da sie bereits eingelöst, abgelaufen oder storniert ist.',
   'gift_card.not_found': 'Geschenkkarte nicht gefunden.',
   'gift_card.cash_only':
-    'Ihr aktuelles Guthaben reicht für diese Karte nicht aus. Eine Geschenkkarte kann nur mit eigenem Guthaben gekauft werden — nicht mit Geschenkkarten-Guthaben und nicht mit einer Gutschrift von SAFRA.',
+    'Ihr aktuelles Guthaben reicht für diese Karte nicht aus. Eine Geschenkkarte kann nur mit eigenem Guthaben gekauft werden, nicht mit Geschenkkarten-Guthaben und nicht mit einer Gutschrift von SAFRA.',
   'gift_card.amount_invalid':
     'Bitte einen der verfügbaren Geschenkkarten-Beträge wählen.',
   'wallet.insufficient_balance': 'Ihr Guthaben reicht dafür nicht aus.',
@@ -268,7 +268,7 @@ export const de = {
   'catalogue.not_found': 'Kein Katalogeintrag mit diesem Code.',
   'catalogue.code_taken': 'Dieser Code ist bereits vergeben. Bitte einen anderen wählen.',
   'catalogue.in_use':
-    '{count} Datensätze verweisen darauf, daher ist Löschen nicht möglich — stattdessen deaktivieren: der Eintrag verschwindet aus den Auswahllisten und alles Bestehende bleibt gültig.',
+    '{count} Datensätze verweisen darauf, daher ist Löschen nicht möglich. Stattdessen deaktivieren: der Eintrag verschwindet aus den Auswahllisten und alles Bestehende bleibt gültig.',
   'catalogue.code_format':
     'Ein Code besteht aus lateinischen Kleinbuchstaben, Ziffern und Bindestrichen, z. B. ev-charger.',
   'faq.not_found': 'Zu dieser Kennung gibt es keine Frage.',
@@ -285,7 +285,7 @@ export const de = {
   'group_trip.cover_required':
     'Eine Reise kann ohne Foto nicht veröffentlicht werden, und eine veröffentlichte Reise kann ihr Foto nicht verlieren.',
   'geo.category_in_use':
-    'Diese Kategorie ist {n} Städten zugeordnet — deaktivieren statt entfernen.',
+    'Diese Kategorie ist {n} Städten zugeordnet. Deaktivieren statt entfernen.',
   'geo.city_in_use':
     'Eine Stadt, auf die {n} Datensätze verweisen (Unterkünfte, Buchungen, Partner…), kann nicht gelöscht werden. Deaktivieren Sie sie stattdessen.',
   'geo.country_in_use':
@@ -293,7 +293,7 @@ export const de = {
   'geo.currency_in_use':
     'Eine Währung, die von {n} Datensätzen verwendet wird, kann nicht gelöscht werden. Deaktivieren Sie sie stattdessen.',
   'geo.currency_accounting':
-    'Die Buchungswährung kann nicht gelöscht werden — jeder Journaleintrag lautet auf sie.',
+    'Die Buchungswährung kann nicht gelöscht werden: Jeder Journaleintrag lautet auf sie.',
   'geo.code_taken': 'Dieser Code wird bereits verwendet.',
   'geo.slug_taken': 'Dieser Bezeichner wird in diesem Land bereits verwendet.',
   'geo.timezone_invalid': 'Keine gültige Zeitzone.',
@@ -317,7 +317,7 @@ export const de = {
   'validation.password_composition':
     'Ihr Passwort braucht einen Groß- und einen Kleinbuchstaben, eine Zahl, ein Sonderzeichen und mindestens 12 Zeichen.',
   'validation.password_common':
-    'Dieses Passwort gehört zu den meistgenutzten und wird zuerst erraten. Bitte ein anderes wählen — vier zusammenhanglose Wörter eignen sich gut.',
+    'Dieses Passwort gehört zu den meistgenutzten und wird zuerst erraten. Bitte ein anderes wählen: Vier zusammenhanglose Wörter eignen sich gut.',
   'validation.password_predictable':
     'Dieses Passwort ist vorhersehbar: wiederholte oder aufeinanderfolgende Zeichen. Länge allein hilft nicht, wenn das Muster offensichtlich ist.',
   'validation.password_contains_identity':
@@ -335,7 +335,7 @@ export const de = {
   'landmark.kind_in_use':
     'Eine Kategorie, die noch von Orten genutzt wird, kann nicht entfernt werden. Deaktiviere sie stattdessen.',
   'landmark.too_far_from_city':
-    'Die Koordinaten liegen weit von der Stadt entfernt — prüfe, ob Breiten- und Längengrad vertauscht sind.',
+    'Die Koordinaten liegen weit von der Stadt entfernt. Prüfe, ob Breiten- und Längengrad vertauscht sind.',
   'validation.code_format':
     'Ein Code besteht aus lateinischen Kleinbuchstaben, Ziffern und Unterstrichen.',
   'validation.slug_format':
@@ -346,7 +346,7 @@ export const de = {
   'validation.range_too_long': 'Ein Zeitraum darf {maxDays} Tage nicht überschreiten.',
   'validation.amount_positive': 'Der Betrag muss größer als null sein.',
   'validation.reason_required':
-    'Eine Begründung ist erforderlich — dies ist der Prüfeintrag.',
+    'Eine Begründung ist erforderlich: Dies ist der Prüfeintrag.',
   'validation.rejection_reason_required':
     'Eine Ablehnung muss eine Begründung enthalten.',
   'validation.latitude_range': 'Der Breitengrad muss zwischen -90 und 90 liegen.',
@@ -526,7 +526,7 @@ export const de = {
   'auth.two_factor_enrolment_required':
     'Für dieses Konto ist eine Zwei-Faktor-Authentisierung erforderlich. Richten Sie sie ein, bevor Sie fortfahren.',
   'setting.value_not_positive_money':
-    '{key} muss ein positiver Betrag sein — eine Zahl oder ein Betrag mit Währung.',
+    '{key} muss ein positiver Betrag sein: eine Zahl oder ein Betrag mit Währung.',
   'setting.schema_not_editable':
     '{key} hat das Schema "{schema}", das dieser Editor nicht prüfen kann. Ändern Sie es bewusst und nicht über dieses Formular.',
   'sanctions.list_unavailable':

@@ -383,7 +383,7 @@ test.describe('a console role that opens one section', () => {
 
         /*
           Enrolment is TWO controls, not one, and reading only the second cost a run: «تفعيل
-          المصادقة الثنائية» submits the code, and «حفظتها — متابعة» acknowledges the RECOVERY CODES
+          المصادقة الثنائية» submits the code, and «حفظتها، متابعة» acknowledges the RECOVERY CODES
           that appear afterwards. Waiting for the second while the first was still on screen spent
           the whole timeout on a button that had not been rendered yet.
         */
@@ -413,7 +413,7 @@ test.describe('a console role that opens one section', () => {
 
           Until O-sec-14 was fixed on 2026-08-24 this branch cleared the cookies and signed in a
           second time, because enrolling did not make the session enrolled: `enable` revoked every
-          session — including the caller's own — and returned no replacement, so «حفظتها — متابعة»
+          session — including the caller's own — and returned no replacement, so «حفظتها، متابعة»
           pushed to `/` and the middleware sent it straight back to `/enrol-2fa`.
 
           `enable` now returns a `session` minted after that revocation, with claims rebuilt from

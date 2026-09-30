@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+
+import { ar as t } from '../packages/i18n/src/messages/admin/ar.js';
 import type { Page } from '@playwright/test';
 
 import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
@@ -300,7 +302,7 @@ test('the whole lifecycle: create, verify, activate, open, release, pay', async 
 
   const panelAgain = page.locator(`[data-safra-account-panel="${accountId}"]`);
 
-  await panelAgain.getByText('مفعَّل — يمكن التحويل إليه').click();
+  await panelAgain.getByText(t.sections.treasury.isActive).click();
   await panelAgain.locator('[data-geo-save]').click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'تأكيد' }).click();
   await page.waitForTimeout(1000);

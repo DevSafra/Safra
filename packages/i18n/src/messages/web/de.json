@@ -282,7 +282,7 @@
     "basketCapacity": "Für {count, plural, one {1 Gast} other {# Gäste}}",
     "basketEmpty": "Ihre Auswahl ist leer. Fügen Sie einen oder mehrere Zimmertypen hinzu, um Details und Gesamtpreis hier zu sehen.",
     "basketAccommodation": "Unterkunft",
-    "basketTooShort": "Dieses Zimmer erfordert mindestens {count, plural, one {1 Nacht} other {# Nächte}} — ändern Sie die Daten, um es hinzuzufügen.",
+    "basketTooShort": "Dieses Zimmer erfordert mindestens {count, plural, one {1 Nacht} other {# Nächte}}. Ändern Sie die Daten, um es hinzuzufügen.",
     "basketLineAll": "Mehr dieses Typs gibt es nicht.",
     "nearbyTitle": "In der Umgebung",
     "nearbyIntro": "Entfernungen gelten ab dem ungefähren Gebiet der Unterkunft, nicht ab ihrer genauen Adresse.",
@@ -294,7 +294,7 @@
     "nearbyStaysHint": "Preise pro Nacht, ab.",
     "nearbyCount": "{count} Unterkünfte hier",
     "noPrice": "Kein Preis angegeben",
-    "markerLabel": "{name} — {price}",
+    "markerLabel": "{name}: {price}",
     "fromCityCentre": "{value} vom Zentrum {city}"
   },
   "city": {
@@ -369,7 +369,7 @@
     "couponRemove": "Entfernen",
     "couponApplied": "Rabatt {code}",
     "couponInvalid": "Dieser Code konnte nicht angewendet werden.",
-    "signedInDetails": "Dies sind Ihre Kontodaten. Ändern Sie Name oder Telefonnummer bei Bedarf — Ihr Konto wird aktualisiert und diese Buchung samt Nachrichten verwendet die neuen Werte.",
+    "signedInDetails": "Dies sind Ihre Kontodaten. Ändern Sie Name oder Telefonnummer bei Bedarf: Ihr Konto wird aktualisiert und diese Buchung samt Nachrichten verwendet die neuen Werte.",
     "emailLocked": "Ihre Anmeldeadresse. Ändern Sie sie in den Kontoeinstellungen.",
     "submitNoPayment": "Buchung abschließen"
   },
@@ -650,7 +650,7 @@
     "disputesNone": "Sie haben keinen Streitfall eröffnet.",
     "disputesOpenTitle": "Streitfall eröffnen",
     "disputesIntro": "Wenn bei einem bezahlten Aufenthalt etwas schwerwiegend schiefgelaufen ist, eröffnen Sie hier einen Streitfall. SAFRA prüft ihn und hält die Auszahlung an den Gastgeber für diese Buchung zurück, bis er geklärt ist.",
-    "disputesBothSides": "SAFRA zeigt dem Gastgeber den Titel und den Text Ihrer Beschwerde, damit er darauf antworten kann — die Entscheidung fällt erst, nachdem beide Seiten gehört wurden. Ihre Fotos und Dateien, Ihre Kontaktdaten und Ihre Zahlungs- oder Guthabendaten werden nicht weitergegeben; hält das Team eine Ihrer Dateien für eine faire Entscheidung für erforderlich, ist deren Freigabe eine ausdrückliche Entscheidung des Teams und niemals der Standard.",
+    "disputesBothSides": "SAFRA zeigt dem Gastgeber den Titel und den Text Ihrer Beschwerde, damit er darauf antworten kann, denn die Entscheidung fällt erst, nachdem beide Seiten gehört wurden. Ihre Fotos und Dateien, Ihre Kontaktdaten und Ihre Zahlungs- oder Guthabendaten werden nicht weitergegeben; hält das Team eine Ihrer Dateien für eine faire Entscheidung für erforderlich, ist deren Freigabe eine ausdrückliche Entscheidung des Teams und niemals der Standard.",
     "disputesBooking": "Welche Buchung",
     "disputesReason": "Was ist passiert",
     "disputesSubject": "In einer Zeile",
@@ -670,7 +670,7 @@
     "refundsHeading": "Rückerstattungen",
     "refundLine": "{amount} erstattet",
     "refundWalletLine": "{amount} erstattet, davon {walletAmount} in Ihr Guthaben",
-    "refundPending": "In Bearbeitung — bis zur Gutschrift auf Ihrer Karte können einige Werktage vergehen.",
+    "refundPending": "In Bearbeitung: Bis zur Gutschrift auf Ihrer Karte können einige Werktage vergehen.",
     "refundDone": "Abgeschlossen am {date}",
     "refundPolicy": "{percent}% gemäß der Stornobedingung dieser Buchung",
     "bookingTotalDue": "Zu zahlender Betrag",
@@ -679,9 +679,9 @@
     "unpaidBody": "Ihre Buchung ist bis zum oben genannten Zeitpunkt reserviert. Das SAFRA-Team kontaktiert Sie zur Zahlungsabwicklung; geht der Betrag nicht rechtzeitig ein, wird die Buchung storniert und die Daten werden freigegeben.",
     "bookingTotalNeutral": "Buchungssumme",
     "notCustomerTitle": "Dies ist kein Kundenkonto",
-    "notCustomerBody": "Dieses Konto kann sich anmelden, hat aber keinen Kundendatensatz — es gibt hier also keine Buchungen, kein Guthaben und keine Rechnungen. Partnerkonten werden über das Partnerportal verwaltet. Wenn Sie ein Kundenkonto haben, melden Sie sich ab und mit diesem wieder an.",
+    "notCustomerBody": "Dieses Konto kann sich anmelden, hat aber keinen Kundendatensatz. Es gibt hier also keine Buchungen, kein Guthaben und keine Rechnungen. Partnerkonten werden über das Partnerportal verwaltet. Wenn Sie ein Kundenkonto haben, melden Sie sich ab und mit diesem wieder an.",
     "notCustomerBrowse": "Unterkünfte ansehen",
-    "bookingTotalUnpaid": "Buchungssumme — nie gezahlt"
+    "bookingTotalUnpaid": "Buchungssumme (nie gezahlt)"
   },
   "ads": {
     "title": "In der Nähe, von unseren Partnern",
@@ -741,7 +741,7 @@
     "backHome": "Zurück zur Startseite",
     "terms": {
       "title": "Nutzungsbedingungen",
-      "intro": "Diese Bedingungen beschreiben, was SAFRA leistet, wozu Sie sich verpflichten und wozu wir uns verpflichten. Sie sind bewusst verständlich formuliert — eine Bedingung, die niemand versteht, hält auch niemand ein.",
+      "intro": "Diese Bedingungen beschreiben, was SAFRA leistet, wozu Sie sich verpflichten und wozu wir uns verpflichten. Sie sind bewusst verständlich formuliert, denn eine Bedingung, die niemand versteht, hält auch niemand ein.",
       "roleHeading": "Was SAFRA ist",
       "roleBody": "SAFRA ist ein Vermittler. Die Unterkunft selbst wird von dem Partner bereitgestellt, dem die Immobilie gehört oder der sie verwaltet; dieser Partner ist für den Zustand des Objekts und für Ihren Empfang verantwortlich. SAFRA übernimmt Inserat, Buchung, Zahlung, Support und Streitfälle.",
       "bookingHeading": "Buchung und Bestätigung",
@@ -753,14 +753,14 @@
       "cancelHeading": "Stornierung und Erstattung",
       "cancelBody": "Der Partner wählt eine Stornobedingung aus einem von SAFRA freigegebenen Katalog und kann keine eigenen Bedingungen erfinden. Sie wird auf der Objektseite und in den Buchungsdetails vor der Zahlung angezeigt.\n\nInnerhalb der Frist der jeweiligen Bedingung beträgt die Erstattung nie weniger als {minimum} %.",
       "reviewsHeading": "Bewertungen",
-      "reviewsBody": "Bewerten können Sie erst nach einem abgeschlossenen Aufenthalt. Eine Bewertung wird nie gelöscht — sie kann bei Regelverstoß ausgeblendet werden und bleibt samt Begründung erhalten.\n\nTelefonnummern und E-Mail-Adressen werden in Bewertungen und Nachrichten nicht veröffentlicht, sondern automatisch maskiert.",
+      "reviewsBody": "Bewerten können Sie erst nach einem abgeschlossenen Aufenthalt. Eine Bewertung wird nie gelöscht. Sie kann bei Regelverstoß ausgeblendet werden und bleibt samt Begründung erhalten.\n\nTelefonnummern und E-Mail-Adressen werden in Bewertungen und Nachrichten nicht veröffentlicht, sondern automatisch maskiert.",
       "disputesHeading": "Streitfälle",
       "disputesBody": "War der Aufenthalt nicht wie beschrieben oder war niemand zum Empfang da, eröffnen Sie einen Streitfall in Ihrem Konto. Das friert die Auszahlung an den Partner für diese Buchung ein, bis der Fall geklärt ist. SAFRA zeigt dem Partner den Titel und den Text Ihrer Beschwerde, damit er darauf antworten und Belege für seine Schilderung einreichen kann; entschieden wird erst, nachdem beide Seiten gelesen wurden. Ihre Fotos und Dateien, Ihre Kontaktdaten und Ihre Zahlungsdaten werden nicht weitergegeben, es sei denn, das Team entscheidet ausdrücklich, dass eine Ihrer Dateien für eine faire Entscheidung erforderlich ist.",
       "changesHeading": "Änderungen dieser Bedingungen",
       "changesBody": "Diese Bedingungen können sich ändern. Wesentliche Änderungen werden vor Inkrafttreten angekündigt; für eine bestehende Buchung gelten weiterhin die Bedingungen, unter denen sie zustande kam.",
       "lawHeading": "Anwendbares Recht",
       "lawBody": "Wird vor dem Start ergänzt.",
-      "bookingCutoffBody": "Taggleiche Buchungen schließen standardmäßig um {hour} Uhr Ortszeit der Stadt; einzelne Städte legen eine andere Stunde fest, die bei der Buchung angezeigt wird — eine späte Anreise ohne Bestätigung ist kein Aufenthalt."
+      "bookingCutoffBody": "Taggleiche Buchungen schließen standardmäßig um {hour} Uhr Ortszeit der Stadt; einzelne Städte legen eine andere Stunde fest, die bei der Buchung angezeigt wird, denn eine späte Anreise ohne Bestätigung ist kein Aufenthalt."
     },
     "privacy": {
       "title": "Datenschutzhinweis",
@@ -768,17 +768,17 @@
       "whoHeading": "Wer für Ihre Daten verantwortlich ist",
       "whoBody": "Wird vor dem Start ergänzt: die juristische Person, ihre eingetragene Anschrift und die Kontaktstelle für Datenschutzfragen.",
       "collectHeading": "Was wir erheben",
-      "collectBody": "Kontodaten: Name, E-Mail-Adresse, Telefonnummer und bevorzugte Sprache sowie Ihr Geschlecht, sofern Sie es angeben — freiwillig, ausschließlich zur korrekten Anrede verwendet und nie Grundlage einer Entscheidung. Ihr Passwort wird gehasht gespeichert (Argon2id) und ist nicht wiederherstellbar; ein Zwei-Faktor-Geheimnis wird verschlüsselt gespeichert.\n\nBuchungs- und Zahlungsdaten: Daten, Gästezahl, Beträge, das Objekt und die Aufzeichnung der Geldbewegungen.\n\nNachrichten und Streitfälle: der Text, den Sie an den Support oder in einem Streitfall schreiben. Telefonnummern und E-Mail-Adressen darin werden vor der Speicherung automatisch maskiert; das Original wird nicht aufbewahrt.\n\nTechnische Daten: Ihre IP-Adresse, zur Begrenzung von Missbrauch und zum Schutz der Anmeldung.",
+      "collectBody": "Kontodaten: Name, E-Mail-Adresse, Telefonnummer und bevorzugte Sprache sowie Ihr Geschlecht, sofern Sie es angeben (freiwillig, ausschließlich zur korrekten Anrede verwendet und nie Grundlage einer Entscheidung). Ihr Passwort wird gehasht gespeichert (Argon2id) und ist nicht wiederherstellbar; ein Zwei-Faktor-Geheimnis wird verschlüsselt gespeichert.\n\nBuchungs- und Zahlungsdaten: Daten, Gästezahl, Beträge, das Objekt und die Aufzeichnung der Geldbewegungen.\n\nNachrichten und Streitfälle: der Text, den Sie an den Support oder in einem Streitfall schreiben. Telefonnummern und E-Mail-Adressen darin werden vor der Speicherung automatisch maskiert; das Original wird nicht aufbewahrt.\n\nTechnische Daten: Ihre IP-Adresse, zur Begrenzung von Missbrauch und zum Schutz der Anmeldung.",
       "whyHeading": "Warum wir sie erheben",
       "whyBody": "Um Ihre Buchung zustande zu bringen und zu verwalten, Zahlungen einzuziehen und zu erstatten, Support zu leisten und Streitfälle zu klären, Betrug und Missbrauch zu verhindern und buchhalterische sowie gesetzliche Pflichten zu erfüllen.",
       "shareHeading": "Wer sie außerdem sieht",
-      "shareBody": "Der Partner, bei dem Sie buchen: Ihr Name, Ihre Aufenthaltsdaten und was er benötigt, um Sie zu empfangen.\n\nWenn Sie zu Ihrer Buchung einen Streitfall eröffnen, zeigen wir diesem Partner außerdem den Titel und den Text Ihrer Beschwerde, damit er darauf antworten kann — SAFRA entscheidet keinen Streitfall, nachdem nur eine Seite gehört wurde. Ihre Fotos und Dateien, Ihre Kontaktdaten, Ihre Zahlungs- oder Guthabendaten und die internen Notizen des Teams geben wir nicht weiter. Hält das Team eine Ihrer Dateien für eine faire Entscheidung für erforderlich, ist deren Freigabe ein ausdrücklicher Schritt einer namentlich benannten Mitarbeiterin oder eines Mitarbeiters und wird im Prüfprotokoll festgehalten — niemals der Standard.\n\nUnser Zahlungsdienstleister, unser E-Mail-Anbieter und der Dateispeicherdienst, in dem Fotos und Rechnungen liegen.\n\nWir verkaufen oder vermieten Ihre Daten an niemanden und nutzen sie nicht für Werbung außerhalb der Plattform.",
+      "shareBody": "Der Partner, bei dem Sie buchen: Ihr Name, Ihre Aufenthaltsdaten und was er benötigt, um Sie zu empfangen.\n\nWenn Sie zu Ihrer Buchung einen Streitfall eröffnen, zeigen wir diesem Partner außerdem den Titel und den Text Ihrer Beschwerde, damit er darauf antworten kann, denn SAFRA entscheidet keinen Streitfall, nachdem nur eine Seite gehört wurde. Ihre Fotos und Dateien, Ihre Kontaktdaten, Ihre Zahlungs- oder Guthabendaten und die internen Notizen des Teams geben wir nicht weiter. Hält das Team eine Ihrer Dateien für eine faire Entscheidung für erforderlich, ist deren Freigabe ein ausdrücklicher Schritt einer namentlich benannten Mitarbeiterin oder eines Mitarbeiters und wird im Prüfprotokoll festgehalten, und niemals der Standard.\n\nUnser Zahlungsdienstleister, unser E-Mail-Anbieter und der Dateispeicherdienst, in dem Fotos und Rechnungen liegen.\n\nWir verkaufen oder vermieten Ihre Daten an niemanden und nutzen sie nicht für Werbung außerhalb der Plattform.",
       "keepHeading": "Wie lange wir sie aufbewahren",
       "keepBody": "Buchungs- und Zahlungsunterlagen bleiben so lange erhalten, wie buchhalterische Pflichten und die Klärung von Streitfällen es erfordern.\n\nVon Mitarbeitenden angeforderte Exportdateien werden nach sieben Tagen gelöscht. Unsignierte Zahlungs-Callbacks werden nach dreißig Tagen gelöscht.\n\nObjektfotos bleiben erhalten, weil sie belegen, was ein Inserat am Tag der Buchung versprochen hat.\n\nNichts wird automatisch endgültig gelöscht; Datensätze werden archiviert und bleiben nachprüfbar.",
       "rightsHeading": "Ihre Rechte",
       "rightsBody": "Sie können eine Kopie Ihrer Daten verlangen, Unrichtiges berichtigen lassen, die Löschung von Daten verlangen, für deren Aufbewahrung es keinen Grund gibt, die Übertragung an eine andere Stelle verlangen, einer bestimmten Verarbeitung widersprechen und eine Einwilligung widerrufen, soweit die Verarbeitung darauf beruht.\n\nSie können sich außerdem bei der zuständigen Aufsichtsbehörde beschweren. Diese Behörde wird vor dem Start benannt.",
       "cookiesHeading": "Cookies",
-      "cookiesBody": "Wir verwenden genau drei:\n\nsafra_session — notwendig; hält Sie angemeldet. Ohne dieses Cookie funktioniert die Website nicht.\n\nsafra-theme — das von Ihnen gewählte helle oder dunkle Erscheinungsbild.\n\nsafra_currency — die Währung, in der Sie Preise sehen möchten.\n\nWir verwenden keine Werbe-Tracker und keine Analysedienste Dritter.",
+      "cookiesBody": "Wir verwenden genau drei:\n\nsafra_session: notwendig; hält Sie angemeldet. Ohne dieses Cookie funktioniert die Website nicht.\n\nsafra-theme: das von Ihnen gewählte helle oder dunkle Erscheinungsbild.\n\nsafra_currency: die Währung, in der Sie Preise sehen möchten.\n\nWir verwenden keine Werbe-Tracker und keine Analysedienste Dritter.",
       "contactHeading": "Kontakt",
       "contactBody": "Wird vor dem Start ergänzt: die Kontaktadresse für Datenschutzfragen."
     }
@@ -855,7 +855,7 @@
   },
   "medicalTourism": {
     "title": "Medizintourismus",
-    "body": "Ein Bereich für Unterkünfte, die eine Behandlung begleiten — in der Nähe der Kliniken und Zentren. Er ist noch nicht eröffnet, und wo es um die Gesundheit von Menschen geht, sagen wir das lieber, als etwas zu versprechen, das wir nicht geprüft haben.",
+    "body": "Ein Bereich für Unterkünfte, die eine Behandlung begleiten, in der Nähe der Kliniken und Zentren. Er ist noch nicht eröffnet, und wo es um die Gesundheit von Menschen geht, sagen wir das lieber, als etwas zu versprechen, das wir nicht geprüft haben.",
     "browse": "Unterkünfte ansehen",
     "cities": "Städte ansehen"
   },
@@ -884,13 +884,13 @@
   },
   "contact": {
     "title": "Kontakt",
-    "subtitle": "Wir antworten zu Buchungen, Zahlung und Beschwerden. Wenn Sie eine Buchung bei uns haben, ist ein Support-Ticket der schnellste Weg — es erreicht das SAFRA-Team mitsamt Ihrer Buchung.",
+    "subtitle": "Wir antworten zu Buchungen, Zahlung und Beschwerden. Wenn Sie eine Buchung bei uns haben, ist ein Support-Ticket der schnellste Weg: Es erreicht das SAFRA-Team mitsamt Ihrer Buchung.",
     "email": "E-Mail",
     "phone": "Telefon",
     "address": "Adresse",
     "addressValue": "Damaskus, Arabische Republik Syrien",
     "hours": "Öffnungszeiten",
-    "hoursValue": "Sonntag bis Donnerstag · 9:00 — 17:00",
+    "hoursValue": "Sonntag bis Donnerstag · 9:00-17:00",
     "supportTitle": "Sie haben eine Buchung? Öffnen Sie ein Support-Ticket",
     "supportBody": "Ein Support-Ticket erreicht das SAFRA-Team mit Ihrer Buchungsnummer, Sie müssen also nicht von vorn erklären. Das ist der schnellste und genaueste Kanal.",
     "supportAction": "Support-Ticket öffnen"

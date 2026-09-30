@@ -134,7 +134,7 @@ const EXEMPT: readonly {
   readonly pinnedTo?: { readonly file: string; readonly declaration: RegExp };
 }[] = [
   {
-    text: 'كسر بين 0 و 1 — نسبة 7٪ تُكتب 0.07',
+    text: 'كسر بين 0 و 1، فنسبة 7٪ تُكتب 0.07',
     why: 'A format example on الإعدادات, which prints the live value beside it',
   },
   {

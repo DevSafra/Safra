@@ -160,7 +160,7 @@ export const en = {
   'conversation.recipient_not_found': 'Recipient not found.',
   'campaign.not_found': 'Campaign not found.',
   'gift_card.code_invalid': 'That gift card code is not valid. Check it and try again.',
-  'ad.target_url_invalid': 'That link is not valid — it must start with http or https.',
+  'ad.target_url_invalid': 'That link is not valid: it must start with http or https.',
   'ad.window_order': 'The end date must be after the start date.',
   'ad.price_needs_currency': 'A price needs a currency, and a currency needs a price.',
   'advertiser.not_found': 'Advertiser not found.',
@@ -189,10 +189,10 @@ export const en = {
   'gift_card.expired': 'This gift card has expired.',
   'gift_card.cancelled': 'This gift card has been cancelled. Please contact support.',
   'gift_card.not_cancellable':
-    'This card cannot be cancelled — it is already used, expired or cancelled.',
+    'This card cannot be cancelled: it is already used, expired or cancelled.',
   'gift_card.not_found': 'Gift card not found.',
   'gift_card.cash_only':
-    'Your current balance is not enough for this card. A gift card can only be bought with your own money — not with gift card balance, and not with credit SAFRA has given you.',
+    'Your current balance is not enough for this card. A gift card can only be bought with your own money, not with gift card balance, and not with credit SAFRA has given you.',
   'gift_card.amount_invalid': 'Choose one of the available gift card amounts.',
   'wallet.insufficient_balance': 'Your wallet balance is not enough for this.',
   'support.message_too_short': 'Please describe the problem in a little more detail.',
@@ -235,7 +235,7 @@ export const en = {
   'catalogue.not_found': 'No catalogue entry with that code.',
   'catalogue.code_taken': 'That code is already in use. Choose another.',
   'catalogue.in_use':
-    '{count} records point at it, so it cannot be deleted — deactivate it instead: it leaves the pickers and everything already using it keeps working.',
+    '{count} records point at it, so it cannot be deleted. Deactivate it instead: it leaves the pickers and everything already using it keeps working.',
   'catalogue.code_format':
     'A code is lowercase Latin letters, digits and hyphens, e.g. ev-charger.',
   'faq.not_found': 'No question exists with that identifier.',
@@ -252,7 +252,7 @@ export const en = {
   'group_trip.cover_required':
     'A trip cannot be published without a photograph, and a published trip cannot lose the one it has.',
   'geo.category_in_use':
-    'That category is filed against {n} cities — deactivate it instead of removing it.',
+    'That category is filed against {n} cities. Deactivate it instead of removing it.',
   'geo.city_in_use':
     'A city referenced by {n} records (properties, bookings, partners…) cannot be deleted. Deactivate it instead.',
   'geo.country_in_use':
@@ -260,7 +260,7 @@ export const en = {
   'geo.currency_in_use':
     'A currency used by {n} records cannot be deleted. Deactivate it instead.',
   'geo.currency_accounting':
-    'The accounting currency cannot be deleted — every ledger entry is denominated in it.',
+    'The accounting currency cannot be deleted: every ledger entry is denominated in it.',
   'geo.code_taken': 'That code is already in use.',
   'geo.slug_taken': 'That slug is already used in this country.',
   'geo.timezone_invalid': 'That is not a valid time zone.',
@@ -282,7 +282,7 @@ export const en = {
   'validation.password_composition':
     'Your password needs an uppercase letter, a lowercase letter, a number, a symbol, and at least 12 characters.',
   'validation.password_common':
-    'That password is among the most used and is guessed first. Choose another — four unrelated words works well.',
+    'That password is among the most used and is guessed first. Choose another: four unrelated words works well.',
   'validation.password_predictable':
     'That password is predictable: repeated or sequential characters. Length alone does not help when the pattern is obvious.',
   'validation.password_contains_identity':
@@ -299,7 +299,7 @@ export const en = {
   'landmark.kind_in_use':
     'A category still used by landmarks cannot be removed. Deactivate it instead.',
   'landmark.too_far_from_city':
-    'The coordinates are far from the city — check that latitude and longitude are not swapped.',
+    'The coordinates are far from the city. Check that latitude and longitude are not swapped.',
   'validation.code_format': 'A code is lowercase Latin letters, digits and underscores.',
   'validation.slug_format':
     'An identifier is lowercase Latin letters, digits and hyphens.',
@@ -308,7 +308,7 @@ export const en = {
   'validation.end_before_start': 'End date must not be before the start date.',
   'validation.range_too_long': 'A calendar range may not exceed {maxDays} days.',
   'validation.amount_positive': 'Amount must be greater than zero.',
-  'validation.reason_required': 'A reason is required — this is the audit record.',
+  'validation.reason_required': 'A reason is required: this is the audit record.',
   'validation.rejection_reason_required': 'A rejection must include a reason.',
   'validation.latitude_range': 'Latitude must be between -90 and 90.',
   'validation.latitude_format': 'Latitude must be decimal degrees.',
@@ -471,7 +471,7 @@ export const en = {
   'auth.two_factor_enrolment_required':
     'Two-factor authentication is required for this account. Enrol before continuing.',
   'setting.value_not_positive_money':
-    '{key} must be a positive amount — either a number, or an amount with a currency.',
+    '{key} must be a positive amount: either a number, or an amount with a currency.',
   'setting.schema_not_editable':
     '{key} has the schema "{schema}", which this editor cannot check. Change it deliberately rather than through this form.',
   'sanctions.list_unavailable':

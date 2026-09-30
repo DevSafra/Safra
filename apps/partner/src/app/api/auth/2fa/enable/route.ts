@@ -39,7 +39,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     Enabling revokes every session — deliberately, since any session predating the second factor was
     established under weaker authentication. That includes THIS one. `totpEnabled` is a claim signed
     at sign-in, so without writing the new token the reader keeps one saying `false`, and the
-    middleware sends them back to `/enrol-2fa` on every navigation. Pressing «حفظتها — متابعة» did
+    middleware sends them back to `/enrol-2fa` on every navigation. Pressing «حفظتها، متابعة» did
     nothing, for fifteen minutes, and then signed them out when the revoked refresh token failed.
 
     A caller that ignores `session` reproduces the bug exactly, which is why the contract says so.

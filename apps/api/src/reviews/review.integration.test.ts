@@ -988,7 +988,7 @@ describeIfDb('ReviewService', () => {
       const row = await logFor('review.received');
 
       expect(row?.locale).toBe('de');
-      expect(sentMail[0]?.subject).toContain('Neue Bewertung');
+      expect(sentMail[0]?.subject).toContain('Neue SAFRA-Bewertung');
 
       await db.execute(sql`
         UPDATE users SET preferred_locale = 'ar'

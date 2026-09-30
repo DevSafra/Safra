@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+import { ar as t } from '../packages/i18n/src/messages/admin/ar.js';
+
 import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
 
 /**
@@ -83,7 +85,7 @@ test('an amenity can be created, retired and deleted', async ({ page }) => {
 
   const editor = page.locator(`[data-amenity-form="${PROBE}"]`);
 
-  await editor.getByText('مفعَّلة — يستطيع الشريك اختيارها').click();
+  await editor.getByText(t.sections.catalogue.activeAmenityLabel).click();
 
   const retired = page.waitForResponse(
     (r) =>
