@@ -51,7 +51,7 @@ type Values =
  * unpredictably, and two paragraphs of different scripts running together is harder to read than
  * either alone.
  */
-const DIVIDER = '\n\n—————————————\n\n';
+const DIVIDER = '\n\n─────────────\n\n';
 
 /** Subjects are joined on one line; `·` is the same separator the console uses between facts. */
 const SUBJECT_SEPARATOR = ' · ';

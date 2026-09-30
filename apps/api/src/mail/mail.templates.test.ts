@@ -636,7 +636,7 @@ describe('every transactional email is Arabic first, English underneath', () => 
           const mail = render(locale);
           const expected = localesFor(locale).length;
 
-          expect(mail.text.split('—————————————')).toHaveLength(expected);
+          expect(mail.text.split('─────────────')).toHaveLength(expected);
         });
 
         /**
@@ -650,7 +650,7 @@ describe('every transactional email is Arabic first, English underneath', () => 
           if (!shows) return;
 
           const mail = render(locale);
-          const blocks = mail.text.split('—————————————');
+          const blocks = mail.text.split('─────────────');
 
           for (const block of blocks) expect(block).toContain(shows);
         });
@@ -714,7 +714,7 @@ describe('a catalogue value is resolved per language block', () => {
       expiresInHours: 48,
     });
 
-    const [ar, en, de] = mail.text.split('—————————————');
+    const [ar, en, de] = mail.text.split('─────────────');
 
     expect(ar).toContain(emailMessages('ar').roles['operations_manager']);
     expect(en).toContain(emailMessages('en').roles['operations_manager']);
@@ -740,7 +740,7 @@ describe('a catalogue value is resolved per language block', () => {
       kind: 'base',
     });
 
-    const [ar, en] = mail.text.split('—————————————');
+    const [ar, en] = mail.text.split('─────────────');
 
     expect(ar).toContain(emailMessages('ar').contractKinds['base']);
     expect(en).toContain(emailMessages('en').contractKinds['base']);
@@ -768,7 +768,7 @@ describe('mails that carry a secret', () => {
       expiresInMinutes: 10,
     });
 
-    for (const block of mail.text.split('—————————————')) {
+    for (const block of mail.text.split('─────────────')) {
       expect(block).toContain('123456');
     }
   });
