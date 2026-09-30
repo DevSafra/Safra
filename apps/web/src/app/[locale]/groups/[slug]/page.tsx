@@ -234,10 +234,14 @@ export default async function GroupTripPage({
         <div>
           <dt className="text-13 text-faint">{t('labelDates')}</dt>
           <dd className="mt-1 text-14 text-text">
-            {t('dates', {
-              from: readableDate(trip.startsOn, locale),
-              to: readableDate(trip.endsOn, locale),
-            })}
+            <DateSpan
+              from={readableDate(trip.startsOn, locale)}
+              to={readableDate(trip.endsOn, locale)}
+              sentence={t('dates', {
+                from: readableDate(trip.startsOn, locale),
+                to: readableDate(trip.endsOn, locale),
+              })}
+            />
           </dd>
         </div>
         {nights > 0 ? (
@@ -293,5 +297,44 @@ export default async function GroupTripPage({
         </Link>
       </section>
     </article>
+  );
+}
+
+/**
+ * Departure over return, joined by a rule — the trip read as the short itinerary it is.
+ *
+ * It replaced one sentence, «{from} ← {to}», in a quarter-width column. Two long Levantine dates
+ * do not fit a quarter of the page, so the line broke wherever it ran out, stranding a weekday at
+ * the end of one line and its date on the next (Bashar, 2026-09-30). Each date is now its own
+ * unbreakable line, and the rule carries the «to» without a glyph whose direction has to be
+ * right in three languages.
+ *
+ * The catalogue sentence stays, for a screen reader: two bare dates announced one after the other
+ * say nothing about which is the departure, and the drawing that says it is `aria-hidden`.
+ */
+function DateSpan({
+  from,
+  to,
+  sentence,
+}: {
+  from: string;
+  to: string;
+  sentence: string;
+}) {
+  return (
+    <>
+      <span className="sr-only">{sentence}</span>
+      <span aria-hidden="true" className="relative grid gap-1.5 ps-4">
+        <span className="absolute start-[3.5px] top-[0.5lh] bottom-[0.5lh] w-px bg-line" />
+        <span data-trip-date className="relative whitespace-nowrap">
+          <span className="absolute -start-4 top-[calc(0.5lh-4px)] size-[8px] rounded-full border border-gold bg-card" />
+          {from}
+        </span>
+        <span data-trip-date className="relative whitespace-nowrap">
+          <span className="absolute -start-4 top-[calc(0.5lh-4px)] size-[8px] rounded-full bg-gold" />
+          {to}
+        </span>
+      </span>
+    </>
   );
 }
