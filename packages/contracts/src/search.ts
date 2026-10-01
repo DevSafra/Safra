@@ -110,6 +110,24 @@ export const searchQuerySchema = z
      */
     starRatings: queryArray(z.coerce.number().int().min(1).max(5)).default([]),
 
+    /*
+      The four filters booking.com offers that SAFRA's data could already answer (Bashar,
+      2026-10-01). Each is a column the search simply never read.
+
+      `minRating` is the GUEST score on SAFRA's own 1-5 scale (properties.rating), not the star
+      classification above; a listing with no reviews has no score and is excluded when the filter
+      is on, for the reason a missing star rating is: it is not known to qualify.
+
+      `minBathrooms` is a floor like `bedrooms`, so zero means «no requirement».
+
+      `maxCentreKm` measures to the city's `city_centre` landmark, the same point every card's
+      «كم من وسط المدينة» line uses, so the filter and the figure beside it cannot disagree.
+    */
+    minRating: z.coerce.number().min(1).max(5).optional(),
+    minBathrooms: z.coerce.number().int().min(0).max(10).default(0),
+    bedType: z.enum(['single', 'double']).optional(),
+    maxCentreKm: z.coerce.number().min(0.5).max(MAX_SEARCH_RADIUS_KM).optional(),
+
     /**
      * «قريب من» — restrict the results to listings near a named landmark.
      *

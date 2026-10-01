@@ -419,6 +419,8 @@ export const de = {
     'Diese Rückerstattung wird automatisch vom Zahlungsanbieter bestätigt, nicht manuell.',
   'pricing.unavailable':
     'Die Preisberechnung ist vorübergehend nicht möglich. Bitte in Kürze erneut versuchen.',
+  'search.facets_unavailable':
+    'Die Anzahl je Filter ist gerade nicht verfügbar; die Ergebnisse selbst werden angezeigt.',
   'wallet.wrong_account':
     'Bitte melden Sie sich mit dem Konto an, zu dem diese Buchung gehört, um Ihr Guthaben zu verwenden.',
   'wallet.balance_changed':

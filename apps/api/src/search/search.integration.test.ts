@@ -3,7 +3,8 @@ import { sql } from 'drizzle-orm';
 
 import { createRollbackDatabase, type Database } from '@safra/db';
 
-import { SearchService } from './search.service.js';
+import { SearchFacetsService } from './search-facets.service.js';
+import { MAX_SEARCH_OFFSET, SearchService } from './search.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { DEFAULT_SEARCH_RADIUS_KM, type SearchQuery } from '@safra/contracts';
 
@@ -49,6 +50,36 @@ describeIfDb('SearchService', () => {
   const db: Database = harness.db;
   const settings = new SettingsService(db);
   const search = new SearchService(db, settings);
+  /*
+    An in-memory stand-in for Redis: the counts are tested against the database, and the cache is
+    tested by what this records. `broken` makes every call throw, for the fall-through test.
+  */
+  const memory = new Map<string, string>();
+  const redisCalls = { get: 0, hits: 0, broken: false };
+  const fakeRedis = {
+    get: (key: string): Promise<string | null> => {
+      if (redisCalls.broken) return Promise.reject(new Error('redis down'));
+      redisCalls.get += 1;
+      const hit = memory.get(key) ?? null;
+      if (hit) redisCalls.hits += 1;
+      return Promise.resolve(hit);
+    },
+    set: (key: string, value: string): Promise<string> => {
+      if (redisCalls.broken) return Promise.reject(new Error('redis down'));
+      memory.set(key, value);
+      return Promise.resolve('OK');
+    },
+  };
+  const facetCounts = new SearchFacetsService(
+    db,
+    fakeRedis as unknown as ConstructorParameters<typeof SearchFacetsService>[1],
+    search,
+  );
+  /** Counts with the cache emptied first, so each assertion reads the database. */
+  const facets = async (overrides: Partial<SearchQuery> = {}) => {
+    memory.clear();
+    return facetCounts.facets(query(overrides));
+  };
 
   /**
    * Sets SAFRA's customer fee for one test, inside its own transaction.
@@ -83,6 +114,7 @@ describeIfDb('SearchService', () => {
     children: 0,
     infants: 0,
     bedrooms: 0,
+    minBathrooms: 0,
     attributes: [],
     starRatings: [],
     amenityCodes: [],
@@ -331,15 +363,21 @@ describeIfDb('SearchService', () => {
     expect(villas).toContain(dearPropertySlug);
   });
 
-  it('filters by the price of the STAY, not the nightly rate', async () => {
-    const upTo = await slugs({ maxPrice: 250 });
+  /*
+    ── The budget is per NIGHT, as the card prints it (Bashar, 2026-10-01) ─────────────────────
 
-    /* 2 × 100 = 200 is in; 2 × 400 = 800 is out. */
+    It compared the whole STAY, so on this two-night search «up to 250» admitted only stays under
+    125 a night. Each figure below is chosen so the old reading and the new one disagree.
+  */
+  it('filters by the nightly price, not the price of the stay', async () => {
+    /* Nightly: 100 is in, 400 is out. Read as a stay total, 150 would have admitted nothing. */
+    const upTo = await slugs({ maxPrice: 150 });
+
     expect(upTo).toContain(cheapPropertySlug);
     expect(upTo).not.toContain(dearPropertySlug);
 
-    /* Both of the cheap property's units are under 600, so it drops out entirely. */
-    const from = await slugs({ minPrice: 600 });
+    /* 300 a night: both of the hotel’s rooms (100, 250) are under it; the villa (400) clears it. */
+    const from = await slugs({ minPrice: 300 });
 
     expect(from).not.toContain(cheapPropertySlug);
     expect(from).toContain(dearPropertySlug);
@@ -349,15 +387,176 @@ describeIfDb('SearchService', () => {
    * The price filter chooses a QUALIFYING unit rather than judging the property on its cheapest.
    *
    * A property whose cheapest room is below the floor still appears if a dearer room clears it, and
-   * it is then quoted at that room's price. Surprising written down, right for a guest who asked for
+   * it is then quoted at that room’s price. Surprising written down, right for a guest who asked for
    * a minimum, and easy to break by moving the filter — which is why it is pinned here.
    */
   it('quotes a dearer unit when the cheapest one falls below the price floor', async () => {
-    const result = await search.search(query({ minPrice: 500 }));
+    const result = await search.search(query({ minPrice: 200 }));
     const cheap = result.items.find((item) => item.slug === cheapPropertySlug);
 
     expect(cheap?.unitId).toBe(secondUnitId);
     expect(cheap?.stayTotal).toBe('500.00');
+  });
+
+  /*
+    The bound is the price the card SHOWS, fee included. With a flat fee of 10 the 100 room reads
+    110 a night, so a ceiling of 105 must exclude it and 110 must keep it: a filter that ignored the
+    fee would answer «under 105» with a card saying 110.
+  */
+  it('applies the budget to the fee-inclusive nightly price, flat or percent', async () => {
+    await setCustomerFee('flat', 10);
+    expect(await slugs({ maxPrice: 105 })).not.toContain(cheapPropertySlug);
+    expect(await slugs({ maxPrice: 110 })).toContain(cheapPropertySlug);
+
+    await setCustomerFee('percent', 0.1);
+    expect(await slugs({ maxPrice: 109 })).not.toContain(cheapPropertySlug);
+    expect(await slugs({ maxPrice: 110 })).toContain(cheapPropertySlug);
+  });
+
+  // ─── The four filters booking.com has and SAFRA could already answer ─────────────────────────
+
+  it('filters on the guest score, excluding a listing below it', async () => {
+    /* The hotel is rated 3.0 and the villa 4.8. */
+    const atLeastFour = await slugs({ minRating: 4 });
+
+    expect(atLeastFour).toContain(dearPropertySlug);
+    expect(atLeastFour).not.toContain(cheapPropertySlug);
+    expect(
+      await slugs({ minRating: 3 }),
+      'a floor at the hotel’s own score keeps it',
+    ).toContain(cheapPropertySlug);
+  });
+
+  it('excludes a listing nobody has reviewed when a score is required', async () => {
+    await db.execute(
+      sql`UPDATE properties SET rating = NULL WHERE slug = ${dearPropertySlug}`,
+    );
+
+    expect(await slugs({ minRating: 1 })).not.toContain(dearPropertySlug);
+    expect(await slugs(), 'and it is still found without the filter').toContain(
+      dearPropertySlug,
+    );
+  });
+
+  it('filters on a minimum number of bathrooms, per unit', async () => {
+    await db.execute(sql`
+      UPDATE units SET bathrooms = 2
+      WHERE property_id = (SELECT id FROM properties WHERE slug = ${dearPropertySlug})
+    `);
+
+    const two = await slugs({ minBathrooms: 2 });
+
+    expect(two).toContain(dearPropertySlug);
+    expect(two).not.toContain(cheapPropertySlug);
+  });
+
+  it('filters on the bed type, and quotes the unit that has it', async () => {
+    await db.execute(
+      sql`UPDATE units SET bed_type = 'double' WHERE id = ${secondUnitId}::uuid`,
+    );
+
+    const doubles = await search.search(query({ bedType: 'double' }));
+    const cheap = doubles.items.find((item) => item.slug === cheapPropertySlug);
+
+    /* Only the 250 room is a double, so the hotel survives on it, not on its cheaper single. */
+    expect(cheap?.unitId).toBe(secondUnitId);
+    expect(doubles.items.map((item) => item.slug)).not.toContain(dearPropertySlug);
+    expect(
+      (await search.search(query({ bedType: 'single' }))).items.find(
+        (item) => item.slug === cheapPropertySlug,
+      )?.unitId,
+    ).toBe(cheapUnitId);
+  });
+
+  it('filters on the distance from the city centre landmark', async () => {
+    await db.execute(sql`
+      INSERT INTO landmarks (city_id, slug, kind_id, name_ar, name_en, name_de, latitude, longitude)
+      SELECT ci.id, 'centre-' || substr(gen_random_uuid()::text, 1, 8),
+             (SELECT id FROM landmark_kinds WHERE code = 'city_centre'),
+             'وسط', 'Centre', 'Zentrum', 33.5100, 36.2900
+      FROM cities ci WHERE ci.slug = ${citySlug}
+    `);
+    /* The hotel about 1 km from the centre, the villa about 9 km. */
+    await db.execute(
+      sql`UPDATE properties SET latitude = 33.5190, longitude = 36.2900 WHERE slug = ${cheapPropertySlug}`,
+    );
+    await db.execute(
+      sql`UPDATE properties SET latitude = 33.5910, longitude = 36.2900 WHERE slug = ${dearPropertySlug}`,
+    );
+
+    const near = await slugs({ maxCentreKm: 3 });
+
+    expect(near).toContain(cheapPropertySlug);
+    expect(near).not.toContain(dearPropertySlug);
+    expect(await slugs({ maxCentreKm: 10 }), 'a wider radius admits the villa').toContain(
+      dearPropertySlug,
+    );
+  });
+
+  /*
+    A ladder written latest-first is FREE: cancel 72 hours ahead and every penny comes back. The
+    filter read only the first tier, so it judged this policy by its 0-hour, 0% step and hid it from
+    «إلغاء مجاني» — while the refund service, which sorts the tiers, refunds it in full.
+  */
+  it('treats a policy as free when ANY tier refunds in full, in whatever order', async () => {
+    await db.execute(sql`
+      UPDATE cancellation_policies
+      SET tiers = '[{"hoursBeforeCheckIn": 0, "refundPercent": 0}, {"hoursBeforeCheckIn": 72, "refundPercent": 100}]'::jsonb
+      WHERE id = (SELECT cancellation_policy_id FROM properties WHERE slug = ${cheapPropertySlug})
+    `);
+
+    const free = await search.search(query({ freeCancellationOnly: true }));
+    const cheap = free.items.find((item) => item.slug === cheapPropertySlug);
+
+    expect(cheap, 'the free ladder is found by the filter').toBeDefined();
+    expect(cheap?.freeCancellation).toBe(true);
+    expect(cheap?.freeCancellationHours).toBe(72);
+
+    await db.execute(sql`
+      UPDATE cancellation_policies SET tiers = '[{"hoursBeforeCheckIn": 72, "refundPercent": 50}]'::jsonb
+      WHERE id = (SELECT cancellation_policy_id FROM properties WHERE slug = ${cheapPropertySlug})
+    `);
+
+    expect(
+      await slugs({ freeCancellationOnly: true }),
+      'a half refund is not free',
+    ).not.toContain(cheapPropertySlug);
+  });
+
+  it('describes the quoted room, and lists facilities only', async () => {
+    await db.execute(sql`
+      UPDATE units SET bedrooms = 2, beds = 3, bed_type = 'double', bathrooms = 2 WHERE id = ${cheapUnitId}::uuid
+    `);
+    await db.execute(sql`
+      INSERT INTO property_amenities (property_id, amenity_id)
+      SELECT p.id, a.id FROM properties p, amenities a
+      WHERE p.slug = ${cheapPropertySlug}
+        AND (a.category = 'rules'
+             OR a.id = (SELECT id FROM amenities WHERE category = 'facilities' ORDER BY sort_order, code LIMIT 1))
+      ON CONFLICT DO NOTHING
+    `);
+
+    const cheap = (await search.search(query())).items.find(
+      (item) => item.slug === cheapPropertySlug,
+    );
+
+    expect(cheap?.unit).toMatchObject({
+      nameEn: 'Unit',
+      bedrooms: 2,
+      beds: 3,
+      bedType: 'double',
+      bathrooms: 2,
+    });
+    /* One facility and every house rule are linked, so only a category filter can keep it to one:
+       with every facility linked the four-item cap hid the rules and this assertion could not fail. */
+    expect(cheap?.amenityCodes).toHaveLength(1);
+
+    const rules = await db.execute<{ code: string }>(
+      sql`SELECT code FROM amenities WHERE category = 'rules'`,
+    );
+    for (const { code } of rules.rows) {
+      expect(cheap?.amenityCodes, 'a house rule is not a facility').not.toContain(code);
+    }
   });
 
   it('filters on trip attributes, requiring ALL of them', async () => {
@@ -733,6 +932,27 @@ describeIfDb('SearchService', () => {
     });
   });
 
+  /*
+    The ceiling a scrolling list meets. The fixtures hold two stays, so the boundary is reached with
+    a page size of one: a cursor at the ceiling is the last one issued, and past it the answer says
+    «truncated» rather than handing out a cursor the decoder would refuse with a 400.
+  */
+  it('stops issuing cursors at the offset ceiling, and says the list was truncated', async () => {
+    const atCeiling = Buffer.from(String(MAX_SEARCH_OFFSET - 1), 'utf8').toString(
+      'base64url',
+    );
+    const first = await search.search(query({ limit: 1 }));
+
+    expect(first.nextCursor, 'an ordinary page still pages').not.toBeNull();
+    expect(first.truncated).toBe(false);
+
+    /* Offset 999 with a limit of 1 asks for row 1,000, which is the last addressable one. */
+    const last = await search.search(query({ limit: 1, cursor: atCeiling }));
+
+    expect(last.nextCursor).toBeNull();
+    expect(last.truncated).toBe(false);
+  });
+
   it('does not leak the columns that exist only to drive ORDER BY', async () => {
     const item = (await search.search(query())).items[0] as unknown as Record<
       string,
@@ -905,5 +1125,213 @@ describeIfDb('SearchService', () => {
       types.size > 1 || !types.has('hotel'),
       'the unfiltered search is not hotel-only by accident, which would make the test above empty',
     ).toBe(true);
+  });
+
+  // ─── The counts beside the filters (Bashar, 2026-10-01: «Live, cached») ─────────────────────
+
+  /*
+    The count and the list must be the same set. Every query here is answered both ways and the
+    two compared, so a predicate written for one and not the other fails here first.
+  */
+  it('counts exactly the stays the search returns, under every filter', async () => {
+    const cases: Partial<SearchQuery>[] = [
+      {},
+      { maxPrice: 150 },
+      { minRating: 4 },
+      { starRatings: [4] },
+      { propertyTypeCode: 'villa' },
+      { attributes: ['families', 'sea'] },
+      { freeCancellationOnly: true },
+      { adults: 8 },
+    ];
+
+    for (const overrides of cases) {
+      const listed = (await search.search(query({ ...overrides, limit: 60 }))).items
+        .length;
+      expect((await facets(overrides)).total, JSON.stringify(overrides)).toBe(listed);
+    }
+  });
+
+  /*
+    A group's own counts ignore its own selection. With «٤ نجوم» ticked the list holds the hotel
+    alone, and the villa still has to be counted under its type, or the reader could never widen.
+  */
+  it('counts a group as if its own selection were not made', async () => {
+    await db.execute(
+      sql`UPDATE properties SET star_rating = 5 WHERE slug = ${dearPropertySlug}`,
+    );
+
+    const counted = await facets({ starRatings: [4] });
+
+    expect(counted.total).toBe(1);
+    expect(counted.starRatings).toMatchObject({ '4': 1, '5': 1 });
+    /* Other groups DO respect the star filter: only the four-star hotel is left to count. */
+    expect(counted.propertyTypes).toEqual({ hotel: 1 });
+
+    const villas = await facets({ propertyTypeCode: 'villa' });
+
+    expect(villas.propertyTypes, 'the type list keeps every type').toMatchObject({
+      hotel: 1,
+      villa: 1,
+    });
+  });
+
+  it('counts AND filters over the current results', async () => {
+    const counted = await facets({ attributes: ['families'] });
+
+    /* Both carry families; only the villa adds sea, so ticking sea would leave one. */
+    expect(counted.attributes).toMatchObject({ families: 2, sea: 1 });
+  });
+
+  it('counts score floors, bathrooms and bed types from the same rows', async () => {
+    await db.execute(
+      sql`UPDATE units SET bathrooms = 2, bed_type = 'double' WHERE id = ${secondUnitId}::uuid`,
+    );
+
+    const counted = await facets();
+
+    /* The hotel scores 3.0, the villa 4.8. */
+    expect(counted.ratings).toMatchObject({ '4.5': 1, '4': 1, '3.5': 1, '3': 2 });
+    expect(counted.bathrooms).toMatchObject({ '1': 2, '2': 1 });
+    expect(counted.bedTypes).toMatchObject({ single: 2, double: 1 });
+  });
+
+  /*
+    The bars cover every stay matching the OTHER filters, at the price its card shows — fee in. The
+    budget itself does not narrow them, so the reader sees the range they are choosing inside.
+  */
+  it('draws the price bars over the card price, ignoring the budget itself', async () => {
+    await setCustomerFee('flat', 10);
+
+    const counted = await facets({ maxPrice: 150 });
+
+    expect(counted.total, 'the budget narrows the list').toBe(1);
+    expect(counted.price?.min).toBe('110.00');
+    expect(counted.price?.max).toBe('410.00');
+    expect(
+      counted.price?.bars.reduce((a, b) => a + b, 0),
+      'both stays are drawn',
+    ).toBe(2);
+  });
+
+  it('draws the price bars in one currency, never across two', async () => {
+    /* The villa also gets a room priced in pounds, 100,000 a night, beside its 400-dollar one. */
+    await db.execute(sql`
+      INSERT INTO units (property_id, name_ar, name_en, name_de, max_guests, base_price, currency_id, min_nights, is_active)
+      SELECT p.id, 'ليرة', 'Pound', 'Pfund', 2, '100000.00', (SELECT id FROM currencies WHERE code = 'SYP'), 1, true
+      FROM properties p WHERE p.slug = ${dearPropertySlug}
+    `);
+
+    const counted = await facets();
+
+    /* Both stays are priced in dollars and only one in pounds, so the bars are the dollar ones. */
+    expect(counted.price?.currencyCode).toBe('USD');
+    expect(
+      counted.price?.max,
+      'the axis is not stretched to a price in another currency',
+    ).toBe('400.00');
+    expect(counted.price?.bars.reduce((a, b) => a + b, 0)).toBe(2);
+  });
+
+  /*
+    Without a budget the bars are drawn from each room's base nightly rate (Bashar, 2026-10-01):
+    pricing every unit for the exact dates was nearly all the cost nationwide. With one, the count
+    depends on the exact price, so it is exact. A night overridden to 175 tells the two apart.
+  */
+  it('draws the bars from the base rate unless a budget makes the exact price matter', async () => {
+    await db.execute(sql`
+      INSERT INTO availability_days (unit_id, date, status, price)
+      VALUES (${cheapUnitId}::uuid, ${isoDate(IN)}::date, 'available', '175.00')
+      ON CONFLICT (unit_id, date) DO UPDATE SET price = '175.00'
+    `);
+
+    expect((await facets()).price?.min, 'the base rate, no override read').toBe('100.00');
+    expect(
+      (await facets({ maxPrice: 1000 })).price?.min,
+      'exact: (175 + 100) / 2 with a budget set',
+    ).toBe('137.50');
+  });
+
+  /*
+    Past the limit the counts are abandoned with a 503, and the abandonment is remembered so the
+    same question does not cost the database the full limit again within the minute. The database is
+    replaced by one whose every statement is cancelled the way `statement_timeout` cancels it.
+  */
+  it('answers 503 when the counts run out of time, and does not ask again', async () => {
+    let attempts = 0;
+    const cancelling = new Proxy(db, {
+      get(target, property, receiver) {
+        if (property !== 'transaction')
+          return Reflect.get(target, property, receiver) as unknown;
+        return () => {
+          attempts += 1;
+          return Promise.reject(
+            new Error('query failed', {
+              cause: Object.assign(
+                new Error('canceling statement due to statement timeout'),
+                {
+                  code: '57014',
+                },
+              ),
+            }),
+          );
+        };
+      },
+    });
+    const slow = new SearchFacetsService(
+      cancelling,
+      fakeRedis as unknown as ConstructorParameters<typeof SearchFacetsService>[1],
+      search,
+    );
+    memory.clear();
+
+    for (let i = 0; i < 2; i += 1) {
+      await expect(slow.facets(query())).rejects.toMatchObject({
+        status: 503,
+        response: { code: 'search.facets_unavailable' },
+      });
+    }
+    expect(attempts, 'the second ask is answered from the cache').toBe(1);
+  });
+
+  /** The opposite control: any OTHER database failure is not dressed up as a timeout. */
+  it('does not treat another database error as a timeout', async () => {
+    const failing = new Proxy(db, {
+      get(target, property, receiver) {
+        if (property !== 'transaction')
+          return Reflect.get(target, property, receiver) as unknown;
+        return () => Promise.reject(Object.assign(new Error('boom'), { code: '42P01' }));
+      },
+    });
+    const broken = new SearchFacetsService(
+      failing,
+      fakeRedis as unknown as ConstructorParameters<typeof SearchFacetsService>[1],
+      search,
+    );
+    memory.clear();
+
+    await expect(broken.facets(query())).rejects.toThrow('boom');
+  });
+
+  it('reuses a count for the same question, whatever the paging or the order of a list', async () => {
+    memory.clear();
+    redisCalls.hits = 0;
+
+    await facetCounts.facets(query({ starRatings: [4, 5] }));
+    await facetCounts.facets(
+      query({ starRatings: [5, 4], sort: 'price_asc', cursor: 'MjA' }),
+    );
+
+    expect(redisCalls.hits).toBe(1);
+  });
+
+  it('still counts when the cache is down', async () => {
+    redisCalls.broken = true;
+
+    try {
+      expect((await facets()).total).toBeGreaterThan(0);
+    } finally {
+      redisCalls.broken = false;
+    }
   });
 });

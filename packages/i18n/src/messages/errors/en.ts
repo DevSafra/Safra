@@ -371,6 +371,8 @@ export const en = {
   'refund.not_offline':
     'That refund is confirmed automatically by the payment provider, not by hand.',
   'pricing.unavailable': 'Pricing is temporarily unavailable. Please try again shortly.',
+  'search.facets_unavailable':
+    'The counts for each filter are not available right now; the results themselves are shown.',
   'wallet.wrong_account':
     'Sign in to the account that holds this booking to use your balance.',
   'wallet.balance_changed':

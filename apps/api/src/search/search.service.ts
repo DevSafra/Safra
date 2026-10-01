@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 import {
@@ -14,6 +14,12 @@ import { DATABASE } from '../database/database.module.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { badRequest, notFound } from '../common/errors/app-error.js';
 import { fromMinor, toMinor } from '../common/money.js';
+import {
+  buildSearchFilters,
+  CENTRES_CTE,
+  freeTier,
+  type SearchFilters,
+} from './search-filters.js';
 import {
   customerFeeMinor,
   customerFeeRule,
@@ -85,6 +91,30 @@ export interface SearchResultItem {
     height: number | null;
     alt: { ar: string | null; en: string | null; de: string | null };
   } | null;
+  /**
+   * The unit this card is priced from, as the room line on a booking.com result reads it:
+   * «جناح · سريران مزدوجان · حمّام واحد». Read per RETURNED row in the outer select.
+   */
+  unit: {
+    nameAr: string;
+    nameEn: string;
+    nameDe: string;
+    bedrooms: number;
+    beds: number;
+    bedType: 'single' | 'double';
+    bathrooms: number;
+    maxGuests: number;
+  } | null;
+  /** True when ANY tier of the policy refunds in full — see the note on the filter. */
+  freeCancellation: boolean;
+  /**
+   * Until how many hours before check-in the full refund holds: the smallest threshold among the
+   * 100% tiers, because a refund applies whenever the cancellation is at least that far ahead.
+   * Zero means free right up to arrival; null when the policy has no free tier.
+   */
+  freeCancellationHours: number | null;
+  /** Up to four facility codes, property and room level together, in catalogue order. */
+  amenityCodes: string[];
 }
 
 export interface SearchResult {
@@ -107,7 +137,33 @@ export interface SearchResult {
   previousCursor: string | null;
   /** Echoed so the UI can explain a shifted date (§5.3). */
   firstBookableDate: string;
+  /**
+   * True when there IS more but no cursor can reach it: the next batch would start past
+   * MAX_SEARCH_OFFSET. A list that loads as the reader scrolls must be able to say «narrow your
+   * search» there, rather than either failing on a refused cursor or claiming it showed everything.
+   */
+  truncated: boolean;
 }
+
+/**
+ * The deepest a search may page. OFFSET discards every row before it, so an unbounded one is
+ * unbounded work per request; nobody reads result 5,000 of a hotel search, and the reader who
+ * reaches this is told to narrow rather than shown an error.
+ */
+export const MAX_SEARCH_OFFSET = 1_000;
+
+export type PreparedSearch =
+  | { empty: true; firstBookableDate: string }
+  | {
+      empty: false;
+      firstBookableDate: string;
+      nights: number;
+      distanceExpr: SQL;
+      filters: SearchFilters;
+      feeRule: CustomerFeeRule;
+      minStayBase: number | undefined;
+      maxStayBase: number | undefined;
+    };
 
 @Injectable()
 export class SearchService {
@@ -125,6 +181,391 @@ export class SearchService {
    * availability with two anti-joins over indexed columns instead.
    */
   async search(query: SearchQuery, now: Date = new Date()): Promise<SearchResult> {
+    const prepared = await this.prepare(query, now);
+
+    if (prepared.empty) {
+      return {
+        items: [],
+        nextCursor: null,
+        previousCursor: null,
+        firstBookableDate: prepared.firstBookableDate,
+        truncated: false,
+      };
+    }
+
+    const { nights, distanceExpr, filters, feeRule, minStayBase, maxStayBase } = prepared;
+
+    const tiebreak = sql`, c.property_id_sort ASC`;
+
+    const orderBy = {
+      // These reference the snake_case sort aliases from the `candidates` CTE, not
+      // the quoted camelCase output columns — unquoted identifiers fold to
+      // lowercase, so "stayTotal" is not reachable as c.stay_total.
+      recommended: sql`c.recommendation_score DESC, c.rating DESC NULLS LAST, c.stay_total_sort ASC${tiebreak}`,
+      price_asc: sql`c.stay_total_sort ASC, c.recommendation_score DESC${tiebreak}`,
+      price_desc: sql`c.stay_total_sort DESC, c.recommendation_score DESC${tiebreak}`,
+      rating_desc: sql`c.rating DESC NULLS LAST, c.recommendation_score DESC${tiebreak}`,
+      /*
+        Nearest first. The contract refuses this sort without a landmark, so distance_sort is
+        never NULL here — but NULLS LAST is written anyway, because a null sorting first would
+        put every unplaceable listing above the nearest one and the failure would look like a
+        ranking bug rather than a missing filter.
+      */
+      distance_asc: sql`c.distance_sort ASC NULLS LAST, c.recommendation_score DESC${tiebreak}`,
+    }[query.sort];
+
+    const offset = this.decodeOffset(query.cursor);
+
+    /**
+     * Whether this search can decide its page BEFORE pricing anything.
+     *
+     * ## What it buys
+     *
+     * Pricing is the dominant cost of an unfiltered search: one index probe per candidate unit, and
+     * an unfiltered search has 150,000 of them. But `recommended` and `rating_desc` rank on
+     * `recommendation_score` and `rating`, which are columns of the PROPERTY and owe nothing to the
+     * dates being searched. So the page can be chosen first and only its properties priced — twenty
+     * of them instead of fifty thousand.
+     *
+     * ## Why the other two sorts cannot
+     *
+     * `price_asc` and `price_desc` rank BY the price, which is the thing being computed. There is no
+     * way to know which properties belong on page one without pricing all of them.
+     *
+     * ## Why a price filter also disqualifies it
+     *
+     * `minPrice`/`maxPrice` are applied after pricing, and they can eliminate every unit of a
+     * property — so a property inside the rank window can drop out, and one outside it should have
+     * taken its place. Narrowing first would then return a short page and silently omit a match.
+     */
+    const rankBeforePricing =
+      (query.sort === 'recommended' || query.sort === 'rating_desc') &&
+      query.minPrice === undefined &&
+      query.maxPrice === undefined;
+
+    /**
+     * The properties that can appear on this page, when pricing can be deferred.
+     *
+     * `RANK()`, deliberately, not `ROW_NUMBER()`: ties share a rank, so `rk <= n` returns EVERY
+     * property level with the last one on (score, rating). That is what keeps this exact. With
+     * `ROW_NUMBER` a property tied at the page boundary would be cut arbitrarily, and for
+     * `recommended` — whose third key is the price — the cut would decide an ordering that the price
+     * is supposed to decide.
+     */
+    const pageProperties = rankBeforePricing
+      ? sql`
+        AND u.property_id IN (
+          SELECT ranked.property_id FROM (
+            SELECT eligible.property_id,
+                   RANK() OVER (
+                     ORDER BY pr.recommendation_score DESC, pr.rating DESC NULLS LAST
+                   ) AS rk
+            FROM (SELECT DISTINCT available.property_id FROM available) eligible
+            JOIN properties pr ON pr.id = eligible.property_id
+          ) ranked
+          WHERE ranked.rk <= ${offset + query.limit + 1}
+        )`
+      : sql``;
+
+    const rows = await this.db.execute<Record<string, unknown>>(
+      sql`
+      WITH ${CENTRES_CTE},
+      -- available: which units could be slept in, with no price computed yet.
+      --
+      -- Pricing is a probe per unit, and an unfiltered search has 150,000 candidates. Splitting
+      -- availability from pricing is what lets the page be chosen first and only its properties
+      -- priced — see rankBeforePricing above. Every predicate comes from search-filters, which the
+      -- facet counts compose too, so a count beside a filter cannot drift from the list it narrows.
+      available AS MATERIALIZED (
+        SELECT
+          u.id                AS unit_id,
+          u.property_id,
+          u.currency_id,
+          u.base_price
+        FROM units u
+        JOIN properties p ON p.id = u.property_id
+        WHERE ${filters.scope}
+          ${filters.propertyType}
+          ${filters.stars}
+          ${filters.rating}
+          ${filters.bathrooms}
+          ${filters.bedType}
+          ${filters.centre}
+          ${filters.freeCancellation}
+          ${filters.attributes}
+          ${filters.amenities}
+      ),
+      bookable AS (
+        SELECT
+          u.unit_id,
+          u.property_id,
+          u.currency_id,
+          -- The stay's price, as the base rate plus what the overrides CHANGE.
+          --
+          -- Equivalent to summing COALESCE(ad.price, u.base_price) over every night, which is how
+          -- this was written, and far cheaper to execute. That form drove the sum from
+          -- generate_series LEFT JOINed to availability_days, so the date never became an index
+          -- bound: the plan read all 365 of a unit's rows and hash-joined them down to the two
+          -- nights being priced, for every candidate unit (O-scale-2).
+          --
+          -- Written this way the subquery is a bounded range scan that touches only the nights in
+          -- the stay carrying an override, and usually none of them. It is served index-only by
+          -- availability_days_priced_idx, which includes the price in its payload.
+          --
+          -- The algebra: nights × base, plus (override − base) for each overridden night, is the
+          -- same total as base for the plain nights plus the override for the priced ones.
+          --
+          -- A row with a NULL price is a status-only row, so it must NOT read as a free night. It
+          -- is excluded here and falls into the base-rate term, which is what COALESCE did.
+          u.base_price * ${nights} + COALESCE(
+            (
+              SELECT SUM(ad.price - u.base_price)
+              FROM availability_days ad
+              WHERE ad.unit_id = u.unit_id
+                AND ad.date >= ${query.checkIn}::date
+                AND ad.date <  ${query.checkOut}::date
+                AND ad.price IS NOT NULL
+            ),
+            0
+          ) AS stay_total
+        FROM available u
+        WHERE TRUE
+          ${pageProperties}
+      ),
+      candidates AS (
+        -- One row per PROPERTY, carrying its cheapest bookable unit. Guests search
+        -- for a place to stay, not for a room id.
+        SELECT DISTINCT ON (b.property_id)
+          p.reference          AS "propertyReference",
+          p.slug,
+          p.name_ar            AS "nameAr",
+          p.name_en            AS "nameEn",
+          p.name_de            AS "nameDe",
+          ci.slug              AS "citySlug",
+          ci.name_ar           AS "cityNameAr",
+          ci.name_en           AS "cityNameEn",
+          ci.name_de           AS "cityNameDe",
+          pt.code              AS "propertyTypeCode",
+          p.star_rating        AS "starRating",
+          p.rating,
+          p.reviews_count      AS "reviewsCount",
+          p.badges,
+          p.recommendation_score AS "recommendationScore",
+          cp.code              AS "cancellationPolicyCode",
+          -- Free when ANY tier refunds in full. Tiers are stored in no particular order (the refund
+          -- service sorts them), so reading the first one misjudged a ladder written latest-first.
+          ${freeTier(sql`cp.tiers`)} AS "freeCancellation",
+          (
+            SELECT MIN((tier ->> 'hoursBeforeCheckIn')::int)
+            FROM jsonb_array_elements(cp.tiers) tier
+            WHERE (tier ->> 'refundPercent')::int = 100
+          )                    AS "freeCancellationHours",
+          b.unit_id            AS "unitId",
+          cur.code             AS "currencyCode",
+          b.stay_total         AS "stayTotal",
+          ROUND(b.stay_total / ${nights}, 2) AS "nightlyFrom",
+          ${nights}::int       AS nights,
+          p.public_latitude    AS "publicLatitude",
+          p.public_longitude   AS "publicLongitude",
+          -- Rounded to PUBLIC_DISTANCE_STEP_METRES (100 m) for the same honesty reason the
+          -- property page's list is: the input is a coordinate good to about 100 m, so a
+          -- sharper figure would claim precision the data never had.
+          CASE WHEN ${distanceExpr} IS NULL THEN NULL
+               ELSE ROUND(${distanceExpr} / 100) * 100 END AS "distanceMetres",
+          /*
+            Metres from the city centre, from the PUBLIC pair and rounded to the same 100 m
+            step as every other published distance — it is the same promise, on a card instead
+            of a list, and a sharper figure here would undo the rounding one screen along.
+          */
+          CASE
+            WHEN centre.latitude IS NULL OR p.public_latitude IS NULL THEN NULL
+            ELSE ROUND(
+              (6371008.8 * 2 * asin(sqrt(
+                power(sin(radians(centre.latitude - p.public_latitude) / 2), 2)
+                + cos(radians(p.public_latitude)) * cos(radians(centre.latitude))
+                  * power(sin(radians(centre.longitude - p.public_longitude) / 2), 2)
+              ))) / 100
+            ) * 100
+          END AS "cityCentreMetres",
+          -- Duplicated in snake_case purely to drive ORDER BY; stripped before
+          -- the rows are returned. property_id_sort drives the cover subquery in the OUTER
+          -- select instead, and is stripped with them.
+          p.recommendation_score,
+          b.stay_total         AS stay_total_sort,
+          -- The UNROUNDED distance drives the order. Sorting on the rounded one would make
+          -- every listing inside the same 100 m band a tie, and ties are decided by
+          -- recommendation — so "nearest first" would visibly disagree with the distances
+          -- printed beside it.
+          ${distanceExpr}      AS distance_sort,
+          p.id                 AS property_id_sort
+        FROM bookable b
+        JOIN properties p            ON p.id = b.property_id
+        JOIN cities ci               ON ci.id = p.city_id
+        /*
+          The city's CENTRE, so a card can say «١٫٢ كم من وسط دمشق» without the reader having
+          chosen a landmark first. Location was invisible on a result card until they did.
+
+          The city_centre LANDMARK rather than cities.latitude, and the difference matters:
+          the property page measures to the landmark, and two screens quoting different
+          distances to «وسط دمشق» is the kind of disagreement nobody can explain. The two are
+          1.4 km apart for Damascus.
+
+          A LATERAL over a handful of rows per city, and landmarks_city_active_idx serves it.
+          LEFT, because a city whose centre staff have not placed yet simply has no figure —
+          not a missing card.
+
+          (No backticks in here: this sits inside a sql template literal and one would end it.
+          That is the sixth time this file has recorded the same trap.)
+        */
+        LEFT JOIN LATERAL (
+          SELECT lc.latitude, lc.longitude
+          FROM landmarks lc
+          JOIN landmark_kinds lk ON lk.id = lc.kind_id
+          WHERE lc.city_id = p.city_id
+            AND lk.code = 'city_centre'
+            AND lk.is_active AND lk.deleted_at IS NULL
+            AND lc.is_active AND lc.deleted_at IS NULL
+          ORDER BY lc.sort_order, lc.slug
+          LIMIT 1
+        ) centre ON TRUE
+        -- The market has to be OPEN — the city's flag and its country's (Bashar, 2026-08-31).
+        --
+        -- Neither was checked, so deactivating a city or a country took it off the destinations
+        -- grid and left every property in it BOOKABLE through search. Of the three paths this
+        -- rule reaches, this is the one that takes money: a withdrawn market that still sells is
+        -- worse than one that is merely still listed.
+        --
+        -- A join rather than an EXISTS: countries holds three rows and the lookup is on a
+        -- primary key, so the planner treats it as a constant-ish probe on the hot path.
+        JOIN countries co            ON co.id = ci.country_id AND co.is_active
+        JOIN property_types pt       ON pt.id = p.property_type_id
+        JOIN cancellation_policies cp ON cp.id = p.cancellation_policy_id
+        JOIN currencies cur          ON cur.id = b.currency_id
+        WHERE ci.is_active
+          ${query.citySlug ? sql`AND ci.slug = ${query.citySlug}` : sql``}
+          ${query.propertyTypeCode ? sql`AND pt.code = ${query.propertyTypeCode}` : sql``}
+          ${minStayBase !== undefined ? sql`AND b.stay_total >= ${minStayBase}` : sql``}
+          ${maxStayBase !== undefined ? sql`AND b.stay_total <= ${maxStayBase}` : sql``}
+          ${query.freeCancellationOnly ? sql`AND ${freeTier(sql`cp.tiers`)}` : sql``}
+        ORDER BY b.property_id, b.stay_total ASC
+      )
+      -- No ROW_NUMBER() here.
+      --
+      -- There was one, aliased row_no, and stripSortColumns deleted it from every row before
+      -- returning them: nothing read it, in this file or anywhere else. A window function is
+      -- computed over the WHOLE partition before LIMIT can apply, so the cost of ranking every
+      -- matching property was paid on every search and then discarded. Removing it lets the sort
+      -- feed the limit directly.
+      --
+      -- The cover is read HERE, in the outer target list, and that placement is the whole cost
+      -- argument. A scalar subquery in the target list of a limited query is evaluated per
+      -- RETURNED row, so this runs at most limit + 1 times — eight probes on a home page, not
+      -- one per matching property. Inside the candidates CTE it would have run for every bookable
+      -- listing before the limit could apply, which on a city with two thousand of them is the
+      -- shape that took search from 0.6s to 144s once before.
+      --
+      -- property_images_property_idx is (property_id, sort_order), so each probe is an index
+      -- scan. is_cover DESC first, matching the gallery's own order: the cover if one is
+      -- flagged, else the first by position.
+      --
+      -- status = 'ready' because a row mid-pipeline has no rendered variants yet, and a card
+      -- asking for one would draw a broken frame. No backticks in this comment: it sits inside a
+      -- sql template literal.
+      SELECT c.*,
+             (
+               SELECT jsonb_build_object(
+                        'fileKey', i.file_key,
+                        'variantWidths', i.variant_widths,
+                        'width', i.width,
+                        'height', i.height,
+                        'alt', jsonb_build_object('ar', i.alt_ar, 'en', i.alt_en, 'de', i.alt_de)
+                      )
+               FROM property_images i
+               WHERE i.property_id = c.property_id_sort
+                 AND i.deleted_at IS NULL
+                 AND i.status = 'ready'
+               ORDER BY i.is_cover DESC, i.sort_order
+               LIMIT 1
+             ) AS cover,
+             -- The priced unit and the card highlights, per RETURNED row for the same reason the
+             -- cover is: limit + 1 primary-key probes, never one per candidate.
+             (
+               SELECT jsonb_build_object(
+                        'nameAr', un.name_ar, 'nameEn', un.name_en, 'nameDe', un.name_de,
+                        'bedrooms', un.bedrooms, 'beds', un.beds, 'bedType', un.bed_type,
+                        'bathrooms', un.bathrooms, 'maxGuests', un.max_guests
+                      )
+               FROM units un
+               WHERE un.id = c."unitId"
+             ) AS unit,
+             (
+               SELECT COALESCE(jsonb_agg(top.code ORDER BY top.sort_order, top.code), '[]'::jsonb)
+               FROM (
+                 SELECT a.code, a.sort_order
+                 FROM (
+                   SELECT pa.amenity_id FROM property_amenities pa
+                    WHERE pa.property_id = c.property_id_sort
+                   UNION
+                   SELECT ua.amenity_id FROM unit_amenities ua WHERE ua.unit_id = c."unitId"
+                 ) held
+                 JOIN amenities a ON a.id = held.amenity_id
+                 WHERE a.category = 'facilities'
+                 ORDER BY a.sort_order, a.code
+                 LIMIT 4
+               ) top
+             ) AS "amenityCodes"
+      FROM candidates c
+      ORDER BY ${orderBy}
+      LIMIT ${query.limit + 1}
+      OFFSET ${offset}
+    `,
+    );
+
+    const all = rows.rows;
+    const hasMore = all.length > query.limit;
+    /*
+      Every price a guest is shown INCLUDES SAFRA's fee (Bashar, 2026-09-03).
+
+      The query totals accommodation only — `u.base_price * nights` plus overrides — and the fee is
+      added at checkout. So a card said «$100» and the last screen said «$101.99», with nothing on
+      the page accounting for the difference now that the fee is no longer itemised. He saw exactly
+      that on three surfaces and said «I still see the price not including it».
+
+      Added HERE rather than in the SQL for two reasons. The fee is a flat amount per BOOKING, not
+      a per-night rate, so it does not belong inside a per-unit total that the query also uses to
+      rank; and the ordering must not change — a constant added to every row leaves the sort
+      identical, and a percentage fee is monotonic in the base, so `price_asc` still means cheapest
+      first either way. `stay_total_sort` is deliberately left alone for that reason.
+
+      `nightlyFrom` has the fee added to it, exactly as the property page adds it — see below for
+      why it is no longer divided out of the inclusive total.
+    */
+    const items = (hasMore ? all.slice(0, query.limit) : all)
+      .map(stripSortColumns)
+      .map((item) => this.withCustomerFee(item, feeRule));
+
+    return {
+      items,
+      ...nextPage(offset, query.limit, hasMore),
+      /*
+        `Math.max(0, …)` rather than a subtraction, because a caller can arrive at any offset the
+        decoder accepts — `?cursor=` for offset 10 with a limit of 24 is a legitimate request that
+        would otherwise produce a cursor for -14, which `decodeOffset` refuses with a 400. Going
+        back from a partial page lands on the first one, which is where those results are.
+      */
+      previousCursor: offset > 0 ? encodeOffset(Math.max(0, offset - query.limit)) : null,
+      firstBookableDate: prepared.firstBookableDate,
+    };
+  }
+
+  /**
+   * Everything a search and its facet counts share, decided once: the arrival check, the landmark
+   * and the map area resolved to geometry, the fee-adjusted budget, and the named filters.
+   *
+   * `empty` is the honest answer to «near a place that is not on our map»: no candidates at all,
+   * which the search renders as an empty page and the counts as zeros.
+   */
+  async prepare(query: SearchQuery, now: Date = new Date()): Promise<PreparedSearch> {
     const guests = query.adults + query.children; // Infants do not occupy a bed.
 
     // ── Same-day cutoff, per city local time (§5.3) ──────────────────────────
@@ -195,12 +636,7 @@ export class SearchService {
       sees depend on which mistake they made first.
     */
     if (query.nearLandmark !== undefined && near === null) {
-      return {
-        items: [],
-        nextCursor: null,
-        previousCursor: null,
-        firstBookableDate: verdict.firstBookableDate,
-      };
+      return { empty: true, firstBookableDate: verdict.firstBookableDate };
     }
 
     const maxNights = await this.settings.getNumber('search.max_nights', 90);
@@ -320,510 +756,49 @@ export class SearchService {
           )})`
         : sql``;
 
-    const tiebreak = sql`, c.property_id_sort ASC`;
-
-    const orderBy = {
-      // These reference the snake_case sort aliases from the `candidates` CTE, not
-      // the quoted camelCase output columns — unquoted identifiers fold to
-      // lowercase, so "stayTotal" is not reachable as c.stay_total.
-      recommended: sql`c.recommendation_score DESC, c.rating DESC NULLS LAST, c.stay_total_sort ASC${tiebreak}`,
-      price_asc: sql`c.stay_total_sort ASC, c.recommendation_score DESC${tiebreak}`,
-      price_desc: sql`c.stay_total_sort DESC, c.recommendation_score DESC${tiebreak}`,
-      rating_desc: sql`c.rating DESC NULLS LAST, c.recommendation_score DESC${tiebreak}`,
-      /*
-        Nearest first. The contract refuses this sort without a landmark, so distance_sort is
-        never NULL here — but NULLS LAST is written anyway, because a null sorting first would
-        put every unplaceable listing above the nearest one and the failure would look like a
-        ranking bug rather than a missing filter.
-      */
-      distance_asc: sql`c.distance_sort ASC NULLS LAST, c.recommendation_score DESC${tiebreak}`,
-    }[query.sort];
-
-    const offset = this.decodeOffset(query.cursor);
-
-    /**
-     * Whether this search can decide its page BEFORE pricing anything.
-     *
-     * ## What it buys
-     *
-     * Pricing is the dominant cost of an unfiltered search: one index probe per candidate unit, and
-     * an unfiltered search has 150,000 of them. But `recommended` and `rating_desc` rank on
-     * `recommendation_score` and `rating`, which are columns of the PROPERTY and owe nothing to the
-     * dates being searched. So the page can be chosen first and only its properties priced — twenty
-     * of them instead of fifty thousand.
-     *
-     * ## Why the other two sorts cannot
-     *
-     * `price_asc` and `price_desc` rank BY the price, which is the thing being computed. There is no
-     * way to know which properties belong on page one without pricing all of them.
-     *
-     * ## Why a price filter also disqualifies it
-     *
-     * `minPrice`/`maxPrice` are applied after pricing, and they can eliminate every unit of a
-     * property — so a property inside the rank window can drop out, and one outside it should have
-     * taken its place. Narrowing first would then return a short page and silently omit a match.
-     */
-    const rankBeforePricing =
-      (query.sort === 'recommended' || query.sort === 'rating_desc') &&
-      query.minPrice === undefined &&
-      query.maxPrice === undefined;
-
-    /**
-     * The properties that can appear on this page, when pricing can be deferred.
-     *
-     * `RANK()`, deliberately, not `ROW_NUMBER()`: ties share a rank, so `rk <= n` returns EVERY
-     * property level with the last one on (score, rating). That is what keeps this exact. With
-     * `ROW_NUMBER` a property tied at the page boundary would be cut arbitrarily, and for
-     * `recommended` — whose third key is the price — the cut would decide an ordering that the price
-     * is supposed to decide.
-     */
-    const pageProperties = rankBeforePricing
-      ? sql`
-        AND u.property_id IN (
-          SELECT ranked.property_id FROM (
-            SELECT eligible.property_id,
-                   RANK() OVER (
-                     ORDER BY pr.recommendation_score DESC, pr.rating DESC NULLS LAST
-                   ) AS rk
-            FROM (SELECT DISTINCT available.property_id FROM available) eligible
-            JOIN properties pr ON pr.id = eligible.property_id
-          ) ranked
-          WHERE ranked.rk <= ${offset + query.limit + 1}
-        )`
-      : sql``;
-
-    const rows = await this.db.execute<Record<string, unknown>>(
-      sql`
-      -- available: which units could be slept in, with no price computed yet.
-      --
-      -- Pricing is a probe per unit, and an unfiltered search has 150,000 candidates. Splitting
-      -- availability from pricing is what lets the page be chosen first and only its properties
-      -- priced — see rankBeforePricing above.
-      WITH available AS MATERIALIZED (
-        SELECT
-          u.id                AS unit_id,
-          u.property_id,
-          u.currency_id,
-          u.base_price
-        FROM units u
-        JOIN properties p ON p.id = u.property_id
-        WHERE u.is_active
-          AND u.deleted_at IS NULL
-          AND p.deleted_at IS NULL
-          -- §8.1 / P-002: only verified, published inventory is ever searchable.
-          AND p.status = 'published'
-          /*
-            A SUSPENDED partner's listings leave search and discovery (Bashar, 2026-08-24).
-
-            The first clause of the suspension policy, and the only one enforced on a path a
-            CUSTOMER walks — everything else suspension does is refused at a partner's own write.
-            This join did not exist: search referenced no partner table at all, which is why hiding
-            the listings was a new predicate rather than a changed one.
-
-            Not a soft delete: a suspension is reversible and the listing comes straight back when
-            it is lifted, which is the difference between a lever and a deletion.
-
-            No backticks in this comment — it sits inside a sql template literal and a backtick ends
-            it. Fourth time today.
-          */
-          AND NOT EXISTS (
-            SELECT 1 FROM partners sp
-            WHERE sp.id = p.partner_id AND sp.suspended_at IS NOT NULL
-          )
-          AND u.max_guests >= ${guests}
-          -- Zero is «no requirement», so the predicate is omitted rather than written as a
-          -- constant-true comparison: the planner would still carry it through every candidate row.
-          -- (No backticks in this comment. See the note above — that is now the fifth time.)
-          ${query.bedrooms > 0 ? sql`AND u.bedrooms >= ${query.bedrooms}` : sql``}
-          AND ${nights} >= u.min_nights
-          AND (u.max_nights IS NULL OR ${nights} <= u.max_nights)
-
-          -- ── Narrow BEFORE pricing ────────────────────────────────────────
-          --
-          -- City, type and cancellation policy are properties of the PROPERTY, and they used to be
-          -- applied in candidates — after every unit in the country had already been priced and
-          -- had its availability checked. So a search of one city did the work of a search of all
-          -- of them, and properties_published_idx, which exists precisely for
-          -- (city_id, recommendation_score) over published rows, could never be used.
-          --
-          -- They are repeated in candidates rather than moved. Applying the same predicate twice
-          -- cannot change the result, and it means this optimisation cannot quietly alter what a
-          -- guest sees if one of these is not exactly equivalent to the join it mirrors.
-          ${
-            query.citySlug
-              ? sql`AND p.city_id = (
-                      SELECT id FROM cities WHERE slug = ${query.citySlug} AND deleted_at IS NULL
-                    )`
-              : sql``
-          }
-          ${
-            query.propertyTypeCode
-              ? sql`AND p.property_type_id = (
-                      SELECT id FROM property_types WHERE code = ${query.propertyTypeCode}
-                    )`
-              : sql``
-          }
-          ${
-            /*
-              Star classification, ORed within the filter (Bashar, 2026-09-04).
-
-              `IN` rather than `@>` or a chain of ANDs, because a property has exactly ONE
-              classification: requiring all of a multi-select would return nothing the moment a
-              second box was ticked. Each value bound individually — the same reason the attribute
-              filter does, and the same reason it must not become a joined string.
-
-              A listing with NO classification is excluded when the filter is on. That is the
-              honest answer to "show me 4-star hotels": a listing nobody has classified is not
-              known to be one, and including it would put unverified rows in a filtered result.
-            */
-            query.starRatings.length > 0
-              ? sql`AND p.star_rating IN (${sql.join(
-                  query.starRatings.map((one) => sql`${one}`),
-                  sql`, `,
-                )})`
-              : sql``
-          }
-          ${
-            query.freeCancellationOnly
-              ? sql`AND p.cancellation_policy_id IN (
-                      SELECT id FROM cancellation_policies
-                      WHERE (tiers -> 0 ->> 'refundPercent')::int = 100
-                    )`
-              : sql``
-          }
-          -- The proximity filters, applied here for the same reason city and type are: each is a
-          -- predicate on the PROPERTY, and running them before pricing is the difference between
-          -- pricing the listings near a landmark and pricing every unit in the country.
-          ${nearFilter}
-          ${kindFilter}
-          ${boxFilter}
-
-          -- Anti-join 1: the calendar says no.
-          --
-          -- Two rules over the same rows, so ONE scan rather than two: a day in the range that is
-          -- closed, booked or under maintenance, OR an arrival day carrying a minimum-nights
-          -- override this stay is too short for. They were separate NOT EXISTS clauses, each
-          -- opening its own index scan on (unit_id, date) for every candidate unit — and at 200,000
-          -- units an unfiltered search made 450,000 lookups into a 73-million-row table.
-          --
-          -- The union of the two predicates is the union of the two excluded sets, so this is the
-          -- same set of units. The min-nights term keeps its date = arrival restriction, which is
-          -- inside the range being scanned.
-          --
-          -- An ABSENT row means available — §8.4 puts the burden on the partner to close dates, so
-          -- units are open by default rather than needing 365 rows before a listing can sell.
-          AND NOT EXISTS (
-            SELECT 1 FROM availability_days ad
-            WHERE ad.unit_id = u.id
-              AND ad.date >= ${query.checkIn}::date
-              AND ad.date <  ${query.checkOut}::date
-              AND (
-                ad.status <> 'available'
-                OR (
-                  ad.date = ${query.checkIn}::date
-                  AND ad.min_nights IS NOT NULL
-                  AND ${nights} < ad.min_nights
-                )
-              )
-          )
-
-          -- Anti-join 2: no live booking overlaps. Uses the same '[)' bound as the
-          -- exclusion constraint, so search and the constraint can never disagree
-          -- about what "overlapping" means.
-          --
-          -- booking_units, not bookings: a booking of four suites NAMES one of
-          -- them and HOLDS four, so reading the booking row would offer the other
-          -- three to somebody else. Every booking has a row here whatever created
-          -- it — the bookings_hold_lead_room trigger sees to that.
-          AND NOT EXISTS (
-            SELECT 1 FROM booking_units b
-            WHERE b.unit_id = u.id
-              AND b.status IN ('pending_payment', 'pending_confirmation', 'confirmed', 'checked_in')
-              AND daterange(b.check_in, b.check_out, '[)')
-                  && daterange(${query.checkIn}::date, ${query.checkOut}::date, '[)')
-          )
-
-          ${
-            // §5.2 trip attributes. `@>` requires the property to carry ALL
-            // selected attributes, matching how the amenity filter behaves — a
-            // multi-select that silently ORed would surprise anyone narrowing a
-            // search on purpose.
-            query.attributes.length > 0
-              ? // Bound as a parameter, never interpolated. The Zod enum already
-                // restricts these to 10 known values, but rule 1 is unconditional:
-                // no string-built SQL, so a future change to the schema cannot turn
-                // this into an injection point.
-                // Each element is bound individually. Passing the JS array directly
-                // makes drizzle emit a row constructor `($1,$2)`, which Postgres
-                // cannot cast to text[] — "cannot cast type record to text[]".
-                sql`AND p.attributes @> ARRAY[${sql.join(
-                  query.attributes.map((a) => sql`${a}`),
-                  sql`, `,
-                )}]::text[]`
-              : sql``
-          }
-          ${
-            query.amenityCodes.length > 0
-              ? /*
-                  EITHER level satisfies a filter (Bashar, 2026-09-06).
-
-                  A guest ticking «مسبح» means the building has one; ticking «شرفة» means the room
-                  does. They are the same control and the customer does not think of them as two
-                  questions, so the filter counts distinct codes across the UNION of what the unit
-                  declares and what its property declares.
-
-                  Before property amenities existed this read `unit_amenities` alone, which was
-                  right then and silently wrong the moment a partner moved the hotel's pool up to
-                  the property: the facility was still true, still shown on the page, and the
-                  property vanished from the filter that asked for it.
-
-                  DISTINCT over the union, so a code held at BOTH levels counts once and cannot
-                  make a two-filter search pass on one satisfied filter.
-                */
-                sql`AND (
-                  SELECT COUNT(DISTINCT a.code)
-                  FROM (
-                    SELECT ua.amenity_id FROM unit_amenities ua WHERE ua.unit_id = u.id
-                    UNION
-                    SELECT pa.amenity_id FROM property_amenities pa
-                     WHERE pa.property_id = u.property_id
-                  ) held
-                  JOIN amenities a ON a.id = held.amenity_id
-                  WHERE a.code IN ${query.amenityCodes}
-                ) = ${query.amenityCodes.length}`
-              : sql``
-          }
-      ),
-      bookable AS (
-        SELECT
-          u.unit_id,
-          u.property_id,
-          u.currency_id,
-          -- The stay's price, as the base rate plus what the overrides CHANGE.
-          --
-          -- Equivalent to summing COALESCE(ad.price, u.base_price) over every night, which is how
-          -- this was written, and far cheaper to execute. That form drove the sum from
-          -- generate_series LEFT JOINed to availability_days, so the date never became an index
-          -- bound: the plan read all 365 of a unit's rows and hash-joined them down to the two
-          -- nights being priced, for every candidate unit (O-scale-2).
-          --
-          -- Written this way the subquery is a bounded range scan that touches only the nights in
-          -- the stay carrying an override, and usually none of them. It is served index-only by
-          -- availability_days_priced_idx, which includes the price in its payload.
-          --
-          -- The algebra: nights × base, plus (override − base) for each overridden night, is the
-          -- same total as base for the plain nights plus the override for the priced ones.
-          --
-          -- A row with a NULL price is a status-only row, so it must NOT read as a free night. It
-          -- is excluded here and falls into the base-rate term, which is what COALESCE did.
-          u.base_price * ${nights} + COALESCE(
-            (
-              SELECT SUM(ad.price - u.base_price)
-              FROM availability_days ad
-              WHERE ad.unit_id = u.unit_id
-                AND ad.date >= ${query.checkIn}::date
-                AND ad.date <  ${query.checkOut}::date
-                AND ad.price IS NOT NULL
-            ),
-            0
-          ) AS stay_total
-        FROM available u
-        WHERE TRUE
-          ${pageProperties}
-      ),
-      candidates AS (
-        -- One row per PROPERTY, carrying its cheapest bookable unit. Guests search
-        -- for a place to stay, not for a room id.
-        SELECT DISTINCT ON (b.property_id)
-          p.reference          AS "propertyReference",
-          p.slug,
-          p.name_ar            AS "nameAr",
-          p.name_en            AS "nameEn",
-          p.name_de            AS "nameDe",
-          ci.slug              AS "citySlug",
-          ci.name_ar           AS "cityNameAr",
-          ci.name_en           AS "cityNameEn",
-          ci.name_de           AS "cityNameDe",
-          pt.code              AS "propertyTypeCode",
-          p.star_rating        AS "starRating",
-          p.rating,
-          p.reviews_count      AS "reviewsCount",
-          p.badges,
-          p.recommendation_score AS "recommendationScore",
-          cp.code              AS "cancellationPolicyCode",
-          b.unit_id            AS "unitId",
-          cur.code             AS "currencyCode",
-          b.stay_total         AS "stayTotal",
-          ROUND(b.stay_total / ${nights}, 2) AS "nightlyFrom",
-          ${nights}::int       AS nights,
-          p.public_latitude    AS "publicLatitude",
-          p.public_longitude   AS "publicLongitude",
-          -- Rounded to PUBLIC_DISTANCE_STEP_METRES (100 m) for the same honesty reason the
-          -- property page's list is: the input is a coordinate good to about 100 m, so a
-          -- sharper figure would claim precision the data never had.
-          CASE WHEN ${distanceExpr} IS NULL THEN NULL
-               ELSE ROUND(${distanceExpr} / 100) * 100 END AS "distanceMetres",
-          /*
-            Metres from the city centre, from the PUBLIC pair and rounded to the same 100 m
-            step as every other published distance — it is the same promise, on a card instead
-            of a list, and a sharper figure here would undo the rounding one screen along.
-          */
-          CASE
-            WHEN centre.latitude IS NULL OR p.public_latitude IS NULL THEN NULL
-            ELSE ROUND(
-              (6371008.8 * 2 * asin(sqrt(
-                power(sin(radians(centre.latitude - p.public_latitude) / 2), 2)
-                + cos(radians(p.public_latitude)) * cos(radians(centre.latitude))
-                  * power(sin(radians(centre.longitude - p.public_longitude) / 2), 2)
-              ))) / 100
-            ) * 100
-          END AS "cityCentreMetres",
-          -- Duplicated in snake_case purely to drive ORDER BY; stripped before
-          -- the rows are returned. property_id_sort drives the cover subquery in the OUTER
-          -- select instead, and is stripped with them.
-          p.recommendation_score,
-          b.stay_total         AS stay_total_sort,
-          -- The UNROUNDED distance drives the order. Sorting on the rounded one would make
-          -- every listing inside the same 100 m band a tie, and ties are decided by
-          -- recommendation — so "nearest first" would visibly disagree with the distances
-          -- printed beside it.
-          ${distanceExpr}      AS distance_sort,
-          p.id                 AS property_id_sort
-        FROM bookable b
-        JOIN properties p            ON p.id = b.property_id
-        JOIN cities ci               ON ci.id = p.city_id
-        /*
-          The city's CENTRE, so a card can say «١٫٢ كم من وسط دمشق» without the reader having
-          chosen a landmark first. Location was invisible on a result card until they did.
-
-          The city_centre LANDMARK rather than cities.latitude, and the difference matters:
-          the property page measures to the landmark, and two screens quoting different
-          distances to «وسط دمشق» is the kind of disagreement nobody can explain. The two are
-          1.4 km apart for Damascus.
-
-          A LATERAL over a handful of rows per city, and landmarks_city_active_idx serves it.
-          LEFT, because a city whose centre staff have not placed yet simply has no figure —
-          not a missing card.
-
-          (No backticks in here: this sits inside a sql template literal and one would end it.
-          That is the sixth time this file has recorded the same trap.)
-        */
-        LEFT JOIN LATERAL (
-          SELECT lc.latitude, lc.longitude
-          FROM landmarks lc
-          JOIN landmark_kinds lk ON lk.id = lc.kind_id
-          WHERE lc.city_id = p.city_id
-            AND lk.code = 'city_centre'
-            AND lk.is_active AND lk.deleted_at IS NULL
-            AND lc.is_active AND lc.deleted_at IS NULL
-          ORDER BY lc.sort_order, lc.slug
-          LIMIT 1
-        ) centre ON TRUE
-        -- The market has to be OPEN — the city's flag and its country's (Bashar, 2026-08-31).
-        --
-        -- Neither was checked, so deactivating a city or a country took it off the destinations
-        -- grid and left every property in it BOOKABLE through search. Of the three paths this
-        -- rule reaches, this is the one that takes money: a withdrawn market that still sells is
-        -- worse than one that is merely still listed.
-        --
-        -- A join rather than an EXISTS: countries holds three rows and the lookup is on a
-        -- primary key, so the planner treats it as a constant-ish probe on the hot path.
-        JOIN countries co            ON co.id = ci.country_id AND co.is_active
-        JOIN property_types pt       ON pt.id = p.property_type_id
-        JOIN cancellation_policies cp ON cp.id = p.cancellation_policy_id
-        JOIN currencies cur          ON cur.id = b.currency_id
-        WHERE ci.is_active
-          ${query.citySlug ? sql`AND ci.slug = ${query.citySlug}` : sql``}
-          ${query.propertyTypeCode ? sql`AND pt.code = ${query.propertyTypeCode}` : sql``}
-          ${query.minPrice !== undefined ? sql`AND b.stay_total >= ${query.minPrice}` : sql``}
-          ${query.maxPrice !== undefined ? sql`AND b.stay_total <= ${query.maxPrice}` : sql``}
-          ${
-            query.freeCancellationOnly
-              ? sql`AND (cp.tiers -> 0 ->> 'refundPercent')::int = 100`
-              : sql``
-          }
-        ORDER BY b.property_id, b.stay_total ASC
-      )
-      -- No ROW_NUMBER() here.
-      --
-      -- There was one, aliased row_no, and stripSortColumns deleted it from every row before
-      -- returning them: nothing read it, in this file or anywhere else. A window function is
-      -- computed over the WHOLE partition before LIMIT can apply, so the cost of ranking every
-      -- matching property was paid on every search and then discarded. Removing it lets the sort
-      -- feed the limit directly.
-      --
-      -- The cover is read HERE, in the outer target list, and that placement is the whole cost
-      -- argument. A scalar subquery in the target list of a limited query is evaluated per
-      -- RETURNED row, so this runs at most limit + 1 times — eight probes on a home page, not
-      -- one per matching property. Inside the candidates CTE it would have run for every bookable
-      -- listing before the limit could apply, which on a city with two thousand of them is the
-      -- shape that took search from 0.6s to 144s once before.
-      --
-      -- property_images_property_idx is (property_id, sort_order), so each probe is an index
-      -- scan. is_cover DESC first, matching the gallery's own order: the cover if one is
-      -- flagged, else the first by position.
-      --
-      -- status = 'ready' because a row mid-pipeline has no rendered variants yet, and a card
-      -- asking for one would draw a broken frame. No backticks in this comment: it sits inside a
-      -- sql template literal.
-      SELECT c.*,
-             (
-               SELECT jsonb_build_object(
-                        'fileKey', i.file_key,
-                        'variantWidths', i.variant_widths,
-                        'width', i.width,
-                        'height', i.height,
-                        'alt', jsonb_build_object('ar', i.alt_ar, 'en', i.alt_en, 'de', i.alt_de)
-                      )
-               FROM property_images i
-               WHERE i.property_id = c.property_id_sort
-                 AND i.deleted_at IS NULL
-                 AND i.status = 'ready'
-               ORDER BY i.is_cover DESC, i.sort_order
-               LIMIT 1
-             ) AS cover
-      FROM candidates c
-      ORDER BY ${orderBy}
-      LIMIT ${query.limit + 1}
-      OFFSET ${offset}
-    `,
-    );
-
-    const all = rows.rows;
-    const hasMore = all.length > query.limit;
     /*
-      Every price a guest is shown INCLUDES SAFRA's fee (Bashar, 2026-09-03).
+      The budget is read the way the card prints it: per NIGHT, fee included (Bashar, 2026-10-01).
 
-      The query totals accommodation only — `u.base_price * nights` plus overrides — and the fee is
-      added at checkout. So a card said «$100» and the last screen said «$101.99», with nothing on
-      the page accounting for the difference now that the fee is no longer itemised. He saw exactly
-      that on three surfaces and said «I still see the price not including it».
-
-      Added HERE rather than in the SQL for two reasons. The fee is a flat amount per BOOKING, not
-      a per-night rate, so it does not belong inside a per-unit total that the query also uses to
-      rank; and the ordering must not change — a constant added to every row leaves the sort
-      identical, and a percentage fee is monotonic in the base, so `price_asc` still means cheapest
-      first either way. `stay_total_sort` is deliberately left alone for that reason.
-
-      `nightlyFrom` has the fee added to it, exactly as the property page adds it — see below for
-      why it is no longer divided out of the inclusive total.
+      It compared the WHOLE STAY against «السعر لليلة», so «up to $100» on a three-night search
+      admitted nothing above $33 a night, and the same filter meant something different for every
+      length of trip. Converted here to a bound on the base stay total, by undoing the fee the card
+      adds: a rate divides out, a flat amount subtracts. The SQL keeps comparing an unrounded base
+      column, so the sort and the price index stay exactly as they were.
     */
     const feeRule = await customerFeeRule(this.settings);
-    const items = (hasMore ? all.slice(0, query.limit) : all)
-      .map(stripSortColumns)
-      .map((item) => this.withCustomerFee(item, feeRule));
+    /* Rounded to six places: 110 / 1.1 is 99.99999999999999 in binary floating point, and an
+       unrounded bound would exclude the very room whose card says 110. */
+    const baseNightly = (shown: number): number =>
+      Math.max(
+        0,
+        Math.round(
+          (feeRule.mode === 'percent'
+            ? shown / (1 + feeRule.value)
+            : shown - feeRule.value) * 1e6,
+        ) / 1e6,
+      );
+    const minStayBase =
+      query.minPrice === undefined ? undefined : baseNightly(query.minPrice) * nights;
+    const maxStayBase =
+      query.maxPrice === undefined ? undefined : baseNightly(query.maxPrice) * nights;
+
+    const filters = buildSearchFilters(query, {
+      guests,
+      nights,
+      nearFilter,
+      kindFilter,
+      boxFilter,
+    });
 
     return {
-      items,
-      nextCursor: hasMore ? encodeOffset(offset + query.limit) : null,
-      /*
-        `Math.max(0, …)` rather than a subtraction, because a caller can arrive at any offset the
-        decoder accepts — `?cursor=` for offset 10 with a limit of 24 is a legitimate request that
-        would otherwise produce a cursor for -14, which `decodeOffset` refuses with a 400. Going
-        back from a partial page lands on the first one, which is where those results are.
-      */
-      previousCursor: offset > 0 ? encodeOffset(Math.max(0, offset - query.limit)) : null,
+      empty: false,
       firstBookableDate: verdict.firstBookableDate,
+      nights,
+      distanceExpr,
+      filters,
+      feeRule,
+      minStayBase,
+      maxStayBase,
     };
   }
 
@@ -1010,12 +985,28 @@ export class SearchService {
 
     const raw = Number(Buffer.from(cursor, 'base64url').toString('utf8'));
 
-    if (!Number.isInteger(raw) || raw < 0 || raw > 1_000) {
+    if (!Number.isInteger(raw) || raw < 0 || raw > MAX_SEARCH_OFFSET) {
       throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
     }
 
     return raw;
   }
+}
+
+/**
+ * Where the next batch starts, or why there is none. Pure, so the ceiling can be tested without a
+ * thousand fixture rows: past MAX_SEARCH_OFFSET there is no cursor to hand out, and the result says
+ * it was cut short rather than complete.
+ */
+export function nextPage(
+  offset: number,
+  limit: number,
+  hasMore: boolean,
+): { nextCursor: string | null; truncated: boolean } {
+  const next = offset + limit;
+  if (!hasMore) return { nextCursor: null, truncated: false };
+  if (next > MAX_SEARCH_OFFSET) return { nextCursor: null, truncated: true };
+  return { nextCursor: encodeOffset(next), truncated: false };
 }
 
 function encodeOffset(offset: number): string {

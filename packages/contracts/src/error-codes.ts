@@ -523,6 +523,8 @@ export const ERROR = {
   REFUND_NOT_PENDING: 'refund.not_pending',
   REFUND_NOT_OFFLINE: 'refund.not_offline',
   PRICING_UNAVAILABLE: 'pricing.unavailable',
+  /* The filter counts took longer than they are allowed; the results never wait for them. */
+  SEARCH_FACETS_UNAVAILABLE: 'search.facets_unavailable',
   WALLET_WRONG_ACCOUNT: 'wallet.wrong_account',
   WALLET_BALANCE_CHANGED: 'wallet.balance_changed',
   PARTNER_NOT_VERIFIED: 'partner.not_verified',
