@@ -129,6 +129,19 @@ deleting it; the reason something was blocked is often the reason it comes back.
 > - **Data booking.com filters on that SAFRA does not hold:** district, brands, per-property payment
 >   methods, certifications, meal plans. Left out by Bashar's choice (2026-10-01); each is a data
 >   model plus a partner form before it can be a filter.
+> - **The full map's feed is unmeasured at production volume** (`GET /search/map`, added
+>   2026-10-01). It is the page search with a limit of 250 placed stays, so it prices up to 251
+>   properties where a page prices 21. `safra_load` cannot measure it: none of its 50,000
+>   properties has coordinates. The load generator needs to place them before launch. Each settled
+>   pan is one request, under the global 120/min throttle; a tighter per-route limit is one
+>   decorator if the measurement asks for it.
+> - **The development database is mostly test leftovers.** Aleppo shows 2,010 published stays, of
+>   which 1,950 are `dash-test-…`/`rev-test-…` fixtures from earlier runs with no coordinates. They
+>   are why the map once showed one price, and they make every development count misleading. A
+>   cleanup of fixtures a suite fails to roll back is its own task.
+> - **Two `z.coerce.boolean()` remain** in `packages/contracts/src/property.ts`
+>   (`hasMultipleUnits`, `isActive`). Harmless today, because the console sends JSON booleans, but
+>   the same trap as the search flag fixed on 2026-10-01 the day a caller sends a string.
 
 > ### Feature development closed, 2026-09-30
 >
