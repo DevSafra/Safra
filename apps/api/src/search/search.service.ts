@@ -152,6 +152,30 @@ export interface SearchResult {
  */
 export const MAX_SEARCH_OFFSET = 1_000;
 
+/**
+ * The most stays the full map draws at once (Bashar, 2026-10-01: «I see only one price, while
+ * there are so many hotels»).
+ *
+ * The map had drawn the twenty cards of the page it was opened from, so a search whose first page
+ * happened to hold one placed stay showed one price on a map of a whole city. It now asks for
+ * every matching stay in view, and this bounds that: a country-wide view at production volume
+ * would otherwise be fifty thousand rows for a picture that can hold a few hundred. Past it the
+ * reader is told to zoom in, which is what narrows the box.
+ */
+export const MAP_STAY_LIMIT = 250;
+
+export interface MapStays {
+  items: SearchResultItem[];
+  /** True when more stays match than were sent: the map says «zoom in to see more». */
+  capped: boolean;
+}
+
+/** How a caller may narrow a search beyond its query. Internal only: never read from a request. */
+interface SearchOptions {
+  /** Only stays with a published point, for the map. */
+  placedOnly?: boolean;
+}
+
 export type PreparedSearch =
   | { empty: true; firstBookableDate: string }
   | {
@@ -180,8 +204,12 @@ export class SearchService {
    * an N+1 that no amount of caching rescues — the database can answer
    * availability with two anti-joins over indexed columns instead.
    */
-  async search(query: SearchQuery, now: Date = new Date()): Promise<SearchResult> {
-    const prepared = await this.prepare(query, now);
+  async search(
+    query: SearchQuery,
+    now: Date = new Date(),
+    options: SearchOptions = {},
+  ): Promise<SearchResult> {
+    const prepared = await this.prepare(query, now, options);
 
     if (prepared.empty) {
       return {
@@ -565,7 +593,26 @@ export class SearchService {
    * `empty` is the honest answer to «near a place that is not on our map»: no candidates at all,
    * which the search renders as an empty page and the counts as zeros.
    */
-  async prepare(query: SearchQuery, now: Date = new Date()): Promise<PreparedSearch> {
+  /**
+   * The stays the full map draws: the same search, filters and order as the list, limited to the
+   * stays that can be placed and to {@link MAP_STAY_LIMIT}. The cursor is ignored, because a map is
+   * one picture of everything in view rather than a page of it.
+   */
+  async mapStays(query: SearchQuery, now: Date = new Date()): Promise<MapStays> {
+    const result = await this.search(
+      { ...query, limit: MAP_STAY_LIMIT, cursor: undefined },
+      now,
+      { placedOnly: true },
+    );
+
+    return { items: result.items, capped: result.nextCursor !== null };
+  }
+
+  async prepare(
+    query: SearchQuery,
+    now: Date = new Date(),
+    options: SearchOptions = {},
+  ): Promise<PreparedSearch> {
     const guests = query.adults + query.children; // Infants do not occupy a bed.
 
     // ── Same-day cutoff, per city local time (§5.3) ──────────────────────────
@@ -732,7 +779,9 @@ export class SearchService {
           AND p.public_latitude IS NOT NULL
           AND p.public_latitude BETWEEN ${box[0]}::numeric AND ${box[2]}::numeric
           AND p.public_longitude BETWEEN ${box[1]}::numeric AND ${box[3]}::numeric`
-      : sql``;
+      : options.placedOnly
+        ? sql`AND p.public_latitude IS NOT NULL AND p.public_longitude IS NOT NULL`
+        : sql``;
 
     /*
       «Near ANY of these» — one OR per landmark of the chosen kind, each a box plus a radius.

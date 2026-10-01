@@ -5,7 +5,7 @@ import { type SearchQuery, searchQuerySchema } from '@safra/contracts';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { Public } from '../rbac/decorators.js';
 import { SearchFacetsService, type SearchFacets } from './search-facets.service.js';
-import { SearchService, type SearchResult } from './search.service.js';
+import { type MapStays, SearchService, type SearchResult } from './search.service.js';
 
 /**
  * Public search (SRS §5.1: "a visitor searches without registering").
@@ -41,5 +41,17 @@ export class SearchController {
     @Query(new ZodValidationPipe(searchQuerySchema)) query: SearchQuery,
   ): Promise<SearchFacets> {
     return this.facetCounts.facets(query);
+  }
+
+  /**
+   * Every matching stay that can be placed, for the full map: the same schema and filters as the
+   * search, so the map and the list cannot disagree about what matches.
+   */
+  @Public()
+  @Get('map')
+  async map(
+    @Query(new ZodValidationPipe(searchQuerySchema)) query: SearchQuery,
+  ): Promise<MapStays> {
+    return this.search.mapStays(query);
   }
 }

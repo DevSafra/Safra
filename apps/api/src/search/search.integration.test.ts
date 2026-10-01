@@ -1127,6 +1127,58 @@ describeIfDb('SearchService', () => {
     ).toBe(true);
   });
 
+  // ─── The full map (Bashar, 2026-10-01: «I see only one price, while there are so many») ─────
+
+  /** Places a fixture property at a point, as a partner's address entry would. */
+  const place = (slug: string, latitude: string, longitude: string) =>
+    db.execute(
+      sql`UPDATE properties SET latitude = ${latitude}, longitude = ${longitude} WHERE slug = ${slug}`,
+    );
+
+  it('maps every placed stay that matches, and leaves out the ones it cannot place', async () => {
+    await place(cheapPropertySlug, '33.5100', '36.2900');
+    await db.execute(
+      sql`UPDATE properties SET latitude = NULL, longitude = NULL WHERE slug = ${dearPropertySlug}`,
+    );
+
+    const mapped = await search.mapStays(query());
+
+    expect(mapped.items.map((item) => item.slug)).toEqual([cheapPropertySlug]);
+    expect(mapped.capped).toBe(false);
+
+    /* The opposite control: the LIST still has both, so the map's filter is the map's alone. */
+    expect(await slugs()).toEqual(
+      expect.arrayContaining([cheapPropertySlug, dearPropertySlug]),
+    );
+  });
+
+  it('maps past the twenty a page holds, and ignores the page it was opened from', async () => {
+    await place(cheapPropertySlug, '33.5100', '36.2900');
+    await place(dearPropertySlug, '33.5200', '36.3000');
+
+    const mapped = await search.mapStays(query({ limit: 1, cursor: 'MQ' }));
+
+    expect(mapped.items.map((item) => item.slug).sort()).toEqual(
+      [cheapPropertySlug, dearPropertySlug].sort(),
+    );
+  });
+
+  it('applies the same filters and box as the list', async () => {
+    await place(cheapPropertySlug, '33.5100', '36.2900');
+    await place(dearPropertySlug, '33.6100', '36.3900');
+
+    expect(
+      (await search.mapStays(query({ propertyTypeCode: 'villa' }))).items.map(
+        (i) => i.slug,
+      ),
+    ).toEqual([dearPropertySlug]);
+    expect(
+      (await search.mapStays(query({ bbox: '33.50,36.28,33.52,36.30' }))).items.map(
+        (i) => i.slug,
+      ),
+    ).toEqual([cheapPropertySlug]);
+  });
+
   // ─── The counts beside the filters (Bashar, 2026-10-01: «Live, cached») ─────────────────────
 
   /*
