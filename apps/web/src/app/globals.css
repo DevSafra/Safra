@@ -656,10 +656,85 @@ body {
  * nobody looks at.
  *
  * `background-image` rather than `background`, so a `bg-*` utility cannot half-override it.
+ *
+ * ## The finish (Bashar, 2026-10-01: «design the gold buttons better and nicer»)
+ *
+ * The prototype's two stops and angle are kept exactly; what was missing was everything around them.
+ * The button read as a flat sticker, and seventeen of them answered a hover by FADING to 90%, which
+ * washes a primary action out at the moment it should feel most alive. So the class now owns the
+ * whole behaviour, once, instead of forty-three call sites each choosing one:
+ *
+ * - **Light from above.** A 1px inner highlight on the top edge and a faint darker one on the bottom
+ *   give the face a bevel, so it reads as something to press rather than a printed shape.
+ * - **A shadow with an offset, tinted with the gold** rather than grey, so it sits on the page the
+ *   way a warm object would. The night theme swaps the tint for depth, because a gold glow on a dark
+ *   page is a halo, not a shadow.
+ * - **Hover lifts and brightens**: a deeper shadow and 6% more light. Never opacity.
+ * - **Press sinks**: scaled to 0.97 with the shadow drawn in, in 90ms, and the release springs back
+ *   in 160ms. Fast on the way down because that is the system answering; the craft floor's rule.
+ * - **Disabled stays still.** No lift and no press on a control that will not act.
+ *
+ * Unlayered on purpose: it beats Tailwind's utilities, so a stray `shadow-*` or `hover:opacity-*` on
+ * one button cannot quietly give it a different finish from the other forty-two.
  */
 .btn-gold {
   background-image: linear-gradient(135deg, #f0cb7c, #c4923e);
   color: #241a05;
+  box-shadow:
+    inset 0 1px 0 rgb(255 247 224 / 0.55),
+    inset 0 -1px 0 rgb(110 74 16 / 0.28),
+    0 1px 2px rgb(92 62 12 / 0.24),
+    0 6px 14px -6px rgb(168 116 32 / 0.55);
+  transition:
+    filter 160ms var(--ease-out-strong),
+    box-shadow 200ms var(--ease-out-strong),
+    transform 160ms var(--ease-out-strong);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn-gold:not(:disabled):not([aria-disabled='true']):hover {
+    filter: brightness(1.06) saturate(1.04);
+    box-shadow:
+      inset 0 1px 0 rgb(255 247 224 / 0.65),
+      inset 0 -1px 0 rgb(110 74 16 / 0.28),
+      0 2px 4px rgb(92 62 12 / 0.26),
+      0 12px 24px -8px rgb(168 116 32 / 0.62);
+  }
+}
+
+.btn-gold:not(:disabled):not([aria-disabled='true']):active {
+  transform: scale(0.97);
+  filter: brightness(0.97);
+  box-shadow:
+    inset 0 1px 2px rgb(92 62 12 / 0.35),
+    0 1px 1px rgb(92 62 12 / 0.18);
+  transition-duration: 90ms;
+}
+
+/* Night: the same face, but depth rather than a warm glow under it. */
+:root[data-theme='dark'] .btn-gold {
+  box-shadow:
+    inset 0 1px 0 rgb(255 247 224 / 0.5),
+    inset 0 -1px 0 rgb(110 74 16 / 0.3),
+    0 1px 2px rgb(0 0 0 / 0.5),
+    0 8px 18px -8px rgb(0 0 0 / 0.7);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :root[data-theme='dark'] .btn-gold:not(:disabled):not([aria-disabled='true']):hover {
+    box-shadow:
+      inset 0 1px 0 rgb(255 247 224 / 0.6),
+      inset 0 -1px 0 rgb(110 74 16 / 0.3),
+      0 2px 5px rgb(0 0 0 / 0.55),
+      0 14px 28px -10px rgb(0 0 0 / 0.75);
+  }
+}
+
+/* Reduced motion keeps the light and the shadow, and drops the movement. */
+@media (prefers-reduced-motion: reduce) {
+  .btn-gold:not(:disabled):active {
+    transform: none;
+  }
 }
 
 /*
@@ -669,6 +744,7 @@ body {
 @media print {
   .btn-gold {
     background-image: none;
+    box-shadow: none;
     color: #000000;
   }
 }
@@ -1014,6 +1090,11 @@ body {
 .btn-gold-hover:hover {
   background-image: linear-gradient(135deg, #f0cb7c, #c4923e);
   color: #241a05;
+  box-shadow:
+    inset 0 1px 0 rgb(255 247 224 / 0.55),
+    inset 0 -1px 0 rgb(110 74 16 / 0.28),
+    0 2px 4px rgb(92 62 12 / 0.24),
+    0 10px 20px -8px rgb(168 116 32 / 0.55);
 }
 
 /*

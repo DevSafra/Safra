@@ -114,7 +114,7 @@ export default async function ContactPage({
         </p>
         <Link
           href={`/${locale}/account/support`}
-          className="mt-4 inline-flex min-h-11 items-center rounded-lg btn-gold px-5 text-15 font-bold transition-opacity duration-200 ease-out-strong hover:opacity-90"
+          className="mt-4 inline-flex min-h-11 items-center rounded-lg btn-gold px-5 text-15 font-bold"
         >
           {t('supportAction')}
         </Link>

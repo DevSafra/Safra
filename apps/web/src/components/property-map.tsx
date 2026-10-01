@@ -584,7 +584,7 @@ export function PropertyMap({
           opener.current = event.currentTarget;
           setOpen(true);
         }}
-        className="btn-gold absolute bottom-3 left-1/2 -translate-x-1/2 cursor-pointer rounded-full px-4 py-2 text-sm font-bold shadow-[var(--shadow-lift)] transition-[transform,box-shadow] duration-150 ease-out-strong hover:shadow-[var(--shadow-lift-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-card active:scale-[0.97] motion-reduce:transition-none"
+        className="btn-gold absolute bottom-3 left-1/2 -translate-x-1/2 cursor-pointer rounded-full px-4 py-2 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-card"
       >
         {labels.explore}
       </button>

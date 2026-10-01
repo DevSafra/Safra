@@ -576,7 +576,7 @@ export function FilterPanel({
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="btn-gold inline-flex min-h-11 w-full cursor-pointer items-center justify-center rounded-lg px-4 text-15 font-bold transition-transform duration-150 ease-out active:scale-[0.98] motion-reduce:transition-none"
+              className="btn-gold inline-flex min-h-11 w-full cursor-pointer items-center justify-center rounded-lg px-4 text-15 font-bold"
             >
               {pending
                 ? t('updating')

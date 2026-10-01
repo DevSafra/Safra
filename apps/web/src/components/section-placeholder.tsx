@@ -83,7 +83,7 @@ export function SectionPlaceholder({
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
             <Link
               href={`/${locale}/search`}
-              className="inline-flex min-h-11 items-center rounded-lg btn-gold px-5 text-15 font-bold transition-opacity duration-200 ease-out-strong hover:opacity-90"
+              className="inline-flex min-h-11 items-center rounded-lg btn-gold px-5 text-15 font-bold"
             >
               {browseLabel}
             </Link>

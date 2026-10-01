@@ -188,7 +188,7 @@ export function ResultCard({
               href={card.href}
               tabIndex={-1}
               aria-hidden
-              className="btn-gold relative z-10 mt-3 inline-flex min-h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg px-4 text-14 font-bold shadow-[var(--shadow-lift)] transition-[filter,transform,box-shadow] duration-150 ease-out hover:shadow-[var(--shadow-lift-hover)] hover:brightness-105 active:scale-[0.97] motion-reduce:transition-none md:w-auto"
+              className="btn-gold relative z-10 mt-3 inline-flex min-h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg px-4 text-14 font-bold md:w-auto"
             >
               {card.cta}
               <ChevronIcon />

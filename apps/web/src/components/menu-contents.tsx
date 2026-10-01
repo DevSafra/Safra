@@ -95,7 +95,7 @@ export function MenuContents({
         {session ? (
           <Link
             href={`/${locale}/account`}
-            className="btn-gold inline-flex min-h-12 items-center justify-center rounded-lg px-4 text-16 font-bold transition-opacity duration-200 ease-out-strong hover:opacity-90"
+            className="btn-gold inline-flex min-h-12 items-center justify-center rounded-lg px-4 text-16 font-bold"
             title={accountTitle}
           >
             {accountLabel}
@@ -112,7 +112,7 @@ export function MenuContents({
             */}
             <Link
               href={`/${locale}/login`}
-              className="btn-gold inline-flex min-h-12 items-center justify-center rounded-lg px-4 text-16 font-bold transition-opacity duration-200 ease-out-strong hover:opacity-90"
+              className="btn-gold inline-flex min-h-12 items-center justify-center rounded-lg px-4 text-16 font-bold"
             >
               {signInLabel}
             </Link>

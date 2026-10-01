@@ -436,7 +436,7 @@ export function CheckoutForm({
       <button
         type="submit"
         disabled={submitting}
-        className="mt-6 w-full rounded-lg btn-gold px-5 py-3 font-semibold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-6 w-full rounded-lg btn-gold px-5 py-3 font-semibold disabled:cursor-not-allowed disabled:opacity-60"
       >
         {/*
           «تابع إلى الدفع» promises a next screen that takes money. With no rail there is none —

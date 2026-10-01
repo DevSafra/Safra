@@ -419,7 +419,7 @@ export async function SearchForm({
 
         <button
           type="submit"
-          className="btn-gold min-h-12 cursor-pointer rounded-lg px-6 text-base font-bold transition-[opacity] duration-200 ease-out-strong hover:opacity-90 sm:col-span-2 lg:col-span-1"
+          className="btn-gold min-h-12 cursor-pointer rounded-lg px-6 text-base font-bold sm:col-span-2 lg:col-span-1"
         >
           {t('submit')}
         </button>

@@ -134,7 +134,7 @@ export function BookingSummaryCard({
         */}
         <a
           href="#units"
-          className="btn-gold mt-4 block rounded-lg px-5 py-3 text-center font-semibold transition-opacity hover:opacity-90"
+          className="btn-gold mt-4 block rounded-lg px-5 py-3 text-center font-semibold"
         >
           {copy.chooseRoom}
         </a>
@@ -419,7 +419,7 @@ export function BookingSummaryCard({
 
       <Link
         href={checkout}
-        className="btn-gold mt-4 block rounded-lg px-5 py-3 text-center font-semibold transition-opacity hover:opacity-90"
+        className="btn-gold mt-4 block rounded-lg px-5 py-3 text-center font-semibold"
       >
         {copy.bookNow}
       </Link>

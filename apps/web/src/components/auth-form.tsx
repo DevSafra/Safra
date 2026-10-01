@@ -361,7 +361,7 @@ export function AuthForm({
       <button
         type="submit"
         disabled={submitting}
-        className="mt-2 w-full rounded-lg btn-gold px-5 py-3 font-semibold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-2 w-full rounded-lg btn-gold px-5 py-3 font-semibold disabled:cursor-not-allowed disabled:opacity-60"
       >
         {submitting ? t('submitting') : t(mode === 'login' ? 'signIn' : 'createAccount')}
       </button>

@@ -537,7 +537,7 @@ export default async function HomePage({
             */}
             <Link
               href={`/${locale}/partners/join`}
-              className="btn-gold inline-flex min-h-12 items-center justify-center justify-self-start rounded-lg px-8 text-16 font-bold transition-opacity duration-200 ease-out-strong hover:opacity-90 sm:min-h-[52px]"
+              className="btn-gold inline-flex min-h-12 items-center justify-center justify-self-start rounded-lg px-8 text-16 font-bold sm:min-h-[52px]"
             >
               {t('partnersCta')}
             </Link>

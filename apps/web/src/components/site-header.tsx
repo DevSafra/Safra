@@ -306,7 +306,7 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
           {session ? (
             <Link
               href={`/${locale}/account`}
-              className="inline-flex min-h-10 max-w-[10rem] btn-gold items-center truncate rounded-lg px-4 py-2 text-sm font-bold transition-opacity hover:opacity-90 sm:h-11"
+              className="inline-flex min-h-10 max-w-[10rem] btn-gold items-center truncate rounded-lg px-4 py-2 text-sm font-bold sm:h-11"
               title={session.user.email}
             >
               {auth('account')}
@@ -321,7 +321,7 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
               </Link>
               <Link
                 href={`/${locale}/login`}
-                className="inline-flex min-h-10 btn-gold items-center rounded-lg px-4 py-2 text-sm font-bold transition-opacity hover:opacity-90 sm:h-11"
+                className="inline-flex min-h-10 btn-gold items-center rounded-lg px-4 py-2 text-sm font-bold sm:h-11"
               >
                 {auth('signIn')}
               </Link>
