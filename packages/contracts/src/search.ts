@@ -94,7 +94,17 @@ export const searchQuerySchema = z
 
     minPrice: z.coerce.number().min(0).max(1_000_000).optional(),
     maxPrice: z.coerce.number().min(0).max(1_000_000).optional(),
-    freeCancellationOnly: z.coerce.boolean().default(false),
+    /**
+     * Only stays that refund in full. Read as EXACTLY true or false, never coerced (2026-10-01):
+     * `z.coerce.boolean()` turns every non-empty string true, so the `false` the results page sent
+     * on every search switched this filter ON, and «الإقامات» showed only free-cancellation stays.
+     * The counts used the same coercion, so they agreed with the list and nothing looked wrong.
+     * Anything other than the four spellings is refused rather than guessed at.
+     */
+    freeCancellationOnly: z
+      .union([z.boolean(), z.enum(['true', 'false', '1', '0'])])
+      .default(false)
+      .transform((value) => value === true || value === 'true' || value === '1'),
     /**
      * Star classification, as a MULTI-SELECT (Bashar, 2026-09-04: "1★, 2★, 3★, 4★, 5★ and
      * combinations where appropriate").

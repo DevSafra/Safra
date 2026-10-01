@@ -169,6 +169,27 @@ describe('searchQuerySchema (§5.2)', () => {
     expect(r.sort).toBe('recommended'); // §5.5: never cheapest by default
   });
 
+  /*
+    A query string carries «false» as a word, and `z.coerce.boolean()` read every word as true, so
+    the results page's `freeCancellationOnly=false` hid every stay without free cancellation.
+  */
+  it('reads the free-cancellation flag as the word says, not as «a word was sent»', () => {
+    const flag = (value: unknown) =>
+      searchQuerySchema.parse({ ...base, freeCancellationOnly: value })
+        .freeCancellationOnly;
+
+    expect(flag('false')).toBe(false);
+    expect(flag('0')).toBe(false);
+    expect(flag(false)).toBe(false);
+    expect(searchQuerySchema.parse(base).freeCancellationOnly).toBe(false);
+    /* The opposite control: the filter still switches on. */
+    expect(flag('true')).toBe(true);
+    expect(flag('1')).toBe(true);
+    expect(
+      searchQuerySchema.safeParse({ ...base, freeCancellationOnly: 'yes' }).success,
+    ).toBe(false);
+  });
+
   it('requires arrival, departure and guest count', () => {
     // §5.2: "searching or booking without them is not permitted"
     expect(searchQuerySchema.safeParse({ checkIn: '2026-07-01' }).success).toBe(false);

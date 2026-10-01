@@ -223,7 +223,8 @@ export function toSearchParams(
     starRatings: parsed.starRatings,
     minPrice: parsed.minPrice,
     maxPrice: parsed.maxPrice,
-    freeCancellationOnly: parsed.freeCancellationOnly,
+    /* Sent only when on: an absent flag cannot be misread, whatever the API's parser does with words. */
+    freeCancellationOnly: parsed.freeCancellationOnly || undefined,
     minRating: parsed.minRating,
     minBathrooms: parsed.minBathrooms > 0 ? parsed.minBathrooms : undefined,
     bedType: parsed.bedType,
