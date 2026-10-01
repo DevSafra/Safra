@@ -174,6 +174,25 @@ test('the filters are a sidebar on a desktop and a sheet on a phone', async ({
 });
 
 /**
+ * The sidebar card shows the MAP of the results, not a pattern standing in for one (Bashar,
+ * 2026-10-01: «I can not see the map behind the button»), and still opens the full map.
+ */
+test('the map card draws the map of the results behind its button', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(SEARCH);
+
+  const card = page.locator('[data-map-thumbnail]');
+  await expect(card.locator('[data-ready="true"] canvas')).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(card).toContainText('OpenStreetMap');
+
+  await card.getByRole('button', { name: 'شاهد على الخريطة' }).click();
+  await expect(page.getByRole('dialog', { name: /خريطة/ })).toBeVisible();
+  await page.keyboard.press('Escape');
+});
+
+/**
  * A filter that can only ever empty the page is not offered — as an INVARIANT: every amenity on
  * screen reports a count above zero, whatever the data happens to be on the day it runs.
  */

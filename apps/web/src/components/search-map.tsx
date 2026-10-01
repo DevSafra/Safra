@@ -222,28 +222,15 @@ export function SearchMap({
         }
       >
         {variant === 'thumbnail' ? (
-          /*
-            The sidebar card: SAFRA's ornament as the ground rather than a live map. A real map
-            here would load MapLibre and its tiles on every results page for a picture nobody
-            asked to move; the dialog loads them only when the reader opens it.
-          */
-          <button
-            type="button"
-            onClick={(event) => {
-              opener.current = event.currentTarget;
+          <MapThumbnail
+            stays={stays}
+            theme={theme}
+            label={t('mapShow')}
+            onOpen={(button) => {
+              opener.current = button;
               setOpen(true);
             }}
-            className="group relative grid h-32 w-full cursor-pointer place-items-center overflow-hidden rounded-card border border-line bg-band transition-[border-color,box-shadow] duration-200 ease-out hover:border-gold/60 hover:shadow-[var(--shadow-lift)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
-          >
-            <OrnamentField
-              id="ornament-map-thumbnail"
-              className="text-gold-read opacity-25"
-            />
-            <span className="relative inline-flex min-h-10 items-center gap-2 rounded-full bg-indigo px-4 text-14 font-bold text-bg shadow-[var(--shadow-lift)] transition-transform duration-150 ease-out group-active:scale-[0.97] motion-reduce:transition-none">
-              <MapGlyph />
-              {t('mapShow')}
-            </span>
-          </button>
+          />
         ) : (
           <button
             type="button"
@@ -360,6 +347,168 @@ function boundsOf(stays: readonly NearbyStay[]): [[number, number], [number, num
     [Math.min(...lons) - pad, Math.min(...lats) - pad],
     [Math.max(...lons) + pad, Math.max(...lats) + pad],
   ];
+}
+
+/**
+ * The sidebar card: the real map of the results, behind the button that opens the full one.
+ *
+ * It was SAFRA's ornament until Bashar asked to see the map there (2026-10-01). What keeps that
+ * affordable on every results page:
+ *
+ * - **Loaded only when the card nears the viewport.** On a phone the card lives in the closed filter
+ *   sheet, so it costs nothing until the sheet opens; the ornament holds the place until then and
+ *   stays as the answer if WebGL refuses.
+ * - **A picture, not a second map to drive.** `interactive: false`: dragging belongs to the dialog,
+ *   and a card that pans under a scrolling thumb would steal the page's scroll.
+ * - **The stays are dots in a layer, not DOM markers.** Price pills at this size would overlap into a
+ *   smear; the dialog is where they are read.
+ * - **The licence notice is printed, not a control.** ODbL needs it visible on every map, and
+ *   MapLibre's own attribution control is a button, which cannot sit inside this one.
+ */
+function MapThumbnail({
+  stays,
+  theme,
+  label,
+  onOpen,
+}: {
+  readonly stays: readonly NearbyStay[];
+  readonly theme: 'light' | 'dark';
+  readonly label: string;
+  readonly onOpen: (button: HTMLButtonElement) => void;
+}) {
+  const card = useRef<HTMLDivElement | null>(null);
+  const canvas = useRef<HTMLDivElement | null>(null);
+  const [near, setNear] = useState(false);
+  const [ready, setReady] = useState(false);
+  /* Read from the style it draws, so the notice cannot differ from the map's own licence. */
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    const element = card.current;
+    if (!element || near) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) setNear(true);
+      },
+      { rootMargin: '200px' },
+    );
+    observer.observe(element);
+
+    return () => observer.disconnect();
+  }, [near]);
+
+  useEffect(() => {
+    if (!near || !canvas.current || !BASEMAP) return;
+
+    let cancelled = false;
+    let dispose: (() => void) | null = null;
+
+    void (async () => {
+      try {
+        const { maplibre, basemaps } = await loadMapLibre();
+        if (cancelled || !canvas.current) return;
+
+        const tokens = getComputedStyle(document.documentElement);
+        const style = basemapStyle(basemaps, theme, 'ar');
+        const source = style.sources['protomaps'];
+        setNotice(
+          source && 'attribution' in source ? (source.attribution ?? null) : null,
+        );
+        const instance = new maplibre.Map({
+          container: canvas.current,
+          style,
+          bounds: boundsOf(stays),
+          fitBoundsOptions: { padding: 20, maxZoom: PUBLIC_MAP_MAX_ZOOM },
+          maxZoom: PUBLIC_MAP_MAX_ZOOM,
+          interactive: false,
+          attributionControl: false,
+        });
+
+        instance.on('load', () => {
+          instance.addSource('stays', {
+            type: 'geojson',
+            data: {
+              type: 'FeatureCollection',
+              features: stays
+                .map((stay) => [Number(stay.longitude), Number(stay.latitude)] as const)
+                .filter(([lon, lat]) => Number.isFinite(lon) && Number.isFinite(lat))
+                .map(([lon, lat]) => ({
+                  type: 'Feature' as const,
+                  properties: {},
+                  geometry: { type: 'Point' as const, coordinates: [lon, lat] },
+                })),
+            },
+          });
+          instance.addLayer({
+            id: 'stays',
+            type: 'circle',
+            source: 'stays',
+            paint: {
+              'circle-radius': 4.5,
+              'circle-color': tokens.getPropertyValue('--color-gold').trim(),
+              'circle-stroke-width': 1.5,
+              'circle-stroke-color': tokens.getPropertyValue('--color-card').trim(),
+            },
+          });
+        });
+        /* Shown once the tiles are drawn, so the reader never watches an empty canvas fill in. */
+        void instance.once('idle', () => {
+          if (!cancelled) setReady(true);
+        });
+
+        const resizer = new ResizeObserver(() => instance.resize());
+        resizer.observe(canvas.current);
+
+        dispose = () => {
+          resizer.disconnect();
+          instance.remove();
+        };
+      } catch {
+        /* WebGL refused, or a chunk did not arrive: the ornament stays, and the button still works. */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      setReady(false);
+      dispose?.();
+    };
+  }, [near, theme, stays]);
+
+  return (
+    <div
+      ref={card}
+      data-map-thumbnail
+      className="relative h-32 w-full overflow-hidden rounded-card border border-line bg-band transition-[border-color,box-shadow] duration-200 ease-out hover:border-gold/60 hover:shadow-[var(--shadow-lift)]"
+    >
+      <OrnamentField id="ornament-map-thumbnail" className="text-gold-read opacity-25" />
+      <div
+        ref={canvas}
+        aria-hidden
+        data-ready={ready}
+        className={`absolute inset-0 transition-opacity duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] ${ready ? 'opacity-100' : 'opacity-0'}`}
+      />
+      <button
+        type="button"
+        onClick={(event) => onOpen(event.currentTarget)}
+        className="group absolute inset-0 grid cursor-pointer place-items-center rounded-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold"
+      >
+        <span className="inline-flex min-h-10 items-center gap-2 rounded-full bg-indigo px-4 text-14 font-bold text-bg shadow-[var(--shadow-lift)] transition-transform duration-150 ease-out group-active:scale-[0.97] motion-reduce:transition-none">
+          <MapGlyph />
+          {label}
+        </span>
+      </button>
+      {ready && notice ? (
+        <span
+          dir="ltr"
+          className="pointer-events-none absolute bottom-1 end-1.5 rounded bg-card/80 px-1 text-[10px] leading-4 text-muted"
+        >
+          {notice}
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 function MapGlyph() {
