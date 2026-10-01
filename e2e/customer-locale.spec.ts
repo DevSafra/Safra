@@ -119,7 +119,11 @@ test.describe('Arabic plurals on a real page', () => {
       .filter({ hasText: /إقامة|إقامات|إقامتان/ })
       .first();
 
-    await expect(heading).toBeVisible();
+    /*
+      The count STREAMS in behind the results (2026-10-01): the heading first reads «الإقامات المتاحة
+      لتواريخك», which carries no number, and is replaced when the counts arrive. Read it only then.
+    */
+    await expect(heading).toHaveText(/[0-9٠-٩]/, { timeout: 10_000 });
 
     const text = (await heading.textContent()) ?? '';
     const digits = text
