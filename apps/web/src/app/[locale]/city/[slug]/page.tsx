@@ -1,9 +1,8 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 
-import { BreadcrumbChevron } from '@/components/icons';
+import { Breadcrumb } from '@/components/breadcrumb';
 import { JsonLd } from '@/components/json-ld';
 import { PropertyCard } from '@/components/property-card';
 import { SearchForm } from '@/components/search-form';
@@ -212,29 +211,10 @@ export default async function CityPage({
           />
         )}
         <div className="relative mx-auto max-w-7xl px-4 py-14 sm:py-20">
-          <nav
-            aria-label={tnav('breadcrumb')}
-            className="flex flex-wrap items-center text-sm text-faint"
-          >
-            {/*
-              A breadcrumb link is a CONTROL, so it carries the 40px floor below `lg`.
-
-              `min-height` does nothing to an inline element, which is why `inline-flex` comes with it —
-              the same combination the project rule names for anchors styled as controls. These were
-              36x17 at 390px: the city page's went unnoticed because that route answered 500 until
-              2026-08-12, and the property page's because no responsive test requested it.
-            */}
-            <Link
-              href={`/${locale}`}
-              className="inline-flex min-h-10 items-center hover:text-gold-read lg:min-h-0"
-            >
-              {t('backHome')}
-            </Link>
-            <span aria-hidden className="mx-2 inline-flex items-center">
-              <BreadcrumbChevron />
-            </span>
-            <span className="text-muted">{name}</span>
-          </nav>
+          <Breadcrumb
+            label={tnav('breadcrumb')}
+            items={[{ label: t('backHome'), href: `/${locale}` }, { label: name }]}
+          />
 
           <p className="mt-4 text-sm tracking-wide text-sky">
             {city.categories.map((c) => localisedName(c, locale)).join(' · ')}

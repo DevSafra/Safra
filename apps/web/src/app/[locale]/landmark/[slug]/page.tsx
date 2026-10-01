@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 
-import { BreadcrumbChevron } from '@/components/icons';
+import { Breadcrumb } from '@/components/breadcrumb';
 import { JsonLd } from '@/components/json-ld';
 import { PropertyCard } from '@/components/property-card';
 import { addDays, todayInDamascus } from '@/lib/settings';
@@ -263,35 +263,14 @@ export default async function LandmarkPage({
           className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_-20%,color-mix(in_oklab,var(--color-sky)_28%,transparent),transparent_65%)]"
         />
         <div className="relative mx-auto max-w-7xl px-4 py-14 sm:py-20">
-          <nav
-            aria-label={tnav('breadcrumb')}
-            className="flex flex-wrap items-center text-sm text-faint"
-          >
-            {/* A breadcrumb link is a CONTROL, so it carries the 40px floor below `lg`. */}
-            <Link
-              href={`/${locale}`}
-              className="inline-flex min-h-10 items-center hover:text-gold-read lg:min-h-0"
-            >
-              {tnav('home')}
-            </Link>
-            <span aria-hidden className="mx-2 inline-flex items-center">
-              <BreadcrumbChevron />
-            </span>
-            {/*
-              A real link, not a label. The city page is this page's parent in the crawl and the
-              reader's most likely next step when nothing here is free.
-            */}
-            <Link
-              href={`/${locale}/city/${landmark.citySlug}`}
-              className="inline-flex min-h-10 items-center hover:text-gold-read lg:min-h-0"
-            >
-              {cityName}
-            </Link>
-            <span aria-hidden className="mx-2 inline-flex items-center">
-              <BreadcrumbChevron />
-            </span>
-            <span className="text-muted">{name}</span>
-          </nav>
+          <Breadcrumb
+            label={tnav('breadcrumb')}
+            items={[
+              { label: tnav('home'), href: `/${locale}` },
+              { label: cityName, href: `/${locale}/city/${landmark.citySlug}` },
+              { label: name },
+            ]}
+          />
 
           {/* Staff author the kinds, so a landmark may have none — then the line is absent. */}
           {kind ? <p className="mt-4 text-sm tracking-wide text-sky">{kind}</p> : null}

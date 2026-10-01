@@ -10,7 +10,8 @@ import { breadcrumbGraph, faqGraph, lodgingGraph, pick } from '@/lib/structured-
 import { siteOrigin } from '@/lib/site-url';
 import { MAX_BASKET_ROOMS } from '@/lib/basket-limits';
 import { readableDate, readableMonth } from '@/lib/readable-date';
-import { AmenityIcon, BreadcrumbChevron } from '@/components/icons';
+import { AmenityIcon } from '@/components/icons';
+import { Breadcrumb } from '@/components/breadcrumb';
 import { FaqList } from '@/components/faq-list';
 import { JsonLd } from '@/components/json-ld';
 import { SaveButton } from '@/components/save-button';
@@ -559,31 +560,14 @@ export default async function PropertyPage({
         available={rooms}
       >
         <article className="mx-auto max-w-7xl px-4 py-8">
-          <nav
-            aria-label={tnav('breadcrumb')}
-            className="flex flex-wrap items-center text-sm text-faint"
-          >
-            {/* Both breadcrumb links are controls — see the note on the city page. */}
-            <Link
-              href={`/${locale}`}
-              className="inline-flex min-h-10 items-center hover:text-gold-read lg:min-h-0"
-            >
-              {tc('backHome')}
-            </Link>
-            <span aria-hidden className="mx-2 inline-flex items-center">
-              <BreadcrumbChevron />
-            </span>
-            <Link
-              href={`/${locale}/city/${property.city.slug}`}
-              className="inline-flex min-h-10 items-center hover:text-gold-read lg:min-h-0"
-            >
-              {cityName}
-            </Link>
-            <span aria-hidden className="mx-2 inline-flex items-center">
-              <BreadcrumbChevron />
-            </span>
-            <span className="text-muted">{name}</span>
-          </nav>
+          <Breadcrumb
+            label={tnav('breadcrumb')}
+            items={[
+              { label: tc('backHome'), href: `/${locale}` },
+              { label: cityName, href: `/${locale}/city/${property.city.slug}` },
+              { label: name },
+            ]}
+          />
 
           <header className="mt-6">
             <div className="flex flex-wrap items-start justify-between gap-4">

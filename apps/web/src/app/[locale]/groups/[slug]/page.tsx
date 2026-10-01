@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 
-import { BreadcrumbChevron } from '@/components/icons';
+import { Breadcrumb } from '@/components/breadcrumb';
 import { JsonLd } from '@/components/json-ld';
 import { formatMoney, localisedText } from '@/lib/localise';
 import { getGroupTrip, hasFinished, nightsBetween } from '@/lib/group-trips';
@@ -153,21 +153,10 @@ export default async function GroupTripPage({
       ))}
 
       {/* The same breadcrumb shape the property page uses — one chevron, drawn, following the page. */}
-      <nav
-        aria-label={t('title')}
-        className="flex flex-wrap items-center text-sm text-faint"
-      >
-        <Link
-          href={`/${locale}/groups`}
-          className="inline-flex min-h-10 items-center hover:text-gold-read lg:min-h-0"
-        >
-          {t('backToList')}
-        </Link>
-        <span aria-hidden className="mx-2 inline-flex items-center">
-          <BreadcrumbChevron />
-        </span>
-        <span className="text-muted">{title}</span>
-      </nav>
+      <Breadcrumb
+        label={t('title')}
+        items={[{ label: t('backToList'), href: `/${locale}/groups` }, { label: title }]}
+      />
 
       {/*
         The photograph, between the breadcrumb and the title.
