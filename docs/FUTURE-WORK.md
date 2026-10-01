@@ -91,6 +91,45 @@ deleting it; the reason something was blocked is often the reason it comes back.
 
 ## 1. Where the project stands
 
+> ### «الإقامات» rebuilt on booking.com's model, 2026-10-01 (awaiting Bashar's review, uncommitted)
+>
+> Bashar asked for the results page to be «very similar» to booking.com, with every filter and a
+> list that loads on scroll instead of pages. Built: live filter counts (`GET /search/facets`,
+> cached 60 s per query in Redis), a budget histogram on the fee-inclusive nightly price, four new
+> filters the data already supported (guest score, bathrooms, bed type, distance from the centre),
+> horizontal result cards with the room, the cancellation promise and the guest score, hearts that
+> save from the card (`GET /favourites/statuses`, one query per batch), a map card that opens the
+> existing full-screen map, a phone bar with a filter sheet, and a feed that restores the loaded
+> list and the opened card on the way back. The breadcrumb trail is now one component
+> (`apps/web/src/components/breadcrumb.tsx`) on all five pages that have one, held by
+> `one-breadcrumb.test.ts`.
+>
+> **Open items it leaves, each needing a decision or a measurement:**
+>
+> - **Nationwide counts do not fit their budget at production volume.** Measured on `safra_load`
+>   (50k published properties, 200k units, one laptop) on 2026-10-01: uncached facets took 4.9 to
+>   15 s nationwide, and the first call hit the pool's 15 s timeout and answered 500. Three fixes
+>   followed, approved by Bashar the same day: the page streams the counts behind the results
+>   (Suspense, so the list never waits); the counts query runs under a 1.5 s `statement_timeout`
+>   and answers 503 past it, remembered for the cache's 60 s; and without a budget the price bars
+>   use each room's base rate rather than exact pricing. Re-measured: a city is 0.2 to 0.6 s warm,
+>   up to ~1.5 s on a cold buffer cache (one Latakia and one Aleppo query landed on the limit); a
+>   repeat is 3 ms; **nationwide still exceeds 1.5 s and now answers 503 in 1.5 s**, so the
+>   unfiltered «الإقامات» shows its filters without numbers. Making nationwide counts real needs
+>   precomputation (per city and date window, in the worker) or the precomputed nightly total
+>   O-scale-2 already names; production hardware must be measured before either is chosen.
+> - **The filters now need JavaScript.** The old panel was a GET form that worked without it. The
+>   new one applies on change, as booking.com's does. A `<noscript>` form could restore it.
+> - **Facets are a heavier request than search.** Varying parameters defeats the cache, and the
+>   endpoint is bounded only by the global 120/min throttle and the 15 s statement timeout. A
+>   tighter per-route limit is one decorator.
+> - **Nine listings are still priced in SYP** in the development data, though USD has been the only
+>   offered currency since 2026-09-14. The price bars use the currency most stays are priced in;
+>   the cards still print those nine in pounds.
+> - **Data booking.com filters on that SAFRA does not hold:** district, brands, per-property payment
+>   methods, certifications, meal plans. Left out by Bashar's choice (2026-10-01); each is a data
+>   model plus a partner form before it can be a filter.
+
 > ### Feature development closed, 2026-09-30
 >
 > **Bashar, 2026-09-30, confirmed complete:** Group Trips, FAQ, maps and landmarks, the readiness
