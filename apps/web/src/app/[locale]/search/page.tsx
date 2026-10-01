@@ -1,18 +1,25 @@
 import type { Metadata } from 'next';
+import { Suspense, type ReactNode } from 'react';
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 
-import {
-  DEFAULT_SEARCH_RADIUS_KM,
-  MAX_SEARCH_RADIUS_KM,
-  TRIP_ATTRIBUTES,
-} from '@safra/contracts';
+import { TRIP_ATTRIBUTES } from '@safra/contracts';
 
-import { PropertyCard } from '@/components/property-card';
-import { SearchFilters } from '@/components/search-filters';
+import { Breadcrumb } from '@/components/breadcrumb';
+import { CollapsibleSearch } from '@/components/search/collapsible-search';
+import { FilterPanel, type FilterOption } from '@/components/search/filter-panel';
+import { ResultsFeed } from '@/components/search/results-feed';
+import { SortControl } from '@/components/search/sort-control';
 import { SearchMap } from '@/components/search-map';
 import { SearchForm } from '@/components/search-form';
-import { isLocale, type Locale } from '@/i18n/routing';
+import { isLocale } from '@/i18n/routing';
+import {
+  savedSlugs,
+  searchFacetsSafely,
+  searchSafely,
+  type SearchFacets,
+} from '@/lib/api';
+import { BBOX_PLACEHOLDER } from '@/lib/basemap';
 import {
   getAmenities,
   getCities,
@@ -20,37 +27,40 @@ import {
   getPropertyTypes,
   getPublicSettings,
 } from '@/lib/catalog';
-import { searchSafely } from '@/lib/api';
-import { BBOX_PLACEHOLDER } from '@/lib/basemap';
+import { dynamicMessage } from '@/lib/dynamic-message';
 import { formatMoney, localisedName, localisedText } from '@/lib/localise';
-import { addDays, todayInDamascus } from '@/lib/settings';
+import { readableDate } from '@/lib/readable-date';
+import { toCardModels } from '@/lib/search-cards';
+import {
+  parseSearch,
+  toQueryString,
+  toSearchParams,
+  type RawQuery,
+  type Sort,
+} from '@/lib/search-query';
+import { getSession } from '@/lib/session-server';
+import { todayInDamascus } from '@/lib/settings';
 
 /**
- * Results page (§5.5).
+ * «الإقامات» — the results page (§5.5), rebuilt as booking.com's (Bashar, 2026-10-01: «make it
+ * very similar … implement a lazy loading when I scroll to the bottom. Do not use pagination.
+ * implement all filter»).
  *
- * Dynamic by necessity — results depend on live availability, so nothing here can
- * be cached. `noindex` because a parameterised search URL is not content worth
- * indexing; the CITY pages are the SEO surface (§5.4), and letting crawlers loose
- * on date permutations would burn budget on near-duplicate pages.
+ * ## The shape
  *
- * ## Three things it could not do until 2026-09-02
+ * The search bar, a breadcrumb, and a heading that states the TRUE total — «دمشق: وجدنا ١٢ مكان
+ * إقامة» — from the facet query, which counts the same set the list pages through. Beside it the
+ * order. Down the reading start, the map card and every filter with its live count; on a phone
+ * those collapse into a sticky «الترتيب · التصفية · الخريطة» bar. Then the results, twenty at a time,
+ * the next twenty fetched before the reader reaches the end.
  *
- * **It could not be paged.** It asked for 24 results and rendered them, and the twenty-fifth stay
- * was unreachable by any means — not by scrolling, not by a control, not by editing the URL, since
- * `limit` caps at 60 and no cursor was ever sent. §2 makes pagination mandatory on every list a
- * customer reads and cursor the only permitted mechanism. It now sends the cursor the API returns
- * and renders links in both directions.
+ * ## What it inherits and keeps
  *
- * **It could not be filtered.** `searchQuerySchema` accepts a price range, a property type, trip
- * attributes, amenity codes and a free-cancellation switch; the screen offered a sort order. Every
- * one of those was live in the API and reachable only by hand-writing a query string.
- *
- * **Its sort links reflected the query string.** They were built by iterating `Object.entries` over
- * whatever the URL happened to carry, which put arbitrary caller-chosen parameters into four links
- * on our own page. `URLSearchParams` encodes, and the base path is a literal, so this was not an
- * open redirect or an injection — but it is the shape `returnQuery` was written to forbid, and the
- * fix is the same one: build the link from the values this page PARSED and CLAMPED, never from the
- * request. A parameter nobody here understands is now dropped rather than carried forward.
+ * Dynamic and `noindex`, because results depend on live availability and a parameterised search
+ * is not content worth indexing — the city pages are the SEO surface (§5.4). Every link on the
+ * page is rebuilt from the PARSED query by `toQueryString`, so a parameter nobody here understands
+ * is dropped rather than reflected (the rule `returnQuery` states for the console). The same-day
+ * cutoff stays a notice, not an error.
  */
 export const dynamic = 'force-dynamic';
 
@@ -58,67 +68,12 @@ export const metadata: Metadata = {
   robots: { index: false, follow: true },
 };
 
-type SearchParams = Record<string, string | string[] | undefined>;
-
-function first(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
-
-function many(value: string | string[] | undefined): string[] {
-  if (value === undefined) return [];
-  return Array.isArray(value) ? value : [value];
-}
-
-/** A whole number inside its bounds, or the fallback — never NaN, never negative. */
-function whole(raw: string | undefined, fallback: number, max: number): number {
-  const value = Number(raw);
-
-  if (!Number.isFinite(value)) return fallback;
-
-  return Math.min(Math.max(Math.trunc(value), 0), max);
-}
-
-/**
- * A price bound, or nothing at all.
- *
- * Distinct from `whole` because absence is meaningful here: `minPrice` omitted means "no floor",
- * and coercing a missing or unparseable value to 0 would turn an empty box into a filter. The
- * schema refuses `min > max`, so an inverted pair is dropped rather than sent — a 400 on the
- * results page would replace somebody's search with an error for a typo in a number field.
- */
-function money(raw: string | undefined): number | undefined {
-  if (raw === undefined || raw.trim() === '') return undefined;
-
-  const value = Number(raw);
-
-  if (!Number.isFinite(value) || value < 0) return undefined;
-
-  return Math.min(Math.trunc(value), 1_000_000);
-}
-
-const SORTS = [
-  'recommended',
-  'price_asc',
-  'price_desc',
-  'rating_desc',
-  'distance_asc',
-] as const;
-
-type Sort = (typeof SORTS)[number];
-
-function isSort(value: string | undefined): value is Sort {
-  return SORTS.includes((value ?? '') as Sort);
-}
-
-/** How many results a page holds. Under the contract's 60 ceiling, and a multiple of the grid. */
-const PAGE_SIZE = 24;
-
 export default async function SearchPage({
   params,
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<SearchParams>;
+  searchParams: Promise<RawQuery>;
 }) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
@@ -126,351 +81,243 @@ export default async function SearchPage({
 
   const query = await searchParams;
   const t = await getTranslations('search');
+  const tr = await getTranslations('search.results');
   const ta = await getTranslations('attributes');
+  const tt = await getTranslations('propertyTypes');
+  const tm = await getTranslations('amenities');
+  const tnav = await getTranslations('nav');
 
-  const [cities, propertyTypes, amenities] = await Promise.all([
+  const [cities, propertyTypes, amenities, publicSettings] = await Promise.all([
     getCities(),
     getPropertyTypes(),
     getAmenities(),
+    getPublicSettings(),
   ]);
 
   /*
-    A date, or nothing — and `??` alone could not tell the difference.
-
-    `first(query['checkIn']) ?? todayInDamascus()` fell back only on `undefined`, and an EMPTY
-    string is not nullish. So `?checkIn=` put `''` into every date path below: the page answered
-    **500** on the server, and `?checkOut=` got through to the browser and threw
-    `RangeError: Invalid time value` — a blank «Application error» on the busiest page of the site,
-    from a link that had merely lost its query string. `?checkIn=not-a-date` did the same.
-
-    Validated by SHAPE rather than parsed: `YYYY-MM-DD` or nothing. A shape test is an allow-list,
-    it cannot pass through something that is not a date, and it leaves the API as the authority on
-    whether the date is bookable — which it already is, and re-checks.
-
-    Checkout has answered this correctly since it was written (`if (!slug || !unitId || !checkIn
-    || !checkOut)`); it refuses and says so, because a checkout with no dates is a broken link. A
-    SEARCH with no dates is an ordinary first visit, so this falls back instead.
+    Every filterable amenity is an allowed code, and the live counts decide which are SHOWN. The
+    old allow-list used the catalogue's `propertyCount`, which counts room-level links only — so a
+    pool declared on the BUILDING never appeared as a filter at all, while the search itself would
+    have found it.
   */
-  const asDate = (value: string | undefined): string | undefined =>
-    value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
-
-  const checkIn = asDate(first(query['checkIn'])) ?? todayInDamascus();
-  const checkOut = asDate(first(query['checkOut'])) ?? addDays(checkIn, 2);
-  const adultsRaw = Number(first(query['adults']) ?? 2);
-  const adults = Number.isFinite(adultsRaw) && adultsRaw > 0 ? Math.trunc(adultsRaw) : 2;
-  /*
-    §5.2's other two. Clamped here rather than trusted: the API bounds them again, but an
-    unclamped `?children=abc` would reach `searchSafely` as NaN and lose the whole result set to a
-    validation error on a page the reader arrived at by editing a URL.
-  */
-  const children = whole(first(query['children']), 0, 20);
-  const infants = whole(first(query['infants']), 0, 10);
-  /*
-    A REQUIREMENT, not a party size, and it floors at ONE (Bashar, 2026-09-03).
-
-    One filters nothing today — every unit in the database has at least one bedroom — so a plain
-    search is unchanged, and the form can show «غرفة» instead of a zero the reader has to decode.
-    Clamped rather than trusted: the API bounds it again, but an unclamped `?bedrooms=abc` would
-    reach `searchSafely` as NaN and lose the whole result set on a page somebody reached by editing
-    a URL.
-  */
-  const bedrooms = whole(first(query['bedrooms']), 1, 10);
-  const citySlug = first(query['citySlug']) || undefined;
+  const parsed = parseSearch(query, new Set(amenities.map((one) => one.code)));
+  const landmarks = await getLandmarks(parsed.citySlug);
+  const searchParamsForApi = toSearchParams(parsed);
 
   /*
-    Fetched here rather than in the parallel block above, because it depends on the city the
-    reader chose. Reference data behind the same cache, so the extra round trip is a cache
-    read on all but the first request for a city.
+    Started, NOT awaited: the counts stream in behind the results (Bashar, 2026-10-01). Nationwide at
+    production volume they cost seconds, and a reader waiting on a sidebar number before seeing a
+    single stay is the wrong way round.
   */
-  const landmarks = await getLandmarks(citySlug);
+  const facetsPromise = searchFacetsSafely(searchParamsForApi);
+  const results = await searchSafely(searchParamsForApi);
 
-  /*
-    «قريب من». A landmark belongs to a city, so one named without a city is dropped rather
-    than honoured — the API would answer an empty page, and an empty page under a filter the
-    reader cannot see is worse than no filter at all.
+  const session = await getSession();
+  const saved = session
+    ? await savedSlugs(
+        session.accessToken,
+        results.items.map((item) => item.slug),
+      )
+    : new Set<string>();
 
-    The radius is CLAMPED here as well as validated at the API, for the reason the page-size
-    control is: the API answers an out-of-range value with a 400, and a crafted
-    `?withinKm=500` in a shared link would become an error page instead of a result list.
-  */
-  const nearLandmark = citySlug ? first(query['nearLandmark']) || undefined : undefined;
-  /* Same scoping rule as the named landmark: a kind is only answerable inside one city. */
-  const nearKind = citySlug ? first(query['nearKind']) || undefined : undefined;
-  const withinKm = Math.min(
-    MAX_SEARCH_RADIUS_KM,
-    Math.max(0.5, Number(first(query['withinKm'])) || DEFAULT_SEARCH_RADIUS_KM),
-  );
-
-  /*
-    «ابحث في هذه المنطقة». Validated by the CONTRACT rather than here — a malformed box is
-    refused at the API, and reflecting one into a link on our own page is the thing
-    `returnQuery`'s allow-list exists to prevent. The shape check is cheap insurance that a
-    crafted value never reaches an href.
-  */
-  const bboxParam = first(query['bbox']);
-  const bbox =
-    bboxParam && /^-?\d{1,3}(\.\d{1,8})?(,-?\d{1,3}(\.\d{1,8})?){3}$/.test(bboxParam)
-      ? bboxParam
-      : undefined;
-
-  const sortParam = first(query['sort']);
-  const requested: Sort = isSort(sortParam) ? sortParam : 'recommended';
-  /*
-    «Nearest first» with nothing to be near is unanswerable, and the contract refuses it with
-    a 400. That refusal is right for an API and wrong for a page: `?sort=distance_asc` with
-    no landmark is an ordinary stale link — somebody cleared the landmark, or shared the URL
-    from a different search — and it must degrade to a result list, not an error.
-
-    The same reasoning as «a page past the end renders an empty table, never a 400».
-  */
-  const sort: Sort =
-    requested === 'distance_asc' && !nearLandmark ? 'recommended' : requested;
-
-  const propertyTypeCode = first(query['propertyTypeCode']) || undefined;
-  /*
-    Filtered against the enum the contract states, not passed through. An unknown attribute is a
-    400 from the API — which would answer a hand-edited URL with an error page instead of a search,
-    and would let a crafted link put an arbitrary string into the checkbox state of our own form.
-  */
-  const attributes = many(query['attributes']).filter((code): code is string =>
-    (TRIP_ATTRIBUTES as readonly string[]).includes(code),
-  );
-  /*
-    Against the amenities that can actually return something, which is the same set the panel
-    renders — see the note on the `/amenities` endpoint. Filtering against the whole catalogue
-    instead would let a bookmarked `?amenityCodes=wifi` reach the API and empty the page while no
-    checkbox on screen explained why, which is the untagged-catalogue defect wearing a URL.
-  */
-  const known = new Set(
-    amenities.filter((one) => one.propertyCount > 0).map((one) => one.code),
-  );
-  const amenityCodes = many(query['amenityCodes']).filter((code) => known.has(code));
-
-  const minPrice = money(first(query['minPrice']));
-  const maxPrice = money(first(query['maxPrice']));
-  /* An inverted range is refused by the schema, so it is dropped here rather than sent. */
-  const rangeOk =
-    minPrice === undefined || maxPrice === undefined || minPrice <= maxPrice;
-
-  /*
-    The star classification filter, CLAMPED to the five values that exist.
-
-    Parsed here rather than forwarded, for the reason the amenity filter records: a bookmarked
-    `?starRatings=9` would otherwise reach the API, be refused by the schema, and empty the page
-    with no explanation. Anything that is not 1-5 is simply not a filter, and `Set` drops a repeat
-    so `?starRatings=4&starRatings=4` narrows once.
-  */
-  const starRatings = [
-    ...new Set(
-      many(query['starRatings'])
-        .map((value) => Number(value))
-        .filter((value) => Number.isInteger(value) && value >= 1 && value <= 5),
-    ),
-  ].sort((a, b) => a - b);
-
-  const freeCancellationOnly = first(query['freeCancellationOnly']) === 'true';
-
-  const cursor = first(query['cursor']) || undefined;
-
-  /*
-    The cutoff hour as the customer reads it — «17:00» — from the setting rather than a literal.
-    Padded rather than formatted with `Intl`: it is a clock hour on the 24-hour dial, the same
-    string in all three locales, and `Intl.DateTimeFormat` would drag a real date into it.
-  */
-  const publicSettings = await getPublicSettings();
-  const cutoffHourLabel = `${String(cutoffHour(publicSettings)).padStart(2, '0')}:00`;
-
-  const results = await searchSafely({
-    checkIn,
-    checkOut,
-    adults,
-    children,
-    infants,
-    bedrooms,
-    citySlug,
-    propertyTypeCode,
-    attributes,
-    amenityCodes,
-    starRatings,
-    minPrice: rangeOk ? minPrice : undefined,
-    maxPrice: rangeOk ? maxPrice : undefined,
-    freeCancellationOnly,
-    nearLandmark,
-    nearKind,
-    withinKm,
-    bbox,
-    sort,
-    limit: PAGE_SIZE,
-    cursor,
-  });
-
-  /**
-   * Every parameter this page understands, rebuilt from the values it parsed.
-   *
-   * The allow-list IS this function. Nothing reaches a link on this page that did not survive the
-   * clamping above, so a crafted `?whatever=…` is dropped rather than reflected — the rule
-   * `returnQuery` states for the console, applied here.
-   */
-  const link = (
-    overrides: { sort?: Sort; cursor?: string | null; bbox?: string | null } = {},
-  ) => {
-    const next = new URLSearchParams({
-      checkIn,
-      checkOut,
-      adults: String(adults),
-      children: String(children),
-      infants: String(infants),
-      sort: overrides.sort ?? sort,
-    });
-
-    /*
-      Only when it narrows something. `bedrooms=1` in every URL would be noise in a shared link and
-      is the default anyway — but it MUST be carried above one, or paging past the first page of a
-      «three bedrooms» search quietly returns one-bedroom flats.
-    */
-    if (bedrooms > 1) next.set('bedrooms', String(bedrooms));
-
-    if (citySlug) next.set('citySlug', citySlug);
-    if (propertyTypeCode) next.set('propertyTypeCode', propertyTypeCode);
-    for (const code of attributes) next.append('attributes', code);
-    for (const code of amenityCodes) next.append('amenityCodes', code);
-    /* Carried, or paging out of a «5 stars» search quietly returns everything. */
-    for (const value of starRatings) next.append('starRatings', String(value));
-    if (rangeOk && minPrice !== undefined) next.set('minPrice', String(minPrice));
-    if (rangeOk && maxPrice !== undefined) next.set('maxPrice', String(maxPrice));
-    if (freeCancellationOnly) next.set('freeCancellationOnly', 'true');
-    /*
-      Carried, or paging out of a «near the airport» search quietly returns the whole city —
-      the same failure the star filter's note above describes. The radius rides with it,
-      because a landmark without one silently widens to the default.
-    */
-    if (nearLandmark) {
-      next.set('nearLandmark', nearLandmark);
-      next.set('withinKm', String(withinKm));
-    } else if (nearKind) {
-      next.set('nearKind', nearKind);
-      next.set('withinKm', String(withinKm));
-    }
-    /*
-      Carried, or paging out of a map search quietly returns the whole city.
-
-      `overrides.bbox` is how the map SETS one and how «أزل حدود المنطقة» clears it: `undefined`
-      means «keep what the page has», `null` means «drop it». The two have to be distinguishable
-      or the clear control could only ever be a no-op.
-    */
-    const nextBbox = overrides.bbox === undefined ? bbox : overrides.bbox;
-    if (nextBbox) next.set('bbox', nextBbox);
-
-    /*
-      `cursor: null` means "back to the first page" — what changing the SORT must do. Keeping an
-      offset across a reorder lands the reader on page three of a differently ordered list, which
-      shows them results they have not seen while claiming to be where they were.
-    */
-    const target = overrides.cursor === undefined ? cursor : overrides.cursor;
-
-    if (target) next.set('cursor', target);
-
-    return `/${locale}/search?${next.toString()}`;
-  };
-
-  /*
-    What the reader asked for, carried into every result link. Built from the parsed values, never
-    from the raw query string — see the note on `PropertyCard`'s `stay` prop.
-  */
-  const stay = `?${new URLSearchParams({
-    checkIn,
-    checkOut,
-    adults: String(adults),
-    children: String(children),
-    infants: String(infants),
-  }).toString()}`;
-
-  /* The landmark's NAME, for the distance line on each card. */
-  const nearLandmarkLabel = nearLandmark
-    ? localisedText(
-        landmarks.find((one) => one.slug === nearLandmark)?.name ?? {
-          ar: null,
-          en: null,
-          de: null,
-        },
-        locale,
-      ) || undefined
+  const nearLandmark = landmarks.find((one) => one.slug === parsed.nearLandmark);
+  const nearLandmarkName = nearLandmark
+    ? localisedText(nearLandmark.name, locale) || undefined
     : undefined;
 
-  const sortOptions: { value: Sort; label: string }[] = [
-    { value: 'recommended', label: t('sortRecommended') },
-    { value: 'price_asc', label: t('sortPriceAsc') },
-    { value: 'price_desc', label: t('sortPriceDesc') },
-    { value: 'rating_desc', label: t('sortRatingDesc') },
-    /*
-      Offered ONLY with a landmark to measure from. The contract refuses the combination, so
-      a select that showed it regardless would let a reader pick an option that answers 400 —
-      a control whose failure is a broken page rather than a different order.
-    */
-    ...(nearLandmark
+  const cards = await toCardModels(results.items, {
+    locale,
+    stay: `?${new URLSearchParams({
+      checkIn: parsed.checkIn,
+      checkOut: parsed.checkOut,
+      adults: String(parsed.adults),
+      children: String(parsed.children),
+      infants: String(parsed.infants),
+    }).toString()}`,
+    adults: parsed.adults,
+    nearLandmarkName,
+    amenities,
+    saved,
+  });
+
+  const view = toQueryString(parsed);
+  const link = (overrides: Parameters<typeof toQueryString>[1]) =>
+    `/${locale}/search?${toQueryString(parsed, overrides)}`;
+
+  const sortOptions: { value: Sort; label: string; href: string }[] = [
+    { value: 'recommended' as const, label: t('sortRecommended') },
+    { value: 'price_asc' as const, label: t('sortPriceAsc') },
+    { value: 'price_desc' as const, label: t('sortPriceDesc') },
+    { value: 'rating_desc' as const, label: t('sortRatingDesc') },
+    /* Offered only with a landmark to measure from; the contract refuses it otherwise. */
+    ...(parsed.nearLandmark
       ? [{ value: 'distance_asc' as const, label: t('sortDistance') }]
       : []),
-  ];
+  ].map((option) => ({ ...option, href: link({ sort: option.value }) }));
 
-  /*
-    «# نتيجة» is the whole answer only when there is no page after this one. With more to come it
-    would be a count of what this page happens to hold presented as a total, which is the kind of
-    number somebody quotes back at you.
-  */
-  const heading = results.nextCursor
-    ? t('resultsOnPage', { count: results.items.length })
-    : t('resultsTitle', { count: results.items.length });
+  const city = cities.find((one) => one.slug === parsed.citySlug);
+  const cityName = city ? localisedName(city, locale) : undefined;
+
+  const headingFor = (facets: SearchFacets | null) =>
+    facets
+      ? cityName
+        ? tr('headingCity', { city: cityName, count: facets.total })
+        : tr('headingAll', { count: facets.total })
+      : tr('headingNoCount');
+  const headingNode = (facets: SearchFacets | null) => (
+    <h1
+      id="results-heading"
+      className="font-display text-26 font-bold leading-tight text-text text-balance"
+    >
+      {headingFor(facets)}
+    </h1>
+  );
+  /* The centre filter needs a placed centre; a card that carries the figure proves one. */
+  const cardsHaveCentre = results.items.some((item) => item.cityCentreMetres !== null);
+
+  const option = (code: string, label: string): FilterOption => ({ code, label });
+  const amenityOptions = (category: string) =>
+    amenities
+      .filter((one) => one.category === category)
+      .map((one) =>
+        option(one.code, dynamicMessage(tm, one.code, localisedName(one, locale))),
+      );
+
+  const signInHref = `/${locale}/login?next=${encodeURIComponent(`/${locale}/search?${view}`)}`;
+
+  const mapStays = results.items
+    .filter((item) => item.publicLatitude && item.publicLongitude)
+    .map((item) => ({
+      slug: item.slug,
+      name: localisedName(item, locale),
+      latitude: item.publicLatitude ?? '',
+      longitude: item.publicLongitude ?? '',
+      price: formatMoney(item.nightlyFrom, item.currencyCode, locale),
+      staysHere: 1,
+    }));
+
+  const mapProps = {
+    hrefPrefix: `/${locale}/property/`,
+    bboxActive: parsed.bbox !== undefined,
+    bboxUrlTemplate: link({ bbox: BBOX_PLACEHOLDER }),
+    urlWithoutBbox: link({ bbox: null }),
+    stays: mapStays,
+  };
+
+  const cutoff = cutoffHour(publicSettings);
+
+  const adultsText = t('guestsCount', { count: parsed.adults });
+  const summary = tr('searchSummary', {
+    place: cityName ?? t('allCities'),
+    from: readableDate(parsed.checkIn, locale),
+    to: readableDate(parsed.checkOut, locale),
+    party:
+      parsed.children > 0
+        ? tr('partyWithChildren', {
+            adults: adultsText,
+            children: t('childrenCount', { count: parsed.children }),
+          })
+        : adultsText,
+  });
+
+  const panel = (
+    <FilterPanel
+      facets={facetsPromise}
+      locale={locale}
+      parsed={parsed}
+      options={{
+        hasCentre: cardsHaveCentre,
+        cityName,
+        propertyTypes: propertyTypes.map((type) =>
+          option(type.code, dynamicMessage(tt, type.code, localisedName(type, locale))),
+        ),
+        facilities: amenityOptions('facilities'),
+        houseRules: amenityOptions('rules'),
+        accessibility: amenityOptions('accessibility'),
+        attributes: TRIP_ATTRIBUTES.map((code) => option(code, ta(code))),
+        landmarks: landmarks.map((mark) =>
+          option(mark.slug, localisedText(mark.name, locale) || mark.slug),
+        ),
+        landmarkKinds: [
+          ...new Map(
+            landmarks.map((mark) => [
+              mark.kind,
+              option(mark.kind, localisedText(mark.kindName, locale) || mark.kind),
+            ]),
+          ).values(),
+        ],
+      }}
+      sortSlot={
+        <SortControl
+          compact
+          label={tr('sortBy')}
+          value={parsed.sort}
+          options={sortOptions}
+        />
+      }
+      mapThumbnailSlot={<SearchMap variant="thumbnail" {...mapProps} />}
+      mapButtonSlot={<SearchMap variant="compact" {...mapProps} />}
+    />
+  );
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-10">
-      <SearchForm
-        locale={locale}
-        cities={cities}
-        propertyTypes={propertyTypes}
-        minDate={results.firstBookableDate ?? todayInDamascus()}
-        attributes={TRIP_ATTRIBUTES.map((code) => ({ code, label: ta(code) }))}
-        attributesLabel={t('attributes')}
-        defaults={{
-          citySlug,
-          /*
-            The value the PAGE parsed, so the bar and the sidebar cannot disagree.
+    <div className="mx-auto max-w-7xl px-4 pb-16 pt-6">
+      {/*
+        No trip-attribute chips here: «صفات الرحلة» is a group in the sidebar, and the same control in
+        two places is two states that can disagree.
+      */}
+      <CollapsibleSearch summary={summary} editLabel={tr('editSearch')}>
+        <SearchForm
+          locale={locale}
+          cities={cities}
+          propertyTypes={propertyTypes}
+          minDate={results.firstBookableDate ?? todayInDamascus()}
+          attributesLabel={t('attributes')}
+          defaults={{
+            citySlug: parsed.citySlug,
+            /* The value the PAGE parsed, so the bar and the sidebar cannot disagree. */
+            propertyTypeCode: parsed.propertyTypeCode,
+            checkIn: parsed.checkIn,
+            checkOut: parsed.checkOut,
+            adults: parsed.adults,
+            children: parsed.children,
+            infants: parsed.infants,
+            bedrooms: parsed.bedrooms,
+            attributes: parsed.attributes,
+          }}
+        />
+      </CollapsibleSearch>
 
-            Both controls carry `propertyTypeCode`, in two separate forms. Passing the active value
-            here means the bar shows what the sidebar's radio shows; without it the bar would read
-            «كل الأنواع» over a filtered result set, and submitting the bar would silently clear a
-            filter the reader had set.
-          */
-          propertyTypeCode,
-          checkIn,
-          checkOut,
-          adults,
-          children,
-          infants,
-          bedrooms,
-          attributes,
-        }}
+      <Breadcrumb
+        label={tr('breadcrumb')}
+        className="mt-5"
+        items={[
+          { label: tnav('home'), href: `/${locale}` },
+          ...(cityName
+            ? [
+                {
+                  label: tnav('stays'),
+                  href: link({
+                    citySlug: null,
+                    maxCentreKm: null,
+                    nearLandmark: null,
+                    nearKind: null,
+                  }),
+                },
+                { label: cityName },
+              ]
+            : [{ label: tnav('stays') }]),
+        ]}
       />
 
-      {/*
-        §5.3: a closed same-day cutoff is a normal outcome, not an error. The API
-        returns the next bookable date and the page explains it in the customer's
-        language rather than showing an empty result set with no reason.
-      */}
+      {/* §5.3: a closed same-day cutoff is a normal outcome, explained rather than shown as empty. */}
       {results.notice ? (
         <p
           role="status"
-          className="mt-6 rounded-card border border-warn/40 bg-warn/10 p-4 text-sm text-warn"
+          className="mt-4 rounded-card border border-warn/40 bg-warn/10 p-4 text-14 text-warn"
         >
           {t('cutoffNotice', {
-            /*
-              The CONFIGURED hour, not a literal.
-
-              This said «17:00» whatever the setting was, so an operator who moved the cutoff to
-              20:00 left every customer reading a sentence that named the wrong hour — and since
-              2026-09-04 the rule can be switched off entirely, at which point this notice cannot
-              appear at all. A message that states a rule has to read the rule.
-            */
-            hour: cutoffHourLabel,
+            hour: `${String(cutoff).padStart(2, '0')}:00`,
             date: results.notice.firstBookableDate,
           })}
         </p>
@@ -479,266 +326,81 @@ export default async function SearchPage({
       {results.failed ? (
         <p
           role="alert"
-          className="mt-6 rounded-card border border-bad/40 bg-bad/10 p-4 text-sm text-bad"
+          className="mt-4 rounded-card border border-bad/40 bg-bad/10 p-4 text-14 text-bad"
         >
           {t('noResults')}
         </p>
       ) : null}
 
-      {/*
-        Filters at the reading START — the right of an Arabic page — which is where booking.com
-        puts them and where `ps`/`pe` logical properties place them without a second stylesheet.
-        Below `lg` the aside comes FIRST in the DOM but collapses to its summary, so a phone lands
-        on one line of controls and then the results, rather than on a column of checkboxes.
-      */}
-      <div className="mt-8 grid items-start gap-6 lg:grid-cols-[17rem_1fr]">
-        <aside>
-          <SearchFilters
-            locale={locale}
-            propertyTypes={propertyTypes}
-            amenities={amenities}
-            landmarks={landmarks}
-            /*
-              The kinds actually PRESENT in this city, each named once. A kind with no landmark
-              here would be an option that empties the page.
-            */
-            landmarkKinds={[
-              ...new Map(
-                landmarks.map((one) => [
-                  one.kind,
-                  {
-                    code: one.kind,
-                    label: localisedText(one.kindName, locale) || one.kind,
-                  },
-                ]),
-              ).values(),
-            ]}
-            carried={{
-              citySlug,
-              checkIn,
-              checkOut,
-              adults,
-              children,
-              infants,
-              bedrooms,
-              sort,
-            }}
-            active={{
-              propertyTypeCode,
-              attributes,
-              starRatings,
-              amenityCodes,
-              minPrice: rangeOk ? minPrice : undefined,
-              maxPrice: rangeOk ? maxPrice : undefined,
-              freeCancellationOnly,
-              nearLandmark,
-              nearKind,
-              withinKm,
-            }}
-          />
-        </aside>
+      <div className="mt-4 grid items-start gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
+        <aside>{panel}</aside>
 
-        <div>
-          <div className="flex flex-wrap items-baseline justify-between gap-3">
-            <h1 className="font-display text-2xl text-text">{heading}</h1>
-
-            {/* Sort as links, so the choice stays in the URL and remains shareable. */}
-            <nav aria-label={t('sortLabel')} className="flex flex-wrap gap-1.5 text-sm">
-              {sortOptions.map((option) => (
-                <a
-                  key={option.value}
-                  href={link({ sort: option.value, cursor: null })}
-                  aria-current={sort === option.value ? 'true' : undefined}
-                  className={
-                    sort === option.value
-                      ? 'inline-flex min-h-10 items-center rounded-lg border border-gold/50 bg-card px-3 py-1.5 text-gold-read sm:min-h-11'
-                      : 'inline-flex min-h-10 items-center rounded-lg border border-line px-3 py-1.5 text-muted transition-colors duration-200 ease-out-strong hover:border-gold/50 hover:bg-gold/10 hover:text-text sm:min-h-11'
-                  }
-                >
-                  {option.label}
-                </a>
-              ))}
-            </nav>
+        <section aria-labelledby="results-heading" className="min-w-0">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Suspense fallback={headingNode(null)}>
+              <Counted promise={facetsPromise}>{headingNode}</Counted>
+            </Suspense>
+            <div className="hidden w-72 lg:block">
+              <SortControl
+                label={tr('sortBy')}
+                value={parsed.sort}
+                options={sortOptions}
+              />
+            </div>
           </div>
 
-          {/*
-            The map, as a way to SEARCH rather than to confirm.
-
-            Under the heading and above the results, because it is a way of reading this list
-            rather than a filter on it — the panel on the left narrows what is in the set, and
-            this changes how the set is looked at.
-          */}
-          <div className="mt-4">
-            <SearchMap
-              hrefPrefix={`/${locale}/property/`}
-              bboxActive={bbox !== undefined}
-              bboxUrlTemplate={link({ bbox: BBOX_PLACEHOLDER, cursor: null })}
-              urlWithoutBbox={link({ bbox: null, cursor: null })}
-              /*
-                Only the results that can be PLACED. A listing whose partner has set no location
-                cannot go on a map, and inventing a position for it would be the one thing this
-                whole model refuses.
-              */
-              stays={results.items
-                .filter((item) => item.publicLatitude && item.publicLongitude)
-                .map((item) => ({
-                  slug: item.slug,
-                  name: localisedName(
-                    { nameAr: item.nameAr, nameEn: item.nameEn, nameDe: item.nameDe },
-                    locale,
-                  ),
-                  latitude: item.publicLatitude ?? '',
-                  longitude: item.publicLongitude ?? '',
-                  price: formatMoney(item.nightlyFrom, item.currencyCode, locale),
-                  /* One card per result here; co-location is the neighbours query's problem. */
-                  staysHere: 1,
-                }))}
-            />
-          </div>
-
-          {results.items.length > 0 ? (
-            <>
-              <ul className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {results.items.map((item) => (
-                  <li key={item.propertyReference}>
-                    <PropertyCard
-                      item={item}
-                      locale={locale}
-                      stay={stay}
-                      /*
-                        Resolved once for the page rather than per card: the landmark list is
-                        already in hand, and a lookup inside the card would repeat for every
-                        result to answer the same question.
-                      */
-                      nearLandmarkName={nearLandmarkLabel}
-                    />
-                  </li>
-                ))}
-              </ul>
-
-              <Paging
+          <div className="mt-5">
+            {cards.length > 0 ? (
+              <ResultsFeed
+                /* A new search is a new list: remount, so nothing from the old one survives. */
+                key={view}
+                initialCards={cards}
+                initialNextCursor={results.nextCursor}
+                initialTruncated={results.truncated}
+                query={view}
                 locale={locale}
-                previousHref={
-                  results.previousCursor === null
-                    ? null
-                    : link({ cursor: results.previousCursor })
-                }
-                nextHref={
-                  results.nextCursor === null
-                    ? null
-                    : link({ cursor: results.nextCursor })
-                }
+                signInHref={signInHref}
                 labels={{
-                  previous: t('previousPage'),
-                  next: t('nextPage'),
+                  loading: tr('loading'),
+                  end: tr('end'),
+                  loadFailed: tr('loadFailed'),
+                  retry: tr('retry'),
                 }}
               />
-            </>
-          ) : (
-            !results.notice &&
-            !results.failed && (
-              <div className="mt-6 rounded-card border border-line bg-card p-8 text-center">
-                <p className="font-display text-lg text-text">{t('noResults')}</p>
-                <p className="mt-2 text-sm text-muted">{t('noResultsHint')}</p>
+            ) : !results.notice && !results.failed ? (
+              <div className="rounded-card border border-line bg-card p-8 text-center">
+                <p className="font-display text-18 font-bold text-text">
+                  {t('noResults')}
+                </p>
+                <p className="mt-2 text-14 text-muted">{t('noResultsHint')}</p>
               </div>
-            )
-          )}
-        </div>
+            ) : null}
+          </div>
+        </section>
       </div>
     </div>
   );
 }
 
 /**
- * Previous and next, as links.
- *
- * Anchors rather than buttons because each one is a DESTINATION: it can be opened in a new tab,
- * copied, and read by a crawler following `follow` — which this page is marked for even though it
- * is `noindex`. A disabled button at either end would be a control that says "there is more here"
- * and refuses; an absent link says the truth.
- *
- * The arrows are NOT mirrored for RTL by the component — they are drawn pointing at the reading
- * direction of travel by `rtl:` variants, which is the same decision `ImageSlider` records: an
- * arrow beside «التالي» means "onward through the list", and onward on an Arabic page is leftward.
- */
-function Paging({
-  locale,
-  previousHref,
-  nextHref,
-  labels,
-}: {
-  locale: Locale;
-  previousHref: string | null;
-  nextHref: string | null;
-  labels: { previous: string; next: string };
-}) {
-  if (!previousHref && !nextHref) return null;
-
-  const control =
-    'inline-flex min-h-10 items-center gap-2 rounded-lg border border-line px-4 py-2 text-sm font-semibold text-text transition-colors duration-200 ease-out-strong hover:border-gold/60 hover:bg-gold/10 sm:min-h-11';
-
-  return (
-    <nav
-      aria-label={labels.next}
-      className="mt-8 flex items-center justify-between gap-3 border-t border-line pt-6"
-    >
-      {previousHref ? (
-        <a href={previousHref} rel="prev" className={control}>
-          <Arrow direction="back" />
-          {labels.previous}
-        </a>
-      ) : (
-        <span />
-      )}
-
-      {nextHref ? (
-        <a href={nextHref} rel="next" className={`${control} ms-auto`} hrefLang={locale}>
-          {labels.next}
-          <Arrow direction="forward" />
-        </a>
-      ) : null}
-    </nav>
-  );
-}
-
-function Arrow({ direction }: { direction: 'back' | 'forward' }) {
-  return (
-    <svg
-      aria-hidden
-      width="1.05em"
-      height="1.05em"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      /*
-        One glyph, flipped by direction and by writing mode. `rtl:-scale-x-100` is what makes
-        «التالي» point left on an Arabic page and right on a German one, from a single path.
-      */
-      className={
-        direction === 'forward'
-          ? 'shrink-0 -scale-x-100 rtl:scale-x-100'
-          : 'shrink-0 rtl:-scale-x-100'
-      }
-    >
-      <path d="M19 12H5m0 0 6-6m-6 6 6 6" />
-    </svg>
-  );
-}
-
-/**
- * The configured cutoff hour, or 17 when the setting cannot be read as one.
- *
- * `Number(undefined)` and `Number('evening')` are both `NaN`, and `NaN` here does not fail — it
- * renders «NaN:00» into a sentence explaining a rule to a customer. The API validates this key as
- * `hourOfDay` on write, so the guard is for the value arriving some other way: an unseeded row, a
- * hand-edited one, or a future change to what `publicSettings` returns. Same discipline as
- * `SettingsService.getNumber`, on the other side of the wire.
+ * The configured cutoff hour, or 17 when the setting cannot be read as one — never «NaN:00» in a
+ * sentence explaining a rule to a customer.
  */
 function cutoffHour(settings: Record<string, unknown>): number {
   const hour = Number(settings['booking.same_day_cutoff_hour']);
-
   return Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : 17;
+}
+
+/**
+ * Renders `children` once the counts arrive, inside a Suspense boundary whose fallback is the same
+ * markup without them. A server component, so the render function never crosses to the client.
+ */
+async function Counted({
+  promise,
+  children,
+}: {
+  promise: Promise<SearchFacets | null>;
+  children: (facets: SearchFacets | null) => ReactNode;
+}) {
+  return children(await promise);
 }

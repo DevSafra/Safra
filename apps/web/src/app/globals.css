@@ -513,33 +513,6 @@
 }
 
 /**
- * A `<details>` that is a disclosure on a phone and a permanent panel on a desktop.
- *
- * The search filters are a screenful of controls. On a phone they have to collapse; from `lg`
- * there is a column for them and they must never be closed. The server cannot know the viewport,
- * so the element is rendered CLOSED and `lg` reveals it.
- *
- * **Setting `display` on the child is not enough, and believing it was cost a build.** Chrome hides
- * a closed disclosure's subtree with `content-visibility: hidden` on the `::details-content`
- * pseudo-element, which no property on a descendant can override — the form computed
- * `display: flex` with a 1911px box and was still not rendered. A first test appeared to prove the
- * opposite because it measured `getBoundingClientRect()`, which reports a box for content that is
- * never painted. `isVisible()` is the question; a height is not.
- *
- * Two rules, deliberately separate. A browser that does not know `::details-content` drops only
- * that rule and keeps the other, which is the whole mechanism on Firefox. Checked with a real
- * visibility test in Chromium and Firefox at 390 and 1440; WebKit is not installed here, and its
- * failure mode would be one extra click on a desktop rather than a panel nobody can open.
- */
-@layer base {
-  @media (min-width: 64rem) {
-    .disclosure-open-lg::details-content {
-      content-visibility: visible;
-    }
-  }
-}
-
-/**
  * Grid and flex children may shrink below their content.
  *
  * ## The bug this removes as a class

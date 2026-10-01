@@ -2,7 +2,6 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { PARTNER_BASE as PORTAL, PARTNER_STATE } from './partner-session.js';
 import { STAFF_STATE } from './staff.js';
-import tw from '../packages/i18n/src/messages/web/ar.json' with { type: 'json' };
 
 /**
  * The star classification, on every surface a property appears (Bashar, 2026-09-04).
@@ -51,13 +50,12 @@ async function starsOn(page: Page): Promise<number[]> {
  * result never is.
  */
 async function resultStarsOn(page: Page): Promise<number[]> {
-  return page
-    .locator('[data-star-rating]')
-    .evaluateAll((nodes) =>
-      nodes
-        .filter((node) => !node.closest('form'))
-        .map((node) => Number(node.getAttribute('data-star-rating'))),
-    );
+  return page.locator('[data-star-rating]').evaluateAll((nodes) =>
+    nodes
+      /* The sidebar draws the same component for its own 1..5 rows; results are in main's list. */
+      .filter((node) => !node.closest('form') && !node.closest('aside'))
+      .map((node) => Number(node.getAttribute('data-star-rating'))),
+  );
 }
 
 test.describe('the star classification, across all three applications', () => {
@@ -82,21 +80,10 @@ test.describe('the star classification, across all three applications', () => {
         bar (Bashar, 2026-09-04: «they should be inside التصفية on the الإقامات page»).
 
         Not by typing `?starRatings=5`, which would prove the API filters and say nothing about
-        whether the control on the page is wired to it — the half that breaks. Below `lg` the panel
-        is a `<details>`, so it is opened first; at the desktop width this runs at it is already
-        open and opening it again is harmless.
+        whether the control on the page is wired to it — the half that breaks. Since 2026-10-01 a
+        box applies on its own, as on booking.com, so ticking it IS the request; there is no button.
       */
-      const panel = page.locator('details').filter({ hasText: 'التصفية' }).first();
-
-      if ((await panel.count()) > 0)
-        await panel.evaluate((node: HTMLDetailsElement) => {
-          node.open = true;
-        });
-
-      await page.locator('input[name="starRatings"][value="5"]').check();
-      /* The panel's own «تطبيق التصفية», named from the catalogue rather than guessed. */
-      await page.getByRole('button', { name: tw.search.filtersApply }).click();
-      await page.waitForLoadState('domcontentloaded');
+      await page.locator('aside input[name="starRatings"][value="5"]').check();
 
       await expect(page).toHaveURL(/starRatings=5/);
 

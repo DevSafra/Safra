@@ -157,6 +157,26 @@ export const searchResultItemSchema = z.object({
       }),
     })
     .nullable(),
+  /*
+    The card's room line, cancellation promise and highlights (2026-10-01). All `.nullable()` or
+    required — never `.default()`: «إلغاء مجاني» invented for a field the API stopped sending would
+    be a promise about somebody's money that nobody made.
+  */
+  unit: z
+    .object({
+      nameAr: z.string(),
+      nameEn: z.string(),
+      nameDe: z.string(),
+      bedrooms: z.number(),
+      beds: z.number(),
+      bedType: z.enum(['single', 'double']),
+      bathrooms: z.number(),
+      maxGuests: z.number(),
+    })
+    .nullable(),
+  freeCancellation: z.boolean(),
+  freeCancellationHours: z.number().nullable(),
+  amenityCodes: z.array(z.string()),
 });
 
 export type SearchResultItem = z.infer<typeof searchResultItemSchema>;
@@ -171,6 +191,8 @@ const searchResponseSchema = z.object({
   */
   previousCursor: z.string().nullable(),
   firstBookableDate: z.string(),
+  /* Required, never defaulted: «that is every result» must not be invented for a cut-short list. */
+  truncated: z.boolean(),
 });
 
 export interface SearchParams {
@@ -214,6 +236,11 @@ export interface SearchParams {
   minPrice?: number | undefined;
   maxPrice?: number | undefined;
   freeCancellationOnly?: boolean | undefined;
+  /** The guest-score floor, on the 1-5 scale; bathrooms floor; bed type; km from the centre. */
+  minRating?: number | undefined;
+  minBathrooms?: number | undefined;
+  bedType?: 'single' | 'double' | undefined;
+  maxCentreKm?: number | undefined;
   /**
    * «قريب من» — a landmark SLUG, and the radius around it.
    *
@@ -282,6 +309,8 @@ export interface SearchOutcome {
   firstBookableDate: string | null;
   notice: { reason: string; firstBookableDate: string } | null;
   failed: boolean;
+  /** There is more than any cursor can reach — the list should ask the reader to narrow. */
+  truncated: boolean;
 }
 
 export async function searchSafely(
@@ -315,6 +344,7 @@ export async function searchSafely(
             ),
           },
           failed: false,
+          truncated: false,
         };
       }
     }
@@ -326,7 +356,91 @@ export async function searchSafely(
       firstBookableDate: null,
       notice: null,
       failed: true,
+      truncated: false,
     };
+  }
+}
+
+// ─── Filter counts ───────────────────────────────────────────────────────────
+
+const facetCountsSchema = z.record(z.string(), z.number());
+
+const searchFacetsSchema = z.object({
+  total: z.number(),
+  propertyTypes: facetCountsSchema,
+  starRatings: facetCountsSchema,
+  ratings: facetCountsSchema,
+  bathrooms: facetCountsSchema,
+  bedTypes: facetCountsSchema,
+  centre: facetCountsSchema,
+  freeCancellation: z.number(),
+  attributes: facetCountsSchema,
+  amenities: facetCountsSchema,
+  price: z
+    .object({
+      min: z.string(),
+      max: z.string(),
+      currencyCode: z.string(),
+      bars: z.array(z.number()),
+    })
+    .nullable(),
+});
+
+export type SearchFacets = z.infer<typeof searchFacetsSchema>;
+
+/**
+ * The counts beside every filter, or `null` when they cannot be had.
+ *
+ * Never fatal, for the reason an ad is not: counts are a convenience beside a result list that
+ * must render without them. A failure answers `null`, and the panel draws its options with no
+ * numbers rather than with numbers nobody can trust. Never cached here — the API caches them per
+ * query for a minute, which is the layer that knows what «the same question» means.
+ */
+export async function searchFacetsSafely(
+  params: SearchParams,
+): Promise<SearchFacets | null> {
+  try {
+    const { sort: _sort, limit: _limit, cursor: _cursor, ...rest } = params;
+    return await apiFetch('/search/facets', searchFacetsSchema, {
+      revalidate: false,
+      searchParams: { ...rest },
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Which of these listings the signed-in reader has saved, in one request per page of cards.
+ *
+ * Server-side only: it carries the reader's access token, which never reaches client JavaScript.
+ * A failure answers «none saved» — a heart drawn empty is a smaller wrong than an error banner on a
+ * page of search results.
+ */
+export async function savedSlugs(
+  accessToken: string,
+  slugs: readonly string[],
+): Promise<ReadonlySet<string>> {
+  if (slugs.length === 0) return new Set();
+
+  try {
+    const url = new URL(`${API_URL}/api/v1/favourites/statuses`);
+    for (const slug of slugs) url.searchParams.append('slugs', slug);
+
+    const response = await fetch(url, {
+      headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}` },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) return new Set();
+
+    const parsed = z
+      .object({ saved: z.array(z.string()) })
+      .safeParse(await response.json());
+
+    return new Set(parsed.success ? parsed.data.saved : []);
+  } catch {
+    return new Set();
   }
 }
 

@@ -11,6 +11,7 @@ import { BASEMAP, BBOX_PLACEHOLDER, basemapStyle, loadMapLibre } from '@/lib/bas
 import { MapPriceMarkers, type NearbyStay } from './map-price-markers';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { OrnamentField } from '@/components/ornament';
 
 /**
  * «اعرض على الخريطة» on the search results — the map as a way to SEARCH.
@@ -50,6 +51,7 @@ export function SearchMap({
   bboxActive,
   bboxUrlTemplate,
   urlWithoutBbox,
+  variant = 'default',
 }: {
   readonly stays: readonly NearbyStay[];
   readonly hrefPrefix: string;
@@ -65,6 +67,11 @@ export function SearchMap({
    */
   readonly bboxUrlTemplate: string;
   readonly urlWithoutBbox: string;
+  /**
+   * How the OPENER is drawn (2026-10-01). `thumbnail` is booking.com's map card at the top of the
+   * filter column; `compact` is the phone bar's button. The dialog behind them is the same one.
+   */
+  readonly variant?: 'default' | 'thumbnail' | 'compact';
 }) {
   const t = useTranslations('search');
   const router = useRouter();
@@ -209,25 +216,58 @@ export function SearchMap({
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={(event) => {
-            opener.current = event.currentTarget;
-            setOpen(true);
-          }}
-          className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border border-line bg-card px-4 text-13 font-bold text-text transition-colors hover:border-gold lg:min-h-0 lg:py-2"
-        >
-          <MapGlyph />
-          {t('mapShow')}
-        </button>
+      <div
+        className={
+          variant === 'thumbnail' ? 'grid gap-2' : 'flex flex-wrap items-center gap-2'
+        }
+      >
+        {variant === 'thumbnail' ? (
+          /*
+            The sidebar card: SAFRA's ornament as the ground rather than a live map. A real map
+            here would load MapLibre and its tiles on every results page for a picture nobody
+            asked to move; the dialog loads them only when the reader opens it.
+          */
+          <button
+            type="button"
+            onClick={(event) => {
+              opener.current = event.currentTarget;
+              setOpen(true);
+            }}
+            className="group relative grid h-32 w-full cursor-pointer place-items-center overflow-hidden rounded-card border border-line bg-band transition-[border-color,box-shadow] duration-200 ease-out hover:border-gold/60 hover:shadow-[var(--shadow-lift)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+          >
+            <OrnamentField
+              id="ornament-map-thumbnail"
+              className="text-gold-read opacity-25"
+            />
+            <span className="relative inline-flex min-h-10 items-center gap-2 rounded-full bg-indigo px-4 text-14 font-bold text-bg shadow-[var(--shadow-lift)] transition-transform duration-150 ease-out group-active:scale-[0.97] motion-reduce:transition-none">
+              <MapGlyph />
+              {t('mapShow')}
+            </span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={(event) => {
+              opener.current = event.currentTarget;
+              setOpen(true);
+            }}
+            className={
+              variant === 'compact'
+                ? 'inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-line bg-card px-3 text-14 font-bold text-text transition-[transform,border-color] duration-150 ease-out hover:border-gold active:scale-[0.97] motion-reduce:transition-none'
+                : 'inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border border-line bg-card px-4 text-13 font-bold text-text transition-colors hover:border-gold lg:min-h-0 lg:py-2'
+            }
+          >
+            <MapGlyph />
+            {variant === 'compact' ? t('results.mapButton') : t('mapShow')}
+          </button>
+        )}
 
         {/*
           The box, said out loud and removable. A filter the reader cannot see is a filter they
           cannot undo — and this one is set by dragging, so it is the easiest to acquire by
           accident and the hardest to notice afterwards.
         */}
-        {bboxActive ? (
+        {bboxActive && variant !== 'compact' ? (
           <span className="inline-flex min-h-10 items-center gap-2 rounded-full border border-gold/50 bg-gold/10 px-3 text-13 text-gold-read lg:min-h-0 lg:py-1.5">
             {t('mapAreaActive')}
             <a

@@ -106,33 +106,48 @@ test('the English wording does not appear on the Arabic page', async ({ page }) 
  * So this asserts the rendered page at a count in the range that used to be wrong.
  */
 test.describe('Arabic plurals on a real page', () => {
-  test('a result count between 11 and 99 takes the singular noun', async ({ page }) => {
+  test('a result count takes the CLDR category Arabic requires', async ({ page }) => {
     await page.goto('/ar/search');
 
+    /*
+      The heading reads «١٬٥٤٦ إقامة متاحة لتواريخك» since the page was rebuilt (2026-10-01): the noun
+      is «إقامة / إقامات» where it used to be «نتيجة / نتائج», and the count is the TRUE total with
+      grouping separators, which a bare (\d+) read as «1».
+    */
     const heading = page
-      .locator('h1, h2')
-      .filter({ hasText: /نتيجة|نتائج/ })
+      .locator('h1')
+      .filter({ hasText: /إقامة|إقامات|إقامتان/ })
       .first();
 
     await expect(heading).toBeVisible();
 
     const text = (await heading.textContent()) ?? '';
-    const digits = text.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+    const digits = text
+      .replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+      .replace(/[,٬\u066C\s](?=\d)/g, '');
     const count = Number(/(\d+)/.exec(digits)?.[1] ?? '0');
 
+    expect(count, 'the heading states a real count').toBeGreaterThan(0);
+
     /*
-      The assertion is conditional on WHICH category the fixture count lands in, because the seed
-      decides how many published listings there are — and a test that hard-coded "٦ نتائج" would
-      break every time somebody added a listing, for a reason unrelated to plurals.
+      Decided on the count MODULO 100, which is the CLDR rule: 1,546 is «many» like 46, and takes the
+      singular noun exactly as 46 does. The test so asserts something whatever the fixture count is,
+      where the old range check (11 to 99) passed by doing nothing once the total passed a hundred.
     */
-    if (count >= 3 && count <= 10) {
-      expect(text).toContain('نتائج');
-    } else if (count >= 11 && count <= 99) {
-      /* The category that was wrong: Arabic takes the SINGULAR here. */
-      expect(text).toContain('نتيجة');
-      expect(text).not.toContain('نتائج');
-    } else if (count === 1) {
-      expect(text).toContain('نتيجة واحدة');
+    const tail = count % 100;
+
+    if (count === 1) {
+      expect(text).toContain('إقامة واحدة');
+    } else if (count === 2) {
+      expect(text).toContain('إقامتان');
+    } else if (tail >= 3 && tail <= 10) {
+      expect(text).toContain('إقامات');
+    } else if (tail >= 11 && tail <= 99) {
+      /* The category that was once wrong: Arabic takes the SINGULAR here. */
+      expect(text).toContain('إقامة');
+      expect(text).not.toContain('إقامات');
+    } else {
+      expect(text).toContain('إقامة');
     }
   });
 

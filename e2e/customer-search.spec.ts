@@ -1,226 +1,181 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import { stayFrom } from './free-nights.js';
 
 /**
- * The results page — paging, filtering, and what its own links are allowed to carry.
+ * The results page — loading on scroll, filtering, and what its own links are allowed to carry.
  *
- * Every assertion here corresponds to something the page could not do, or did wrongly, on
- * 2026-09-02. None of them would have failed any unit test: the page rendered, returned 200 and
- * looked finished.
+ * Rewritten 2026-10-01 with the page (Bashar: «make it very similar as the one on booking.com …
+ * implement a lazy loading when I scroll to the bottom. Do not use pagination»). Every intent the
+ * paged version tested is kept and re-asked of the new shape: nothing beyond the first batch was
+ * reachable once, filters once lost the search, links once reflected the request. None of these
+ * would fail a unit test — the page renders, returns 200 and looks finished either way.
  */
 test.use({ baseURL: 'http://localhost:3000' });
 
 /**
- * A night the §5.3 cutoff cannot close.
- *
- * It said that already and named TODAY, which is the one date the cutoff does close: past 17:00 in
- * the city's own timezone the API refuses same-day arrivals, so every test here returned zero
- * results and failed — reliably, every evening, for a reason with no relationship to the code
- * under test. Found at 20:48 Damascus on 2026-09-03. A fortnight out is far enough that no cutoff,
- * timezone or clock skew reaches it, and near enough to stay inside the seeded availability.
- *
- * DERIVED, not written down. «A fortnight out» was the intention and `2026-09-17` was that
- * intention frozen on the day it was typed; on 2026-09-18 it became yesterday, the API
- * correctly returned nothing for a stay in the past, and five tests here failed for a
- * reason with no relationship to the code under test — the same failure this comment was
- * already written to describe, reintroduced by spelling the answer instead of computing it.
+ * A night the §5.3 cutoff cannot close — DERIVED, never written down. A frozen date became
+ * yesterday on 2026-09-18 and failed five tests for a reason unrelated to the code.
  */
 const { checkIn: CHECK_IN_DATE, checkOut: CHECK_OUT_DATE } = stayFrom(14, 2);
 const STAY = `checkIn=${CHECK_IN_DATE}&checkOut=${CHECK_OUT_DATE}&adults=2`;
-/**
- * The arrival, derived rather than retyped.
- *
- * Two assertions below carried their own copy of the date and drifted from `STAY` the moment it
- * moved — they were checking that the dates survive a filter, and they were checking it against a
- * date the page had never been asked for.
- */
 const CHECK_IN = new URLSearchParams(STAY).get('checkIn') ?? '';
 const SEARCH = `/ar/search?${STAY}`;
 
-const apply = 'button[type="submit"]:has-text("طبّق")';
+/** Results identified by LINK, never by name: the testbed shares names across many stays. */
+const slugs = (page: Page) =>
+  page
+    .locator('main article h3 a[href*="/property/"]')
+    .evaluateAll((links) =>
+      links.map((link) => (link.getAttribute('href') ?? '').split('?')[0]),
+    );
 
-/**
- * Result 25 was unreachable.
- *
- * Not "hard to reach" — unreachable. The page asked for 24 and rendered them, sent no cursor, and
- * `limit` caps at 60, so no URL a person could type would show the twenty-fifth stay. §2 makes
- * pagination mandatory on every list a customer reads.
- */
-test('the results can be paged past the first screenful', async ({ page }) => {
-  /*
-    Compared by LINK, never by name. `db:testbed` gives twenty-four published stays that share one
-    name, so an assertion on the heading text reports two identical pages for two completely
-    different result sets — it fails against a working build and would pass against a broken one
-    the day the fixture names differ. The slug is what identifies a result.
-  */
-  const slugs = () =>
-    page
-      .locator('article a[href*="/property/"]')
-      .evaluateAll((links) =>
-        links.map((link) => (link.getAttribute('href') ?? '').split('?')[0]),
-      );
+/** Scrolls until more cards than `beyond` are on the page, the way a reader reaches the end. */
+async function scrollPast(page: Page, beyond: number): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        await page.mouse.wheel(0, 6000);
+        return page.locator('main article').count();
+      },
+      { message: 'scrolling to the end loads the next batch', timeout: 20_000 },
+    )
+    .toBeGreaterThan(beyond);
+}
 
+test('the results load as the reader scrolls, with no pages and no repeats', async ({
+  page,
+}) => {
   await page.goto(SEARCH);
 
-  const first = await slugs();
-
+  const first = await slugs(page);
   expect(first.length).toBeGreaterThan(0);
 
-  const next = page.locator('a[rel="next"]');
+  /* No pager at all — the reader was explicit. */
+  await expect(page.locator('a[rel="next"], a[rel="prev"]')).toHaveCount(0);
 
-  await expect(next).toBeVisible();
-  await next.click();
-  await page.waitForURL(/cursor=/);
+  await scrollPast(page, first.length);
 
-  const second = await slugs();
+  const loaded = await slugs(page);
 
-  expect(second.length).toBeGreaterThan(0);
-  /*
-    Nothing in common — which is what distinguishes real paging from a cursor that was accepted and
-    ignored. The latter renders a second page identical to the first and looks like working paging
-    in a screenshot.
-  */
-  expect(second.filter((slug) => first.includes(slug))).toStrictEqual([]);
-
-  /*
-    And back, which needs the cursor the API computes — the page cannot build one itself.
-
-    «السابق» from page two carries the cursor for OFFSET ZERO, not no cursor at all: the first page
-    has two valid addresses, its bare URL and `?cursor=MA`. That is deliberate rather than untidy —
-    the alternative is the customer app decoding the cursor to recognise the start, which would be
-    a second definition of a wire format the API owns. The page is `noindex`, so two addresses for
-    one page cost nothing. What matters is that the RESULTS are the first page's again.
-  */
-  await page.locator('a[rel="prev"]').click();
-
-  /*
-    Polled on the RESULTS, not on the network.
-
-    This waited for `networkidle`, and that stopped settling on 2026-09-27 when the header grew
-    from two destinations to six: Next prefetches the routes a link points at, and six of them keep
-    a request in flight past the 500ms of quiet `networkidle` is defined as. The test then timed
-    out at a moment when the page was correct and finished — a wait that fails on a working build
-    is worse than no wait, because it sends whoever reads the run looking at paging.
-
-    `expect.poll` retries the assertion itself, so it ends the instant the first page's results are
-    back and cannot be held open by traffic that has nothing to do with them.
-  */
-  await expect
-    .poll(slugs, { message: 'السابق returns to the first page’s results' })
-    .toStrictEqual(first);
+  /* The first batch is still there, and nothing appears twice — offset paging can shift a row. */
+  expect(loaded.slice(0, first.length)).toStrictEqual(first);
+  expect(new Set(loaded).size).toBe(loaded.length);
+  /* And no cursor leaked into the address: the view is the search, not a position in it. */
+  expect(new URL(page.url()).searchParams.has('cursor')).toBe(false);
 });
 
 /**
- * Filtering, driven through the panel rather than by typing a URL.
+ * «عرض التفاصيل» goes to the stay (Bashar, 2026-10-01: «the button is not clickable»).
  *
- * `searchQuerySchema` accepted a price range, a property type, attributes, amenity codes and a
- * free-cancellation switch since it was written, and the screen offered a sort order. The panel is
- * the only thing that makes any of it reachable.
+ * It was a span drawn as a button, painted ABOVE the card's stretched link by its own transform, so
+ * a press on it landed nowhere while a press anywhere else on the card worked. Pressed by its
+ * POSITION, as a finger does — a locator click on the title would pass whatever this does.
  */
-test('a filter applies, survives in the URL, and keeps the search', async ({ page }) => {
+test('the button on a card takes the reader to the stay', async ({ page }) => {
   await page.goto(SEARCH);
 
-  await page.locator('input[name="minPrice"]').fill('60');
-  await page.locator('input[name="freeCancellationOnly"]').check();
-  await page.locator(apply).click();
-  await page.waitForURL(/minPrice=60/);
+  const card = page.locator('main article').first();
+  const button = card.getByText('عرض التفاصيل');
+  await button.scrollIntoViewIfNeeded();
+  const box = await button.boundingBox();
+  if (!box) throw new Error('the card has no visible button');
+
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await page.waitForURL(/\/ar\/property\//);
+});
+
+test('a filter applies at once, survives in the URL, and keeps the search', async ({
+  page,
+}) => {
+  await page.goto(SEARCH);
+
+  /* No «طبّق» button: ticking IS applying, as on booking.com. */
+  await page.locator('aside input[name="freeCancellationOnly"]').check();
+  await page.waitForURL(/freeCancellationOnly=true/);
 
   /* The dates and the party are not filters and must not be lost by filtering. */
   expect(page.url()).toContain(`checkIn=${CHECK_IN}`);
   expect(page.url()).toContain('adults=2');
-  expect(page.url()).toContain('freeCancellationOnly=true');
 
   /* The panel comes back holding what was chosen, or the next change silently resets it. */
-  await expect(page.locator('input[name="minPrice"]')).toHaveValue('60');
-  await expect(page.locator('input[name="freeCancellationOnly"]')).toBeChecked();
+  await expect(page.locator('aside input[name="freeCancellationOnly"]')).toBeChecked();
 
   /* Clearing drops the filters and keeps the search. */
-  await page.getByRole('link', { name: 'مسح الكل' }).click();
-  await page.waitForURL((url) => !url.searchParams.has('minPrice'));
+  await page.getByRole('link', { name: 'إزالة كل الخيارات' }).first().click();
+  await page.waitForURL((url) => !url.searchParams.has('freeCancellationOnly'));
   expect(page.url()).toContain(`checkIn=${CHECK_IN}`);
-  expect(page.url()).not.toContain('freeCancellationOnly');
 });
 
 /**
- * The page's own links carry only what the page understands.
+ * The page's own links, and the batches it asks for, carry only what the page understands.
  *
- * They were built by iterating `Object.entries` over the request's query string, which put
- * arbitrary caller-chosen parameters into four links on our own page. Not an injection —
- * `URLSearchParams` encodes and the base path is a literal — but it is the shape `returnQuery` was
- * written to forbid, and the allow-list is the fix.
- *
- * Scoped to the RESULTS, deliberately. The footer's language picker carries the whole query string
- * on purpose, so that changing language keeps the reader on their search; asserting over every
- * anchor on the page would fail on behaviour that is correct.
+ * Scoped to the RESULTS: the footer's language picker carries the whole query string on purpose.
  */
-test('a crafted parameter is dropped rather than reflected into the results links', async ({
+test('a crafted parameter reaches neither the links nor the batches', async ({
   page,
 }) => {
   await page.goto(`${SEARCH}&surprise=xyz123&attributes=notarealattribute`);
 
   const hrefs = await page
-    .locator('main a, [aria-label] a[rel]')
+    .locator('main a')
     .evaluateAll((links) => links.map((link) => link.getAttribute('href') ?? ''));
 
   expect(hrefs.length).toBeGreaterThan(0);
   expect(hrefs.filter((href) => href.includes('surprise'))).toStrictEqual([]);
   expect(hrefs.filter((href) => href.includes('notarealattribute'))).toStrictEqual([]);
 
-  /* An unknown attribute must not survive into the form's state either. */
-  await expect(page.locator('input[name="attributes"]:checked')).toHaveCount(0);
+  /* The next batch is asked for with the PARSED query, never the request's. */
+  const batch = page.waitForRequest(/\/ar\/api\/search\?/);
+  await page.mouse.wheel(0, 20_000);
+  const asked = (await batch).url();
 
-  /* And the page still answers with results rather than a validation error. */
-  await expect(page.locator('article').first()).toBeVisible();
+  expect(asked).not.toContain('surprise');
+  expect(asked).not.toContain('notarealattribute');
+
+  /* An unknown attribute does not survive into the panel's state, and results still render. */
+  await expect(page.locator('aside input[name="attributes"]:checked')).toHaveCount(0);
+  await expect(page.locator('main article').first()).toBeVisible();
 });
 
-/**
- * Sorting returns to the first page.
- *
- * Keeping an offset across a reorder lands the reader on page three of a differently ordered list,
- * which shows them stays they have never seen while the URL claims they are where they were.
- */
-test('changing the sort order returns to the first page', async ({ page }) => {
+test('changing the order starts the list again from the top', async ({ page }) => {
   await page.goto(SEARCH);
-  await page.locator('a[rel="next"]').click();
-  await page.waitForURL(/cursor=/);
+  await scrollPast(page, 20);
 
-  await page.getByRole('link', { name: 'السعر: الأقل أولاً' }).click();
+  /* The sort beside the heading, not the search bar's own selects above it. */
+  await page
+    .locator('section[aria-labelledby="results-heading"] select')
+    .selectOption('price_asc');
   await page.waitForURL(/sort=price_asc/);
 
+  /* A reorder is a new list: the first batch only, never a position carried into another order. */
+  await expect.poll(() => page.locator('main article').count()).toBeLessThanOrEqual(20);
   expect(new URL(page.url()).searchParams.has('cursor')).toBe(false);
 });
 
-/**
- * The filter panel is a disclosure on a phone and a permanent panel on a desktop.
- *
- * The desktop half is the one that broke silently: Chrome hides a closed `<details>` subtree with
- * `content-visibility` on `::details-content`, which no `display` on a descendant overrides. The
- * form computed `display: flex` with a 1911px box and was not rendered — and a height measurement
- * reported it as working.
- */
-test('the filter panel opens on a desktop and collapses on a phone', async ({ page }) => {
+test('the filters are a sidebar on a desktop and a sheet on a phone', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(SEARCH);
-  await expect(page.locator('input[name="minPrice"]')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'ضيّق النتائج' }).first()).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 850 });
-  await expect(page.locator('input[name="minPrice"]')).toBeHidden();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 
-  await page.locator('aside summary').click();
-  await expect(page.locator('input[name="minPrice"]')).toBeVisible();
+  const opener = page.getByRole('button', { name: /^التصفية/ });
+  await opener.click();
+  await expect(page.getByRole('dialog', { name: 'التصفية' })).toBeVisible();
+
+  /* Escape dismisses, and focus returns to what opened it — modal in fact, not only in looks. */
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(opener).toBeFocused();
 });
 
 /**
- * A filter that can only ever empty the page is not offered.
- *
- * `unit_amenities` held zero rows while the catalogue listed twelve filterable amenities, so a
- * panel built from the catalogue would have given every visitor twelve checkboxes whose only
- * possible outcome is «لا نتائج» — which reads as a broken search, not as an untagged catalogue.
- *
- * Phrased as an INVARIANT rather than as "there are no amenities": the moment staff tag a stay,
- * this must keep passing, and it does — the assertion is that every amenity ON SCREEN reports a
- * count above zero, whatever the data happens to be on the day it runs.
+ * A filter that can only ever empty the page is not offered — as an INVARIANT: every amenity on
+ * screen reports a count above zero, whatever the data happens to be on the day it runs.
  */
 test('every amenity offered as a filter has at least one stay behind it', async ({
   page,
@@ -228,7 +183,7 @@ test('every amenity offered as a filter has at least one stay behind it', async 
   await page.goto(SEARCH);
 
   const counts = await page
-    .locator('label:has(input[name="amenityCodes"])')
+    .locator('aside label:has(input[name="amenityCodes"])')
     .evaluateAll((labels) =>
       labels.map((label) =>
         Number(label.querySelector('span:last-child')?.textContent ?? '0'),
@@ -239,14 +194,10 @@ test('every amenity offered as a filter has at least one stay behind it', async 
 });
 
 /**
- * «غرف النوم» — a requirement on the place, not a number of rooms to book.
- *
- * Driven through the popover rather than by typing a URL, because the stepper only exists after
- * hydration and the hidden input it writes is the whole mechanism. Three things have to hold and
- * each fails independently: the control writes the value, the search carries it, and the results
- * links keep it — a filter dropped on page two is a filter that silently widens itself.
+ * «غرف النوم» — a requirement on the place. It has to reach the search AND every later batch: a
+ * requirement dropped by the second batch is one that silently widens itself while scrolling.
  */
-test('the bedrooms requirement reaches the search and survives its links', async ({
+test('the bedrooms requirement reaches the search and every batch after it', async ({
   page,
 }) => {
   await page.goto('/ar');
@@ -257,40 +208,25 @@ test('the bedrooms requirement reaches the search and survives its links', async
 
   /* It starts at one and reads «غرفة» — never a zero, never «any» (Bashar, 2026-09-03). */
   await expect(page.locator('input[name="bedrooms"]').first()).toHaveValue('1');
-
   await page.getByRole('button', { name: 'زيادة غرف' }).click();
-
-  /* The control writes what it shows. */
   await expect(page.locator('input[name="bedrooms"]').first()).toHaveValue('2');
 
   await page.getByRole('button', { name: 'تم' }).click();
   await page.getByRole('button', { name: /ابحث عن إقامة/ }).click();
   await page.waitForURL('**/search**');
 
-  /* The search carries it… */
   expect(new URL(page.url()).searchParams.get('bedrooms')).toBe('2');
 
-  /* …and so does every link the results page builds from its allow-list. */
-  const sortLinks = await page
-    .locator('a[href*="sort="]')
-    .evaluateAll((links) => links.map((link) => link.getAttribute('href') ?? ''));
-
-  expect(sortLinks.length).toBeGreaterThan(0);
-  expect(sortLinks.filter((href) => !href.includes('bedrooms=2'))).toStrictEqual([]);
+  if ((await page.locator('main article').count()) >= 20) {
+    const batch = page.waitForRequest(/\/ar\/api\/search\?/);
+    await page.mouse.wheel(0, 20_000);
+    expect(new URL((await batch).url()).searchParams.get('bedrooms')).toBe('2');
+  }
 });
 
 /**
- * نوع العقار on the bar reaches the search, and the two controls on `/search` agree.
- *
- * Bashar asked for it on the landing page (2026-09-27). Nothing new went in behind it —
- * `searchQuerySchema` has taken `propertyTypeCode` since the contract was written and the results
- * sidebar already filtered on it — so what needed proving is the wiring, and the half that is easy
- * to get wrong is the SECOND one.
- *
- * On `/search` the value now has two controls: the bar's select and the sidebar's radio, in two
- * separate forms. If the bar did not receive the active value it would read «كل الأنواع» over a
- * filtered result set, and pressing search would silently clear a filter the reader had set — a
- * control that undoes another control on the same screen, which is worse than not having it.
+ * نوع العقار on the bar reaches the search, and the two controls on `/search` agree — the bar must
+ * not read «كل الأنواع» over a filtered list, or searching again silently clears the filter.
  */
 test('نوع العقار reaches the search, and the bar and the sidebar agree', async ({
   page,
@@ -298,11 +234,8 @@ test('نوع العقار reaches the search, and the bar and the sidebar agree'
   await page.goto('/ar');
 
   const field = page.locator('#q-type');
-
   await expect(field, 'the bar offers the type').toBeVisible();
   await expect(field).toHaveAttribute('name', 'propertyTypeCode');
-
-  /* «كل الأنواع» is the first option and it is EMPTY — a real way back, not a placeholder. */
   await expect(field.locator('option').first()).toHaveAttribute('value', '');
 
   await field.selectOption('hotel');
@@ -310,79 +243,93 @@ test('نوع العقار reaches the search, and the bar and the sidebar agree'
   await page.waitForURL('**/search**');
 
   expect(new URL(page.url()).searchParams.get('propertyTypeCode')).toBe('hotel');
-
-  /* The bar keeps the choice… */
   await expect(page.locator('#q-type')).toHaveValue('hotel');
-
-  /* …and the sidebar's radio is the SAME value, not «كل الأنواع» beside a filtered list. */
   await expect(
-    page.locator('input[name="propertyTypeCode"][value="hotel"]').first(),
+    page.locator('aside input[name="propertyTypeCode"][value="hotel"]').first(),
   ).toBeChecked();
 });
 
-/**
- * An empty choice is «any», so an ordinary search is untouched by the field existing.
- *
- * The regression half, and the same one the bedrooms field carries: a default of anything but the
- * empty value, or a predicate applied when it is empty, would narrow every search on the site —
- * which shows up as «fewer results than yesterday» rather than as a failure.
- */
 test('choosing no type leaves the search as wide as it was', async ({ page }) => {
   await page.goto(SEARCH);
-
-  const unfiltered = await page.locator('article').count();
-
+  const unfiltered = await page.locator('main article').count();
   await page.goto(`${SEARCH}&propertyTypeCode=`);
-
-  expect(await page.locator('article').count()).toBe(unfiltered);
+  expect(await page.locator('main article').count()).toBe(unfiltered);
   expect(unfiltered).toBeGreaterThan(0);
 });
 
-/**
- * And zero means «any», so an ordinary search is untouched by the field existing.
- *
- * The regression half: a default of anything but zero, or a predicate applied when it is zero,
- * would narrow every search on the site — the kind of change that shows up as «fewer results than
- * yesterday» rather than as a failure.
- */
 test('a search that does not ask for bedrooms is not narrowed by the field', async ({
   page,
 }) => {
   await page.goto(SEARCH);
-
-  const withoutTheField = await page.locator('article').count();
-
+  const withoutTheField = await page.locator('main article').count();
   await page.goto(`${SEARCH}&bedrooms=0`);
-
-  expect(await page.locator('article').count()).toBe(withoutTheField);
+  expect(await page.locator('main article').count()).toBe(withoutTheField);
   expect(withoutTheField).toBeGreaterThan(0);
 });
 
 /**
- * Saving a listing while signed out sends you to sign in — it does not lie about a failure.
- *
- * Bashar hit this on 2026-09-04: pressing «حفظ في المفضلة» said «تعذّر الحفظ. حاول مرة أخرى»,
- * which is untrue in the way that matters — trying again fails identically, forever, and nothing
- * on the screen said an account was needed. The proxy answers 401 `auth.required`, and the button
- * reported every non-OK status as the same transient failure.
- *
- * No sign-in here, deliberately: this is the SIGNED-OUT path, and the suite's login budget is its
- * binding constraint (ten per minute per account, thirteen already spent). The assertion that
- * matters is reachable without one.
+ * Opening a stay and coming back returns the reader to it — the rule every list a person can click
+ * into keeps. On an infinite list the loaded batches have to come back too, or the card they opened
+ * no longer exists on the page they return to. Tested against a card from a LATER batch, because
+ * the first batch is there whether or not anything works.
+ */
+test('coming back from a stay returns to it, with what was loaded', async ({ page }) => {
+  await page.goto(SEARCH);
+  const firstBatch = await page.locator('main article').count();
+  test.skip(
+    firstBatch < 20,
+    'the testbed has fewer than one batch of stays for these dates',
+  );
+
+  await scrollPast(page, firstBatch);
+
+  const target = page.locator('main article').nth(firstBatch + 2);
+  const id = await target.getAttribute('id');
+  await target.locator('h3 a').click();
+  await page.waitForURL(/\/property\//);
+
+  await page.goBack();
+  await page.waitForURL(/\/search/);
+
+  const back = page.locator(`[id="${id}"]`);
+  await expect(back, 'the opened card is on the page again').toHaveCount(1);
+  await expect(
+    back,
+    'brought into view, not left at the edge it was pressed at',
+  ).toBeInViewport({ ratio: 0.8 });
+});
+
+test('the batch route sends a browser to the page, and refuses a malformed cursor', async ({
+  page,
+  request,
+}) => {
+  /* A pasted or opened batch URL is never a JSON body in front of a person. */
+  await page.goto(`/ar/api/search?${STAY}&cursor=MjA`);
+  expect(new URL(page.url()).pathname).toBe('/ar/search');
+
+  const refused = await request.get(
+    `/ar/api/search?${STAY}&cursor=${encodeURIComponent('a b')}`,
+    {
+      headers: { Accept: 'application/json' },
+    },
+  );
+  expect(refused.status()).toBe(400);
+});
+
+/**
+ * Saving a listing while signed out sends you to sign in — it does not lie about a failure. On the
+ * CARD now as well as on the listing: the heart answers a 401 by going to sign-in and back.
  */
 test('saving a stay while signed out leads to sign-in, not to an error', async ({
   page,
 }) => {
   await page.goto(SEARCH);
 
-  const first = page.locator('article a').first();
-  const href = await first.getAttribute('href');
-
-  await page.goto(href ?? SEARCH);
-
-  const listing = new URL(page.url());
-
-  await page.getByRole('button', { name: /حفظ في المفضلة/ }).click();
+  await page
+    .locator('main article')
+    .first()
+    .getByRole('button', { name: /^احفظ / })
+    .click();
   await page.waitForURL('**/login**');
 
   const back = new URL(
@@ -390,21 +337,9 @@ test('saving a stay while signed out leads to sign-in, not to an error', async (
     'http://localhost:3000',
   );
 
-  /* Back to the same listing… */
-  expect(back.pathname, 'the sign-in link lost the listing').toBe(listing.pathname);
-
-  /*
-    …AND with the party intact. Returning somebody to a bare property URL drops the guests they
-    searched with, and a family of four comes back as a party of two — the defect the SRS audit
-    found on this exact path on 2026-08-25.
-  */
-  for (const key of ['adults', 'children', 'infants']) {
-    expect(back.searchParams.get(key), key).toBe(listing.searchParams.get(key));
-  }
-
-  /*
-    And the lie is gone. Named rather than «no alert on the page»: the sign-in screen has alerts of
-    its own, and asserting their absence would be asserting something about a different screen.
-  */
+  /* Back to the same search, with its dates and party intact. */
+  expect(back.pathname).toBe('/ar/search');
+  expect(back.searchParams.get('checkIn')).toBe(CHECK_IN);
+  expect(back.searchParams.get('adults')).toBe('2');
   await expect(page.getByText(/تعذّر الحفظ/)).toHaveCount(0);
 });
