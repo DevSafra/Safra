@@ -191,6 +191,36 @@ describeIfDb('FavouritesService', () => {
    * server-rendered: a cached page would hand one customer's shortlist to the next. These assertions
    * were written after the method, which is how it came to ship untested for a turn.
    */
+  describe('statuses — one page of cards in one query', () => {
+    it('names exactly the listings this customer saved', async () => {
+      await expect(
+        service.statuses(customer(), [PUBLISHED_SLUG, 'no-such-listing']),
+      ).resolves.toStrictEqual({
+        saved: [],
+      });
+
+      await service.save(customer(), PUBLISHED_SLUG);
+
+      await expect(
+        service.statuses(customer(), [PUBLISHED_SLUG, 'no-such-listing']),
+      ).resolves.toStrictEqual({ saved: [PUBLISHED_SLUG] });
+    });
+
+    it('says nothing about another customer’s list', async () => {
+      await service.save(customer(), PUBLISHED_SLUG);
+
+      await expect(
+        service.statuses(customer(OTHER_PROFILE_ID, OTHER_USER_ID), [PUBLISHED_SLUG]),
+      ).resolves.toStrictEqual({ saved: [] });
+      /* The opposite control: the owner still sees it, so the empty answer above is the filter. */
+      await expect(service.statuses(customer(), [PUBLISHED_SLUG])).resolves.toStrictEqual(
+        {
+          saved: [PUBLISHED_SLUG],
+        },
+      );
+    });
+  });
+
   describe('status', () => {
     it('answers false before anything is saved', async () => {
       await expect(service.status(customer(), PUBLISHED_SLUG)).resolves.toStrictEqual({

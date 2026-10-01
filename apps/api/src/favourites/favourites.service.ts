@@ -176,6 +176,32 @@ export class FavouritesService {
     return { slug, saved: found.rows.length > 0 };
   }
 
+  /**
+   * Which of these listings the reader has saved, in ONE query (Bashar, 2026-10-01).
+   *
+   * The results page draws a heart on every card, and asking `status` per card would be one
+   * request per result, twenty-four per page and again on every scroll. The caller is the web
+   * server, which asks once per page it renders.
+   *
+   * The profile is the WHERE clause, so the answer can only ever be about the caller's own list:
+   * a slug somebody else saved reads as not saved, exactly like one nobody saved.
+   */
+  async statuses(claims: AccessTokenClaims | undefined, slugs: readonly string[]) {
+    if (!claims?.customerProfileId || slugs.length === 0)
+      return { saved: [] as string[] };
+
+    const found = await this.db.execute<{ slug: string }>(sql`
+      SELECT p.slug
+      FROM favourites f
+      JOIN properties p ON p.id = f.property_id
+      WHERE f.customer_profile_id = ${claims.customerProfileId}
+        AND f.deleted_at IS NULL
+        AND p.slug IN ${slugs}
+    `);
+
+    return { saved: found.rows.map((row) => row.slug) };
+  }
+
   /** Saves a listing. Idempotent: saving one already saved returns the same answer. */
   async save(claims: AccessTokenClaims | undefined, slug: string) {
     const profileId = this.profileOf(claims);

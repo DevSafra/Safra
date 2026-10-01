@@ -28,6 +28,19 @@ type SlugBody = z.infer<typeof slugBodySchema>;
 /** The same one field, arriving as a query string on the read. */
 const slugQuerySchema = slugBodySchema;
 
+/** Up to one page of results: 60 is the search's own page ceiling. Repeated or single. */
+const slugsQuerySchema = z
+  .object({
+    slugs: z.preprocess(
+      (value: unknown): unknown[] =>
+        value === undefined ? [] : Array.isArray(value) ? (value as unknown[]) : [value],
+      z.array(z.string().min(1).max(200)).max(60),
+    ),
+  })
+  .strict();
+
+type SlugsQuery = z.infer<typeof slugsQuerySchema>;
+
 @Controller('favourites')
 export class FavouritesController {
   constructor(private readonly favourites: FavouritesService) {}
@@ -53,6 +66,15 @@ export class FavouritesController {
     @Query(new ZodValidationPipe(slugQuerySchema)) query: SlugBody,
   ) {
     return this.favourites.status(user, query.slug);
+  }
+
+  @Get('statuses')
+  @AuditExempt('Reading which of a page of listings you saved; changes nothing.')
+  async statuses(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Query(new ZodValidationPipe(slugsQuerySchema)) query: SlugsQuery,
+  ) {
+    return this.favourites.statuses(user, query.slugs);
   }
 
   @Post()
