@@ -1087,6 +1087,24 @@ body {
 
   A class rather than a Tailwind variant because `hover:` cannot prefix a custom utility.
 */
+/*
+  The gold FACE without the button's motion, for the map's price pills (2026-10-01).
+
+  A pill is moved by an inline transform on every frame of a pan, so it cannot carry `.btn-gold`:
+  that class transitions `transform`, and the pill would trail behind its point while the map
+  moved. Same stops, same ink, same light edge; the shadow stays the pill's own.
+*/
+.pill-gold,
+.pill-gold-hover:hover {
+  background-image: linear-gradient(135deg, #f0cb7c, #c4923e);
+  border-color: transparent;
+  color: #241a05;
+  box-shadow:
+    inset 0 1px 0 rgb(255 247 224 / 0.55),
+    0 2px 4px rgb(92 62 12 / 0.24),
+    0 8px 18px -8px rgb(168 116 32 / 0.6);
+}
+
 .btn-gold-hover:hover {
   background-image: linear-gradient(135deg, #f0cb7c, #c4923e);
   color: #241a05;

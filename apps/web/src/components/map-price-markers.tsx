@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 
+import { withoutOverlaps } from '@/lib/map-declutter';
+
 import { LandmarkIcon } from './landmark-icon';
 
 export interface NearbyStay {
@@ -57,11 +59,34 @@ export function MapPriceMarkers({
   map,
   stays,
   hrefPrefix,
+  hrefSuffix = '',
+  declutter = false,
+  highlight = null,
+  onHighlight,
+  newTab = null,
 }: {
   readonly map: MapLibreMap | null;
   readonly stays: readonly NearbyStay[];
   /** `/ar/property/` — the slug is appended. A prefix crosses the boundary; a builder cannot. */
   readonly hrefPrefix: string;
+  /** Appended after the slug: the search map carries the reader's dates and party. */
+  readonly hrefSuffix?: string;
+  /**
+   * Draw a pill only where it does not cover a higher-ranked one, and a dot elsewhere. The
+   * search map draws hundreds of stays, which at a city's zoom is a heap of overlapping prices
+   * nobody can read; `stays` arrives in the search's own order, so the pills are the stays the
+   * reader would meet first in the list. Zooming in gives the dots room and they become pills.
+   */
+  readonly declutter?: boolean;
+  /** A stay to draw in gold and above the rest: the card the reader is pointing at. */
+  readonly highlight?: string | null;
+  readonly onHighlight?: (slug: string | null) => void;
+  /**
+   * Open a stay in a new tab, with these words for a screen reader (Bashar, 2026-10-01: «When I
+   * click on a property it should open in a new tab»). The search map is a place the reader comes
+   * back to; a pill that navigated away threw the area they had found away with it.
+   */
+  readonly newTab?: { label: string } | null;
 }) {
   /*
     Read HERE rather than passed down as props, which is what the other client components in
@@ -71,7 +96,7 @@ export function MapPriceMarkers({
   */
   const t = useTranslations('property');
   const [placed, setPlaced] = useState<
-    ReadonlyArray<{ stay: NearbyStay; x: number; y: number }>
+    ReadonlyArray<{ stay: NearbyStay; x: number; y: number; dot: boolean }>
   >([]);
 
   const reproject = useCallback(() => {
@@ -81,13 +106,12 @@ export function MapPriceMarkers({
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
 
-    setPlaced(
-      stays
-        .map((stay) => {
-          const point = map.project([Number(stay.longitude), Number(stay.latitude)]);
-          return { stay, x: point.x, y: point.y };
-        })
-        /*
+    const visible = stays
+      .map((stay) => {
+        const point = map.project([Number(stay.longitude), Number(stay.latitude)]);
+        return { stay, x: point.x, y: point.y };
+      })
+      /*
           Only pills that can actually be SEEN. A pill parked off-screen is still a focusable
           anchor in the tab order, so a keyboard reader would tab through listings that are
           nowhere on their screen.
@@ -99,9 +123,14 @@ export function MapPriceMarkers({
           a NARROW one — «$45», 60px — entirely off-screen at x = -96, because the margin
           assumed a width that pill did not have. The centre needs no width to reason about.
         */
-        .filter(({ x, y }) => x >= 0 && y >= 0 && x <= width && y <= height),
+      .filter(({ x, y }) => x >= 0 && y >= 0 && x <= width && y <= height);
+
+    setPlaced(
+      declutter
+        ? withoutOverlaps(visible)
+        : visible.map((one) => ({ ...one, dot: false })),
     );
-  }, [map, stays]);
+  }, [map, stays, declutter]);
 
   useEffect(() => {
     if (!map) return;
@@ -130,8 +159,39 @@ export function MapPriceMarkers({
       begins anywhere in the viewport.
     */
     <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
-      {placed.map(({ stay, x, y }) => {
+      {placed.map(({ stay, x, y, dot }) => {
         const many = stay.staysHere > 1;
+        const lit = highlight === stay.slug;
+        const tab = newTab ? { target: '_blank', rel: 'noopener' } : {};
+        const hover = onHighlight
+          ? {
+              onPointerEnter: () => onHighlight(stay.slug),
+              onPointerLeave: () => onHighlight(null),
+              onFocus: () => onHighlight(stay.slug),
+              onBlur: () => onHighlight(null),
+            }
+          : {};
+
+        /*
+          A stay with no room for its pill: a dot that still links, kept out of the tab order
+          and away from a screen reader, because the list beside the map is where those readers
+          meet every stay. It turns into a pill the moment its card is pointed at.
+        */
+        if (dot && !lit) {
+          return (
+            <a
+              key={stay.slug}
+              href={`${hrefPrefix}${stay.slug}${hrefSuffix}`}
+              tabIndex={-1}
+              aria-hidden
+              {...tab}
+              {...hover}
+              style={{ transform: `translate(-50%, -50%) translate(${x}px, ${y}px)` }}
+              className="pointer-events-auto absolute top-0 left-0 block size-3 cursor-pointer rounded-full border-2 border-card bg-indigo shadow-[var(--shadow-lift)] transition-transform duration-150 ease-out pill-gold-hover hover:scale-150"
+              title={stay.name}
+            />
+          );
+        }
 
         /*
           No advertised price draws a DOT, not a pill reading «لا يوجد سعر معلن».
@@ -144,9 +204,10 @@ export function MapPriceMarkers({
           return (
             <a
               key={stay.slug}
-              href={`${hrefPrefix}${stay.slug}`}
+              href={`${hrefPrefix}${stay.slug}${hrefSuffix}`}
               style={{ transform: `translate(-50%, -50%) translate(${x}px, ${y}px)` }}
-              className="pointer-events-auto absolute top-0 left-0 block size-3.5 cursor-pointer rounded-full border-2 border-card bg-muted shadow-[var(--shadow-lift)] transition-[background-color,transform] duration-150 ease-out hover:scale-125 hover:bg-gold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-read"
+              {...tab}
+              className="pointer-events-auto absolute top-0 left-0 block size-3.5 cursor-pointer rounded-full border-2 border-card bg-muted shadow-[var(--shadow-lift)] transition-[background-color,transform] duration-150 ease-out pill-gold-hover hover:scale-125 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-read"
               title={stay.name}
             >
               {/*
@@ -154,6 +215,7 @@ export function MapPriceMarkers({
                 price as visible text; this one would otherwise announce nothing at all.
               */}
               <span className="sr-only">{`${stay.name}: ${t('noPrice')}`}</span>
+              {newTab ? <span className="sr-only">{newTab.label}</span> : null}
             </a>
           );
         }
@@ -163,14 +225,18 @@ export function MapPriceMarkers({
         return (
           <a
             key={stay.slug}
-            href={`${hrefPrefix}${stay.slug}`}
+            href={`${hrefPrefix}${stay.slug}${hrefSuffix}`}
+            {...tab}
+            {...hover}
+            data-map-pill={stay.slug}
+            data-lit={lit || undefined}
             style={{ transform: `translate(-50%, -50%) translate(${x}px, ${y}px)` }}
             /*
               `top-0 left-0` plus a transform, rather than `left: x`: a transform is composited
               and does not invalidate layout, so dragging the map does not relayout the
               overlay once per frame.
             */
-            className="pointer-events-auto absolute top-0 left-0 inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-full border border-line bg-card px-2.5 py-1 text-13 font-bold whitespace-nowrap text-text shadow-[var(--shadow-lift)] transition-[background-color,color,box-shadow] duration-150 ease-out hover:bg-gold hover:text-ink hover:shadow-[var(--shadow-lift-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-read"
+            className={`pointer-events-auto absolute top-0 left-0 inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-full border px-2.5 py-1 text-13 font-bold whitespace-nowrap shadow-[var(--shadow-lift)] transition-[background-color,color,box-shadow] duration-150 ease-out hover:z-20 pill-gold-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-read ${lit ? 'z-20 pill-gold' : 'border-line bg-card text-text'}`}
             title={stay.name}
           >
             <span className="tabular-nums">{price}</span>
@@ -179,6 +245,7 @@ export function MapPriceMarkers({
               «3 stays here» and nothing else made the map's one job — comparing prices at a
               glance — impossible at exactly the points where several listings compete.
             */}
+            {newTab ? <span className="sr-only">{newTab.label}</span> : null}
             {many ? (
               <span className="text-11 font-normal opacity-70">
                 {t('nearbyCount', { count: stay.staysHere })}

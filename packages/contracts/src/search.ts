@@ -389,3 +389,12 @@ export function evaluateArrival(
 
   return { allowed: true, firstBookableDate: earliest };
 }
+
+/**
+ * The most listings one «which of these have I saved» request may name.
+ *
+ * Shared because both ends need it: the API refuses a longer list, and the web splits a longer one
+ * (the full map holds up to 250 stays) into requests of this size rather than having all 250
+ * refused and every heart drawn empty.
+ */
+export const FAVOURITE_STATUS_BATCH = 60;

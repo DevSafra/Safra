@@ -139,6 +139,13 @@
     "mapAreaActive": "Results limited to the map area",
     "mapAreaClear": "Clear the area",
     "mapEmpty": "No stays in this area.",
+    "mapInView": "{count, plural, =0 {No stays in this area} one {1 stay in this area} other {# stays in this area}}",
+    "mapCapped": "This area holds more stays than the map can show. Zoom in to see the rest.",
+    "mapLoading": "Loading stays on the map",
+    "mapFailed": "The stays could not be loaded. Move the map to try again.",
+    "mapListLabel": "Stays in this area",
+    "mapFiltersLabel": "Filter the stays on the map",
+    "opensInNewTab": "opens in a new tab",
     "nearKind": "Or near a kind of place",
     "nearKindAny": "Any kind",
     "results": {

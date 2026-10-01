@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { FAVOURITE_STATUS_BATCH } from '@safra/contracts';
+
 /**
  * Server-side API client.
  *
@@ -410,6 +412,30 @@ export async function searchFacetsSafely(
   }
 }
 
+const searchMapSchema = z.object({
+  items: z.array(searchResultItemSchema),
+  capped: z.boolean(),
+});
+
+/**
+ * Every matching stay that can be placed, for the full map. Paging fields are dropped: the API
+ * ignores the cursor anyway, and a map is one picture rather than a page. Null on any failure, so
+ * the map can say it could not load rather than drawing an empty city as if nothing matched.
+ */
+export async function searchMapSafely(
+  params: SearchParams,
+): Promise<z.infer<typeof searchMapSchema> | null> {
+  try {
+    const { limit: _limit, cursor: _cursor, ...rest } = params;
+    return await apiFetch('/search/map', searchMapSchema, {
+      revalidate: false,
+      searchParams: { ...rest },
+    });
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Which of these listings the signed-in reader has saved, in one request per page of cards.
  *
@@ -422,6 +448,21 @@ export async function savedSlugs(
   slugs: readonly string[],
 ): Promise<ReadonlySet<string>> {
   if (slugs.length === 0) return new Set();
+
+  /*
+    In batches the API accepts. The full map asks about up to 250 stays at once, and one request
+    naming them all would be refused whole and draw every heart empty.
+  */
+  if (slugs.length > FAVOURITE_STATUS_BATCH) {
+    const batches: string[][] = [];
+    for (let at = 0; at < slugs.length; at += FAVOURITE_STATUS_BATCH) {
+      batches.push(slugs.slice(at, at + FAVOURITE_STATUS_BATCH));
+    }
+    const answers = await Promise.all(
+      batches.map((batch) => savedSlugs(accessToken, batch)),
+    );
+    return new Set(answers.flatMap((answer) => [...answer]));
+  }
 
   try {
     const url = new URL(`${API_URL}/api/v1/favourites/statuses`);

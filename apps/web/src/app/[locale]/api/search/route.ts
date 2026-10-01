@@ -2,10 +2,11 @@ import { NextResponse } from 'next/server';
 
 import { isLocale } from '@/i18n/routing';
 import { savedSlugs, searchSafely } from '@/lib/api';
-import { getAmenities, getLandmarks } from '@/lib/catalog';
+import { getLandmarks } from '@/lib/catalog';
 import { localisedText } from '@/lib/localise';
 import { toCardModels } from '@/lib/search-cards';
-import { parseSearch, toQueryString, toSearchParams } from '@/lib/search-query';
+import { toQueryString, toSearchParams } from '@/lib/search-query';
+import { readSearchRequest } from '@/lib/search-request';
 import { getSession } from '@/lib/session-server';
 
 /**
@@ -36,23 +37,7 @@ export async function GET(
 
   if (!isLocale(locale)) return NextResponse.json({ code: 'not_found' }, { status: 404 });
 
-  const url = new URL(request.url);
-  const raw = Object.fromEntries(
-    [...new Set(url.searchParams.keys())].map((key) => {
-      const values = url.searchParams.getAll(key);
-      return [key, values.length > 1 ? values : values[0]];
-    }),
-  );
-
-  const amenities = await getAmenities();
-  const parsed = parseSearch(
-    raw,
-    new Set(amenities.filter((one) => one.propertyCount > 0).map((one) => one.code)),
-  );
-
-  const navigation =
-    request.headers.get('sec-fetch-mode') === 'navigate' ||
-    (request.headers.get('accept') ?? '').includes('text/html');
+  const { url, parsed, amenities, navigation } = await readSearchRequest(request);
 
   if (navigation) {
     /* A relative Location: there is no host here to get wrong. */

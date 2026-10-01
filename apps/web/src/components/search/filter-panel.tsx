@@ -63,6 +63,7 @@ export function FilterPanel({
   sortSlot,
   mapThumbnailSlot,
   mapButtonSlot,
+  layout = 'page',
 }: {
   locale: Locale;
   parsed: ParsedSearch;
@@ -88,6 +89,13 @@ export function FilterPanel({
   sortSlot: ReactNode;
   mapThumbnailSlot: ReactNode;
   mapButtonSlot: ReactNode;
+  /**
+   * `column` is the same filters as one always-open column, for the full map (Bashar, 2026-10-01:
+   * the map «same as booking.com», which filters beside it). The phone bar and its sheet are the
+   * page's, so a column draws neither; a change navigates the page exactly as the sidebar's does,
+   * which is what lets the map and the list behind it stay one search.
+   */
+  layout?: 'page' | 'column';
 }) {
   const t = useTranslations('search.results');
   const facets = useArrived(facetsPromise);
@@ -508,6 +516,22 @@ export function FilterPanel({
       ) : null}
     </div>
   );
+
+  if (layout === 'column') {
+    return (
+      <div
+        className="rounded-card border border-line bg-card px-4 py-3"
+        aria-busy={pending}
+      >
+        {heading}
+        <div
+          className={`transition-opacity duration-200 ease-out ${pending ? 'opacity-60' : ''}`}
+        >
+          {groups}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

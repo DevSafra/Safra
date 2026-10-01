@@ -125,15 +125,18 @@ export default async function SearchPage({
     ? localisedText(nearLandmark.name, locale) || undefined
     : undefined;
 
+  /* The party and dates every stay link carries, built from PARSED values. */
+  const stay = `?${new URLSearchParams({
+    checkIn: parsed.checkIn,
+    checkOut: parsed.checkOut,
+    adults: String(parsed.adults),
+    children: String(parsed.children),
+    infants: String(parsed.infants),
+  }).toString()}`;
+
   const cards = await toCardModels(results.items, {
     locale,
-    stay: `?${new URLSearchParams({
-      checkIn: parsed.checkIn,
-      checkOut: parsed.checkOut,
-      adults: String(parsed.adults),
-      children: String(parsed.children),
-      infants: String(parsed.infants),
-    }).toString()}`,
+    stay,
     adults: parsed.adults,
     nearLandmarkName,
     amenities,
@@ -196,12 +199,54 @@ export default async function SearchPage({
       staysHere: 1,
     }));
 
+  const filterProps = {
+    facets: facetsPromise,
+    locale,
+    parsed,
+    options: {
+      hasCentre: cardsHaveCentre,
+      cityName,
+      propertyTypes: propertyTypes.map((type) =>
+        option(type.code, dynamicMessage(tt, type.code, localisedName(type, locale))),
+      ),
+      facilities: amenityOptions('facilities'),
+      houseRules: amenityOptions('rules'),
+      accessibility: amenityOptions('accessibility'),
+      attributes: TRIP_ATTRIBUTES.map((code) => option(code, ta(code))),
+      landmarks: landmarks.map((mark) =>
+        option(mark.slug, localisedText(mark.name, locale) || mark.slug),
+      ),
+      landmarkKinds: [
+        ...new Map(
+          landmarks.map((mark) => [
+            mark.kind,
+            option(mark.kind, localisedText(mark.kindName, locale) || mark.kind),
+          ]),
+        ).values(),
+      ],
+    },
+  };
+
   const mapProps = {
     hrefPrefix: `/${locale}/property/`,
     bboxActive: parsed.bbox !== undefined,
     bboxUrlTemplate: link({ bbox: BBOX_PLACEHOLDER }),
     urlWithoutBbox: link({ bbox: null }),
     stays: mapStays,
+    hrefSuffix: stay,
+    signInHref,
+    /* The list's box is the map's opening view, never a limit on what the map may show. */
+    mapFeedUrl: `/${locale}/api/search/map?${toQueryString(parsed, { bbox: null })}`,
+    pageBbox: parsed.bbox,
+    filtersSlot: (
+      <FilterPanel
+        {...filterProps}
+        layout="column"
+        sortSlot={null}
+        mapThumbnailSlot={null}
+        mapButtonSlot={null}
+      />
+    ),
   };
 
   const cutoff = cutoffHour(publicSettings);
@@ -222,31 +267,7 @@ export default async function SearchPage({
 
   const panel = (
     <FilterPanel
-      facets={facetsPromise}
-      locale={locale}
-      parsed={parsed}
-      options={{
-        hasCentre: cardsHaveCentre,
-        cityName,
-        propertyTypes: propertyTypes.map((type) =>
-          option(type.code, dynamicMessage(tt, type.code, localisedName(type, locale))),
-        ),
-        facilities: amenityOptions('facilities'),
-        houseRules: amenityOptions('rules'),
-        accessibility: amenityOptions('accessibility'),
-        attributes: TRIP_ATTRIBUTES.map((code) => option(code, ta(code))),
-        landmarks: landmarks.map((mark) =>
-          option(mark.slug, localisedText(mark.name, locale) || mark.slug),
-        ),
-        landmarkKinds: [
-          ...new Map(
-            landmarks.map((mark) => [
-              mark.kind,
-              option(mark.kind, localisedText(mark.kindName, locale) || mark.kind),
-            ]),
-          ).values(),
-        ],
-      }}
+      {...filterProps}
       sortSlot={
         <SortControl
           compact

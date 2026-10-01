@@ -193,6 +193,160 @@ test('the map card draws the map of the results behind its button', async ({ pag
 });
 
 /**
+ * The full map shows every matching stay it can place, not the twenty cards of the page it was
+ * opened from (Bashar, 2026-10-01: «I see only one price, while there are so many hotels»), with
+ * the list of what is in view beside it, and the filters beside that.
+ */
+test.describe('the full map', () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  async function openMap(page: Page) {
+    await page.goto(SEARCH);
+    await page.locator('[data-map-thumbnail] button').click();
+    const dialog = page.getByRole('dialog', { name: 'الإقامات على الخريطة' });
+    await expect(dialog).toBeVisible();
+    const list = dialog.getByRole('region', { name: 'الإقامات في هذه المنطقة' });
+    await expect(list.locator('li').first()).toBeVisible({ timeout: 15_000 });
+    return { dialog, list };
+  }
+
+  test('lists every placed stay the search matches, and lights the pill of a card', async ({
+    page,
+    request,
+  }) => {
+    const feed = (await (
+      await request.get(`/ar/api/search/map?${STAY}`, {
+        headers: { accept: 'application/json' },
+      })
+    ).json()) as { stays: { slug: string }[] };
+
+    expect(
+      feed.stays.length,
+      'the testbed has more than one placed stay',
+    ).toBeGreaterThan(1);
+
+    const { dialog, list } = await openMap(page);
+
+    /* The opening view holds them all, so the list is the whole feed. */
+    await expect(list.locator('li')).toHaveCount(feed.stays.length);
+    await expect(
+      dialog.getByText(/إقامات? في هذه المنطقة|إقامتان في هذه المنطقة/).first(),
+    ).toBeVisible();
+
+    await list.locator('li a').first().hover();
+    await expect(dialog.locator('[data-map-pill][data-lit]')).toHaveCount(1);
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+  });
+
+  /*
+    A stay opens in a NEW tab from every place the map offers it (Bashar, 2026-10-01): the card,
+    the price pill and the dot, so the area the reader found is still there when they come back.
+  */
+  test('opens a stay in a new tab and keeps the map where it was', async ({
+    page,
+    context,
+  }) => {
+    const { dialog, list } = await openMap(page);
+
+    const opened = context.waitForEvent('page');
+    await list.locator('li a').first().click();
+    const tab = await opened;
+
+    await expect(tab).toHaveURL(/\/ar\/property\//);
+    await expect(dialog, 'the map is still open behind the new tab').toBeVisible();
+    await tab.close();
+
+    /* Every pill and every dot opens the same way; none of them navigates the map away. */
+    const targets = await dialog
+      .locator('a[href*="/property/"]')
+      .evaluateAll((links) => links.map((link) => link.getAttribute('target')));
+    expect(targets.length).toBeGreaterThan(1);
+    expect(new Set(targets)).toEqual(new Set(['_blank']));
+  });
+
+  /*
+    Every card beside the map carries the heart (Bashar, 2026-10-01). It sits above the card's
+    stretched link, so pressing it SAVES: signed out, it leads to sign-in in this tab and back to this
+    search, and it never opens the stay in a new one.
+  */
+  test('a heart on a map card saves rather than opening the stay', async ({
+    page,
+    context,
+  }) => {
+    const { list } = await openMap(page);
+
+    const hearts = list.getByRole('button', { name: /^احفظ / });
+    await expect(hearts).toHaveCount(await list.locator('li').count());
+
+    let opened = false;
+    context.on('page', () => {
+      opened = true;
+    });
+
+    await hearts.first().click();
+    await page.waitForURL('**/login**');
+
+    const back = new URL(
+      decodeURIComponent(new URL(page.url()).searchParams.get('next') ?? ''),
+      'http://localhost:3000',
+    );
+    expect(back.pathname).toBe('/ar/search');
+    expect(back.searchParams.get('checkIn')).toBe(CHECK_IN);
+    expect(opened, 'the heart did not open the stay in a new tab').toBe(false);
+  });
+
+  test('a filter beside the map narrows the map and keeps it open', async ({ page }) => {
+    const { dialog, list } = await openMap(page);
+    const before = await list.locator('li').count();
+
+    const filters = dialog.getByRole('complementary', {
+      name: 'تصفية الإقامات على الخريطة',
+    });
+    await filters
+      .getByRole('checkbox', { name: /إلغاء دون رسوم/ })
+      .first()
+      .check();
+
+    /* The box ticks at once; the URL follows the server's render, which a cold server takes a while over. */
+    await expect(page).toHaveURL(/freeCancellationOnly=true/, { timeout: 15_000 });
+    await expect(dialog).toBeVisible();
+    await expect
+      .poll(() => list.locator('li').count(), { timeout: 15_000 })
+      .toBeLessThan(before);
+  });
+});
+
+/*
+  «false» is a word, and the API's parser once read every word as true: the page's
+  `freeCancellationOnly=false` hid every stay without free cancellation, on the list and the map.
+*/
+test('an unfiltered search keeps the stays that charge to cancel', async ({
+  request,
+}) => {
+  const read = async (query: string) =>
+    (
+      (await (
+        await request.get(`/ar/api/search/map?${query}`, {
+          headers: { accept: 'application/json' },
+        })
+      ).json()) as { stays: { freeCancellation: string | null }[] }
+    ).stays;
+
+  const all = await read(STAY);
+  const free = await read(`${STAY}&freeCancellationOnly=true`);
+
+  expect(
+    all.some((stay) => stay.freeCancellation === null),
+    'the testbed has a stay that charges to cancel, and the unfiltered search shows it',
+  ).toBe(true);
+  /* The opposite control: switched on, the filter still filters. */
+  expect(free.length).toBeGreaterThan(0);
+  expect(free.every((stay) => stay.freeCancellation !== null)).toBe(true);
+});
+
+/**
  * A filter that can only ever empty the page is not offered — as an INVARIANT: every amenity on
  * screen reports a count above zero, whatever the data happens to be on the day it runs.
  */

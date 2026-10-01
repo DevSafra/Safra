@@ -200,3 +200,66 @@ export async function toCardModels(
     };
   });
 }
+
+/**
+ * One stay on the full map: its pill and its card in the list beside the map.
+ *
+ * Built FROM the card model rather than beside it, so a stay's price, score and stars read the same
+ * on the map as in the list it was opened from; the only additions are the point and a smaller
+ * photograph, because the map's cards are a third of the width of the list's.
+ */
+export interface MapStay extends Pick<
+  CardModel,
+  | 'key'
+  | 'slug'
+  | 'href'
+  | 'name'
+  | 'starRating'
+  | 'starLabel'
+  | 'typeLine'
+  | 'freeCancellation'
+  | 'review'
+  | 'newListing'
+  | 'nightly'
+  | 'perNight'
+  | 'saved'
+  | 'labels'
+> {
+  image: { webp: string; alt: string } | null;
+  latitude: string;
+  longitude: string;
+}
+
+export async function toMapStays(
+  items: readonly SearchResultItem[],
+  context: Parameters<typeof toCardModels>[1],
+): Promise<MapStay[]> {
+  const placed = items.filter((item) => item.publicLatitude && item.publicLongitude);
+  const cards = await toCardModels(placed, context);
+
+  return cards.map((card, index) => {
+    const item = placed[index];
+    return {
+      key: card.key,
+      slug: card.slug,
+      href: card.href,
+      name: card.name,
+      starRating: card.starRating,
+      starLabel: card.starLabel,
+      typeLine: card.typeLine,
+      freeCancellation: card.freeCancellation,
+      review: card.review,
+      newListing: card.newListing,
+      nightly: card.nightly,
+      perNight: card.perNight,
+      saved: card.saved,
+      labels: card.labels,
+      image:
+        item?.cover && card.image
+          ? { webp: imageUrl(item.cover, 320, 'webp'), alt: card.image.alt }
+          : null,
+      latitude: item?.publicLatitude ?? '',
+      longitude: item?.publicLongitude ?? '',
+    };
+  });
+}

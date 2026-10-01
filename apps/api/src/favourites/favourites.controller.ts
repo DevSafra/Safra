@@ -1,6 +1,10 @@
 import { Body, Controller, Delete, Get, Post, Query } from '@nestjs/common';
 
-import { cursorQuerySchema, type CursorQuery } from '@safra/contracts';
+import {
+  cursorQuerySchema,
+  type CursorQuery,
+  FAVOURITE_STATUS_BATCH,
+} from '@safra/contracts';
 import { z } from 'zod';
 
 import { AuditExempt } from '../common/audit/audit.interceptor.js';
@@ -34,7 +38,7 @@ const slugsQuerySchema = z
     slugs: z.preprocess(
       (value: unknown): unknown[] =>
         value === undefined ? [] : Array.isArray(value) ? (value as unknown[]) : [value],
-      z.array(z.string().min(1).max(200)).max(60),
+      z.array(z.string().min(1).max(200)).max(FAVOURITE_STATUS_BATCH),
     ),
   })
   .strict();

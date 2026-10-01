@@ -139,6 +139,13 @@
     "mapAreaActive": "Ergebnisse auf den Kartenbereich begrenzt",
     "mapAreaClear": "Bereich aufheben",
     "mapEmpty": "Keine Unterkünfte in diesem Bereich.",
+    "mapInView": "{count, plural, =0 {Keine Unterkünfte in diesem Bereich} one {1 Unterkunft in diesem Bereich} other {# Unterkünfte in diesem Bereich}}",
+    "mapCapped": "In diesem Bereich gibt es mehr Unterkünfte, als die Karte zeigen kann. Zoomen Sie hinein, um den Rest zu sehen.",
+    "mapLoading": "Unterkünfte werden auf der Karte geladen",
+    "mapFailed": "Die Unterkünfte konnten nicht geladen werden. Bewegen Sie die Karte, um es erneut zu versuchen.",
+    "mapListLabel": "Unterkünfte in diesem Bereich",
+    "mapFiltersLabel": "Unterkünfte auf der Karte filtern",
+    "opensInNewTab": "öffnet in einem neuen Tab",
     "nearKind": "Oder in der Nähe einer Art von Ort",
     "nearKindAny": "Beliebige Art",
     "results": {
