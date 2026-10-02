@@ -91,6 +91,29 @@ deleting it; the reason something was blocked is often the reason it comes back.
 
 ## 1. Where the project stands
 
+> ### Refund destination audit, 2026-10-02: NOT VERIFIED for the offline rail (decision needed)
+>
+> Bashar asked for proof that «a customer refund must always be returned to the exact same payment
+> method that was originally used». **Enforced:** every refund is written by `RefundService.post`,
+> which routes the gateway share through `payments.provider` with the original `provider_ref` and no
+> request names a destination (`createRefundSchema` takes a reason only); the wallet share is capped
+> at what the wallet funded. `post/0026_refund_destination.sql` now makes that the database's rule:
+> a refund names a captured payment of its own booking in its currency, never more than it took, its
+> payment cannot change, a captured payment's method, provider and reference cannot change, and a
+> booking has one capture. `refund-destination.integration.test.ts` attempts every bypass.
+> **Fixed:** «تأكيد استلام الحوالة» on a booking with no intent recorded a WALLET payment for money
+> that came by bank transfer (1,788 rows on the development database, 1,764 refunded through the
+> manual `internal` route); it now records the bank transfer.
+>
+> **Open, and the reason for NOT VERIFIED:** `manual_transfer` (bank transfer), the only rail in
+> production, refunds `processing` and finance settles it by hand. The platform never records the
+> account the money came FROM, and settlement records nothing about where it went, so nothing can
+> force or check that the money goes back to the same account. Proposed fix, awaiting Bashar: finance
+> records the remitter's account (encrypted, last four shown) when confirming receipt, and settling
+> a refund requires the destination, refused unless it matches. Card, Sham Cash and Klarna adapters
+> do not exist yet; the provider port carries no destination field, so an adapter can only refund
+> against the original charge, and each will need its own provider test when it lands.
+
 > ### «الإقامات» rebuilt on booking.com's model, 2026-10-01 (awaiting Bashar's review, uncommitted)
 >
 > Bashar asked for the results page to be «very similar» to booking.com, with every filter and a
