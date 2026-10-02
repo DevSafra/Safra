@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+import { ltrIsolate } from '@safra/i18n';
+
 import { OrnamentField } from '@/components/ornament';
 import { formatMoney, localisedText } from '@/lib/localise';
 import { imageUrl } from '@/lib/property';
@@ -119,7 +121,10 @@ export function GroupTripCard({
 
           <p className="text-14 font-bold text-gold-read">
             {trip.priceFrom && trip.currencyCode
-              ? labels.priceFrom(formatMoney(trip.priceFrom, trip.currencyCode, locale))
+              ? /* The VALUE isolated, never the sentence: «من $100» otherwise reads «من 100$». */
+                labels.priceFrom(
+                  ltrIsolate(formatMoney(trip.priceFrom, trip.currencyCode, locale)),
+                )
               : labels.priceOnRequest}
           </p>
         </div>

@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+
+import { ltrIsolate } from '@safra/i18n';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 
@@ -255,7 +257,9 @@ export default async function GroupTripPage({
           <dd className="mt-1 text-14 font-bold text-gold-read">
             {trip.priceFrom && trip.currencyCode
               ? t('priceFrom', {
-                  amount: formatMoney(trip.priceFrom, trip.currencyCode, locale),
+                  amount: ltrIsolate(
+                    formatMoney(trip.priceFrom, trip.currencyCode, locale),
+                  ),
                 })
               : t('priceOnRequest')}
           </dd>

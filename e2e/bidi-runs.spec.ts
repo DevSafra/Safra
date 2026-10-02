@@ -95,6 +95,9 @@ const SURFACES = [
       '/ar',
       '/ar/search?checkIn=2027-04-05&checkOut=2027-04-07&adults=2',
       '/ar/property/qasr-al-sharq-malki',
+      /* The trip card prints «من $100», on the home row, the list and the trip's own page. */
+      '/ar/groups',
+      '/ar/groups/coastal-syria-spring',
       '/ar/terms',
       '/ar/privacy',
       '/ar/find-booking',
