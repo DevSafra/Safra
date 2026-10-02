@@ -341,7 +341,7 @@ export default async function CheckoutPage({
             <div className="rounded-card border border-line bg-card p-5">
               <h2 className="font-display text-lg text-text">{t('summary')}</h2>
               <p className="mt-1 text-sm text-faint">
-                {name} · {cityName}
+                <span className="font-bold text-text">{name}</span> · {cityName}
               </p>
               {/*
                 One line per room TYPE, with its quantity and its subtotal.

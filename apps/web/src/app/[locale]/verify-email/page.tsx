@@ -121,7 +121,7 @@ function Shell({
   return (
     <div className="mx-auto max-w-md px-4 py-16 text-center">
       <h1
-        className={`font-display text-2xl ${tone === 'good' ? 'text-gold' : 'text-bad'}`}
+        className={`font-display text-2xl font-bold ${tone === 'good' ? 'text-gold' : 'text-bad'}`}
       >
         {title}
       </h1>

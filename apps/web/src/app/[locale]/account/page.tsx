@@ -138,7 +138,7 @@ export default async function AccountOverviewPage({
                     className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-gold/40 bg-card p-4 transition-colors hover:border-gold"
                   >
                     <span>
-                      <span className="block text-sm text-text">
+                      <span className="block text-sm font-bold text-text">
                         {localisedName(stay.property, locale)}
                       </span>
                       <span className="block text-xs text-faint">

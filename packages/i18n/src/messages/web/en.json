@@ -766,7 +766,7 @@
   },
   "reviews": {
     "title": "Review your stay",
-    "prompt": "You stayed at {property}. Tell other travellers how it went.",
+    "prompt": "You stayed at <b>{property}</b>. Tell other travellers how it went.",
     "pendingTitle": "Stays waiting for your review",
     "writeReview": "Write a review",
     "ratingLabel": "Your score out of 5",

@@ -70,7 +70,9 @@ export function SectionPlaceholder({
         />
 
         <div className="relative">
-          <h1 className="font-display text-3xl text-text sm:text-4xl">{title}</h1>
+          <h1 className="font-display text-3xl font-bold text-text sm:text-4xl">
+            {title}
+          </h1>
           <p className="mx-auto mt-4 max-w-[58ch] text-16 leading-relaxed text-muted">
             {body}
           </p>

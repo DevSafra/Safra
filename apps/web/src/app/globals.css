@@ -489,6 +489,30 @@
  * component asking for a SMALLER one now also gets it, which is why the one button that did
  * (`field-popover`'s «تم») carries the floor explicitly and drops to 36px only from `lg`.
  */
+/**
+ * Every heading is bold unless it says otherwise (Bashar, 2026-10-02: «I want them to be same as
+ * what you did for group item … the title is easy to read and nice»).
+ *
+ * Tailwind's reset sets every heading to `font-weight: inherit`, so a heading was bold only where a
+ * component remembered to write `font-bold`, and a sweep found fifteen that had not: the property
+ * page's section titles («اختر وحدتك», «مرافق العقار», «سياسة الإلغاء» …), every room name, the city
+ * and landmark pages' section titles, the trip page's. Fixing them one class at a time would leave
+ * the next new heading to remember again, which is how fifteen happened.
+ *
+ * In `@layer base`, after the reset: a plain element selector beats the reset's by order, and any
+ * weight utility on a heading still wins, because utilities sit in a later layer.
+ */
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-weight: 700;
+  }
+}
+
 @layer base {
   @media (max-width: 63.999rem) {
     :where(button, select, summary, [role='button']) {

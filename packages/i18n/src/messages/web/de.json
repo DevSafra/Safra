@@ -766,7 +766,7 @@
   },
   "reviews": {
     "title": "Bewerten Sie Ihren Aufenthalt",
-    "prompt": "Sie waren in {property}. Berichten Sie anderen Reisenden davon.",
+    "prompt": "Sie waren in <b>{property}</b>. Berichten Sie anderen Reisenden davon.",
     "pendingTitle": "Aufenthalte, die auf Ihre Bewertung warten",
     "writeReview": "Bewertung schreiben",
     "ratingLabel": "Ihre Bewertung von 5",

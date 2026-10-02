@@ -47,7 +47,9 @@ export default async function ResetPasswordPage({
   if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
-        <h1 className="font-display text-2xl text-bad">{t('resetLinkInvalidTitle')}</h1>
+        <h1 className="font-display text-2xl font-bold text-bad">
+          {t('resetLinkInvalidTitle')}
+        </h1>
         <p className="mt-2 text-sm text-muted">{t('resetLinkInvalid')}</p>
         <Link
           href={`/${locale}/forgot-password`}

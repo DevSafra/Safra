@@ -109,7 +109,7 @@ export function GroupTripCard({
             ) : null}
           </div>
 
-          <h3 className="font-display text-lg text-text group-hover:text-gold-read">
+          <h3 className="font-display text-lg font-bold text-text group-hover:text-gold-read">
             {title}
           </h3>
           <p className="line-clamp-2 text-sm leading-relaxed text-muted">{summary}</p>

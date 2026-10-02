@@ -482,7 +482,7 @@ export default async function HomePage({
                   <pledge.icon />
                 </span>
                 <p className="mt-3 text-14 tracking-wide text-faint">{pledge.ordinal}</p>
-                <h3 className="mt-1 text-base font-semibold text-balance text-text sm:text-[1.0625rem]">
+                <h3 className="mt-1 text-lg font-bold text-balance text-text">
                   {pledge.title}
                 </h3>
                 <div className="gold-rule mx-auto mt-3 w-12" />

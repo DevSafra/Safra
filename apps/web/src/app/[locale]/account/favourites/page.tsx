@@ -87,7 +87,7 @@ export default async function AccountFavouritesPage({
                 className="flex h-full flex-col gap-2 rounded-card border border-line bg-card p-4"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <h2 className="font-display text-lg text-text">
+                  <h2 className="font-display text-lg font-bold text-text">
                     <Link
                       href={`/${locale}/property/${item.slug}`}
                       className="inline-flex min-h-10 items-center hover:text-gold-read lg:min-h-0"

@@ -132,7 +132,9 @@ export function UnitSelector({
               <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-start">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <h3 className="font-display text-lg text-text">{room.name}</h3>
+                    <h3 className="font-display text-lg font-bold text-text">
+                      {room.name}
+                    </h3>
                     {many && room.cheapest ? (
                       <span className="rounded-full border border-[rgba(var(--goldA),0.4)] px-2 py-0.5 text-13 font-semibold text-gold-read">
                         {copy.cheapest}

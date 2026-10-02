@@ -72,7 +72,9 @@ export default async function CitiesPage({
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:py-12">
-      <h1 className="font-display text-3xl text-text sm:text-4xl">{t('title')}</h1>
+      <h1 className="font-display text-3xl font-bold text-text sm:text-4xl">
+        {t('title')}
+      </h1>
       <p className="mt-3 max-w-[65ch] text-16 leading-relaxed text-muted">
         {t('subtitle')}
       </p>

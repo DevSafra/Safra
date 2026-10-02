@@ -63,7 +63,7 @@ export default function NotFound() {
             {ORNAMENT_BRAND}
           </p>
 
-          <h1 style={{ fontSize: '1.25rem', marginTop: '1rem' }}>
+          <h1 style={{ fontSize: '1.25rem', fontWeight: 700, marginTop: '1rem' }}>
             {fallback.notFound.title}
           </h1>
 

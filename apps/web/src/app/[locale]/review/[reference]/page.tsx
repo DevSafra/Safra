@@ -73,7 +73,11 @@ export default async function ReviewPage({
   return (
     <Shell title={t('title')} locale={locale} back={back}>
       <p className="text-muted">
-        {t('prompt', { property: localisedName(eligibility.property, locale) })}
+        {t.rich('prompt', {
+          property: localisedName(eligibility.property, locale),
+          /* The stay's name in bold inside the sentence, as every stay name is (2026-10-02). */
+          b: (chunks) => <strong className="font-bold text-text">{chunks}</strong>,
+        })}
       </p>
       <p className="mt-1 text-sm text-faint">{localisedName(eligibility.unit, locale)}</p>
 

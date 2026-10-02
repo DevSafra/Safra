@@ -131,7 +131,7 @@ export default async function BookingDetailPage({
           <span className="font-mono">{ltrIsolate(booking.reference)}</span>
         </Row>
         <Row label={t('bookingProperty')}>
-          {localisedName(booking.property, locale)}
+          <span className="font-bold">{localisedName(booking.property, locale)}</span>
           {' · '}
           <span className="text-muted">{localisedName(booking.unit, locale)}</span>
           {/*

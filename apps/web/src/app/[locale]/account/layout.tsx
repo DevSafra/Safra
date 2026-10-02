@@ -66,7 +66,9 @@ export default async function AccountLayout({
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
       <section className="rounded-card border border-line bg-card p-6">
-        <h1 className="font-display text-xl text-text">{t('notCustomerTitle')}</h1>
+        <h1 className="font-display text-xl font-bold text-text">
+          {t('notCustomerTitle')}
+        </h1>
         <p className="mt-3 text-sm leading-relaxed text-muted">{t('notCustomerBody')}</p>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
