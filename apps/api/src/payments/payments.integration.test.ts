@@ -1181,15 +1181,20 @@ describeIfDb('payment collection, webhooks and refunds', () => {
 
       await actions.recordPaymentReceived(own.reference, undefined);
 
-      const captured = await db.execute<{ provider: string }>(sql`
-        SELECT provider FROM payments
+      const captured = await db.execute<{ provider: string; method: string }>(sql`
+        SELECT provider, method::text AS method FROM payments
          WHERE booking_id = ${own.id}::uuid AND status = 'captured'
       `);
 
-      expect(
-        captured.rows[0]?.provider,
-        'a staff-recorded capture has no gateway behind it',
-      ).toBe('internal');
+      /*
+        The bank transfer it was, through the offline rail (2026-10-02). It was recorded as a WALLET
+        payment through `internal`, which the money never came by, so its refund followed a false
+        original method. `refund-destination.integration.test.ts` holds the rule.
+      */
+      expect(captured.rows[0], 'a confirmed transfer is recorded as one').toEqual({
+        provider: 'manual_transfer',
+        method: 'bank_transfer',
+      });
 
       const result = await refunds.execute(
         own.reference,
@@ -1361,6 +1366,16 @@ describeIfDb('payment collection, webhooks and refunds', () => {
       });
 
       expect(started.status).toBe('requires_action');
+
+      /*
+        Captured first: a refund names a payment that took money, and the database refuses one that
+        did not (post/0026_refund_destination.sql). What this asserts is the SETTLE refusal for an
+        online rail, which needs the refund to exist, so the payment it refunds must have been paid.
+      */
+      await db.execute(sql`
+        UPDATE payments SET status = 'captured'::payment_status, captured_at = now()
+         WHERE booking_id = ${booking.id}::uuid AND provider = 'simulator'
+      `);
 
       const online = await db.execute<{ id: string }>(sql`
         INSERT INTO refunds (payment_id, booking_id, amount, currency_id, status, reason,

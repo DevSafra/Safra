@@ -15,7 +15,7 @@ import { VoucherService } from './voucher.service.js';
 import { describeError } from '../common/errors/safe-error.js';
 import { NotificationService } from '../notifications/notification.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
-import { MONEY_SCALE, toMinor } from '../common/money.js';
+import { MONEY_SCALE, fromMinor, toMinor } from '../common/money.js';
 import { DATABASE } from '../database/database.module.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
@@ -134,12 +134,12 @@ export class BookingActionsService {
        * there would leave the real attempt permanently "requires_action" and make
        * refunds route through a payment that never took money.
        *
-       * The staff simulate-capture path has no row, so one is created to satisfy
-       * the ledger's payment_id foreign key.
+       * Finance confirming a transfer on a booking with no intent has no row, so one is created,
+       * recording the rail the money actually came by, which a refund then follows back.
        */
       const payment =
         paymentId ??
-        (await this.createInternalPayment(
+        (await this.createRecordedPayment(
           tx as unknown as Database,
           booking.id,
           amounts,
@@ -883,24 +883,54 @@ export class BookingActionsService {
   }
 
   /**
-   * A payment row for a capture that had no gateway behind it.
+   * The payment row for money finance confirmed on a booking that had no intent.
    *
-   * `provider = 'internal'` is what marks it as such, so a later reconciliation can
-   * tell staff-simulated money from money an acquirer actually settled.
+   * ## It records the rail the money came by (2026-10-02)
+   *
+   * This minted `method = 'wallet', provider = 'internal'` for the whole total, whatever had paid.
+   * The control that reaches it is «تأكيد استلام الحوالة», which exists for one rail, a bank
+   * transfer, so the books said the wallet paid for money that came from a bank account. A refund
+   * follows `payments.provider` back, and on that record it went out through the manual `internal`
+   * route to wherever a person sent it: 1,764 refunds on the development database had. «A refund
+   * always returns through the original payment method» cannot hold over a false original method.
+   *
+   * So the wallet is named only when it really funded the whole stay; otherwise the row is the
+   * bank transfer it was, through `manual_transfer`, for the part the transfer covered (the
+   * wallet's share, if any, is held on the booking and returns to the wallet on its own).
    */
-  private async createInternalPayment(
+  private async createRecordedPayment(
     tx: Database,
     bookingId: string,
-    amounts: { total_amount: string; currency_id: string },
+    amounts: { total_amount: string; wallet_amount: string; currency_id: string },
   ): Promise<string> {
-    const created = await tx.execute<{ id: string }>(sql`
-      INSERT INTO payments
-        (booking_id, method, provider, amount, currency_id, status, captured_at)
-      VALUES (${bookingId}, 'wallet'::payment_method, 'internal',
-              ${amounts.total_amount}, ${amounts.currency_id},
-              'captured'::payment_status, now())
-      RETURNING id
-    `);
+    const walletFunded =
+      toMinor(amounts.wallet_amount, MONEY_SCALE) >=
+      toMinor(amounts.total_amount, MONEY_SCALE);
+    const transferred = fromMinor(
+      toMinor(amounts.total_amount, MONEY_SCALE) -
+        toMinor(amounts.wallet_amount, MONEY_SCALE),
+      MONEY_SCALE,
+    );
+
+    const created = await tx.execute<{ id: string }>(
+      walletFunded
+        ? sql`
+            INSERT INTO payments
+              (booking_id, method, provider, amount, currency_id, status, captured_at)
+            VALUES (${bookingId}, 'wallet'::payment_method, 'internal',
+                    ${amounts.total_amount}, ${amounts.currency_id},
+                    'captured'::payment_status, now())
+            RETURNING id
+          `
+        : sql`
+            INSERT INTO payments
+              (booking_id, method, provider, amount, currency_id, status, captured_at)
+            VALUES (${bookingId}, 'bank_transfer'::payment_method, 'manual_transfer',
+                    ${transferred}, ${amounts.currency_id},
+                    'captured'::payment_status, now())
+            RETURNING id
+          `,
+    );
 
     const id = created.rows[0]?.id;
     if (!id) throw new Error('Payment insert returned no row.');
