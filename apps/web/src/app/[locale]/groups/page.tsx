@@ -81,7 +81,7 @@ export default async function GroupsPage({
   return (
     <article className="mx-auto max-w-7xl px-4 py-10">
       <header className="max-w-2xl">
-        <h1 className="font-display text-3xl font-bold text-gold sm:text-4xl">
+        <h1 className="font-display text-3xl font-bold text-text sm:text-4xl">
           {t('title')}
         </h1>
         <p className="mt-3 text-muted">{t('body')}</p>
