@@ -13,12 +13,13 @@ import { proxy } from '@/lib/proxy';
  * choose.
  */
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ reference: string }> },
 ) {
   const { reference } = await params;
 
   return proxy(`/bookings/${encodeURIComponent(reference)}/capture-payment`, {
     method: 'POST',
+    body: await request.json(),
   });
 }

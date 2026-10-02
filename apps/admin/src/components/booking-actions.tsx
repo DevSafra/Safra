@@ -7,7 +7,9 @@ import {
   BOOKING_CANCEL_REASON_MIN,
   DISPUTE_KINDS,
   ENFORCEMENT_REASON_MIN,
+  normaliseBankAccount,
 } from '@safra/contracts';
+import { ltrIsolate } from '@safra/i18n';
 
 import { useConfirm } from '@safra/ui';
 
@@ -30,7 +32,7 @@ export type BookingActionAvailability = {
 };
 
 /** The moves that open a form, because each has something the operator must say or choose. */
-type Explained = 'cancel' | 'confirm' | 'dispute' | 'refund' | 'compensate';
+type Explained = 'cancel' | 'confirm' | 'dispute' | 'refund' | 'compensate' | 'capture';
 
 /**
  * Everything a staff actor can do to a booking (§6.3, §6.4, §9.4).
@@ -94,17 +96,23 @@ export function BookingActions({
    * that has moved, and painting it red would spend the colour that means «you cannot undo this»
    * on the wrong half of this screen — cancelling a paid stay is the one that deserves it.
    */
-  async function confirmThenCapture(): Promise<void> {
+  async function confirmThenCapture(payerAccount: string): Promise<void> {
+    /*
+      The question names the account's last four (2026-10-02), so the operator confirms WHICH
+      account the money came from, read back from what they typed, not only that it came.
+    */
     const go = await ask({
       title: copy.capturePaymentTitle,
-      message: copy.capturePaymentBody,
+      message: fill(copy.capturePaymentBody, {
+        last4: ltrIsolate(normaliseBankAccount(payerAccount).slice(-4)),
+      }),
       confirmLabel: copy.capturePaymentConfirm,
       cancelLabel: t.sections.dialog.cancel,
     });
 
     if (!go) return;
 
-    await submit('capture-payment', undefined, copy.paymentCaptured);
+    await submit('capture-payment', { payerAccount }, copy.paymentCaptured);
   }
 
   async function submit(step: string, body: unknown, success: string): Promise<void> {
@@ -224,11 +232,10 @@ export function BookingActions({
             fact about somebody's money on one press.
           */}
           {offer.capture ? (
-            <Press
-              busy={busy}
-              idle={copy.capturePayment}
-              working={copy.capturing}
-              onClick={() => void confirmThenCapture()}
+            <Toggle
+              label={copy.capturePayment}
+              active={open === 'capture'}
+              onClick={() => setOpen(open === 'capture' ? null : 'capture')}
             />
           ) : null}
           {offer.checkIn ? (
@@ -290,6 +297,13 @@ export function BookingActions({
       {/* Each hint sits under the control it explains, and only while that control is offered. */}
       {offer.capture ? <Hint>{copy.captureHint}</Hint> : null}
       {offer.complete ? <Hint>{copy.completeHint}</Hint> : null}
+
+      {open === 'capture' ? (
+        <CaptureForm
+          busy={busy}
+          onSubmit={(payerAccount) => void confirmThenCapture(payerAccount)}
+        />
+      ) : null}
 
       {open === 'confirm' ? (
         <Reasoned
@@ -478,6 +492,56 @@ function Reasoned({
         }`}
       >
         {submitLabel}
+      </button>
+    </form>
+  );
+}
+
+/**
+ * «تأكيد استلام الحوالة» asks for the account the transfer came FROM (2026-10-02).
+ *
+ * It is what any refund of this payment must go back to, so it is recorded here, once, read off the
+ * bank statement. `field-ltr`: an IBAN reads left to right whatever the page, and the alignment
+ * still follows the document (docs/i18n.md). Arabic digits are fine; the API normalises them.
+ */
+function CaptureForm({
+  busy,
+  onSubmit,
+}: {
+  busy: boolean;
+  onSubmit: (payerAccount: string) => void;
+}) {
+  const copy = t.sections.bookingDetail;
+
+  return (
+    <form
+      className="grid gap-1.5 rounded-lg border border-gold/30 bg-gold/[0.06] p-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit(text(new FormData(event.currentTarget), 'payerAccount').trim());
+      }}
+    >
+      <label className="grid gap-1">
+        <span className="text-13 text-faint">{copy.capturePayerLabel}</span>
+        <input
+          name="payerAccount"
+          required
+          minLength={6}
+          maxLength={80}
+          autoComplete="off"
+          spellCheck={false}
+          disabled={busy}
+          className="field-ltr rounded-lg border border-line bg-field px-3 py-2 text-14 text-text disabled:cursor-not-allowed"
+        />
+        <span className="text-13 text-faint">{copy.capturePayerHint}</span>
+      </label>
+
+      <button
+        type="submit"
+        disabled={busy}
+        className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-gold/50 px-4 py-2 text-14 font-bold text-gold-read hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
+      >
+        {busy ? copy.capturing : copy.captureSubmit}
       </button>
     </form>
   );

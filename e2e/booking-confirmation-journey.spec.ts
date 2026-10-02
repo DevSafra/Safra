@@ -4,6 +4,7 @@ import { PARTNER_BASE, PARTNER_STATE } from './partner-session.js';
 import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
 import { checkoutSubmit } from './checkout-submit.js';
 import { acceptConfirm } from './confirm.js';
+import { confirmTransferReceived } from './transfer.js';
 import { partnerAr as partnerCopy } from '../packages/i18n/src/partner.js';
 
 /**
@@ -137,9 +138,7 @@ test('a chosen room survives capture, acceptance, the email, the voucher and the
     });
 
     await expect(capture, 'finance can confirm the money arrived').toBeVisible();
-    await capture.click();
-
-    await acceptConfirm(console_);
+    await confirmTransferReceived(console_);
 
     await expect(
       console_.locator('[data-status-pill]').first(),

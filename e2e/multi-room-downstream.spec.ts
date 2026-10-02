@@ -4,6 +4,7 @@ import { PARTNER_BASE, PARTNER_STATE } from './partner-session.js';
 import { STAFF_STATE } from './staff.js';
 import { checkoutSubmit } from './checkout-submit.js';
 import { acceptConfirm } from './confirm.js';
+import { confirmTransferReceived } from './transfer.js';
 
 const MAILPIT = 'http://localhost:8025';
 
@@ -145,13 +146,13 @@ test('finance captures the money and the partner accepts three rooms', async ({
 
     const capture = console_.getByRole('button', {
       name: 'تأكيد استلام الحوالة',
+
       exact: true,
     });
 
     await expect(capture, 'finance can confirm the money arrived').toBeVisible();
-    await capture.click();
 
-    await acceptConfirm(console_);
+    await confirmTransferReceived(console_);
 
     await expect(
       console_.locator('[data-status-pill]').first(),

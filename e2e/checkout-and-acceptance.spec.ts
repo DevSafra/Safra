@@ -4,6 +4,7 @@ import { partnerAr } from '../packages/i18n/src/partner.js';
 import { PARTNER_STATE } from './partner-session.js';
 import { STAFF_STATE } from './staff.js';
 import { bookableStay, type Bookable } from './free-nights.js';
+import { confirmTransferReceived } from './transfer.js';
 
 /**
  * Findings 213, 214 and 215, driven end to end (Bashar, 2026-09-07).
@@ -211,8 +212,7 @@ test('215: a booking reaches the partner queue', async ({ browser, request }) =>
 
   try {
     await console_.goto(`${CONSOLE}/bookings/${reference}`);
-    await console_.getByRole('button', { name: 'تأكيد استلام الحوالة' }).click();
-    await console_.getByRole('button', { name: 'نعم، وصلت الحوالة' }).click();
+    await confirmTransferReceived(console_);
     await expect(console_.getByText('قيد التأكيد').first()).toBeVisible({
       timeout: 20_000,
     });

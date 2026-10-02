@@ -21,7 +21,7 @@ import { proxy } from '@/lib/proxy';
  * carry, and a caller without it gets the API's refusal rather than a screen that pretended.
  */
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ refundId: string }> },
 ): Promise<NextResponse> {
   const { refundId } = await params;
@@ -33,5 +33,6 @@ export async function POST(
   */
   return proxy(`/payments/refunds/${encodeURIComponent(refundId)}/settle`, {
     method: 'POST',
+    body: await request.json(),
   });
 }

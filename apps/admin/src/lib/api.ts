@@ -958,6 +958,14 @@ const bookingDetailSchema = z.object({
             reversed. The API decides — see `booking-detail.service.ts` for why.
           */
           settleable: z.boolean(),
+          /*
+            The last four of the account a bank transfer came from and of the one its refund went
+            to, and the bank's reference. `.nullable()`, not defaulted: null is «none recorded»,
+            which the settle form acts on, and a made-up value would hide that.
+          */
+          sourceLast4: z.string().nullable(),
+          destinationLast4: z.string().nullable(),
+          transferReference: z.string().nullable(),
         }),
       ),
     })

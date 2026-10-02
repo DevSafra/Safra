@@ -4,6 +4,7 @@ import { PARTNER_BASE, PARTNER_STATE } from './partner-session.js';
 import { STAFF_STATE } from './staff.js';
 import { checkoutSubmit } from './checkout-submit.js';
 import { acceptConfirm } from './confirm.js';
+import { confirmTransferReceived } from './transfer.js';
 
 /**
  * A booking of SEVERAL room types, followed to every document and screen it produces.
@@ -146,13 +147,13 @@ test('the console shows the composition, and finance captures it', async ({
 
     const capture = page.getByRole('button', {
       name: 'تأكيد استلام الحوالة',
+
       exact: true,
     });
 
     await expect(capture).toBeVisible();
-    await capture.click();
 
-    await acceptConfirm(page);
+    await confirmTransferReceived(page);
 
     await expect(page.locator('[data-status-pill]').first()).toHaveText('قيد التأكيد', {
       timeout: 20_000,

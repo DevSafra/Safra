@@ -19,6 +19,7 @@ import {
 } from '@/lib/strings';
 import { refuseSection } from '@/components/section-refusal';
 import { COMPENSATION_CURRENCIES } from '@safra/contracts';
+import { ltrIsolate } from '@safra/i18n';
 import { readerPermissions } from '@/lib/gate';
 import { BookingActions } from '@/components/booking-actions';
 import { SettleRefund } from '@/components/settle-refund';
@@ -412,7 +413,18 @@ export default async function BookingPage({
                       refundId={refund.id}
                       amount={money(refund.amount)}
                       currency={booking.money.currencyCode}
+                      sourceLast4={refund.sourceLast4}
                     />
+                  ) : null}
+
+                  {/* Where a settled bank-transfer refund went, read from the record, last four only. */}
+                  {refund.destinationLast4 && refund.transferReference ? (
+                    <span className="block text-13 text-faint">
+                      {fill(t.sections.bookingDetail.refundSentTo, {
+                        last4: ltrIsolate(refund.destinationLast4),
+                        reference: ltrIsolate(refund.transferReference),
+                      })}
+                    </span>
                   ) : null}
                 </li>
               ))}
