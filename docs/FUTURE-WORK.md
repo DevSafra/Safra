@@ -91,7 +91,7 @@ deleting it; the reason something was blocked is often the reason it comes back.
 
 ## 1. Where the project stands
 
-> ### Refund destination audit, 2026-10-02: NOT VERIFIED for the offline rail (decision needed)
+> ### Refund destination audit, 2026-10-02: the offline rail fixed the same day
 >
 > Bashar asked for proof that «a customer refund must always be returned to the exact same payment
 > method that was originally used». **Enforced:** every refund is written by `RefundService.post`,
@@ -105,14 +105,15 @@ deleting it; the reason something was blocked is often the reason it comes back.
 > that came by bank transfer (1,788 rows on the development database, 1,764 refunded through the
 > manual `internal` route); it now records the bank transfer.
 >
-> **Open, and the reason for NOT VERIFIED:** `manual_transfer` (bank transfer), the only rail in
-> production, refunds `processing` and finance settles it by hand. The platform never records the
-> account the money came FROM, and settlement records nothing about where it went, so nothing can
-> force or check that the money goes back to the same account. Proposed fix, awaiting Bashar: finance
-> records the remitter's account (encrypted, last four shown) when confirming receipt, and settling
-> a refund requires the destination, refused unless it matches. Card, Sham Cash and Klarna adapters
-> do not exist yet; the provider port carries no destination field, so an adapter can only refund
-> against the original charge, and each will need its own provider test when it lands.
+> **Bank transfer, fixed (Bashar: «build the bank transfer fix»):** «تأكيد استلام الحوالة» now
+> records the account the transfer came from (encrypted, last four shown), and settling a refund
+> requires the destination and the bank's reference; the API compares the accounts and refuses any
+> other, and `post/0027_bank_transfer_refund.sql` refuses a completed offline refund whose
+> destination is not the payment's own ciphertext. A payment confirmed before this asks for its
+> source once, at settlement. `offline-rails.test.ts` fails if an `isOffline` provider is missing
+> from the rule's list. **Still to come:** card, Sham Cash and Klarna adapters do not exist; the
+> provider port carries no destination field, so an adapter can only refund against the original
+> charge, and each needs its own provider test when it lands.
 
 > ### «الإقامات» rebuilt on booking.com's model, 2026-10-01 (awaiting Bashar's review, uncommitted)
 >
