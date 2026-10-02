@@ -17,8 +17,6 @@ import { isLocale } from '@/i18n/routing';
  * with, like بحر and جبل, so the item opens a filtered search. That was offered and deferred; it
  * is recorded in `docs/FUTURE-WORK.md` rather than half-built here.
  */
-export const dynamic = 'force-static';
-
 export async function generateMetadata({
   params,
 }: {

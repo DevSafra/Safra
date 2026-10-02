@@ -32,13 +32,14 @@ import { isLocale } from '@/i18n/routing';
  * plain responsive grid with no horizontal scrolling — the one thing `.claude/CLAUDE.md` forbids
  * outright on a page.
  *
- * ## Prerendered, and revalidated with the catalogue
+ * ## Rendered per request, with the cities cached
  *
- * The cities list is reference data behind `CATALOGUE_TAG`, so this page is as cacheable as the
- * landing page's own section and a city added in the console reaches it without a deploy.
+ * It was `force-static`, and that ran no script at all (2026-10-02): the security policy gives every
+ * response a fresh nonce, a page built once carries a stale one, and the browser refused all forty
+ * scripts, so the menu, the theme and the language switch were dead here. The cities list is still
+ * reference data cached behind `CATALOGUE_TAG`, which is where the saving was; the HTML is not
+ * cacheable under a nonce policy and `no-force-static.test.ts` keeps it so.
  */
-export const dynamic = 'force-static';
-export const revalidate = 300;
 
 export async function generateMetadata({
   params,

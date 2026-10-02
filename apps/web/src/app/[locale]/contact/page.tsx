@@ -36,8 +36,6 @@ import { ltrIsolate } from '@/lib/bidi';
  * decision about what a stranger may attach. It was offered as an option and not chosen, so it is
  * not half-built here.
  */
-export const dynamic = 'force-static';
-
 export async function generateMetadata({
   params,
 }: {
