@@ -457,8 +457,12 @@ describeIfDb('SafraPayoutService', () => {
            AND NOT EXISTS (SELECT 1 FROM refunds r
                             WHERE r.booking_id = b.id AND r.deleted_at IS NULL)
            AND NOT EXISTS (SELECT 1 FROM partner_payout_items i WHERE i.booking_id = b.id)
+           -- The payment has to cover the stay price: the refund below goes back through it in
+           -- full, and a booking part-paid from the wallet took less than that through the
+           -- gateway, so the database refuses the refund (post/0026_refund_destination.sql).
            AND EXISTS (SELECT 1 FROM payments p WHERE p.booking_id = b.id
-                        AND p.status IN ('captured','partially_refunded','refunded'))
+                        AND p.status IN ('captured','partially_refunded','refunded')
+                        AND p.amount >= b.base_amount)
            AND EXISTS (SELECT 1 FROM ledger_entries e
                         WHERE e.booking_id = b.id
                           AND e.account = 'safra_commission_partner'
