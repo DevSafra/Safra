@@ -39,6 +39,7 @@ export function GroupTripCard({
   trip,
   locale,
   labels,
+  className = '',
 }: {
   readonly trip: GroupTrip;
   readonly locale: Locale;
@@ -49,6 +50,8 @@ export function GroupTripCard({
     readonly seats: (n: number) => string;
     readonly past: string;
   };
+  /** The item's own sizing: the home page's slider fixes its width, the groups grid does not. */
+  readonly className?: string;
 }) {
   const title = localisedText(trip.title, locale);
   const summary = localisedText(trip.summary, locale);
@@ -57,7 +60,7 @@ export function GroupTripCard({
   const finished = hasFinished(trip.endsOn);
 
   return (
-    <li>
+    <li className={className}>
       <Link
         href={`/${locale}/groups/${trip.slug}`}
         className="group flex h-full flex-col overflow-hidden rounded-card border border-line bg-card transition-colors hover:border-gold/40"

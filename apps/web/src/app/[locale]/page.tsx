@@ -1,12 +1,12 @@
 import Link from 'next/link';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 
-import { confirmationWindowMinutes, durationParts } from '@safra/contracts';
 import { notFound } from 'next/navigation';
 
 import { SearchForm } from '@/components/search-form';
 import { CardSlider } from '@/components/card-slider';
 import { CityCard } from '@/components/city-card';
+import { GroupTripCard } from '@/components/group-trip-card';
 import { PropertyCard } from '@/components/property-card';
 import {
   CompensationIcon,
@@ -26,6 +26,7 @@ import { searchSafely } from '@/lib/api';
 import { formatCustomerFee, partnerRate, todayInDamascus } from '@/lib/settings';
 import { dayAfter, night, retryFrom } from '@/lib/bookable-night';
 import { dynamicMessage } from '@/lib/dynamic-message';
+import { getGroupTrips, upcomingTrips } from '@/lib/group-trips';
 import { ORNAMENT_BRAND, ORNAMENT_CRESCENT, ORNAMENT_STAR } from '@safra/ui';
 
 export const revalidate = 300;
@@ -59,8 +60,8 @@ const TRIP_FEATURES = [
  *
  * `SAFRA - موقع سفرة 20.08.html` is the approved design and this page follows its SECTIONS and its
  * copy: a centred hero over a radial glow, the search bar with the trip features under it, then
- * destinations, stay types, «موصى به من سفرة», the four booking steps, the three pledges, and the
- * partner band. Two earlier attempts invented compositions of their own instead of reading it; the
+ * destinations, stay types, «موصى به من سفرة», the three pledges, and the partner band. The four
+ * booking steps gave their place to the group trips (Bashar, 2026-10-02). Two earlier attempts invented compositions of their own instead of reading it; the
  * prototype is the brief and this follows it.
  *
  * What is taken from booking.com is the DISCIPLINE rather than the shape: one card pattern used
@@ -92,14 +93,13 @@ export default async function HomePage({
   const t = await getTranslations('home');
   const tt = await getTranslations('propertyTypes');
   const ta = await getTranslations('attributes');
-  /* `common` carries the duration messages — they are needed wherever a setting is a length of time. */
-  const tc = await getTranslations('common');
+  const tg = await getTranslations('groups');
 
   const today = todayInDamascus();
   const tomorrow = tomorrowInDamascus();
 
   /*
-    Four independent reads, none of which depends on another, so none of them waits.
+    Five independent reads, none of which depends on another, so none of them waits.
 
     The search is the only new one and it is the CACHED reader — the same one the city page's
     teaser uses, for the same reason and with the same explicit trade-off: it is marketing content,
@@ -107,39 +107,20 @@ export default async function HomePage({
     the exclusion constraint regardless. `searchSafely` never throws, so a search that fails or a
     same-day cutoff that has passed leaves the section absent rather than the page broken.
   */
-  const [cities, propertyTypes, settings, recommended] = await Promise.all([
+  const [cities, propertyTypes, settings, recommended, trips] = await Promise.all([
     getCities(),
     getPropertyTypes(),
     getPublicSettings(),
     recommendedStays(today, tomorrow),
+    getGroupTrips(),
   ]);
 
-  const rule = durationParts(confirmationWindowMinutes(settings));
-  const windowLabel = tc(rule.unit === 'hours' ? 'durationHours' : 'durationMinutes', {
-    count: rule.count,
-  });
+  const upcoming = upcomingTrips(trips);
 
   const trust = [
     { icon: VerifiedIcon, label: t('trustVerified') },
     { icon: WalletIcon, label: t('trustPayment') },
     { icon: CompensationIcon, label: t('trustCompensation') },
-  ];
-
-  const steps = [
-    { title: t('step1Title'), body: t('step1Body') },
-    /* The fee is a setting the super admin edits (P-005), never a literal in the copy. */
-    { title: t('step2Title'), body: t('step2Body') },
-    /*
-      «نؤكد خلال ساعتين» was a literal, and the window is a SETTING (Bashar, 2026-09-07: operational
-      values «should always be derived from the active configuration rather than embedded in static
-      strings»). Change it to ninety minutes and the home page kept promising two hours.
-
-      The duration goes through `durationParts` and an ICU message rather than a template, because
-      «ساعتين» is Arabic DUAL — correct for 120 minutes and wrong for every other value, and Arabic
-      has six plural forms to pick between. The settings map is already on this page for the fee.
-    */
-    { title: t('step3Title', { window: windowLabel }), body: t('step3Body') },
-    { title: t('step4Title'), body: t('step4Body') },
   ];
 
   /*
@@ -283,9 +264,21 @@ export default async function HomePage({
       {/* ── Destinations (§5.4) ──────────────────────────────────────────── */}
       <section aria-label={t('destinationsTitle')} className="bg-bg">
         <div className="mx-auto max-w-7xl px-4 py-10 sm:py-12">
-          <SectionHeading eyebrow={t('destinationsTitle')}>
-            {t('destinationsSubtitle')}
-          </SectionHeading>
+          {/*
+            The way to every city beside the heading (Bashar, 2026-10-02), the same shape as
+            «كل الرحلات الجماعية» on the trips row: the slider shows a choice, the link the whole set.
+          */}
+          <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+            <SectionHeading eyebrow={t('destinationsTitle')}>
+              {t('destinationsSubtitle')}
+            </SectionHeading>
+            <Link
+              href={`/${locale}/city`}
+              className="inline-flex min-h-10 items-center gap-1.5 text-14 font-semibold text-sky underline-offset-4 transition-colors duration-150 ease-out hover:text-gold-read hover:underline lg:min-h-0"
+            >
+              {t('citiesAll')}
+            </Link>
+          </div>
 
           {/*
             A SLIDER, the way booking.com moves through its destination rows (Bashar, 2026-09-02).
@@ -408,49 +401,58 @@ export default async function HomePage({
         </section>
       ) : null}
 
-      {/* ── How booking works (§6.1) ─────────────────────────────────────── */}
-      <section aria-label={t('howTitle')} className="bg-bg">
-        <div className="mx-auto max-w-7xl px-4 py-10 sm:py-12">
-          <SectionHeading eyebrow={t('howTitle')}>{t('howSubtitle')}</SectionHeading>
-          <p className="mt-3 max-w-[70ch] text-sm leading-relaxed text-muted">
-            {t('howBody', { window: windowLabel })}
-          </p>
+      {/* ── جروبات: the group trips SAFRA runs itself ────────────────────── */}
+      {/*
+        In the place «كيف يعمل الحجز» held (Bashar, 2026-10-02). That section explained that booking
+        is not instant; the same promise is still made where the decision is, on the property page
+        and at checkout, and the trust bar under the hero still names the compensation.
 
-          {/*
-            Four steps, numbered, because the ORDER is the point: the money moves first, the
-            partner answers second, and the outcome is either a confirmation or all of it back.
-            That sequence is the answer to «why is this not instant», which is the question the
-            heading above raises.
-
-            Western digits, unlike the prototype's ١٢٣٤. The rest of this page prints «٢٬٠١٠» as
-            `2,010` — `globals.css` pins lining Western numerals for Arabic — and two numeral
-            systems on one screen is harder to read than either.
-          */}
-          <ol className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {steps.map((step, index) => (
-              <li
-                key={step.title}
-                className="rounded-card border border-line bg-card p-4 transition-colors duration-200 ease-out-strong hover:border-gold/45"
+        Only trips still to come: a finished trip is history on the groups page, where it is labelled
+        as such, and an advertisement for a trip nobody can join is a dead end on the front page.
+        Absent rather than empty when there are none, for the reason «مختارات» gives.
+      */}
+      {upcoming.length > 0 ? (
+        <section aria-label={tg('title')} className="bg-bg">
+          <div className="mx-auto max-w-7xl px-4 py-10 sm:py-12">
+            <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+              <SectionHeading eyebrow={tg('title')}>{t('groupsSubtitle')}</SectionHeading>
+              <Link
+                href={`/${locale}/groups`}
+                className="inline-flex min-h-10 items-center gap-1.5 text-14 font-semibold text-sky underline-offset-4 transition-colors duration-150 ease-out hover:text-gold-read hover:underline lg:min-h-0"
               >
-                {/*
-                  The numeral on the gold GRADIENT rather than in gold text. `--color-gold` on the
-                  light card is 3.55:1, which a 13px numeral does not clear; `.btn-gold` carries its
-                  own dark foreground and measures 6.1:1, and it ties the step markers to the page's
-                  primary action — which is what the prototype's gold discs do.
-                */}
-                <span
-                  aria-hidden
-                  className="btn-gold inline-flex size-7 items-center justify-center rounded-full text-14 font-bold"
-                >
-                  {index + 1}
-                </span>
-                <h3 className="mt-2.5 text-16 font-semibold text-text">{step.title}</h3>
-                <p className="mt-1.5 text-14 leading-relaxed text-muted">{step.body}</p>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
+                {t('groupsAll')}
+              </Link>
+            </div>
+
+            {/*
+              The same `CardSlider` and the same widths as the destinations, so the three rows on
+              this page scroll alike. `GroupTripCard` unchanged from the groups page: one card for
+              one object, so a trip cannot read differently on the front page.
+            */}
+            <div className="mt-5">
+              <CardSlider
+                labels={{ previous: t('groupsPrevious'), next: t('groupsNext') }}
+              >
+                {upcoming.map((trip) => (
+                  <GroupTripCard
+                    key={trip.slug}
+                    trip={trip}
+                    locale={locale}
+                    className="flex w-[16rem] shrink-0 snap-start sm:w-[19rem] lg:w-[21rem]"
+                    labels={{
+                      priceFrom: (amount) => tg('priceFrom', { amount }),
+                      priceOnRequest: tg('priceOnRequest'),
+                      nights: (n) => tg('nights', { n }),
+                      seats: (n) => tg('seats', { n }),
+                      past: tg('past'),
+                    }}
+                  />
+                ))}
+              </CardSlider>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {/* ── The three pledges (P-001, P-002, P-007) ──────────────────────── */}
       <section

@@ -130,3 +130,15 @@ export function nightsBetween(startsOn: string, endsOn: string): number {
 export function hasFinished(endsOn: string, today = new Date()): boolean {
   return endsOn < today.toISOString().slice(0, 10);
 }
+
+/**
+ * The trips a reader can still join, in the order given: what the home page's «جروبات» row offers
+ * (Bashar, 2026-10-02). A trip ending TODAY is still on, so it stays; one that ended yesterday is
+ * history and belongs to the groups page, where it carries its «انتهت» badge.
+ */
+export function upcomingTrips<T extends { endsOn: string }>(
+  trips: readonly T[],
+  today = new Date(),
+): T[] {
+  return trips.filter((trip) => !hasFinished(trip.endsOn, today));
+}
