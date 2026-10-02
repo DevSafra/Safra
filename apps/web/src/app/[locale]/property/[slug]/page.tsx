@@ -521,6 +521,7 @@ export default async function PropertyPage({
     ),
     breadcrumbGraph([
       { name: tc('backHome'), url: `${origin}/${locale}` },
+      { name: tnav('cities'), url: `${origin}/${locale}/city` },
       { name: cityName, url: `${origin}/${locale}/city/${property.city.slug}` },
       { name, url: propertyUrl },
     ]),
@@ -564,6 +565,7 @@ export default async function PropertyPage({
             label={tnav('breadcrumb')}
             items={[
               { label: tc('backHome'), href: `/${locale}` },
+              { label: tnav('cities'), href: `/${locale}/city` },
               { label: cityName, href: `/${locale}/city/${property.city.slug}` },
               { label: name },
             ]}
