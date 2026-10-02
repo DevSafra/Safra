@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { EMAIL, PASSWORD, STAFF_STATE, freshCode } from './staff.js';
+import { TEST_PAYER_ACCOUNT } from './transfer.js';
 
 /**
  * The three apps as one system: a customer books, the partner is told, the console can see it.
@@ -113,6 +114,8 @@ test.describe('the three apps, working together', () => {
 
     const captured = await request.post(`${API}/bookings/${reference}/capture-payment`, {
       headers: { Authorization: `Bearer ${token}` },
+      /* The account the transfer came from, which any refund of it must go back to (2026-10-02). */
+      data: { payerAccount: TEST_PAYER_ACCOUNT },
     });
 
     expect(captured.status(), await captured.text()).toBe(200);

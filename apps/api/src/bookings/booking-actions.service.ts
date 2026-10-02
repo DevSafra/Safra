@@ -26,7 +26,8 @@ import {
   type BookingStatus,
 } from './booking-state.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
-import { ERROR, WALLET_NOTE } from '@safra/contracts';
+import { ERROR, WALLET_NOTE, normaliseBankAccount } from '@safra/contracts';
+import { FieldEncryptionService } from '../common/crypto/field-encryption.service.js';
 import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 import { notFound } from '../common/errors/app-error.js';
 import { conflict } from '../common/errors/app-error.js';
@@ -59,6 +60,8 @@ export class BookingActionsService {
       still reach the transport directly is a service where the next message quietly skips the log.
     */
     private readonly vouchers: VoucherService,
+    /** Encrypts the account a confirmed transfer came from; see `recordPaymentReceived`. */
+    private readonly crypto: FieldEncryptionService,
   ) {}
 
   /**
@@ -71,6 +74,8 @@ export class BookingActionsService {
     reference: string,
     claims: AccessTokenClaims | undefined,
     paymentId?: string,
+    /** The account a confirmed TRANSFER came from, already encrypted. Only finance passes it. */
+    payer?: PayerAccount,
   ) {
     const booking = await this.load(reference, claims);
 
@@ -143,12 +148,24 @@ export class BookingActionsService {
           tx as unknown as Database,
           booking.id,
           amounts,
+          payer,
         ));
 
       if (paymentId) {
+        /*
+          The sender's account is written in the SAME update as the capture, so a payment can never
+          be captured by finance without the account its refund must go back to. Only on a bank
+          transfer: a card or the wallet carries its own way back.
+        */
         await tx.execute(sql`
           UPDATE payments
-          SET status = 'captured'::payment_status, captured_at = now(), updated_at = now()
+          SET status = 'captured'::payment_status, captured_at = now(), updated_at = now(),
+              payer_account_encrypted = CASE WHEN method = 'bank_transfer'
+                                             THEN ${payer?.encrypted ?? null}
+                                             ELSE payer_account_encrypted END,
+              payer_account_last4 = CASE WHEN method = 'bank_transfer'
+                                         THEN ${payer?.last4 ?? null}
+                                         ELSE payer_account_last4 END
           WHERE id = ${paymentId}
         `);
       }
@@ -365,8 +382,21 @@ export class BookingActionsService {
    * fallback for a booking with no intent at all — a stay settled entirely from wallet balance,
    * where there genuinely is no external payment to capture.
    */
-  async recordPaymentReceived(reference: string, claims: AccessTokenClaims | undefined) {
+  async recordPaymentReceived(
+    reference: string,
+    claims: AccessTokenClaims | undefined,
+    /**
+     * The account the transfer came FROM, as the bank statement shows it (2026-10-02). It is what a
+     * refund of this payment must go back to, so it is recorded here, with the capture, once.
+     */
+    payerAccount: string,
+  ) {
     const booking = await this.load(reference, claims);
+    const normalised = normaliseBankAccount(payerAccount);
+    const payer: PayerAccount = {
+      encrypted: this.crypto.encrypt(normalised),
+      last4: normalised.slice(-4),
+    };
 
     /*
       The NEWEST outstanding intent. A booking can accumulate more than one if a customer
@@ -382,7 +412,7 @@ export class BookingActionsService {
        LIMIT 1
     `);
 
-    return this.markPaid(reference, claims, pending.rows[0]?.id);
+    return this.markPaid(reference, claims, pending.rows[0]?.id, payer);
   }
 
   /**
@@ -902,6 +932,7 @@ export class BookingActionsService {
     tx: Database,
     bookingId: string,
     amounts: { total_amount: string; wallet_amount: string; currency_id: string },
+    payer: PayerAccount | undefined,
   ): Promise<string> {
     const walletFunded =
       toMinor(amounts.wallet_amount, MONEY_SCALE) >=
@@ -924,10 +955,12 @@ export class BookingActionsService {
           `
         : sql`
             INSERT INTO payments
-              (booking_id, method, provider, amount, currency_id, status, captured_at)
+              (booking_id, method, provider, amount, currency_id, status, captured_at,
+               payer_account_encrypted, payer_account_last4)
             VALUES (${bookingId}, 'bank_transfer'::payment_method, 'manual_transfer',
                     ${transferred}, ${amounts.currency_id},
-                    'captured'::payment_status, now())
+                    'captured'::payment_status, now(),
+                    ${payer?.encrypted ?? null}, ${payer?.last4 ?? null})
             RETURNING id
           `,
     );
@@ -995,4 +1028,10 @@ export class BookingActionsService {
       throw conflict(ERROR.BOOKING_TRANSITION_INVALID);
     }
   }
+}
+
+/** The account a confirmed transfer came from: ciphertext, and the last four in clear for staff. */
+interface PayerAccount {
+  readonly encrypted: string;
+  readonly last4: string;
 }

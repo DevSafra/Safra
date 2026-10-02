@@ -495,13 +495,26 @@ describeIfDb('SafraPayoutService', () => {
 
     /** One more completed refund for `share` of the stay price. */
     async function addRefund(bookingId: string, share: number): Promise<void> {
+      /*
+        A COMPLETED refund on a bank-transfer rail went back to the account the money came from, or
+        the database refuses it (post/0027_bank_transfer_refund.sql). So the payment is given a
+        sender's account if it has none, and the refund carries that same ciphertext, as a real
+        settlement copies it.
+      */
+      await db.execute(sql`
+        UPDATE payments SET payer_account_encrypted = 'fixture-ciphertext', payer_account_last4 = '0000'
+         WHERE booking_id = ${bookingId}::uuid AND payer_account_encrypted IS NULL
+           AND status IN ('captured','partially_refunded','refunded')
+      `);
       const written = await db.execute(sql`
         INSERT INTO refunds (payment_id, booking_id, amount, currency_id,
                              applied_refund_percent, reason, status, wallet_amount,
-                             completed_at)
+                             completed_at, destination_account_encrypted,
+                             destination_account_last4, transfer_reference)
         SELECT p.id, b.id, round(b.base_amount * ${String(share)}::numeric, 2), b.currency_id,
                ${String(share * 100)}::numeric,
-               'built by safra-payout.integration.test', 'completed', 0, now()
+               'built by safra-payout.integration.test', 'completed', 0, now(),
+               p.payer_account_encrypted, p.payer_account_last4, 'TRX-FIXTURE'
           FROM bookings b JOIN payments p ON p.booking_id = b.id
            AND p.status IN ('captured','partially_refunded','refunded')
          WHERE b.id = ${bookingId}::uuid

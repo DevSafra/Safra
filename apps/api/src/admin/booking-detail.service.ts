@@ -626,11 +626,17 @@ export class BookingDetailService {
       reason: string;
       created_at: string;
       provider: string | null;
+      source_last4: string | null;
+      destination_last4: string | null;
+      transfer_reference: string | null;
     }>(sql`
       SELECT r.id::text AS id,
              r.amount::text AS amount, r.wallet_amount::text AS wallet_amount,
              r.status::text AS status, r.reason, ${utc('r.created_at')} AS created_at,
-             p.provider::text AS provider
+             p.provider::text AS provider,
+             p.payer_account_last4 AS source_last4,
+             r.destination_account_last4 AS destination_last4,
+             r.transfer_reference
         FROM refunds r
         LEFT JOIN payments p ON p.id = r.payment_id
        WHERE r.booking_id = ${bookingId} AND r.deleted_at IS NULL
@@ -654,6 +660,13 @@ export class BookingDetailService {
         status: row.status,
         reason: row.reason,
         createdAt: row.created_at,
+        /*
+          The LAST FOUR only, never the account (2026-10-02): enough for finance to see which
+          account a bank-transfer refund must go back to, and where a settled one went.
+        */
+        sourceLast4: row.source_last4,
+        destinationLast4: row.destination_last4,
+        transferReference: row.transfer_reference,
         /*
           Whether FINANCE has to confirm this one, decided here rather than in the console.
 

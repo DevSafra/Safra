@@ -4790,6 +4790,8 @@ export const ar = {
       partnerReference: 'مرجع الشريك',
       bookingReference: 'مرجع الحجز',
       paidReference: 'مرجع الدفعة',
+      /* On `refund.settled`: the bank's reference for the transfer that returned the money. */
+      transferReference: 'مرجع الحوالة الصادرة',
       unitLabel: 'الوحدة',
       nights: 'عدد الليالي',
       basePrice: 'السعر الأساسي',

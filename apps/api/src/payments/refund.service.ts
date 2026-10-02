@@ -14,7 +14,14 @@ import { ENV, type Env } from '../config/env.js';
 import { describeError } from '../common/errors/safe-error.js';
 import { PaymentProviderRegistry } from './providers/provider.registry.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
-import { DEFAULT_MONEY_CURRENCY, ERROR, WALLET_NOTE } from '@safra/contracts';
+import {
+  DEFAULT_MONEY_CURRENCY,
+  ERROR,
+  WALLET_NOTE,
+  normaliseBankAccount,
+  type SettleRefundRequest,
+} from '@safra/contracts';
+import { FieldEncryptionService } from '../common/crypto/field-encryption.service.js';
 import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 
@@ -64,6 +71,8 @@ export class RefundService {
     private readonly wallet: WalletService,
     private readonly notifications: NotificationService,
     @Inject(ENV) private readonly env: Env,
+    /** Reads and records the account a bank transfer came from; see `settle`. */
+    private readonly crypto: FieldEncryptionService,
   ) {}
 
   /**
@@ -641,7 +650,11 @@ export class RefundService {
    * from the ledger's credits minus what is already reversed — so even a retry that got past this
    * could not double-post.
    */
-  async settle(refundId: string, claims: AccessTokenClaims | undefined) {
+  async settle(
+    refundId: string,
+    claims: AccessTokenClaims | undefined,
+    input: SettleRefundRequest,
+  ) {
     const found = await this.db.execute<{
       booking_id: string;
       payment_id: string;
@@ -649,9 +662,11 @@ export class RefundService {
       status: string;
       amount: string;
       reference: string;
+      payer_account_encrypted: string | null;
     }>(sql`
       SELECT r.booking_id::text, r.payment_id::text, p.provider::text AS provider,
-             r.status::text AS status, r.amount::text AS amount, b.reference
+             r.status::text AS status, r.amount::text AS amount, b.reference,
+             p.payer_account_encrypted
         FROM refunds r
         JOIN payments p ON p.id = r.payment_id
         JOIN bookings b ON b.id = r.booking_id
@@ -676,13 +691,60 @@ export class RefundService {
       throw badRequest(ERROR.REFUND_NOT_OFFLINE);
     }
 
+    /*
+      Back to the account the money came FROM (Bashar, 2026-10-02).
+
+      A transfer finance confirmed carries the sender's account, recorded with the capture. One
+      confirmed before that was recorded has none, and this step is where it is supplied, once, from
+      the statement of the INCOMING transfer; without it there is nothing to check a destination
+      against, and a refund to an account nobody can vouch for is the thing this exists to stop.
+    */
+    let source = refund.payer_account_encrypted;
+
+    if (!source) {
+      if (!input.sourceAccount) throw conflict(ERROR.REFUND_SOURCE_UNKNOWN);
+
+      const recorded = normaliseBankAccount(input.sourceAccount);
+      const written = await this.db.execute<{ payer_account_encrypted: string }>(sql`
+        UPDATE payments
+           SET payer_account_encrypted = ${this.crypto.encrypt(recorded)},
+               payer_account_last4 = ${recorded.slice(-4)},
+               updated_at = now()
+         WHERE id = ${refund.payment_id}::uuid AND payer_account_encrypted IS NULL
+        RETURNING payer_account_encrypted
+      `);
+
+      /* Somebody recorded one between the read and here: theirs stands, and this asks again. */
+      if (!written.rows[0]) throw conflict(ERROR.PAYMENT_PAYER_ACCOUNT_SET);
+
+      source = written.rows[0].payer_account_encrypted;
+    }
+
+    if (this.crypto.decrypt(source) !== normaliseBankAccount(input.destinationAccount)) {
+      /* A security event, logged by id and never by account number. */
+      this.logger.warn(
+        `Refund ${refundId} on ${refund.reference}: settlement refused, the destination is not ` +
+          `the account the transfer came from (by ${claims?.sub ?? 'unknown'}).`,
+      );
+      throw conflict(ERROR.REFUND_DESTINATION_MISMATCH);
+    }
+
     await this.db.transaction(async (tx) => {
+      /*
+        The destination is the payment's OWN ciphertext, copied, not what was typed encrypted
+        afresh: post/0027_bank_transfer_refund.sql then proves it is the same account by comparing
+        two strings, and refuses any completion that is not.
+      */
       const settled = await tx.execute(sql`
-        UPDATE refunds
+        UPDATE refunds r
            SET status = 'completed'::refund_status,
                completed_at = now(),
-               updated_at = now()
-         WHERE id = ${refundId}::uuid AND status = 'processing'
+               updated_at = now(),
+               destination_account_encrypted = p.payer_account_encrypted,
+               destination_account_last4 = p.payer_account_last4,
+               transfer_reference = ${input.transferReference}
+          FROM payments p
+         WHERE r.id = ${refundId}::uuid AND r.status = 'processing' AND p.id = r.payment_id
       `);
 
       /* Somebody else settled it between the read above and here. One settlement, one conflict. */
@@ -727,6 +789,8 @@ export class RefundService {
             amount: refund.amount,
             currency: DEFAULT_MONEY_CURRENCY,
             provider: refund.provider,
+            /* The bank's reference, never the account: an account number is not for the audit log. */
+            transferReference: input.transferReference,
           },
         },
         tx as unknown as Database,

@@ -19,6 +19,8 @@ import {
   type CreateRefundRequest,
   type StartPaymentRequest,
   createRefundSchema,
+  settleRefundSchema,
+  type SettleRefundRequest,
   refundIdSchema,
   startPaymentSchema,
 } from '@safra/contracts';
@@ -203,9 +205,10 @@ export class PaymentsController {
   @AuditExempt('RefundService records refund.settled inside the settlement transaction.')
   async settleRefund(
     @Param('refundId', new ZodValidationPipe(refundIdSchema)) refundId: string,
+    @Body(new ZodValidationPipe(settleRefundSchema)) body: SettleRefundRequest,
     @CurrentUser() user: AccessTokenClaims | undefined,
   ) {
-    return this.refunds.settle(refundId, user);
+    return this.refunds.settle(refundId, user, body);
   }
 
   @Post(':reference/refund')

@@ -10,6 +10,13 @@ import { PayoutService } from '../payouts/payout.service.js';
 import { RefundService } from '../payments/refund.service.js';
 import { ReviewService as AdminReviewService } from '../admin/review.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { FieldEncryptionService } from '../common/crypto/field-encryption.service.js';
+import type { Env } from '../config/env.js';
+
+/** The test key for the account a confirmed transfer came from (2026-10-02). */
+const testCrypto = new FieldEncryptionService({
+  FIELD_ENCRYPTION_KEY: 'c'.repeat(64),
+} as unknown as Env);
 
 /**
  * The `O-sec-13` pass, as behaviour: the services this sweep newly scoped, refusing across cities.
@@ -88,6 +95,7 @@ describeIfDb('the O-sec-13 sweep, in behaviour', () => {
       {} as never,
       {} as never,
       {} as never,
+      testCrypto,
     );
 
     const theirs = await booking(away);

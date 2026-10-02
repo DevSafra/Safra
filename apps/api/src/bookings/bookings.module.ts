@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { FieldEncryptionService } from '../common/crypto/field-encryption.service.js';
 
 import { CouponModule } from '../coupons/coupon.module.js';
 
@@ -35,6 +36,8 @@ import { WalletModule } from '../wallet/wallet.module.js';
     BookingRecoveryService,
     VoucherService,
     IdempotencyService,
+    /* Encrypts the account a confirmed transfer came from (2026-10-02). */
+    FieldEncryptionService,
     AuditService,
     /* markPaid tells the partner their booking is waiting — see `S-2`. */
     NotificationService,

@@ -108,6 +108,53 @@ export const startPaymentSchema = z
 export type StartPaymentRequest = z.infer<typeof startPaymentSchema>;
 
 /** Staff-initiated refund. The AMOUNT is computed from the policy, never supplied. */
+/**
+ * A bank account as finance reads it off a statement: an IBAN or a local account number.
+ *
+ * Normalised before it is checked, so «SY12 3456-7890» and «sy1234567890» are the same account and
+ * Arabic-Indic digits are digits: the console is Arabic, and «١٢٣٤» is what its keyboard produces.
+ * Two spellings of one account must compare equal, because the comparison is what decides whether
+ * a refund may be sent (2026-10-02: a refund returns to the account the money came from).
+ */
+export function normaliseBankAccount(value: string): string {
+  return value
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
+    .replace(/[\s\-._]/g, '')
+    .toUpperCase();
+}
+
+export const bankAccountSchema = z
+  .string()
+  .max(80, ERROR.VALIDATION_BANK_ACCOUNT)
+  .transform(normaliseBankAccount)
+  .pipe(z.string().regex(/^[A-Z0-9]{6,34}$/, ERROR.VALIDATION_BANK_ACCOUNT));
+
+/**
+ * «تأكيد استلام الحوالة»: finance records the account the transfer came FROM, read off the bank
+ * statement. It is what a refund of this payment must later go back to.
+ */
+export const capturePaymentSchema = z
+  .object({ payerAccount: bankAccountSchema })
+  .strict();
+
+export type CapturePaymentRequest = z.infer<typeof capturePaymentSchema>;
+
+/**
+ * «تأكيد إرسال الاسترداد»: the account the refund was sent TO and the bank's reference for it.
+ * `sourceAccount` is only for a payment captured before the sender's account was recorded: it is
+ * written once, and the destination is then checked against it.
+ */
+export const settleRefundSchema = z
+  .object({
+    destinationAccount: bankAccountSchema,
+    transferReference: z.string().trim().min(3).max(80),
+    sourceAccount: bankAccountSchema.optional(),
+  })
+  .strict();
+
+export type SettleRefundRequest = z.infer<typeof settleRefundSchema>;
+
 export const createRefundSchema = z
   .object({
     reason: z.string().min(3).max(500),

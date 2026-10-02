@@ -36,6 +36,17 @@ import type { FxRateService } from '../fx/fx-rate.service.js';
 import type { SettingsService } from '../settings/settings.service.js';
 import { unlockedJobRuns } from '../common/jobs/job-run.testing.js';
 import { InternalCaptureProvider } from './providers/internal-capture.provider.js';
+import { FieldEncryptionService } from '../common/crypto/field-encryption.service.js';
+
+/** The test key, and the account a confirmed transfer in these tests came from (2026-10-02). */
+const testCrypto = new FieldEncryptionService({
+  FIELD_ENCRYPTION_KEY: 'c'.repeat(64),
+} as unknown as Env);
+const TEST_PAYER = 'SY120000000000000001234';
+const SETTLED_TO_PAYER = {
+  destinationAccount: TEST_PAYER,
+  transferReference: 'TRX-TEST-0001',
+};
 
 /**
  * The payment path against a REAL PostgreSQL.
@@ -176,6 +187,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
         environment degrades to «no attachment» rather than a failing capture.
       */
       new VoucherService(db),
+      testCrypto,
     );
 
     /**
@@ -201,9 +213,18 @@ describeIfDb('payment collection, webhooks and refunds', () => {
       The REAL notification service, which this suite already builds and whose transport it already
       captures — so §10.3's refund mail is exercised by every refund test here rather than stubbed.
     */
-    refunds = new RefundService(db, registry, ledger, audit, wallet, notifications, {
-      APP_URL: 'https://safra.test',
-    } as never);
+    refunds = new RefundService(
+      db,
+      registry,
+      ledger,
+      audit,
+      wallet,
+      notifications,
+      {
+        APP_URL: 'https://safra.test',
+      } as never,
+      testCrypto,
+    );
     intents = new PaymentIntentService(
       db,
       { APP_URL: 'https://safra.test' } as never,
@@ -1034,7 +1055,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
          WHERE id = ${paymentId}::uuid
       `);
 
-      await actions.recordPaymentReceived(booking.reference, undefined);
+      await actions.recordPaymentReceived(booking.reference, undefined, TEST_PAYER);
 
       const rows = await db.execute<{
         id: string;
@@ -1063,7 +1084,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
       no external intent to capture, and refusing to record it would strand the booking.
     */
     it('still records a booking that had no payment intent at all', async () => {
-      await actions.recordPaymentReceived(booking.reference, undefined);
+      await actions.recordPaymentReceived(booking.reference, undefined, TEST_PAYER);
 
       const rows = await db.execute<{ method: string; status: string }>(sql`
         SELECT method::text, status::text FROM payments
@@ -1179,7 +1200,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
     it('can be refunded, and waits for finance rather than claiming to be done', async () => {
       const own = await createBooking(db);
 
-      await actions.recordPaymentReceived(own.reference, undefined);
+      await actions.recordPaymentReceived(own.reference, undefined, TEST_PAYER);
 
       const captured = await db.execute<{ provider: string; method: string }>(sql`
         SELECT provider, method::text AS method FROM payments
@@ -1249,7 +1270,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
     it('settling an offline refund reverses the payable and the commission', async () => {
       const own = await createBooking(db);
 
-      await actions.recordPaymentReceived(own.reference, undefined);
+      await actions.recordPaymentReceived(own.reference, undefined, TEST_PAYER);
 
       const refund = await refunds.execute(own.reference, 'اختبار التسوية', undefined);
 
@@ -1259,7 +1280,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
       `);
       const refundId = row.rows[0]!.id;
 
-      const settled = await refunds.settle(refundId, undefined);
+      const settled = await refunds.settle(refundId, undefined, SETTLED_TO_PAYER);
 
       expect(settled.status).toBe('completed');
 
@@ -1306,7 +1327,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
       */
       const own = await createBooking(db);
 
-      await actions.recordPaymentReceived(own.reference, undefined);
+      await actions.recordPaymentReceived(own.reference, undefined, TEST_PAYER);
       await refunds.execute(own.reference, 'اختبار التكرار', undefined);
 
       const row = await db.execute<{ id: string }>(sql`
@@ -1314,10 +1335,12 @@ describeIfDb('payment collection, webhooks and refunds', () => {
       `);
       const refundId = row.rows[0]!.id;
 
-      await refunds.settle(refundId, undefined);
+      await refunds.settle(refundId, undefined, SETTLED_TO_PAYER);
       const afterFirst = await ledgerNet(own.id);
 
-      await expect(refunds.settle(refundId, undefined)).rejects.toThrow();
+      await expect(
+        refunds.settle(refundId, undefined, SETTLED_TO_PAYER),
+      ).rejects.toThrow();
 
       expect(await ledgerNet(own.id), 'the second attempt posted nothing').toStrictEqual(
         afterFirst,
@@ -1327,26 +1350,27 @@ describeIfDb('payment collection, webhooks and refunds', () => {
     it('refuses a refund that is already settled or was never pending', async () => {
       const own = await createBooking(db);
 
-      await actions.recordPaymentReceived(own.reference, undefined);
+      await actions.recordPaymentReceived(own.reference, undefined, TEST_PAYER);
       await refunds.execute(own.reference, 'اختبار الحالة', undefined);
 
       const row = await db.execute<{ id: string }>(sql`
         SELECT id::text AS id FROM refunds WHERE booking_id = ${own.id}::uuid LIMIT 1
       `);
 
-      await db.execute(sql`
-        UPDATE refunds SET status = 'completed'::refund_status
-         WHERE id = ${row.rows[0]!.id}::uuid
-      `);
+      /*
+        Settled the real way: completing it in SQL is now refused unless it went back to the
+        sender's account (post/0027_bank_transfer_refund.sql), which is the rule, not an obstacle.
+      */
+      await refunds.settle(row.rows[0]!.id, undefined, SETTLED_TO_PAYER);
 
       /*
         The CODE, not the message. An app error carries a code for the client and an English
         sentence for the log; asserting the sentence would make this test fail on a reword and pass
         on a wrong code — the opposite of what it is for.
       */
-      await expect(refunds.settle(row.rows[0]!.id, undefined)).rejects.toSatisfy(
-        (error: unknown) => codeOf(error) === ERROR.REFUND_NOT_PENDING,
-      );
+      await expect(
+        refunds.settle(row.rows[0]!.id, undefined, SETTLED_TO_PAYER),
+      ).rejects.toSatisfy((error: unknown) => codeOf(error) === ERROR.REFUND_NOT_PENDING);
     });
 
     it('refuses a refund on a rail the provider confirms itself', async () => {
@@ -1388,14 +1412,18 @@ describeIfDb('payment collection, webhooks and refunds', () => {
         RETURNING id::text AS id
       `);
 
-      await expect(refunds.settle(online.rows[0]!.id, undefined)).rejects.toSatisfy(
-        (error: unknown) => codeOf(error) === ERROR.REFUND_NOT_OFFLINE,
-      );
+      await expect(
+        refunds.settle(online.rows[0]!.id, undefined, SETTLED_TO_PAYER),
+      ).rejects.toSatisfy((error: unknown) => codeOf(error) === ERROR.REFUND_NOT_OFFLINE);
     });
 
     it('refuses a refund that does not exist', async () => {
       await expect(
-        refunds.settle('00000000-0000-4000-8000-000000000000', undefined),
+        refunds.settle(
+          '00000000-0000-4000-8000-000000000000',
+          undefined,
+          SETTLED_TO_PAYER,
+        ),
       ).rejects.toSatisfy((error: unknown) => codeOf(error) === ERROR.REFUND_NOT_FOUND);
     });
 

@@ -289,6 +289,7 @@ export const en = {
     'Do not use your email, your name, or the name of this site inside your password.',
   'validation.code_six_digits': 'Authenticator code must be 6 digits.',
   'validation.date_format': 'Date must be in YYYY-MM-DD format.',
+  'validation.bank_account': 'An account number or IBAN is 6 to 34 letters and digits.',
   'validation.date_unreal': 'Date is not a real calendar date.',
   'validation.departure_after_arrival': 'Departure date must be after the arrival date.',
   'validation.distance_sort_needs_landmark':
@@ -370,6 +371,12 @@ export const en = {
   'refund.not_pending': 'That refund is not in progress, so there is nothing to confirm.',
   'refund.not_offline':
     'That refund is confirmed automatically by the payment provider, not by hand.',
+  'refund.destination_mismatch':
+    'That is not the account the transfer came from. A refund goes back to the same account only.',
+  'refund.source_unknown':
+    'No sender account is on record for this payment. Enter the account the transfer came from, as the bank statement shows it.',
+  'payment.payer_account_set':
+    'A sender account is already recorded for this payment and cannot be changed.',
   'pricing.unavailable': 'Pricing is temporarily unavailable. Please try again shortly.',
   'search.facets_unavailable':
     'The counts for each filter are not available right now; the results themselves are shown.',

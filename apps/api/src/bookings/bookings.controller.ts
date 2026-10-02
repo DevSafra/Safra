@@ -28,6 +28,8 @@ import {
   bookingRecoverySchema,
   bookingVerificationSchema,
   bookingStaffConfirmSchema,
+  capturePaymentSchema,
+  type CapturePaymentRequest,
   bookingCreateSchema,
   bookingQuoteSchema,
   couponPreviewSchema,
@@ -259,8 +261,9 @@ export class BookingsController {
   async capturePayment(
     @CurrentUser() user: AccessTokenClaims | undefined,
     @Param('reference') reference: string,
+    @Body(new ZodValidationPipe(capturePaymentSchema)) body: CapturePaymentRequest,
   ) {
-    return this.actions.recordPaymentReceived(reference, user);
+    return this.actions.recordPaymentReceived(reference, user, body.payerAccount);
   }
 
   /**

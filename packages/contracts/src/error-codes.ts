@@ -437,6 +437,7 @@ export const ERROR = {
   VALIDATION_PASSWORD_CONTAINS_IDENTITY: 'validation.password_contains_identity',
   VALIDATION_CODE_SIX_DIGITS: 'validation.code_six_digits',
   VALIDATION_DATE_FORMAT: 'validation.date_format',
+  VALIDATION_BANK_ACCOUNT: 'validation.bank_account',
   VALIDATION_DATE_UNREAL: 'validation.date_unreal',
   VALIDATION_DEPARTURE_AFTER_ARRIVAL: 'validation.departure_after_arrival',
   VALIDATION_DISTANCE_SORT_NEEDS_LANDMARK: 'validation.distance_sort_needs_landmark',
@@ -522,6 +523,12 @@ export const ERROR = {
   REFUND_NOT_FOUND: 'refund.not_found',
   REFUND_NOT_PENDING: 'refund.not_pending',
   REFUND_NOT_OFFLINE: 'refund.not_offline',
+  /** The account a bank-transfer refund was sent to is not the one the money came from. */
+  REFUND_DESTINATION_MISMATCH: 'refund.destination_mismatch',
+  /** No sender's account is on record for the payment, so a destination cannot be checked. */
+  REFUND_SOURCE_UNKNOWN: 'refund.source_unknown',
+  /** A sender's account is already recorded on this payment and cannot be replaced. */
+  PAYMENT_PAYER_ACCOUNT_SET: 'payment.payer_account_set',
   PRICING_UNAVAILABLE: 'pricing.unavailable',
   /* The filter counts took longer than they are allowed; the results never wait for them. */
   SEARCH_FACETS_UNAVAILABLE: 'search.facets_unavailable',

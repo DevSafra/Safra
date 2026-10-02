@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { FieldEncryptionService } from '../common/crypto/field-encryption.service.js';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { BookingsModule } from '../bookings/bookings.module.js';
@@ -44,6 +45,8 @@ import { WalletModule } from '../wallet/wallet.module.js';
     */
     MailService,
     NotificationService,
+    /* Reads and records the account a bank transfer came from, for a refund to go back to it. */
+    FieldEncryptionService,
     RefundService,
     SystemRefundService,
     // Provided per-module rather than globally, matching BookingsModule. It is

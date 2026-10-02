@@ -64,6 +64,17 @@ export const payments = pgTable(
      * and a guessed fee in the books is worse than a missing one.
      */
     providerFeeAmount: money('provider_fee_amount'),
+    /**
+     * The account a bank transfer came FROM, as finance read it off the statement (2026-10-02).
+     *
+     * AES-256-GCM ciphertext, like a payout account's number; the last four in clear so staff can
+     * confirm it without decrypting. It is what a refund of this payment must go back to: settling
+     * an offline refund copies THIS ciphertext onto the refund, and the database refuses a completed
+     * one whose destination is not identical (post/0027_bank_transfer_refund.sql). Set once, never
+     * changed. Null for a rail that carries its own return path (a card, the wallet).
+     */
+    payerAccountEncrypted: text('payer_account_encrypted'),
+    payerAccountLast4: text('payer_account_last4'),
     ...timestamps,
   },
   (t) => [
@@ -158,6 +169,15 @@ export const refunds = pgTable(
     reason: text('reason').notNull(),
     status: refundStatus('status').notNull().default('pending'),
     providerRef: text('provider_ref'),
+    /**
+     * Where an offline refund was sent, and the bank's reference for the transfer (2026-10-02).
+     *
+     * The ciphertext is COPIED from `payments.payer_account_encrypted` by the settlement, never
+     * encrypted afresh, so the database can check it is the same account by comparing two strings.
+     */
+    destinationAccountEncrypted: text('destination_account_encrypted'),
+    destinationAccountLast4: text('destination_account_last4'),
+    transferReference: text('transfer_reference'),
     initiatedByUserId: foreignId('initiated_by_user_id').references(() => users.id),
     completedAt: timestamp('completed_at', { withTimezone: true }),
     ...timestamps,

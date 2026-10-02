@@ -324,6 +324,8 @@ export const de = {
     'Verwenden Sie nicht Ihre E-Mail-Adresse, Ihren Namen oder den Namen dieser Website im Passwort.',
   'validation.code_six_digits': 'Der Authenticator-Code besteht aus 6 Ziffern.',
   'validation.date_format': 'Datum im Format JJJJ-MM-TT.',
+  'validation.bank_account':
+    'Eine Kontonummer oder IBAN hat 6 bis 34 Buchstaben und Ziffern.',
   'validation.date_unreal': 'Dieses Datum existiert nicht.',
   'validation.departure_after_arrival':
     'Das Abreisedatum muss nach dem Anreisedatum liegen.',
@@ -417,6 +419,12 @@ export const de = {
   'refund.not_pending': 'Diese Rückerstattung läuft nicht, es gibt nichts zu bestätigen.',
   'refund.not_offline':
     'Diese Rückerstattung wird automatisch vom Zahlungsanbieter bestätigt, nicht manuell.',
+  'refund.destination_mismatch':
+    'Das ist nicht das Konto, von dem die Überweisung kam. Erstattet wird nur auf dasselbe Konto.',
+  'refund.source_unknown':
+    'Für diese Zahlung ist kein Absenderkonto hinterlegt. Geben Sie das Konto an, von dem die Überweisung kam, wie es der Kontoauszug zeigt.',
+  'payment.payer_account_set':
+    'Für diese Zahlung ist bereits ein Absenderkonto hinterlegt, es kann nicht geändert werden.',
   'pricing.unavailable':
     'Die Preisberechnung ist vorübergehend nicht möglich. Bitte in Kürze erneut versuchen.',
   'search.facets_unavailable':

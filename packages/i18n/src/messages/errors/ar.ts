@@ -267,6 +267,7 @@ export const ar = {
     'لا تستخدم بريدك أو اسمك أو اسم الموقع داخل كلمة المرور.',
   'validation.code_six_digits': 'رمز المصادقة ستة أرقام.',
   'validation.date_format': 'التاريخ بصيغة سنة-شهر-يوم.',
+  'validation.bank_account': 'رقم الحساب أو IBAN من 6 إلى 34 حرفاً ورقماً.',
   'validation.date_unreal': 'هذا التاريخ غير موجود في التقويم.',
   'validation.departure_after_arrival': 'تاريخ المغادرة يجب أن يكون بعد تاريخ الوصول.',
   'validation.distance_sort_needs_landmark':
@@ -335,6 +336,11 @@ export const ar = {
   'refund.not_found': 'لا يوجد استرداد بهذا المعرّف.',
   'refund.not_pending': 'هذا الاسترداد ليس قيد التنفيذ؛ لا شيء لتأكيده.',
   'refund.not_offline': 'يُؤكَّد هذا الاسترداد آلياً من مزوّد الدفع، لا يدوياً.',
+  'refund.destination_mismatch':
+    'الحساب الذي أدخلته ليس الحساب الذي وصلت منه الحوالة. يُعاد المبلغ إلى الحساب نفسه فقط.',
+  'refund.source_unknown':
+    'لا يوجد حساب مُحوِّل مسجّل لهذه الدفعة. أدخل الحساب الذي وصلت منه الحوالة كما يظهر في كشف المصرف.',
+  'payment.payer_account_set': 'حساب المُحوِّل مسجّل لهذه الدفعة مسبقاً ولا يمكن تغييره.',
   'pricing.unavailable': 'تعذّر حساب السعر مؤقتاً. أعد المحاولة بعد قليل.',
   'search.facets_unavailable': 'تعذّر عدّ النتائج لكل خيار الآن، والنتائج نفسها معروضة.',
   'wallet.wrong_account': 'سجّل الدخول إلى الحساب صاحب الحجز لاستخدام رصيدك.',

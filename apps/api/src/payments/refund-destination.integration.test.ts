@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ERROR } from '@safra/contracts';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
 import type { FxRateService } from '../fx/fx-rate.service.js';
@@ -16,6 +17,14 @@ import { InternalCaptureProvider } from './providers/internal-capture.provider.j
 import { ManualTransferProvider } from './providers/manual-transfer.provider.js';
 import { PaymentProviderRegistry } from './providers/provider.registry.js';
 import { RefundService } from './refund.service.js';
+import { codeOf } from '../common/errors/app-error.js';
+import { FieldEncryptionService } from '../common/crypto/field-encryption.service.js';
+
+/** The test key, and the account a confirmed transfer in these tests came from (2026-10-02). */
+const testCrypto = new FieldEncryptionService({
+  FIELD_ENCRYPTION_KEY: 'c'.repeat(64),
+} as unknown as Env);
+const TEST_PAYER = 'SY120000000000000001234';
 
 /**
  * «A customer refund must always be returned to the exact same payment method that was originally
@@ -56,9 +65,18 @@ describeIfDb('a refund returns through the payment it refunds', () => {
   } as unknown as FxRateService);
   const ledger = new LedgerService(db);
   const audit = new AuditService(db);
-  const refunds = new RefundService(db, registry, ledger, audit, wallet, notifications, {
-    APP_URL: 'https://safra.test',
-  } as never);
+  const refunds = new RefundService(
+    db,
+    registry,
+    ledger,
+    audit,
+    wallet,
+    notifications,
+    {
+      APP_URL: 'https://safra.test',
+    } as never,
+    testCrypto,
+  );
   const actions = new BookingActionsService(
     db,
     settings,
@@ -68,6 +86,7 @@ describeIfDb('a refund returns through the payment it refunds', () => {
     notifications,
     { PARTNER_URL: 'http://localhost:3002' } as unknown as Env,
     new VoucherService(db),
+    testCrypto,
   );
 
   beforeEach(() => harness.begin());
@@ -152,7 +171,7 @@ describeIfDb('a refund returns through the payment it refunds', () => {
       status: 'pending_payment',
     });
 
-    await actions.recordPaymentReceived(fixture.reference, undefined);
+    await actions.recordPaymentReceived(fixture.reference, undefined, TEST_PAYER);
 
     const payment = (
       await db.execute<{ method: string; provider: string; amount: string }>(sql`
@@ -172,7 +191,7 @@ describeIfDb('a refund returns through the payment it refunds', () => {
       payment: null,
       status: 'pending_payment',
     });
-    await actions.recordPaymentReceived(funded.reference, undefined);
+    await actions.recordPaymentReceived(funded.reference, undefined, TEST_PAYER);
     const walletRow = await db.execute<{ method: string; provider: string }>(sql`
       SELECT method::text AS method, provider FROM payments WHERE booking_id = ${funded.bookingId}::uuid
     `);
@@ -345,6 +364,186 @@ describeIfDb('a refund returns through the payment it refunds', () => {
       `),
       '23505',
     );
+  });
+
+  // ── A bank transfer goes back to the account it came from ──────────────────
+
+  /** A transfer finance confirmed with `payer` as its sender, and its refund waiting on finance. */
+  async function confirmedTransferAwaitingRefund(payer: string) {
+    const fixture = await seed({
+      total: '250.00',
+      wallet: '0.00',
+      payment: null,
+      status: 'pending_payment',
+    });
+
+    await actions.recordPaymentReceived(fixture.reference, undefined, payer);
+    const issued = await refunds.refundInFull(
+      fixture.reference,
+      'system.partner_no_response',
+    );
+
+    expect(issued.status, 'a bank transfer refund waits for finance').toBe('processing');
+
+    return { ...fixture, refundId: issued.refundId };
+  }
+
+  async function refundRow(refundId: string) {
+    const rows = await db.execute<{
+      status: string;
+      destination: string | null;
+      last4: string | null;
+      reference: string | null;
+      payer: string | null;
+    }>(sql`
+      SELECT r.status::text AS status, r.destination_account_encrypted AS destination,
+             r.destination_account_last4 AS last4, r.transfer_reference AS reference,
+             p.payer_account_encrypted AS payer
+        FROM refunds r JOIN payments p ON p.id = r.payment_id
+       WHERE r.id = ${refundId}::uuid
+    `);
+    return rows.rows[0]!;
+  }
+
+  it('records the account a confirmed transfer came from, encrypted, with the capture', async () => {
+    const fixture = await confirmedTransferAwaitingRefund('sy12 3456-7890 ١٢٣٤');
+
+    const payment = await db.execute<{ encrypted: string; last4: string }>(sql`
+      SELECT payer_account_encrypted AS encrypted, payer_account_last4 AS last4
+        FROM payments WHERE booking_id = ${fixture.bookingId}::uuid
+    `);
+
+    expect(payment.rows[0]?.last4).toBe('1234');
+    expect(payment.rows[0]?.encrypted, 'never stored in clear').not.toContain('1234');
+    expect(testCrypto.decrypt(payment.rows[0]!.encrypted)).toBe('SY12345678901234');
+  });
+
+  it('settles a refund sent back to the same account, however it is spelt', async () => {
+    const fixture = await confirmedTransferAwaitingRefund('SY12 3456 7890 1234');
+
+    await refunds.settle(fixture.refundId, undefined, {
+      destinationAccount: 'sy12-3456-٧٨٩٠-1234',
+      transferReference: 'TRX-OUT-1',
+    });
+
+    const row = await refundRow(fixture.refundId);
+    expect(row.status).toBe('completed');
+    expect(row.destination, 'the payment’s own ciphertext, copied').toBe(row.payer);
+    expect(row.last4).toBe('1234');
+    expect(row.reference).toBe('TRX-OUT-1');
+  });
+
+  it('refuses to settle a refund sent to any other account, and leaves it waiting', async () => {
+    const fixture = await confirmedTransferAwaitingRefund('SY12 3456 7890 1234');
+
+    await expect(
+      refunds.settle(fixture.refundId, undefined, {
+        destinationAccount: 'SY99 9999 9999 9999',
+        transferReference: 'TRX-OUT-2',
+      }),
+    ).rejects.toSatisfy((error) => codeOf(error) === ERROR.REFUND_DESTINATION_MISMATCH);
+
+    expect((await refundRow(fixture.refundId)).status).toBe('processing');
+  });
+
+  /*
+    A transfer confirmed before the sender's account was recorded. Nothing to check a destination
+    against, so it is refused until the account is supplied, once, from the incoming statement.
+  */
+  it('asks for the sender’s account where none is recorded, records it once, then holds to it', async () => {
+    const fixture = await seed({
+      total: '90.00',
+      wallet: '0.00',
+      payment: 'bank_transfer',
+    });
+    const issued = await refunds.refundInFull(
+      fixture.reference,
+      'system.partner_no_response',
+    );
+
+    await expect(
+      refunds.settle(issued.refundId, undefined, {
+        destinationAccount: 'SY11 1111 1111 1111',
+        transferReference: 'TRX-OUT-3',
+      }),
+    ).rejects.toSatisfy((error) => codeOf(error) === ERROR.REFUND_SOURCE_UNKNOWN);
+
+    await expect(
+      refunds.settle(issued.refundId, undefined, {
+        sourceAccount: 'SY11 1111 1111 1111',
+        destinationAccount: 'SY22 2222 2222 2222',
+        transferReference: 'TRX-OUT-3',
+      }),
+    ).rejects.toSatisfy((error) => codeOf(error) === ERROR.REFUND_DESTINATION_MISMATCH);
+
+    /* The source was recorded by that attempt, and a different one cannot replace it. */
+    await expect(
+      refunds.settle(issued.refundId, undefined, {
+        sourceAccount: 'SY22 2222 2222 2222',
+        destinationAccount: 'SY22 2222 2222 2222',
+        transferReference: 'TRX-OUT-3',
+      }),
+    ).rejects.toSatisfy((error) => codeOf(error) === ERROR.REFUND_DESTINATION_MISMATCH);
+
+    await refunds.settle(issued.refundId, undefined, {
+      destinationAccount: 'SY11 1111 1111 1111',
+      transferReference: 'TRX-OUT-3',
+    });
+    expect((await refundRow(issued.refundId)).status).toBe('completed');
+  });
+
+  it('refuses completing a bank transfer refund in SQL without the sender’s account', async () => {
+    const fixture = await confirmedTransferAwaitingRefund('SY12 3456 7890 1234');
+
+    await refused(
+      db.execute(sql`
+        UPDATE refunds SET status = 'completed'::refund_status, transfer_reference = 'TRX-X'
+         WHERE id = ${fixture.refundId}::uuid
+      `),
+    );
+  });
+
+  /*
+    The same ACCOUNT, encrypted afresh, is still refused: only the payment's own ciphertext, copied,
+    is proof. A path that encrypts whatever it was given could encrypt anything.
+  */
+  it('refuses a destination encrypted afresh, even of the same account', async () => {
+    const fixture = await confirmedTransferAwaitingRefund('SY12 3456 7890 1234');
+
+    await refused(
+      db.execute(sql`
+        UPDATE refunds
+           SET status = 'completed'::refund_status, transfer_reference = 'TRX-X',
+               destination_account_encrypted = ${testCrypto.encrypt('SY12345678901234')},
+               destination_account_last4 = '1234'
+         WHERE id = ${fixture.refundId}::uuid
+      `),
+    );
+  });
+
+  it('refuses changing the sender’s account once it is recorded, or a refund’s destination', async () => {
+    const fixture = await confirmedTransferAwaitingRefund('SY12 3456 7890 1234');
+
+    await refused(
+      db.execute(sql`
+        UPDATE payments
+           SET payer_account_encrypted = ${testCrypto.encrypt('SY99999999999999')},
+               payer_account_last4 = '9999'
+         WHERE booking_id = ${fixture.bookingId}::uuid
+      `),
+    );
+
+    await refunds.settle(fixture.refundId, undefined, SETTLED_TO('SY12 3456 7890 1234'));
+    await refused(
+      db.execute(sql`
+        UPDATE refunds SET transfer_reference = 'SOMETHING-ELSE' WHERE id = ${fixture.refundId}::uuid
+      `),
+    );
+  });
+
+  const SETTLED_TO = (account: string) => ({
+    destinationAccount: account,
+    transferReference: 'TRX-OUT-9',
   });
 
   // ── Fixtures ──────────────────────────────────────────────────────────────
