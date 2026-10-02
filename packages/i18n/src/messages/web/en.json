@@ -373,7 +373,6 @@
     "fromCityCentre": "{value} from {city} centre"
   },
   "city": {
-    "availableStays": "Available stays in {city}",
     "backHome": "Home",
     "highlights": "Highlights"
   },

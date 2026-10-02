@@ -9,6 +9,7 @@ import { StarRating } from '@safra/ui';
 
 import type { Locale } from '@/i18n/routing';
 import type { SearchFacets } from '@/lib/api';
+import type { toQueryString } from '@/lib/search-query';
 import {
   activeFilterCount,
   BATHROOM_FLOORS,
@@ -16,8 +17,9 @@ import {
   clearedFilters,
   RADII_KM,
   RATING_FLOORS,
-  toQueryString,
+  pageHref,
   type ParsedSearch,
+  type ResultsPage,
 } from '@/lib/search-query';
 
 import { BudgetFilter } from './budget-filter';
@@ -64,6 +66,7 @@ export function FilterPanel({
   mapThumbnailSlot,
   mapButtonSlot,
   layout = 'page',
+  page,
 }: {
   locale: Locale;
   parsed: ParsedSearch;
@@ -96,6 +99,11 @@ export function FilterPanel({
    * which is what lets the map and the list behind it stay one search.
    */
   layout?: 'page' | 'column';
+  /**
+   * The page these filters navigate on: `/search`, or a city's own page with the city in its path
+   * (2026-10-02, «every city single page should be very similar to the page الإقامات»).
+   */
+  page: ResultsPage;
 }) {
   const t = useTranslations('search.results');
   const facets = useArrived(facetsPromise);
@@ -120,7 +128,7 @@ export function FilterPanel({
   const active = activeFilterCount(parsed);
 
   const go = (overrides: Parameters<typeof toQueryString>[1]) => {
-    const href = `/${locale}/search?${toQueryString(parsed, overrides)}`;
+    const href = pageHref(page, parsed, overrides);
     setParsed((current) => {
       const next = { ...current };
       for (const [key, value] of Object.entries(overrides ?? {})) {
@@ -500,11 +508,11 @@ export function FilterPanel({
       <h2 className="text-16 font-bold text-text">{t('filterBy')}</h2>
       {active > 0 ? (
         <a
-          href={`/${locale}/search?${clearedFilters(parsed)}`}
+          href={`${page.basePath}?${clearedFilters(parsed, page)}`}
           onClick={(event) => {
             event.preventDefault();
             startTransition(() =>
-              router.push(`/${locale}/search?${clearedFilters(parsed)}`, {
+              router.push(`${page.basePath}?${clearedFilters(parsed, page)}`, {
                 scroll: false,
               }),
             );

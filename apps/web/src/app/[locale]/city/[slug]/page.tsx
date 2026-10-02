@@ -4,16 +4,14 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 
 import { Breadcrumb } from '@/components/breadcrumb';
 import { JsonLd } from '@/components/json-ld';
-import { PropertyCard } from '@/components/property-card';
-import { SearchForm } from '@/components/search-form';
+import { StayResults } from '@/components/search/stay-results';
 import { isLocale, routing, type Locale } from '@/i18n/routing';
-import { getCities, getCity, getPropertyTypes } from '@/lib/catalog';
+import { getCity } from '@/lib/catalog';
 import { localisedDescription, localisedName, localisedText } from '@/lib/localise';
 import { imageUrl as cityImageUrl } from '@/lib/property';
 import { breadcrumbGraph, cityGraph } from '@/lib/structured-data';
-import { searchSafely } from '@/lib/api';
 import { siteOrigin } from '@/lib/site-url';
-import { addDays, todayInDamascus } from '@/lib/settings';
+import type { RawQuery } from '@/lib/search-query';
 
 /**
  * City page (SRS §5.4).
@@ -79,8 +77,10 @@ export async function generateMetadata({
 
 export default async function CityPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; slug: string }>;
+  searchParams: Promise<RawQuery>;
 }) {
   const { locale, slug } = await params;
   if (!isLocale(locale)) notFound();
@@ -91,53 +91,7 @@ export default async function CityPage({
 
   const t = await getTranslations('city');
   const tnav = await getTranslations('nav');
-  const ts = await getTranslations('search');
-
-  const [cities, propertyTypes] = await Promise.all([getCities(), getPropertyTypes()]);
-  const checkIn = todayInDamascus();
-  const checkOut = addDays(checkIn, 2);
-
-  /**
-   * A representative sample of what is bookable, so the page is never empty.
-   *
-   * `cached: true` keeps this page statically renderable — see searchForDisplay.
-   * This block is a teaser; /search is the live, authoritative query.
-   */
-  const today = await searchSafely(
-    { checkIn, checkOut, adults: 2, citySlug: slug, limit: 6 },
-    { cached: true },
-  );
-
-  /**
-   * After the same-day cutoff, ask again for the first day that IS bookable.
-   *
-   * `booking.same_day_cutoff_hour` is 17, and past it the API refuses an arrival of today —
-   * correctly, and it says so with the first bookable date attached. But this block asks "what can
-   * somebody stay in", not "can somebody arrive tonight", so a refusal is an answer to a question
-   * it did not mean to ask: every city page in the product went empty at 17:00 Damascus and stayed
-   * empty until midnight. Found 2026-08-20, by the test above failing for the first time in the
-   * evening.
-   *
-   * `/search` keeps the refusal and shows the notice, which is right there — a customer who TYPED
-   * today's date has to be told why it cannot be today.
-   *
-   * The retry costs a second request only after the cutoff, and the date comes from the API's own
-   * answer rather than from arithmetic repeated here over a setting this app does not read.
-   */
-  const reopened = today.notice?.firstBookableDate;
-
-  const results = reopened
-    ? await searchSafely(
-        {
-          checkIn: reopened,
-          checkOut: addDays(reopened, 2),
-          adults: 2,
-          citySlug: slug,
-          limit: 6,
-        },
-        { cached: true },
-      )
-    : today;
+  const query = await searchParams;
 
   const name = localisedName(city, locale);
   const description = localisedDescription(city, locale);
@@ -210,7 +164,7 @@ export default async function CityPage({
             className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_-20%,color-mix(in_oklab,var(--color-sky)_28%,transparent),transparent_65%)]"
           />
         )}
-        <div className="relative mx-auto max-w-7xl px-4 py-14 sm:py-20">
+        <div className="relative mx-auto max-w-7xl px-4 py-10 sm:py-14">
           <Breadcrumb
             label={tnav('breadcrumb')}
             items={[{ label: t('backHome'), href: `/${locale}` }, { label: name }]}
@@ -245,41 +199,19 @@ export default async function CityPage({
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-10">
-        <SearchForm
-          locale={locale}
-          cities={cities}
-          propertyTypes={propertyTypes}
-          minDate={checkIn}
-          defaults={{ citySlug: slug, checkIn, checkOut, adults: 2 }}
-        />
-      </section>
-
-      <section className="mx-auto max-w-7xl px-4 pb-16">
-        <h2 className="font-display text-2xl text-text">
-          {t('availableStays', { city: name })}
-        </h2>
-
-        {results.items.length > 0 ? (
-          <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {results.items.map((item) => (
-              <li key={item.propertyReference}>
-                <PropertyCard item={item} locale={locale} />
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div className="mt-6 rounded-card border border-line bg-card p-6">
-            {/*
-              Two sentences, two elements. They were joined by a literal em-dash in the markup,
-              which is both a §9.G tell and a punctuation mark living in code rather than in the
-              catalogue — the one place `docs/i18n.md` says no word may live.
-            */}
-            <p className="text-text">{ts('noResults')}</p>
-            <p className="mt-1 text-sm text-muted">{ts('noResultsHint')}</p>
-          </div>
-        )}
-      </section>
+      {/*
+        The results experience of «الإقامات», pinned to this city (Bashar, 2026-10-02: «very similar
+        to the page الإقامات but specific to the selected city same as booking.com»). It replaced a
+        six-card teaser and a search bar that sent the reader to `/search` to see the rest. The city
+        is in the PATH, so every filter, order and map link keeps the reader on this page, and the
+        listings are still server-rendered HTML, which is what makes this page worth indexing.
+      */}
+      <StayResults
+        locale={locale}
+        query={query}
+        page={{ basePath: `/${locale}/city/${city.slug}`, pinnedCity: true }}
+        pinnedCitySlug={city.slug}
+      />
     </>
   );
 }

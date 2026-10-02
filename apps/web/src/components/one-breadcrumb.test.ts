@@ -48,16 +48,21 @@ describe('one breadcrumb trail, used everywhere', () => {
   });
 
   it('is the trail on every page that has one', () => {
-    const pages = ['property', 'city', 'landmark', 'groups', 'search'].map((section) =>
+    const pages = ['property', 'city', 'landmark', 'groups'].map((section) =>
       sources(`apps/web/src/app/[locale]/${section}`).filter((file) =>
         file.endsWith('page.tsx'),
       ),
     );
-    const users = pages
-      .flat()
-      .filter((file) =>
-        /import \{ Breadcrumb \} from '@\/components\/breadcrumb'/.test(read(file)),
-      );
+    /*
+      «الإقامات» draws its trail in the results component it shares with the city pages, which
+      render their own trail in the hero instead (the city is already the page's subject there).
+    */
+    const users = [
+      ...pages.flat(),
+      'apps/web/src/components/search/stay-results.tsx',
+    ].filter((file) =>
+      /import \{ Breadcrumb \} from '@\/components\/breadcrumb'/.test(read(file)),
+    );
 
     /* The sweep has to be able to fail: a corpus it never opened reports a clean bill of health. */
     expect(users).toHaveLength(5);

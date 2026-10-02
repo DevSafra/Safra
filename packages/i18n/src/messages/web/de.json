@@ -373,7 +373,6 @@
     "fromCityCentre": "{value} vom Zentrum {city}"
   },
   "city": {
-    "availableStays": "Verfügbare Unterkünfte in {city}",
     "backHome": "Startseite",
     "highlights": "Highlights"
   },

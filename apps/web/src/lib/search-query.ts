@@ -240,6 +240,30 @@ export function toSearchParams(
 }
 
 /**
+ * The page a view lives on, and its query (2026-10-02).
+ *
+ * `/search` carries the city in the query. A city's own page, `/city/damascus`, carries it in the
+ * PATH, so its links drop `citySlug`: the path is the one thing that decides the city there, and a
+ * `citySlug` in the query beside it would be a second answer that could disagree.
+ */
+export interface ResultsPage {
+  readonly basePath: string;
+  readonly pinnedCity: boolean;
+}
+
+export function pageHref(
+  page: ResultsPage,
+  parsed: ParsedSearch,
+  overrides: Parameters<typeof toQueryString>[1] = {},
+): string {
+  const query = toQueryString(
+    parsed,
+    page.pinnedCity ? { ...overrides, citySlug: null } : overrides,
+  );
+  return query ? `${page.basePath}?${query}` : page.basePath;
+}
+
+/**
  * The query string for a view, rebuilt from parsed values. The allow-list IS this function.
  *
  * `overrides` changes one thing and keeps the rest; `null` clears a field. Default values are left
@@ -313,8 +337,13 @@ export function activeFilterCount(parsed: ParsedSearch): number {
 }
 
 /** Everything a filter change keeps: the search, never the filters. */
-export function clearedFilters(parsed: ParsedSearch): string {
+export function clearedFilters(
+  parsed: ParsedSearch,
+  /** What the page itself fixes, kept out of the query; see `pageHref`. */
+  page?: ResultsPage,
+): string {
   return toQueryString(parsed, {
+    ...(page?.pinnedCity ? { citySlug: null } : {}),
     propertyTypeCode: null,
     attributes: [],
     amenityCodes: [],

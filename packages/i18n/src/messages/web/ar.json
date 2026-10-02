@@ -373,7 +373,6 @@
     "fromCityCentre": "{value} من وسط {city}"
   },
   "city": {
-    "availableStays": "الإقامات المتاحة في {city}",
     "backHome": "الرئيسية",
     "highlights": "أبرز ما فيها"
   },
