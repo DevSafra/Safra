@@ -1915,9 +1915,10 @@ nobody has restored is not a backup.
 
 ---
 
-### M-11 — Closed: `accruedIn` does not time out, and a test now says so
+### M-11 — Fixed 2026-10-02: `accruedIn` timed out on a recent window; the cause is now known
 
-**Status:** CLOSED 2026-09-27 · **Owner:** Backend · **Found 2026-09-23**, incidentally, while
+**Status:** FIXED 2026-10-02 (reopened that morning; the 2026-09-27 closure below was wrong) ·
+**Owner:** Backend · **Found 2026-09-23**, incidentally, while
 running the e2e suite for the map work. **Not caused by it** — the query reads `ledger_entries`,
 `refunds` and `bookings` and touches no table that change modified.
 
@@ -1967,6 +1968,41 @@ less than 5000», and the service file was `diff`ed back to byte-identical after
 **If it returns**, the first thing to run is `ANALYZE ledger_entries; ANALYZE refunds;` and re-read
 the plan — and then the fix is an index or a rewrite rather than a retry, because a staff action on
 the treasury must degrade rather than fail (§3, API p95 200 ms).
+
+#### Reopened and fixed, 2026-10-02
+
+**It returned.** The full e2e run failed `safra-treasury.spec.ts` › «the whole lifecycle» with
+«حدث خطأ ما»: `POST /admin/safra-payouts` answered 500 after 15,009 ms, three times running,
+alone as well as in the suite. Bashar: «fix it».
+
+**The cause, reproduced.** The window that fails is a SHORT, RECENT one, which is what the e2e
+opens (one day, walking backwards from yesterday) and what an operator opens at the end of a day.
+The statistics have not yet seen those rows, so the planner estimated **one** ledger row where there
+were 730, chose a nested loop, and compared every one of ~13,500 fully-refunded bookings against
+every ledger row: 4,050,300 comparisons thrown away. The same statement with the same dates ran
+**16,548 ms**, and as a generic plan 34 ms. `e.account::text IN (…)` made it worse, by casting the
+column off `ledger_entries_account_date_idx` and onto a date-only index with a filter.
+
+**Why the 2026-09-27 measurement missed it, and why its guard could not fail.** It measured the
+WHOLE history and a month, and over a wide window the planner expects many rows and hash-joins. The
+guard opens the whole history for the same reason ("a narrow window would not exercise the join
+that was slow"), which is exactly backwards: the narrow window is the only one that does.
+
+**The fix** (`safra-payout.service.ts`): the refunded-bookings aggregate and the transfer set are
+`MATERIALIZED` CTEs, computed once whatever the estimate; and the account is compared as the enum,
+each value cast rather than the column. Measured on the same data under the plan choice that took
+16.5 s: **98 ms** for a day, 266 ms for the whole ledger, **identical totals** to the old statement
+for both. The treasury summary shares the fragments, so it is fixed by the same change. In the
+browser the open answers in ~4 ms and the lifecycle passes.
+
+**The guard that can fail.** `safra-payout.integration.test.ts` › «opens a one-day period of fresh
+rows without recomputing the refunds per row» inserts 300 revenue rows a YEAR ahead, a day no
+statistic knows (today was tried first and could not fail: this database already had today's rows
+analysed). It asks Postgres for the plan of the service's own exported `accruedInStatement`, never
+a copy, and asserts the joins discard fewer than 10,000 rows; then times `open` over that day.
+**Watched to fail** against the old statement: 4,050,300 discarded and 6,811 ms. Its first version
+counted scans of `refunds` and passed against the old code, because the aggregate is built once
+and compared many times; that assertion was replaced rather than kept.
 
 ## 5. Should-have before production
 

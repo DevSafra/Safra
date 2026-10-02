@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 import {
@@ -71,9 +71,18 @@ import type { AccessTokenClaims } from '../auth/token.service.js';
  *
  * The join and the predicate below travel together: the join is pointless without the predicate
  * and the predicate does not compile without the join, so both queries take both.
+ *
+ * ## MATERIALIZED, because the planner once ran the aggregate 730 times (2026-10-02)
+ *
+ * Opening a transfer for one day took 16.5 seconds and answered 500 at the 15 s timeout. The
+ * statistics had not yet seen the day's ledger rows, so the planner expected ONE row in the window,
+ * chose a nested loop, and re-ran this aggregate (every completed refund joined to its booking, ~22
+ * ms) once per row it actually found: 730 × 22 ms. As a subquery the planner may inline and repeat
+ * it; as a MATERIALIZED CTE it is computed exactly once, whatever the estimate. Measured on the same
+ * data and the same plan choice: 16,548 ms before, 98 ms after, identical totals.
  */
-const REFUNDED_JOIN = sql`
-  LEFT JOIN (
+const REFUNDED_CTE = sql`
+  refunded AS MATERIALIZED (
     SELECT r.booking_id
       FROM refunds r
       JOIN bookings b ON b.id = r.booking_id
@@ -81,7 +90,7 @@ const REFUNDED_JOIN = sql`
        AND r.deleted_at IS NULL
      GROUP BY r.booking_id, b.total_amount
     HAVING sum(r.amount) >= b.total_amount
-  ) refunded ON refunded.booking_id = e.booking_id
+  )
 `;
 
 /**
@@ -95,7 +104,7 @@ const REFUNDED_JOIN = sql`
  *     (`LedgerService.reverseCommissionIfFullyRefunded`), so its balance is already net and
  *     filtering it here as well would subtract the same money twice.
  *   - The FEE is not reversed anywhere, and is only unearned in the §6.4 case where the whole
- *     `total_amount` went back. That is the case `REFUNDED_JOIN` matches, so the filter stays —
+ *     `total_amount` went back. That is the case `REFUNDED_CTE` matches, so the filter stays —
  *     for that one account.
  *
  * A null booking_id is advertising revenue and is always earned.
@@ -122,16 +131,32 @@ const EARNED = sql`
  *
  * A transfer group always credits `safra_payout`; a reversal group credits `refund`. That fact is
  * intrinsic to the entry group and survives anything happening to other tables, so it is what the
- * question is asked of. The subquery is a small distinct set — `safra_payout` has one row per
- * transfer — so it hashes once rather than probing per row.
+ * question is asked of. It is a small distinct set — `safra_payout` has one row per transfer — and
+ * MATERIALIZED for the reason `REFUNDED_CTE` gives.
  */
-const PAYOUT_JOIN = sql`
-  LEFT JOIN (
+const TRANSFER_CTE = sql`
+  xfer AS MATERIALIZED (
     SELECT DISTINCT entry_group_id
       FROM ledger_entries
      WHERE account = 'safra_payout'
-  ) xfer ON xfer.entry_group_id = e.entry_group_id
+  )
 `;
+
+/** Both sets, computed once, then joined: the prefix and the joins every revenue query takes. */
+const REVENUE_SETS = sql`WITH ${REFUNDED_CTE}, ${TRANSFER_CTE}`;
+const REVENUE_JOINS = sql`
+  LEFT JOIN refunded ON refunded.booking_id = e.booking_id
+  LEFT JOIN xfer ON xfer.entry_group_id = e.entry_group_id
+`;
+
+/**
+ * The three revenue accounts, compared AS the enum. `e.account::text IN (…)` cast the column, which
+ * keeps Postgres off `ledger_entries_account_date_idx`; each value is cast instead.
+ */
+const IS_REVENUE_ACCOUNT = sql`e.account IN (${sql.join(
+  SAFRA_REVENUE_ACCOUNTS.map((account) => sql`${account}::ledger_account`),
+  sql`, `,
+)})`;
 
 /** A transfer out. Everything else debited from a revenue account is revenue given back. */
 const IS_TRANSFER = sql`xfer.entry_group_id IS NOT NULL`;
@@ -472,6 +497,7 @@ export class SafraPayoutService {
       accrued: string;
       transferred: string;
     }>(sql`
+      ${REVENUE_SETS}
       SELECT e.account::text AS account,
              (coalesce(sum(e.amount_syp) FILTER (WHERE e.direction = 'credit'), 0)
               - coalesce(sum(e.amount_syp)
@@ -479,9 +505,8 @@ export class SafraPayoutService {
              coalesce(sum(e.amount_syp)
                FILTER (WHERE e.direction = 'debit' AND ${IS_TRANSFER}), 0)::text AS transferred
       FROM ledger_entries e
-      ${REFUNDED_JOIN}
-      ${PAYOUT_JOIN}
-      WHERE e.account::text IN ${SAFRA_REVENUE_ACCOUNTS}
+      ${REVENUE_JOINS}
+      WHERE ${IS_REVENUE_ACCOUNT}
         ${EARNED}
       GROUP BY e.account
       ORDER BY e.account
@@ -836,20 +861,9 @@ export class SafraPayoutService {
    * prevents that; this filter is what stops the number lying if it ever fails.
    */
   private async accruedIn(from: string, to: string) {
-    const rows = await this.db.execute<{ account: string; total: string }>(sql`
-      SELECT e.account::text AS account,
-             (coalesce(sum(e.amount_syp) FILTER (WHERE e.direction = 'credit'), 0)
-              - coalesce(sum(e.amount_syp)
-                  FILTER (WHERE e.direction = 'debit' AND NOT ${IS_TRANSFER}), 0))::text AS total
-      FROM ledger_entries e
-      ${REFUNDED_JOIN}
-      ${PAYOUT_JOIN}
-      WHERE e.account::text IN ${SAFRA_REVENUE_ACCOUNTS}
-        ${EARNED}
-        AND e.created_at >= ${from}::date
-        AND e.created_at < (${to}::date + INTERVAL '1 day')
-      GROUP BY e.account
-    `);
+    const rows = await this.db.execute<{ account: string; total: string }>(
+      accruedInStatement(from, to),
+    );
 
     const of = (account: string) =>
       Number(rows.rows.find((row) => row.account === account)?.total ?? 0).toFixed(2);
@@ -963,4 +977,25 @@ export class SafraPayoutService {
       tx as Database,
     );
   }
+}
+
+/**
+ * The statement `accruedIn` runs, exported so its regression test can ask Postgres for THIS
+ * statement's plan rather than for a copy that could drift from it (2026-10-02, M-11 reopened).
+ */
+export function accruedInStatement(from: string, to: string): SQL {
+  return sql`
+      ${REVENUE_SETS}
+      SELECT e.account::text AS account,
+             (coalesce(sum(e.amount_syp) FILTER (WHERE e.direction = 'credit'), 0)
+              - coalesce(sum(e.amount_syp)
+                  FILTER (WHERE e.direction = 'debit' AND NOT ${IS_TRANSFER}), 0))::text AS total
+      FROM ledger_entries e
+      ${REVENUE_JOINS}
+      WHERE ${IS_REVENUE_ACCOUNT}
+        ${EARNED}
+        AND e.created_at >= ${from}::date
+        AND e.created_at < (${to}::date + INTERVAL '1 day')
+      GROUP BY e.account
+    `;
 }

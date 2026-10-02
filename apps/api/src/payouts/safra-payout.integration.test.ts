@@ -7,7 +7,7 @@ import { ERROR } from '@safra/contracts';
 import { AuditService } from '../common/audit/audit.service.js';
 import { FieldEncryptionService } from '../common/crypto/field-encryption.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
-import { SafraPayoutService } from './safra-payout.service.js';
+import { accruedInStatement, SafraPayoutService } from './safra-payout.service.js';
 import { codeOf } from '../common/errors/app-error.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import type { Env } from '../config/env.js';
@@ -273,8 +273,8 @@ describeIfDb('SafraPayoutService', () => {
      */
     it('opens a period without approaching the read timeout', async () => {
       /*
-        The WHOLE history, which is the widest window an operator can ask for and the one the
-        16-second measurement used. A narrow window would not exercise the join that was slow.
+        The WHOLE history, which is the widest window an operator can ask for. It guards the cost
+        of a wide window; the 500 itself was a NARROW recent one, which the next test holds.
       */
       const period = await periodWithRevenue();
 
@@ -289,6 +289,80 @@ describeIfDb('SafraPayoutService', () => {
       expect(
         took,
         `opening over the whole ledger took ${took} ms; M-11 was a 15-second read timeout`,
+      ).toBeLessThan(5_000);
+    }, 20_000);
+
+    /**
+     * M-11 REOPENED (2026-10-02): the narrow, RECENT window is the one that was slow.
+     *
+     * The guard above opens the whole history and stays green, because over the whole history the
+     * planner expects many rows and hash-joins. The 500 was a ONE-DAY window over today: the
+     * statistics had not yet seen today's rows, so the planner expected one row, chose a nested
+     * loop, and recomputed the refunded-bookings aggregate once per row it found. 730 rows × 22 ms
+     * measured 16.5 s on the development database, the same statement 98 ms once the aggregate was
+     * MATERIALIZED.
+     *
+     * So the fixture is the trap itself: three hundred revenue rows on a day no statistic knows,
+     * a year ahead. TODAY was the first choice and could not fail: this database already holds
+     * today's rows from earlier runs, an autovacuum ANALYZE had seen them, the planner estimated
+     * correctly, and the inlined aggregate passed. A day past the histogram's last value is what
+     * the 500 met, every morning, until the statistics caught up. Then two assertions:
+     *
+     * - **The plan, of the service's own statement** (`accruedInStatement`, never a copy): the
+     *   joins discard almost nothing, where the slow plan's nested loop compared every refunded
+     *   booking against every ledger row and threw the mismatches away. A stopwatch alone would
+     *   miss it on a small database, where the slow plan is merely slow-ish.
+     * - **The operator's call**, `open` over that day, inside the same five seconds as the guard above.
+     */
+    it('opens a one-day period of fresh rows without recomputing the refunds per row', async () => {
+      const day = (
+        await db.execute<{ day: string }>(sql`SELECT (current_date + 365)::text AS day`)
+      ).rows[0]!.day;
+
+      await db.execute(sql`
+        INSERT INTO ledger_entries (entry_group_id, account, direction, amount, currency_id,
+                                    fx_rate_to_syp, amount_syp, description, created_at)
+        SELECT gen_random_uuid(), 'ad_revenue', 'credit', 1000, c.id, 1, 1000, 'M-11 fixture',
+               ${day}::date + INTERVAL '12 hours'
+        FROM generate_series(1, 300), (SELECT id FROM currencies WHERE code = 'SYP') c
+      `);
+
+      const plan = await db.execute<{ 'QUERY PLAN': unknown }>(
+        sql`EXPLAIN (ANALYZE, FORMAT JSON) ${accruedInStatement(day, day)}`,
+      );
+
+      /*
+        Rows a join compared and threw away, summed across the plan tree. The slow plan is a nested
+        loop that compares EVERY refunded booking against EVERY ledger row: the aggregate is built
+        once, so counting its scans says nothing (that was the first version of this assertion, and
+        it passed against the old code), but the comparisons it discards grow with both tables.
+        A hash join discards none.
+      */
+      const discarded = (node: unknown): number => {
+        if (typeof node !== 'object' || node === null) return 0;
+        const record = node as Record<string, unknown>;
+        const own =
+          Number(record['Rows Removed by Join Filter'] ?? 0) *
+          Number(record['Actual Loops'] ?? 1);
+        const children = Array.isArray(record['Plans']) ? record['Plans'] : [];
+        return own + children.reduce((sum: number, child) => sum + discarded(child), 0);
+      };
+      const root = (plan.rows[0]?.['QUERY PLAN'] as Array<{ Plan: unknown }>)[0]?.Plan;
+
+      expect(root, 'Postgres answered a plan to inspect').toBeTruthy();
+      expect(
+        discarded(root),
+        'the refunded bookings are hash-joined to the ledger, not compared row by row',
+      ).toBeLessThan(10_000);
+
+      await account();
+      const started = Date.now();
+      await service.open(actor, { periodStart: day, periodEnd: day });
+      const took = Date.now() - started;
+
+      expect(
+        took,
+        `opening that day took ${took} ms; M-11 was a 15-second read timeout`,
       ).toBeLessThan(5_000);
     }, 20_000);
 
