@@ -112,3 +112,34 @@ export function basemapStyle(
  * A constant shared across the boundary has to come from a module neither side owns.
  */
 export const BBOX_PLACEHOLDER = '__SAFRA_BBOX__';
+
+/**
+ * A box around every placed result, with a small pad so nothing sits on the edge.
+ *
+ * Falls back to Damascus where nothing on the page has coordinates — 1,950 of 2,017 listings
+ * had none before the partner picker shipped, so «no result can be placed» is a real state and
+ * not a defensive nicety. An unfitted map opens on the whole world, which reads as broken.
+ */
+export function boundsOf(
+  stays: readonly { latitude: string; longitude: string }[],
+): [[number, number], [number, number]] {
+  const points = stays
+    .map((stay) => [Number(stay.longitude), Number(stay.latitude)] as const)
+    .filter(([lon, lat]) => Number.isFinite(lon) && Number.isFinite(lat));
+
+  if (points.length === 0)
+    return [
+      [36.2, 33.46],
+      [36.36, 33.57],
+    ];
+
+  const lons = points.map(([lon]) => lon);
+  const lats = points.map(([, lat]) => lat);
+  /* A floor on the span, or a single result produces a zero-size box MapLibre cannot fit. */
+  const pad = 0.004;
+
+  return [
+    [Math.min(...lons) - pad, Math.min(...lats) - pad],
+    [Math.max(...lons) + pad, Math.max(...lats) + pad],
+  ];
+}

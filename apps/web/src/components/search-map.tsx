@@ -8,14 +8,20 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 
 import { PUBLIC_MAP_MAX_ZOOM } from '@safra/contracts';
 
-import { BASEMAP, BBOX_PLACEHOLDER, basemapStyle, loadMapLibre } from '@/lib/basemap';
+import {
+  BASEMAP,
+  BBOX_PLACEHOLDER,
+  basemapStyle,
+  boundsOf,
+  loadMapLibre,
+} from '@/lib/basemap';
 import type { MapStay } from '@/lib/search-cards';
 import { MapStayCard } from '@/components/search/map-stay-card';
 import { MapPriceMarkers, type NearbyStay } from './map-price-markers';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { SearchIcon } from '@/components/icons';
-import { OrnamentField } from '@/components/ornament';
+import { MapGlyph, MapThumbnail } from '@/components/map-thumbnail';
 
 /**
  * «اعرض على الخريطة» on the search results — the map as a way to SEARCH.
@@ -617,222 +623,6 @@ function pinsFor(
     pins: [...atPoint.values()].map(({ pin, count }) => ({ ...pin, staysHere: count })),
     leaderOf,
   };
-}
-
-/**
- * A box around every placed result, with a small pad so nothing sits on the edge.
- *
- * Falls back to Damascus where nothing on the page has coordinates — 1,950 of 2,017 listings
- * had none before the partner picker shipped, so «no result can be placed» is a real state and
- * not a defensive nicety. An unfitted map opens on the whole world, which reads as broken.
- */
-function boundsOf(
-  stays: readonly { latitude: string; longitude: string }[],
-): [[number, number], [number, number]] {
-  const points = stays
-    .map((stay) => [Number(stay.longitude), Number(stay.latitude)] as const)
-    .filter(([lon, lat]) => Number.isFinite(lon) && Number.isFinite(lat));
-
-  if (points.length === 0)
-    return [
-      [36.2, 33.46],
-      [36.36, 33.57],
-    ];
-
-  const lons = points.map(([lon]) => lon);
-  const lats = points.map(([, lat]) => lat);
-  /* A floor on the span, or a single result produces a zero-size box MapLibre cannot fit. */
-  const pad = 0.004;
-
-  return [
-    [Math.min(...lons) - pad, Math.min(...lats) - pad],
-    [Math.max(...lons) + pad, Math.max(...lats) + pad],
-  ];
-}
-
-/**
- * The sidebar card: the real map of the results, behind the button that opens the full one.
- *
- * It was SAFRA's ornament until Bashar asked to see the map there (2026-10-01). What keeps that
- * affordable on every results page:
- *
- * - **Loaded only when the card nears the viewport.** On a phone the card lives in the closed filter
- *   sheet, so it costs nothing until the sheet opens; the ornament holds the place until then and
- *   stays as the answer if WebGL refuses.
- * - **A picture, not a second map to drive.** `interactive: false`: dragging belongs to the dialog,
- *   and a card that pans under a scrolling thumb would steal the page's scroll.
- * - **The stays are dots in a layer, not DOM markers.** Price pills at this size would overlap into a
- *   smear; the dialog is where they are read.
- * - **Hover speaks the result cards' language** (Bashar, 2026-10-01): the frame turns gold and lifts,
- *   the map eases in by 3% like a stay's photograph, and the button lifts too. A SOLID gold line,
- *   where the cards use a tint: a translucent hairline over a street map dissolves into the streets.
- * - **The licence notice is printed, not a control.** ODbL needs it visible on every map, and
- *   MapLibre's own attribution control is a button, which cannot sit inside this one.
- */
-function MapThumbnail({
-  stays,
-  theme,
-  label,
-  onOpen,
-}: {
-  readonly stays: readonly NearbyStay[];
-  readonly theme: 'light' | 'dark';
-  readonly label: string;
-  readonly onOpen: (button: HTMLButtonElement) => void;
-}) {
-  const card = useRef<HTMLDivElement | null>(null);
-  const canvas = useRef<HTMLDivElement | null>(null);
-  const [near, setNear] = useState(false);
-  const [ready, setReady] = useState(false);
-  /* Read from the style it draws, so the notice cannot differ from the map's own licence. */
-  const [notice, setNotice] = useState<string | null>(null);
-
-  useEffect(() => {
-    const element = card.current;
-    if (!element || near) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) setNear(true);
-      },
-      { rootMargin: '200px' },
-    );
-    observer.observe(element);
-
-    return () => observer.disconnect();
-  }, [near]);
-
-  useEffect(() => {
-    if (!near || !canvas.current || !BASEMAP) return;
-
-    let cancelled = false;
-    let dispose: (() => void) | null = null;
-
-    void (async () => {
-      try {
-        const { maplibre, basemaps } = await loadMapLibre();
-        if (cancelled || !canvas.current) return;
-
-        const tokens = getComputedStyle(document.documentElement);
-        const style = basemapStyle(basemaps, theme, 'ar');
-        const source = style.sources['protomaps'];
-        setNotice(
-          source && 'attribution' in source ? (source.attribution ?? null) : null,
-        );
-        const instance = new maplibre.Map({
-          container: canvas.current,
-          style,
-          bounds: boundsOf(stays),
-          fitBoundsOptions: { padding: 20, maxZoom: PUBLIC_MAP_MAX_ZOOM },
-          maxZoom: PUBLIC_MAP_MAX_ZOOM,
-          interactive: false,
-          attributionControl: false,
-        });
-
-        instance.on('load', () => {
-          instance.addSource('stays', {
-            type: 'geojson',
-            data: {
-              type: 'FeatureCollection',
-              features: stays
-                .map((stay) => [Number(stay.longitude), Number(stay.latitude)] as const)
-                .filter(([lon, lat]) => Number.isFinite(lon) && Number.isFinite(lat))
-                .map(([lon, lat]) => ({
-                  type: 'Feature' as const,
-                  properties: {},
-                  geometry: { type: 'Point' as const, coordinates: [lon, lat] },
-                })),
-            },
-          });
-          instance.addLayer({
-            id: 'stays',
-            type: 'circle',
-            source: 'stays',
-            paint: {
-              'circle-radius': 4.5,
-              'circle-color': tokens.getPropertyValue('--color-gold').trim(),
-              'circle-stroke-width': 1.5,
-              'circle-stroke-color': tokens.getPropertyValue('--color-card').trim(),
-            },
-          });
-        });
-        /* Shown once the tiles are drawn, so the reader never watches an empty canvas fill in. */
-        void instance.once('idle', () => {
-          if (!cancelled) setReady(true);
-        });
-
-        const resizer = new ResizeObserver(() => instance.resize());
-        resizer.observe(canvas.current);
-
-        dispose = () => {
-          resizer.disconnect();
-          instance.remove();
-        };
-      } catch {
-        /* WebGL refused, or a chunk did not arrive: the ornament stays, and the button still works. */
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      setReady(false);
-      dispose?.();
-    };
-  }, [near, theme, stays]);
-
-  return (
-    <div
-      ref={card}
-      data-map-thumbnail
-      className="group/map relative h-32 w-full overflow-hidden rounded-card border border-line bg-band transition-[border-color,box-shadow] duration-200 ease-out-strong hover:border-gold hover:shadow-[var(--shadow-lift)]"
-    >
-      <OrnamentField id="ornament-map-thumbnail" className="text-gold-read opacity-25" />
-      <div
-        ref={canvas}
-        aria-hidden
-        data-ready={ready}
-        className={`absolute inset-0 transition-[opacity,transform] duration-500 ease-out-strong group-hover/map:scale-[1.03] motion-reduce:transition-opacity ${ready ? 'opacity-100' : 'opacity-0'}`}
-      />
-      <button
-        type="button"
-        onClick={(event) => onOpen(event.currentTarget)}
-        className="group absolute inset-0 grid cursor-pointer place-items-center rounded-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold"
-      >
-        <span className="inline-flex min-h-10 items-center gap-2 rounded-full bg-indigo px-4 text-14 font-bold text-bg shadow-[var(--shadow-lift)] transition-[filter,transform,box-shadow] duration-150 ease-out group-hover:shadow-[var(--shadow-lift-hover)] group-hover:brightness-110 group-active:scale-[0.97] motion-reduce:transition-none">
-          <MapGlyph />
-          {label}
-        </span>
-      </button>
-      {ready && notice ? (
-        <span
-          dir="ltr"
-          className="pointer-events-none absolute bottom-1 end-1.5 rounded bg-card/80 px-1 text-[10px] leading-4 text-muted"
-        >
-          {notice}
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
-function MapGlyph() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="1.1rem"
-      height="1.1rem"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.6}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path d="M9 4 3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5z" />
-      <path d="M9 4v13M15 6.5v13" />
-    </svg>
-  );
 }
 
 function CloseGlyph() {

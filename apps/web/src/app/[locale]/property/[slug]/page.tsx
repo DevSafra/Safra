@@ -914,7 +914,12 @@ export default async function PropertyPage({
                 under it: two stacked cards for one idea reads as two ideas, and the address
                 and the picture are the same answer to «where is this».
               */}
-                <div className="mt-3 overflow-hidden rounded-card border border-line bg-card">
+                {/*
+                  The `clip-path` is for Safari: the map below is a WebGL canvas, composited as a
+                  layer of its own, and Safari does not clip that to `overflow` + `border-radius`,
+                  so its square corners showed past the card's (the same fault as «15.20.53»).
+                */}
+                <div className="mt-3 overflow-hidden rounded-card border border-line bg-card [clip-path:inset(0_round_var(--radius-card))]">
                   <div className="p-5">
                     <p className="text-sm text-muted">
                       {property.addressApproximate}, {cityName}

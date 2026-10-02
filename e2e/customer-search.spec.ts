@@ -182,9 +182,7 @@ test('the map card draws the map of the results behind its button', async ({ pag
   await page.goto(SEARCH);
 
   const card = page.locator('[data-map-thumbnail]');
-  await expect(card.locator('[data-ready="true"] canvas')).toBeVisible({
-    timeout: 15_000,
-  });
+  await expect(card.locator('img[data-map-picture]')).toBeVisible({ timeout: 15_000 });
   await expect(card).toContainText('OpenStreetMap');
 
   await card.getByRole('button', { name: 'شاهد على الخريطة' }).click();
