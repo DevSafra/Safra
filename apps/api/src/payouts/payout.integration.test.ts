@@ -1096,6 +1096,9 @@ describeIfDb('PayoutService', () => {
                               captured_at)
         SELECT b.id, 'bank_transfer', 'manual', b.total_amount, b.currency_id, 'captured', now()
           FROM bookings b WHERE b.id = ${bookingId}
+           -- The booking's own capture where it has one: a booking has ONE (post/0026).
+           AND NOT EXISTS (SELECT 1 FROM payments p WHERE p.booking_id = b.id
+                            AND p.status IN ('captured','partially_refunded','refunded'))
       `);
       await db.execute(sql`
         INSERT INTO refunds (payment_id, booking_id, amount, currency_id,
@@ -1104,6 +1107,7 @@ describeIfDb('PayoutService', () => {
                'recovery test: the whole stay, after the transfer was paid',
                'completed', 0, now()
           FROM bookings b JOIN payments p ON p.booking_id = b.id
+           AND p.status IN ('captured','partially_refunded','refunded')
          WHERE b.id = ${bookingId} LIMIT 1
       `);
     }
@@ -1713,6 +1717,8 @@ describeIfDb('PayoutService', () => {
                               captured_at)
         SELECT b.id, 'bank_transfer', 'manual', b.total_amount, b.currency_id, 'captured', now()
           FROM bookings b WHERE b.id = ${bookingIds[0]!}::uuid
+           AND NOT EXISTS (SELECT 1 FROM payments p WHERE p.booking_id = b.id
+                            AND p.status IN ('captured','partially_refunded','refunded'))
       `);
       await db.execute(sql`
         INSERT INTO refunds (payment_id, booking_id, amount, currency_id,
@@ -1720,6 +1726,7 @@ describeIfDb('PayoutService', () => {
         SELECT p.id, b.id, b.base_amount, b.currency_id, 100, 'fine and recovery together',
                'completed', 0, now()
           FROM bookings b JOIN payments p ON p.booking_id = b.id
+           AND p.status IN ('captured','partially_refunded','refunded')
          WHERE b.id = ${bookingIds[0]!}::uuid LIMIT 1
       `);
       await ledger.reverseForRefund(db, bookingIds[0]!);

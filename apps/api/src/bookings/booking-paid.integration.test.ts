@@ -107,16 +107,22 @@ describeIfDb('what a customer can learn about their own payment', () => {
     expect(booking['paidAt']).toBeNull();
   });
 
-  it('reports what was captured, and when it first was', async () => {
+  /*
+    One capture beside an attempt that failed. It was two captures summed, which the database now
+    refuses (post/0026_refund_destination.sql: one capture per booking, so a refund always has ONE
+    original payment to return through). A failed attempt is the real shape of «more than one row».
+  */
+  it('reports what was captured, and when', async () => {
     const row = await aBooking();
 
-    await aPayment(row, 'captured', '120.00', '2026-09-01T10:00:00Z');
-    await aPayment(row, 'captured', '30.00', '2026-09-03T10:00:00Z');
+    await aPayment(row, 'failed', '30.00', null);
+    await aPayment(row, 'captured', '150.00', '2026-09-01T10:00:00Z');
 
     const booking = await service.findByReference(customer(row), row.reference);
 
-    expect(Number(booking['paidAmount']), 'both captures, summed').toBe(150);
-    /* The FIRST capture: «when did SAFRA first receive anything» is the question. */
+    expect(Number(booking['paidAmount']), 'the capture, not the failed attempt').toBe(
+      150,
+    );
     expect(String(booking['paidAt'])).toContain('2026-09-01');
   });
 

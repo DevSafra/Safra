@@ -457,7 +457,8 @@ describeIfDb('SafraPayoutService', () => {
            AND NOT EXISTS (SELECT 1 FROM refunds r
                             WHERE r.booking_id = b.id AND r.deleted_at IS NULL)
            AND NOT EXISTS (SELECT 1 FROM partner_payout_items i WHERE i.booking_id = b.id)
-           AND EXISTS (SELECT 1 FROM payments p WHERE p.booking_id = b.id)
+           AND EXISTS (SELECT 1 FROM payments p WHERE p.booking_id = b.id
+                        AND p.status IN ('captured','partially_refunded','refunded'))
            AND EXISTS (SELECT 1 FROM ledger_entries e
                         WHERE e.booking_id = b.id
                           AND e.account = 'safra_commission_partner'
@@ -478,9 +479,23 @@ describeIfDb('SafraPayoutService', () => {
       return row!;
     }
 
+    /*
+      The fault the next tests are about, BUILT: the booking's payment captured, and no capture group
+      in the ledger. Searching for it found bookings whose payment had never been captured at all,
+      a different state, and a refund of money that was never taken, which the database now refuses
+      (post/0026_refund_destination.sql).
+    */
+    async function captureWithoutLedger(bookingId: string): Promise<void> {
+      await db.execute(sql`
+        UPDATE payments SET status = 'captured'::payment_status, captured_at = now()
+         WHERE id = (SELECT id FROM payments WHERE booking_id = ${bookingId}::uuid
+                      ORDER BY created_at DESC, id DESC LIMIT 1)
+      `);
+    }
+
     /** One more completed refund for `share` of the stay price. */
     async function addRefund(bookingId: string, share: number): Promise<void> {
-      await db.execute(sql`
+      const written = await db.execute(sql`
         INSERT INTO refunds (payment_id, booking_id, amount, currency_id,
                              applied_refund_percent, reason, status, wallet_amount,
                              completed_at)
@@ -488,9 +503,17 @@ describeIfDb('SafraPayoutService', () => {
                ${String(share * 100)}::numeric,
                'built by safra-payout.integration.test', 'completed', 0, now()
           FROM bookings b JOIN payments p ON p.booking_id = b.id
+           AND p.status IN ('captured','partially_refunded','refunded')
          WHERE b.id = ${bookingId}::uuid
          LIMIT 1
       `);
+
+      /*
+        A refund that wrote no row is a fixture that changed nothing, and every assertion after it
+        would pass for the wrong reason. It happened: a booking whose payment was never captured
+        joined nothing here and the tests around it stayed green.
+      */
+      expect(written.rowCount, `a refund was written for booking ${bookingId}`).toBe(1);
     }
 
     it('gives back the whole commission AND the whole payable on a booking refunded in full', async () => {
@@ -678,7 +701,15 @@ describeIfDb('SafraPayoutService', () => {
     it('never gives back more than was credited, whatever the refund says', async () => {
       const booking = await bookingRefunded(1);
 
+      /*
+        A second full refund is a state the database refuses (post/0026_refund_destination.sql: the
+        refunds through a payment never exceed what it took). This test is the defence BEHIND that
+        rule, so it builds the impossible row on purpose, with triggers off for this one statement
+        inside the test's own rolled-back transaction.
+      */
+      await db.execute(sql`SET LOCAL session_replication_role = replica`);
       await addRefund(booking.id, 1);
+      await db.execute(sql`SET LOCAL session_replication_role = origin`);
       await ledger.reverseForRefund(db, booking.id);
 
       const commission = await reversedOn('safra_commission_partner', booking.id);
@@ -793,6 +824,8 @@ describeIfDb('SafraPayoutService', () => {
 
       expect(row, 'a booking with a payable and no ledger at all').toBeDefined();
 
+      await captureWithoutLedger(row!.id);
+
       await addRefund(row!.id, 0.5);
 
       /* Null, because there is nothing to reverse — and the column must still move. */
@@ -836,6 +869,7 @@ describeIfDb('SafraPayoutService', () => {
       const row = clean.rows[0];
 
       expect(row).toBeDefined();
+      await captureWithoutLedger(row!.id);
       await addRefund(row!.id, 0.5);
 
       await ledger.reverseForRefund(db, row!.id);
@@ -900,6 +934,7 @@ describeIfDb('SafraPayoutService', () => {
         SELECT partner_payable_amount::text AS payable FROM bookings WHERE id = ${row!.id}::uuid
       `);
 
+      await captureWithoutLedger(row!.id);
       await addRefund(row!.id, 0.5);
       await ledger.reverseForRefund(db, row!.id);
 
