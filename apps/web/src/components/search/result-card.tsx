@@ -76,7 +76,7 @@ export function ResultCard({
           <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <Link
               href={card.href}
-              className="inline-flex min-h-10 items-center font-display text-18 font-bold leading-snug text-text after:absolute after:inset-0 after:content-[''] group-hover:text-gold-read focus-visible:outline-none focus-visible:after:rounded-card focus-visible:after:ring-2 focus-visible:after:ring-gold lg:min-h-0"
+              className="inline-flex min-h-10 items-center font-display text-lg font-bold text-text after:absolute after:inset-0 after:content-[''] group-hover:text-gold-read focus-visible:outline-none focus-visible:after:rounded-card focus-visible:after:ring-2 focus-visible:after:ring-gold lg:min-h-0"
             >
               {card.name}
             </Link>

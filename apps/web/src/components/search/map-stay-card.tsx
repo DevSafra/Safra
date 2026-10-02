@@ -60,7 +60,7 @@ export function MapStayCard({
       </div>
 
       <div className="flex min-w-0 flex-col">
-        <h3 className="pe-11 text-15 leading-snug">
+        <h3 className="pe-11 text-lg">
           <a
             href={stay.href}
             /* A new tab, so the map and the area the reader found stay where they were. */

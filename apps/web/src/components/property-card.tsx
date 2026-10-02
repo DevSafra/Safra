@@ -133,7 +133,7 @@ export async function PropertyCard({
 
       <div className="flex flex-1 flex-col p-4">
         <div className="flex items-start justify-between gap-3">
-          <h3 className="text-16 font-bold text-text">
+          <h3 className="text-lg font-bold text-text">
             {/*
               The WHOLE CARD is the target, and there is still only one link (Bashar, 2026-09-02).
 
