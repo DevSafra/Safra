@@ -21,6 +21,12 @@ const { checkIn: CHECK_IN_DATE, checkOut: CHECK_OUT_DATE } = stayFrom(14, 2);
 const STAY = `checkIn=${CHECK_IN_DATE}&checkOut=${CHECK_OUT_DATE}&adults=2`;
 const CHECK_IN = new URLSearchParams(STAY).get('checkIn') ?? '';
 const SEARCH = `/ar/search?${STAY}`;
+/**
+ * A search the map's feed answers WHOLE: Damascus, under the feed's cap of 250. The unfiltered
+ * search places more than that, and a capped list reads 250 before a filter and 250 after it, so
+ * «the filter narrowed it» and «the stays that charge to cancel are kept» cannot be asked of it.
+ */
+const UNDER_CAP = `${STAY}&citySlug=damascus`;
 
 /** Results identified by LINK, never by name: the testbed shares names across many stays. */
 const slugs = (page: Page) =>
@@ -198,8 +204,8 @@ test('the map card draws the map of the results behind its button', async ({ pag
 test.describe('the full map', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
-  async function openMap(page: Page) {
-    await page.goto(SEARCH);
+  async function openMap(page: Page, url = SEARCH) {
+    await page.goto(url);
     await page.locator('[data-map-thumbnail] button').click();
     const dialog = page.getByRole('dialog', { name: 'الإقامات على الخريطة' });
     await expect(dialog).toBeVisible();
@@ -228,7 +234,8 @@ test.describe('the full map', () => {
     /* The opening view holds them all, so the list is the whole feed. */
     await expect(list.locator('li')).toHaveCount(feed.stays.length);
     await expect(
-      dialog.getByText(/إقامات? في هذه المنطقة|إقامتان في هذه المنطقة/).first(),
+      /* Every plural form the catalogue has: «٢٥٠ إقامة» is the form past ten, and it is a real count. */
+      dialog.getByText(/(\d+ (إقامات|إقامة)|إقامتان|إقامة واحدة) في هذه المنطقة/).first(),
     ).toBeVisible();
 
     await list.locator('li a').first().hover();
@@ -296,7 +303,7 @@ test.describe('the full map', () => {
   });
 
   test('a filter beside the map narrows the map and keeps it open', async ({ page }) => {
-    const { dialog, list } = await openMap(page);
+    const { dialog, list } = await openMap(page, `/ar/search?${UNDER_CAP}`);
     const before = await list.locator('li').count();
 
     const filters = dialog.getByRole('complementary', {
@@ -332,8 +339,8 @@ test('an unfiltered search keeps the stays that charge to cancel', async ({
       ).json()) as { stays: { freeCancellation: string | null }[] }
     ).stays;
 
-  const all = await read(STAY);
-  const free = await read(`${STAY}&freeCancellationOnly=true`);
+  const all = await read(UNDER_CAP);
+  const free = await read(`${UNDER_CAP}&freeCancellationOnly=true`);
 
   expect(
     all.some((stay) => stay.freeCancellation === null),
