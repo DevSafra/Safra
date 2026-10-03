@@ -2,7 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { PUBLIC_MAP_MAX_ZOOM } from '@safra/contracts';
-import { BASEMAP, basemapStyle, boundsOf, loadMapLibre } from '@/lib/basemap';
+import {
+  BASEMAP,
+  basemapStyle,
+  boundsOf,
+  loadMapLibre,
+  type MapBounds,
+} from '@/lib/basemap';
 import { OrnamentField } from '@/components/ornament';
 import type { NearbyStay } from './map-price-markers';
 
@@ -30,11 +36,13 @@ export function MapThumbnail({
   theme,
   label,
   onOpen,
+  whenEmpty,
 }: {
   readonly stays: readonly NearbyStay[];
   readonly theme: 'light' | 'dark';
   readonly label: string;
   readonly onOpen: (button: HTMLButtonElement) => void;
+  readonly whenEmpty?: MapBounds | undefined;
 }) {
   const card = useRef<HTMLDivElement | null>(null);
   const canvas = useRef<HTMLDivElement | null>(null);
@@ -80,7 +88,7 @@ export function MapThumbnail({
         const instance = new maplibre.Map({
           container: canvas.current,
           style,
-          bounds: boundsOf(stays),
+          bounds: boundsOf(stays, whenEmpty),
           fitBoundsOptions: { padding: 20, maxZoom: PUBLIC_MAP_MAX_ZOOM },
           maxZoom: PUBLIC_MAP_MAX_ZOOM,
           interactive: false,
@@ -161,7 +169,7 @@ export function MapThumbnail({
       setPicture(null);
       dispose?.();
     };
-  }, [near, theme, stays]);
+  }, [near, theme, stays, whenEmpty]);
 
   return (
     <div

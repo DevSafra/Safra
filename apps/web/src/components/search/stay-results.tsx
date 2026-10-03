@@ -17,7 +17,7 @@ import {
   searchSafely,
   type SearchFacets,
 } from '@/lib/api';
-import { BBOX_PLACEHOLDER } from '@/lib/basemap';
+import { BBOX_PLACEHOLDER, type MapBounds } from '@/lib/basemap';
 import {
   getAmenities,
   getCities,
@@ -63,12 +63,15 @@ export async function StayResults({
   query,
   page,
   pinnedCitySlug,
+  mapWhenEmpty,
 }: {
   locale: Locale;
   query: RawQuery;
   page: ResultsPage;
   /** The city a city page is FOR. Overrides any `citySlug` the query carries. */
   pinnedCitySlug?: string;
+  /** Where the maps open when no result can be placed: a city page's own city. */
+  mapWhenEmpty?: MapBounds | undefined;
 }) {
   const t = await getTranslations('search');
   const tr = await getTranslations('search.results');
@@ -255,6 +258,7 @@ export async function StayResults({
     /* The list's box is the map's opening view, never a limit on what the map may show. */
     mapFeedUrl: `/${locale}/api/search/map?${toQueryString(parsed, { bbox: null })}`,
     pageBbox: parsed.bbox,
+    whenEmpty: mapWhenEmpty,
     filtersSlot: (
       <FilterPanel
         {...filterProps}

@@ -113,25 +113,35 @@ export function basemapStyle(
  */
 export const BBOX_PLACEHOLDER = '__SAFRA_BBOX__';
 
+/** A map box as MapLibre takes it: south-west, then north-east, each `[longitude, latitude]`. */
+export type MapBounds = [[number, number], [number, number]];
+
+/**
+ * Where a results map opens when NOTHING on it can be placed: Damascus, unless the page says
+ * otherwise. A city page says otherwise (`cityBounds`), because «no stay to show» on the Aleppo page
+ * opening on Damascus reads as the wrong city rather than as an empty one (Bashar, 2026-10-03).
+ */
+const DAMASCUS: MapBounds = [
+  [36.2, 33.46],
+  [36.36, 33.57],
+];
+
 /**
  * A box around every placed result, with a small pad so nothing sits on the edge.
  *
- * Falls back to Damascus where nothing on the page has coordinates — 1,950 of 2,017 listings
- * had none before the partner picker shipped, so «no result can be placed» is a real state and
- * not a defensive nicety. An unfitted map opens on the whole world, which reads as broken.
+ * With nothing placeable it opens on `whenEmpty`. An unfitted map opens on the whole world, which
+ * reads as broken. Every listing has had to carry a location to be submitted since the partner
+ * picker shipped, so on real data this is the no-result case rather than the no-coordinate one.
  */
 export function boundsOf(
   stays: readonly { latitude: string; longitude: string }[],
-): [[number, number], [number, number]] {
+  whenEmpty: MapBounds = DAMASCUS,
+): MapBounds {
   const points = stays
     .map((stay) => [Number(stay.longitude), Number(stay.latitude)] as const)
     .filter(([lon, lat]) => Number.isFinite(lon) && Number.isFinite(lat));
 
-  if (points.length === 0)
-    return [
-      [36.2, 33.46],
-      [36.36, 33.57],
-    ];
+  if (points.length === 0) return whenEmpty;
 
   const lons = points.map(([lon]) => lon);
   const lats = points.map(([, lat]) => lat);
@@ -141,5 +151,27 @@ export function boundsOf(
   return [
     [Math.min(...lons) - pad, Math.min(...lats) - pad],
     [Math.max(...lons) + pad, Math.max(...lats) + pad],
+  ];
+}
+
+/**
+ * The box a city page's map opens on when it has nothing to place: about 8 km across, centred on
+ * the city. `undefined` when the city holds no usable centre, so the caller keeps the default
+ * rather than opening on 0,0: `Number('')` is `0`, which is the Gulf of Guinea.
+ */
+export function cityBounds(
+  latitude: string | null,
+  longitude: string | null,
+): MapBounds | undefined {
+  if (!latitude?.trim() || !longitude?.trim()) return undefined;
+  const lat = Number(latitude);
+  const lon = Number(longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return undefined;
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return undefined;
+
+  const span = 0.04;
+  return [
+    [lon - span, lat - span],
+    [lon + span, lat + span],
   ];
 }

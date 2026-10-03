@@ -14,6 +14,7 @@ import {
   basemapStyle,
   boundsOf,
   loadMapLibre,
+  type MapBounds,
 } from '@/lib/basemap';
 import type { MapStay } from '@/lib/search-cards';
 import { MapStayCard } from '@/components/search/map-stay-card';
@@ -67,6 +68,7 @@ export function SearchMap({
   filtersSlot = null,
   signInHref,
   variant = 'default',
+  whenEmpty,
 }: {
   /** The page's own results: the opening view is fitted to them before the map's own arrive. */
   readonly stays: readonly NearbyStay[];
@@ -97,6 +99,8 @@ export function SearchMap({
   readonly filtersSlot?: ReactNode;
   /** Where a signed-out reader is sent to save a stay from the map's list, built by the server. */
   readonly signInHref: string;
+  /** Where the map opens when nothing can be placed: the page's city, or Damascus when unset. */
+  readonly whenEmpty?: MapBounds | undefined;
   /**
    * How the OPENER is drawn (2026-10-01). `thumbnail` is booking.com's map card at the top of the
    * filter column; `compact` is the phone bar's button. The dialog behind them is the same one.
@@ -221,7 +225,9 @@ export function SearchMap({
             map answers is «where are my options», not «where is this». A single result falls
             back to a sensible zoom instead of MapLibre's default whole-world view.
           */
-          bounds: pageBbox ? boxBounds(pageBbox) : boundsOf(openingStays.current),
+          bounds: pageBbox
+            ? boxBounds(pageBbox)
+            : boundsOf(openingStays.current, whenEmpty),
           fitBoundsOptions: { padding: 64, maxZoom: PUBLIC_MAP_MAX_ZOOM },
           maxZoom: PUBLIC_MAP_MAX_ZOOM,
           attributionControl: false,
@@ -279,7 +285,7 @@ export function SearchMap({
           const first = await load(pageBbox);
           if (cancelled) return;
           if (!pageBbox && first && first.length > 0) {
-            instance.fitBounds(boundsOf(first), {
+            instance.fitBounds(boundsOf(first, whenEmpty), {
               padding: 64,
               maxZoom: PUBLIC_MAP_MAX_ZOOM,
               animate: false,
@@ -503,6 +509,7 @@ export function SearchMap({
         {variant === 'thumbnail' ? (
           <MapThumbnail
             stays={stays}
+            whenEmpty={whenEmpty}
             theme={theme}
             label={t('mapShow')}
             onOpen={(button) => {

@@ -6,6 +6,7 @@ import { Breadcrumb } from '@/components/breadcrumb';
 import { JsonLd } from '@/components/json-ld';
 import { StayResults } from '@/components/search/stay-results';
 import { isLocale, routing, type Locale } from '@/i18n/routing';
+import { cityBounds } from '@/lib/basemap';
 import { getCity } from '@/lib/catalog';
 import { localisedDescription, localisedName, localisedText } from '@/lib/localise';
 import { imageUrl as cityImageUrl } from '@/lib/property';
@@ -216,6 +217,7 @@ export default async function CityPage({
         query={query}
         page={{ basePath: `/${locale}/city/${city.slug}`, pinnedCity: true }}
         pinnedCitySlug={city.slug}
+        mapWhenEmpty={cityBounds(city.latitude, city.longitude)}
       />
     </>
   );
