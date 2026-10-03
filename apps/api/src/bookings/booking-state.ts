@@ -1,3 +1,5 @@
+import { sql, type SQL } from 'drizzle-orm';
+
 /**
  * The booking state machine (SRS §6.2).
  *
@@ -188,6 +190,26 @@ export const BLOCKING_STATUSES: BookingStatus[] = [
    */
   'disputed',
 ];
+
+/**
+ * `BLOCKING_STATUSES` as the SQL list every «is this room taken?» query uses: `status IN ${...}`.
+ *
+ * One fragment, because the question was asked in seven places with two answers (Bashar,
+ * 2026-10-03). The constraint and booking creation counted `disputed` as holding its room; the
+ * property page, search and the partner calendar did not. A room under a dispute was therefore
+ * shown as free, offered, and refused at the last step with «dates just taken». A hand-written
+ * list is now a failing test (`blocking-statuses.test.ts`).
+ *
+ * `sql.raw`, deliberately, over bound parameters: these are compile-time constants, and as
+ * literals the planner can prove the query implies the partial indexes written with the same list
+ * (`post/0022_room_inventory.sql`). The guard below is what makes `raw` safe rather than assumed so.
+ */
+export const BLOCKING_STATUS_SQL: SQL = (() => {
+  for (const status of BLOCKING_STATUSES)
+    if (!/^[a-z_]+$/.test(status))
+      throw new Error(`not a plain status literal: ${status}`);
+  return sql.raw(`(${BLOCKING_STATUSES.map((status) => `'${status}'`).join(', ')})`);
+})();
 
 /** Terminal states: nothing leaves them except a dispute, which is handled above. */
 export const TERMINAL_STATUSES: BookingStatus[] = ['cancelled'];

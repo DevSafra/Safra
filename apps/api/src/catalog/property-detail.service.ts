@@ -9,6 +9,7 @@ import { SettingsService } from '../settings/settings.service.js';
 import { ERROR, PUBLIC_FAQ_LIMIT, publicDistanceMetres } from '@safra/contracts';
 import { notFound } from '../common/errors/app-error.js';
 import { publicCoordinate } from './public-location.js';
+import { BLOCKING_STATUS_SQL } from '../bookings/booking-state.js';
 
 /**
  * How many days of calendar the property page shows (§5.6 requires the calendar
@@ -370,7 +371,7 @@ export class PropertyDetailService {
             -- it — the bookings_hold_lead_room trigger sees to that.
             SELECT 1 FROM booking_units b
              WHERE b.unit_id = u.id
-               AND b.status IN ('pending_payment', 'pending_confirmation', 'confirmed', 'checked_in')
+               AND b.status IN ${BLOCKING_STATUS_SQL}
                AND daterange(b.check_in, b.check_out, '[)')
                    && daterange(${stay.checkIn}::date, ${stay.checkOut}::date, '[)')
           )
@@ -479,7 +480,7 @@ export class PropertyDetailService {
         LEFT JOIN availability_days ad ON ad.unit_id = u.id AND ad.date = days.date
         LEFT JOIN bookings b
           ON b.unit_id = u.id
-         AND b.status IN ('pending_payment', 'pending_confirmation', 'confirmed', 'checked_in')
+         AND b.status IN ${BLOCKING_STATUS_SQL}
          AND days.date >= b.check_in AND days.date < b.check_out
         WHERE p.slug = ${slug} AND u.is_active AND u.deleted_at IS NULL
       )

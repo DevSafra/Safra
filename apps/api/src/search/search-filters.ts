@@ -1,6 +1,7 @@
 import { sql, type SQL } from 'drizzle-orm';
 
 import type { SearchQuery } from '@safra/contracts';
+import { BLOCKING_STATUS_SQL } from '../bookings/booking-state.js';
 
 /**
  * The search's predicates, each written ONCE and named (Bashar, 2026-10-01).
@@ -173,7 +174,7 @@ export function buildSearchFilters(
           AND NOT EXISTS (
             SELECT 1 FROM booking_units b
             WHERE b.unit_id = u.id
-              AND b.status IN ('pending_payment', 'pending_confirmation', 'confirmed', 'checked_in')
+              AND b.status IN ${BLOCKING_STATUS_SQL}
               AND daterange(b.check_in, b.check_out, '[)')
                   && daterange(${query.checkIn}::date, ${query.checkOut}::date, '[)')
           )`;

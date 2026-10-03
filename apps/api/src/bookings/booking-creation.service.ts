@@ -18,6 +18,7 @@ import { PricingService } from './pricing.service.js';
 import { CouponService } from '../coupons/coupon.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
+import { BLOCKING_STATUS_SQL } from './booking-state.js';
 
 /**
  * The most rooms one booking may hold, across every type in the basket.
@@ -341,7 +342,7 @@ export class BookingCreationService {
             -- trigger has already written. Without this the allocation would read
             -- the guest's own choice as taken and refuse the booking making it.
             AND bu.booking_id <> ${input.bookingId}
-            AND bu.status IN ('pending_payment', 'pending_confirmation', 'confirmed', 'checked_in', 'disputed')
+            AND bu.status IN ${BLOCKING_STATUS_SQL}
             AND daterange(bu.check_in, bu.check_out, '[)')
                 && daterange(${input.checkIn}::date, ${input.checkOut}::date, '[)')
         )

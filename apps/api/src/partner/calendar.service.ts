@@ -23,21 +23,10 @@ import type { AccessTokenClaims } from '../auth/token.service.js';
 import { assertMayPrice } from './price-authority.js';
 import { requirePartnerId } from '../rbac/ownership.js';
 import { badRequest, notFound } from '../common/errors/app-error.js';
+import { BLOCKING_STATUS_SQL } from '../bookings/booking-state.js';
 
 /** A uuid, checked before it reaches a `::uuid` cast so a forged cursor is a 400 and not a 500. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/**
- * The booking states that OCCUPY a night.
- *
- * One fragment because TWO calendars read it now — a single unit's month and the whole portfolio's
- * — and a night shown as booked on one screen and free on the other is worse than either answer on
- * its own. Written once here, it cannot drift between them.
- *
- * `completed` and `cancelled` are deliberately absent: a finished stay no longer holds the night,
- * and a cancelled one never did.
- */
-const OCCUPYING_STATUSES = sql`('pending_payment', 'pending_confirmation', 'confirmed', 'checked_in')`;
 
 @Injectable()
 export class CalendarService {
@@ -95,7 +84,7 @@ export class CalendarService {
       -- are sold. Only existence is asked of it, so nothing else changes.
       LEFT JOIN booking_units b
         ON b.unit_id = u.id
-       AND b.status IN ${OCCUPYING_STATUSES}
+       AND b.status IN ${BLOCKING_STATUS_SQL}
        AND d.day::date >= b.check_in
        AND d.day::date <  b.check_out
       WHERE u.id = ${unitId}
@@ -288,7 +277,7 @@ export class CalendarService {
       -- are sold. Only existence is asked of it, so nothing else changes.
       LEFT JOIN booking_units b
         ON b.unit_id = u.id
-       AND b.status IN ${OCCUPYING_STATUSES}
+       AND b.status IN ${BLOCKING_STATUS_SQL}
        AND d.day::date >= b.check_in
        AND d.day::date <  b.check_out
       WHERE u.property_id = ${expanded?.id ?? null}

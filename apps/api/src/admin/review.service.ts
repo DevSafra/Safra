@@ -46,6 +46,7 @@ import {
   scopeCondition,
   scopeFilter,
 } from '../rbac/scope.sql.js';
+import { BLOCKING_STATUS_SQL } from '../bookings/booking-state.js';
 
 /**
  * Staff verification of partners and listings (SRS §8.1, §9.2).
@@ -531,7 +532,7 @@ export class ReviewService {
                WHERE NOT EXISTS (
                  SELECT 1 FROM booking_units bu
                  WHERE bu.unit_id = u.id
-                   AND bu.status IN ('pending_payment', 'pending_confirmation', 'confirmed', 'checked_in', 'disputed')
+                   AND bu.status IN ${BLOCKING_STATUS_SQL}
                    AND bu.check_in <= current_date
                    AND bu.check_out > current_date
                )
