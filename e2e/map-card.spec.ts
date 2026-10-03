@@ -61,3 +61,43 @@ test('the location card on a stay clips its map with a rounded clip-path', async
     /^inset\(0(px)? round /,
   );
 });
+
+/**
+ * On a dense map a dot never sits on a price (Bashar, 2026-10-03: Aleppo's full map read
+ * «$101.�99» where a neighbour's dot landed in the middle of a pill). Asked of EVERY pill in view:
+ * the point at its centre must belong to the pill, not to anything drawn over it.
+ */
+test('no dot is drawn over a price pill on a dense map', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/ar/city/aleppo');
+  await page.locator('[data-map-thumbnail] button').click();
+  const dialog = page.getByRole('dialog', { name: 'الإقامات على الخريطة' });
+  await expect(dialog).toBeVisible();
+  const list = dialog.getByRole('region', { name: 'الإقامات في هذه المنطقة' });
+  await expect(list.locator('li').first()).toBeVisible({ timeout: 15_000 });
+  await page.waitForTimeout(1500);
+  const pills = dialog.locator('a.pill-gold-hover.inline-flex');
+
+  /* A grid across the text, not one point: a 12px dot covers part of a price, rarely its centre. */
+  const covered = await pills.evaluateAll((links) =>
+    links.flatMap((link) => {
+      const box = link.getBoundingClientRect();
+      if (box.width === 0 || box.bottom < 0 || box.top > innerHeight) return [];
+      for (const fx of [0.2, 0.35, 0.5, 0.65, 0.8])
+        for (const fy of [0.35, 0.5, 0.65]) {
+          const hit = document.elementFromPoint(
+            box.left + box.width * fx,
+            box.top + box.height * fy,
+          );
+          if (!hit || (hit !== link && !link.contains(hit)))
+            return [link.textContent ?? ''];
+        }
+      return [];
+    }),
+  );
+
+  expect(await pills.count(), 'the map drew enough pills to be dense').toBeGreaterThan(
+    10,
+  );
+  expect(covered, 'pills with something drawn over their centre').toEqual([]);
+});

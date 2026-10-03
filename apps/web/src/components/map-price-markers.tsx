@@ -176,6 +176,9 @@ export function MapPriceMarkers({
           A stay with no room for its pill: a dot that still links, kept out of the tab order
           and away from a screen reader, because the list beside the map is where those readers
           meet every stay. It turns into a pill the moment its card is pointed at.
+
+          Dots sit UNDER the pills: pills carry `z-[1]` (Bashar, 2026-10-03). With no order, the
+          later sibling painted on top, and on a dense map a dot landed in the middle of a price.
         */
         if (dot && !lit) {
           return (
@@ -236,7 +239,7 @@ export function MapPriceMarkers({
               and does not invalidate layout, so dragging the map does not relayout the
               overlay once per frame.
             */
-            className={`pointer-events-auto absolute top-0 left-0 inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-full border px-2.5 py-1 text-13 font-bold whitespace-nowrap shadow-[var(--shadow-lift)] transition-[background-color,color,box-shadow] duration-150 ease-out hover:z-20 pill-gold-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-read ${lit ? 'z-20 pill-gold' : 'border-line bg-card text-text'}`}
+            className={`pointer-events-auto absolute top-0 left-0 inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-full border px-2.5 py-1 text-13 font-bold whitespace-nowrap shadow-[var(--shadow-lift)] transition-[background-color,color,box-shadow] duration-150 ease-out hover:z-20 pill-gold-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-read ${lit ? 'z-20 pill-gold' : 'z-[1] border-line bg-card text-text'}`}
             title={stay.name}
           >
             <span className="tabular-nums">{price}</span>
