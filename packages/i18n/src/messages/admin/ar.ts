@@ -2818,6 +2818,11 @@ export const ar = {
         'booking.pending_payment_timeout_minutes':
           'مهلة انتظار الدفع، يُلغى الحجز تلقائياً إن لم يكتمل',
         'partner.first_violation_fine': 'غرامة الشريك عند أول مخالفة عدم رد',
+        /*
+          The switch for «سجّل كشريك» on the site (Bashar, 2026-10-04). Off, the form and every link
+          to it disappear and a partner is added only from «شريك جديد».
+        */
+        'partner.applications_open': 'استقبال طلبات الانضمام كشريك من الموقع',
         'wallet.sla_compensation': 'تعويض محفظة العميل عند تجاوز الشريك مهلته',
         'money.always_usd': 'اعتبار كل القيم المالية بالدولار الأمريكي',
         'rbac.finance_can_manage_fx': 'السماح لمسؤول المالية بإدارة أسعار الصرف',

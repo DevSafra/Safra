@@ -436,6 +436,7 @@ describe('the name a reader sees', () => {
       'booking.same_day_cutoff_hour',
       'booking.pending_payment_timeout_minutes',
       'partner.first_violation_fine',
+      'partner.applications_open',
       'wallet.sla_compensation',
       'money.always_usd',
       'rbac.finance_can_manage_fx',

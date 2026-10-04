@@ -683,6 +683,18 @@ export const SETTINGS: {
     descriptionEn: 'No-response fine, first violation (§6.4)',
   },
   {
+    /*
+      Whether the public «سجّل كشريك» form is open (Bashar, 2026-10-04). `true` because that is
+      what the platform did before the switch existed; turning it off hides the form on the site
+      and leaves «شريك جديد» on the console as the only way a partner is added.
+    */
+    key: 'partner.applications_open',
+    value: true,
+    valueSchema: 'boolean',
+    descriptionAr: 'استقبال طلبات الانضمام كشريك من الموقع',
+    descriptionEn: 'Accept partnership requests through the public site',
+  },
+  {
     key: 'wallet.sla_compensation',
     value: 10,
     valueSchema: 'money',

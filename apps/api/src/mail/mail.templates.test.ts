@@ -225,6 +225,18 @@ const RENDERERS: {
     shows: 'PAR-000042',
   },
   {
+    name: 'partnerApplicationRejectedClosedMail',
+    entry: 'partnerApplicationRejectedClosed',
+    render: (locale) =>
+      templates.partnerApplicationRejectedClosedMail({
+        ...SAMPLE,
+        locale,
+        reference: 'PAR-000042',
+        reason: 'لا تتوفر الشروط',
+      }),
+    shows: 'PAR-000042',
+  },
+  {
     name: 'partnerLoginCodeMail',
     entry: 'partnerLoginCode',
     render: (locale) =>

@@ -558,6 +558,11 @@ export const ERROR = {
   PARTNER_APPLICATION_EMAIL_IS_STAFF: 'partner_application.email_is_staff',
   /** The address is already a partner. Nothing to accept; find them in الشركاء. */
   PARTNER_APPLICATION_EMAIL_IS_PARTNER: 'partner_application.email_is_partner',
+  /**
+   * The super admin has closed the public door (`partner.applications_open`, Bashar 2026-10-04).
+   * New partners are then added by staff on «شريك جديد» only.
+   */
+  PARTNER_APPLICATIONS_CLOSED: 'partner_application.closed',
   /* ── Onboarding a partner in person (Bashar, 2026-08-23) ── */
   /**
    * The address belongs to a STAFF account.

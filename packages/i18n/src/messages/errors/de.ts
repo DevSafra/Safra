@@ -437,6 +437,8 @@ export const de = {
   'partner_application.already_open':
     'Zu dieser E-Mail-Adresse liegt bereits eine offene Anfrage vor. Wir melden uns.',
   'partner_application.already_decided': 'Über diese Anfrage wurde bereits entschieden.',
+  'partner_application.closed':
+    'Partnerschaftsanfragen über die Website nehmen wir derzeit nicht entgegen.',
   'partner_application.no_account':
     'Zu dieser Anfrage gehört kein Konto; sie kann nicht angenommen werden.',
   'partner_application.email_is_staff':

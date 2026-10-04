@@ -300,6 +300,28 @@ export function partnerApplicationRejectedMail(input: {
 }
 
 /**
+ * The same refusal while the public partner form is closed (`partner.applications_open`).
+ *
+ * A separate template rather than an optional link, because the sentence goes with the link: «you
+ * are welcome to apply again here» above a page that answers 404 is an invitation the platform has
+ * already withdrawn.
+ */
+export function partnerApplicationRejectedClosedMail(input: {
+  to: string;
+  reference: string;
+  reason: string;
+  locale: string;
+}): OutgoingMail {
+  return {
+    to: input.to,
+    ...compose((m) => m.partnerApplicationRejectedClosed, input.locale, {
+      reference: input.reference,
+      reason: input.reason,
+    }),
+  };
+}
+
+/**
  * The account hand-over — step 4, and the one message in the flow that carries authority.
  *
  * A LINK, never a password. Bashar's step 4 said "email + password"; a password in an inbox is a

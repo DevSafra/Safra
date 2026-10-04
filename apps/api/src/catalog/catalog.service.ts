@@ -582,6 +582,11 @@ export class CatalogService {
       */
       'site.announcement_enabled',
       'site.announcement_text',
+      /*
+        Whether «سجّل كشريك» is drawn at all (Bashar, 2026-10-04). PUBLIC by nature: the visitor can
+        already see whether the door is there. The API enforces it on submission regardless.
+      */
+      'partner.applications_open',
     ];
 
     const rows = await this.db.query.settings.findMany({

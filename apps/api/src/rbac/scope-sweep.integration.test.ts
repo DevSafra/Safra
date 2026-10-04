@@ -171,6 +171,7 @@ describeIfDb('the O-sec-13 sweep, in behaviour', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     const theirs = await application(away);

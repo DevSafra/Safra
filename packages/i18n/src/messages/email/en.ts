@@ -115,6 +115,10 @@ export const en = {
     subject: 'About your partnership request: {reference}',
     body: 'Thank you for your time and for your interest in SAFRA.\n\nAfter reviewing request {reference} we are not able to proceed at this time.\n\nReason:\n{reason}\n\nIf any of that changes, you are welcome to apply again here:\n{url}\n\nThe SAFRA team',
   },
+  partnerApplicationRejectedClosed: {
+    subject: 'About your partnership request: {reference}',
+    body: 'Thank you for your time and for your interest in SAFRA.\n\nAfter reviewing request {reference} we are not able to proceed at this time.\n\nReason:\n{reason}\n\nThe SAFRA team',
+  },
   partnerLoginCode: {
     subject: 'Your SAFRA sign-in code',
     body: 'Your code for the partner portal:\n\n{code}\n\nIt expires in {expiresInMinutes} minutes and can be used once.\n\nIf you did not try to sign in, ignore this message and change your password: whoever asked for this code knows your current one.\n\nThe SAFRA team will never ask you for this code, by phone or by message.\n\nThe SAFRA team',

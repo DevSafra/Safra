@@ -6,6 +6,7 @@ import {
   COUNT_CAP,
   ERROR,
   offsetPage,
+  PARTNER_APPLICATIONS_OPEN_SETTING,
   type PartnerApplicationInput,
   type PartnerApplicationListQuery,
 } from '@safra/contracts';
@@ -19,13 +20,15 @@ import { PasswordService } from '../common/crypto/password.service.js';
 import { TokenService } from '../auth/token.service.js';
 import {
   partnerApplicationReceivedMail,
+  partnerApplicationRejectedClosedMail,
   partnerApplicationRejectedMail,
 } from '../mail/mail.templates.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { PartnerInvitationService } from './partner-invitation.service.js';
 import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 import { actorName } from '../common/actor-name.sql.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
-import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
+import { badRequest, conflict, forbidden, notFound } from '../common/errors/app-error.js';
 
 /** `PRQ-000031`. Bounded before it reaches a query; the lookup is parameterised regardless. */
 const REFERENCE_PATTERN = /^PRQ-\d{1,12}$/;
@@ -177,6 +180,7 @@ export class PartnerApplicationService {
     private readonly tokens: TokenService,
     @Inject(ENV) private readonly env: Env,
     private readonly invitations: PartnerInvitationService,
+    private readonly settings: SettingsService,
   ) {}
 
   /**
@@ -194,6 +198,18 @@ export class PartnerApplicationService {
       userAgent?: string | undefined;
     },
   ): Promise<{ reference: string }> {
+    /*
+      FIRST, before the account or the business is looked at (Bashar, 2026-10-04).
+
+      Hiding «سجّل كشريك» on the site is a courtesy; this is the door. A form loaded before the
+      switch, a replayed request or a hand-built POST all arrive here, and the answer must not
+      depend on whether the page that would have sent it was drawn. Nothing about the caller is
+      read first, so a closed door says the same thing to everybody.
+    */
+    if (!(await this.applicationsOpen())) {
+      throw forbidden(ERROR.PARTNER_APPLICATIONS_CLOSED);
+    }
+
     /*
       Checked here, before anything is written, and again at acceptance.
 
@@ -609,14 +625,25 @@ export class PartnerApplicationService {
       after: { status: 'rejected' },
     });
 
+    /*
+      A request filed while the form was open can still be decided after it closed. The refusal
+      then carries no invitation to apply again: the link would lead to a page that is not there.
+    */
     await this.mail.send(
-      partnerApplicationRejectedMail({
-        to: row.email,
-        reference,
-        reason: notes,
-        url: this.joinUrl(row.preferred_locale),
-        locale: row.preferred_locale,
-      }),
+      (await this.applicationsOpen())
+        ? partnerApplicationRejectedMail({
+            to: row.email,
+            reference,
+            reason: notes,
+            url: this.joinUrl(row.preferred_locale),
+            locale: row.preferred_locale,
+          })
+        : partnerApplicationRejectedClosedMail({
+            to: row.email,
+            reference,
+            reason: notes,
+            locale: row.preferred_locale,
+          }),
     );
 
     return this.detail(reference, claims);
@@ -797,6 +824,16 @@ export class PartnerApplicationService {
       partnerReference,
       locale: row.preferred_locale,
     });
+  }
+
+  /**
+   * Whether the public form is open — `partner.applications_open`, a switch on الإعدادات.
+   *
+   * Open when the row is missing, which is what the platform did before the setting existed and
+   * what `partnerApplicationsOpen` in `@safra/contracts` tells the site, so the two halves agree.
+   */
+  private applicationsOpen(): Promise<boolean> {
+    return this.settings.getBoolean(PARTNER_APPLICATIONS_OPEN_SETTING, true);
   }
 
   /** Built from the configured `APP_URL`, never from a request — the same rule as every other mail. */

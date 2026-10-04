@@ -154,6 +154,14 @@ export const ar = {
     subject: 'بخصوص طلب الشراكة: {reference}',
     body: 'شكرًا لوقتك ولاهتمامك بالانضمام إلى سفرة.\n\nبعد مراجعة الطلب {reference} لن نتمكن من المتابعة في الوقت الحالي.\n\nالسبب:\n{reason}\n\nإذا تغيّر أي من ذلك، يمكنك التقدّم بطلب جديد من هنا:\n{url}\n\nفريق سفرة',
   },
+  /**
+   * The same refusal while the public form is closed (`partner.applications_open`, 2026-10-04):
+   * no invitation to apply again, because the page it pointed at is not there.
+   */
+  partnerApplicationRejectedClosed: {
+    subject: 'بخصوص طلب الشراكة: {reference}',
+    body: 'شكرًا لوقتك ولاهتمامك بالانضمام إلى سفرة.\n\nبعد مراجعة الطلب {reference} لن نتمكن من المتابعة في الوقت الحالي.\n\nالسبب:\n{reason}\n\nفريق سفرة',
+  },
   partnerLoginCode: {
     subject: 'رمز الدخول إلى سفرة',
     body: 'رمز الدخول إلى لوحة الشريك:\n\n{code}\n\nينتهي الرمز خلال {expiresInMinutes} دقائق ويُستخدم مرة واحدة.\n\nإذا لم تحاول تسجيل الدخول، تجاهل هذه الرسالة وغيّر كلمة مرورك، فمن أرسل الطلب يعرف كلمة مرورك الحالية.\n\nلن يطلب منك فريق سفرة هذا الرمز أبدًا، لا عبر الهاتف ولا عبر الرسائل.\n\nفريق سفرة',

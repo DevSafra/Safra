@@ -388,6 +388,8 @@ export const en = {
   'partner_application.already_open':
     'We already have an open request from this email address. We will be in touch.',
   'partner_application.already_decided': 'This request has already been decided.',
+  'partner_application.closed':
+    'We are not accepting partnership requests through the site at the moment.',
   'partner_application.no_account':
     'This request has no account behind it and cannot be accepted.',
   'partner_application.email_is_staff':

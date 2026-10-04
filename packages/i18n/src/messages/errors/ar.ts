@@ -349,6 +349,7 @@ export const ar = {
   'partner_application.already_open':
     'لدينا طلب مفتوح من هذا البريد الإلكتروني. سنتواصل معك قريبًا.',
   'partner_application.already_decided': 'صدر قرار في هذا الطلب بالفعل.',
+  'partner_application.closed': 'لا نستقبل طلبات الشراكة من الموقع حاليًا.',
   'partner_application.no_account': 'هذا الطلب لا يرتبط بحساب، فلا يمكن قبوله.',
   'partner_application.email_is_staff':
     'هذا البريد الإلكتروني يخص حساب موظف. لا يمكن تحويله إلى حساب شريك.',

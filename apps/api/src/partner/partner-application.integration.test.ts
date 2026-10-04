@@ -2,7 +2,11 @@ import { sql } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createRollbackDatabase, type Database } from '@safra/db';
-import { ERROR, type PartnerApplicationInput } from '@safra/contracts';
+import {
+  ERROR,
+  PARTNER_APPLICATIONS_OPEN_SETTING,
+  type PartnerApplicationInput,
+} from '@safra/contracts';
 
 import type { AuditService } from '../common/audit/audit.service.js';
 import type { AuthTokenService } from '../auth/auth-token.service.js';
@@ -10,6 +14,7 @@ import type { Env } from '../config/env.js';
 import type { MailService, OutgoingMail } from '../mail/mail.service.js';
 import type { PasswordService } from '../common/crypto/password.service.js';
 import type { TokenService } from '../auth/token.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { PartnerApplicationService } from './partner-application.service.js';
 import { PartnerInvitationService } from './partner-invitation.service.js';
@@ -79,6 +84,7 @@ describeIfDb('PartnerApplicationService', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   let db: Database;
   let service: PartnerApplicationService;
+  let settings: SettingsService;
   let sent: OutgoingMail[];
   let issued: { userId: string; purpose: string }[];
   let revoked: string[];
@@ -143,6 +149,7 @@ describeIfDb('PartnerApplicationService', () => {
       here would let those two facts change without a single test noticing.
     */
     const invitations = new PartnerInvitationService(authTokens, mail, env);
+    settings = new SettingsService(db);
 
     service = new PartnerApplicationService(
       db,
@@ -153,6 +160,7 @@ describeIfDb('PartnerApplicationService', () => {
       tokens,
       env,
       invitations,
+      settings,
     );
 
     await seed(db);
@@ -573,6 +581,102 @@ describeIfDb('PartnerApplicationService', () => {
       expect(detail.status).toBe('rejected');
       expect(detail.decisionNotes).toBe('المدينة خارج التغطية');
       expect(sent.at(-1)?.text).toContain('المدينة خارج التغطية');
+    });
+  });
+
+  /*
+    The switch on الإعدادات (Bashar, 2026-10-04). Each case writes the row itself, inside the
+    rolled-back transaction, so neither direction depends on what the database was seeded with.
+  */
+  describe('when the super admin closes the public form', () => {
+    const setOpen = async (open: boolean) => {
+      /*
+        UPDATE first, INSERT only if there was nothing to update. A DELETE would fail on any
+        database where the switch was ever saved from the console: `settings_history` points at the
+        row, which is exactly the database this suite runs against after an e2e pass.
+      */
+      const updated = await db.execute(sql`
+        UPDATE settings SET value = ${JSON.stringify(open)}::jsonb
+        WHERE key = ${PARTNER_APPLICATIONS_OPEN_SETTING} AND scope = 'global'
+      `);
+
+      if (updated.rowCount === 0) {
+        await db.execute(sql`
+          INSERT INTO settings (key, scope, value, value_schema)
+          VALUES (${PARTNER_APPLICATIONS_OPEN_SETTING}, 'global', ${JSON.stringify(open)}::jsonb, 'boolean')
+        `);
+      }
+
+      /* What `SettingsAdminService` does after a console save; without it the 30-second cache wins. */
+      settings.invalidate(PARTNER_APPLICATIONS_OPEN_SETTING);
+    };
+
+    const filed = async () =>
+      db.execute<{ n: number }>(sql`
+        SELECT count(*)::int AS n FROM partner_applications
+        WHERE lower(email) = lower(${CUSTOMER_EMAIL})
+      `);
+
+    it('refuses a request, writes nothing and sends nothing', async () => {
+      await setOpen(false);
+      const before = (await filed()).rows[0]?.n;
+
+      await expect(
+        service.submit(application(), { userId: CUSTOMER_USER_ID }),
+      ).rejects.toMatchObject({
+        status: 403,
+        response: { code: ERROR.PARTNER_APPLICATIONS_CLOSED },
+      });
+
+      expect((await filed()).rows[0]?.n).toBe(before);
+      expect(sent).toHaveLength(0);
+    });
+
+    /*
+      The refusal comes BEFORE anything about the caller is read, so a partner, a staff address and
+      an ordinary customer all hear the same thing. An answer that differed would tell a prober
+      which kind of account an address belongs to, through a door that is supposed to be shut.
+    */
+    it('says the same thing to an account that would otherwise be refused for who it is', async () => {
+      await setOpen(false);
+
+      await expect(
+        service.submit(application({ citySlug: 'no-such-city' }), {
+          userId: CUSTOMER_USER_ID,
+        }),
+      ).rejects.toMatchObject({ response: { code: ERROR.PARTNER_APPLICATIONS_CLOSED } });
+    });
+
+    it('takes requests again once the switch is back on', async () => {
+      await setOpen(true);
+
+      const created = await service.submit(application(), { userId: CUSTOMER_USER_ID });
+
+      expect(created.reference).toMatch(/^PRQ-\d{6,}$/);
+    });
+
+    /* A request filed while open can still be decided after the door closed. */
+    it('rejects a request filed before, without inviting the applicant to apply again', async () => {
+      await setOpen(true);
+      const created = await service.submit(application(), { userId: CUSTOMER_USER_ID });
+
+      await setOpen(false);
+      await service.reject(reviewer, created.reference, 'المدينة خارج التغطية');
+
+      const refusal = sent.at(-1);
+
+      expect(refusal?.text).toContain('المدينة خارج التغطية');
+      expect(refusal?.text).not.toContain('/partners/join');
+    });
+
+    /* The opposite control: open, the same refusal DOES carry the link, so the absence above is a decision. */
+    it('still invites the applicant to apply again while the form is open', async () => {
+      await setOpen(true);
+      const created = await service.submit(application(), { userId: CUSTOMER_USER_ID });
+
+      await service.reject(reviewer, created.reference, 'المدينة خارج التغطية');
+
+      expect(sent.at(-1)?.text).toContain('https://safra.test/ar/partners/join');
     });
   });
 
