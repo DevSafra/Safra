@@ -153,7 +153,7 @@ deleting it; the reason something was blocked is often the reason it comes back.
 > provider port carries no destination field, so an adapter can only refund against the original
 > charge, and each needs its own provider test when it lands.
 
-> ### «الإقامات» rebuilt on booking.com's model, 2026-10-01 (awaiting Bashar's review, uncommitted)
+> ### «الإقامات» rebuilt on booking.com's model, 2026-10-01, committed and pushed
 >
 > Bashar asked for the results page to be «very similar» to booking.com, with every filter and a
 > list that loads on scroll instead of pages. Built: live filter counts (`GET /search/facets`,
