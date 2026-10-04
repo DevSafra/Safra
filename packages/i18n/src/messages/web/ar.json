@@ -365,8 +365,6 @@
     "distanceM": "{value} م",
     "showAllLandmarks": "اعرض كل المعالم",
     "showFewerLandmarks": "اعرض أقل",
-    "nearbyStays": "إقامات قريبة",
-    "nearbyStaysHint": "الأسعار من، لليلة الواحدة.",
     "nearbyCount": "{count} إقامات هنا",
     "noPrice": "لا يوجد سعر معلن",
     "markerLabel": "{name}: {price}",

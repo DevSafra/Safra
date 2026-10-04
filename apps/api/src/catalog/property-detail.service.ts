@@ -511,38 +511,6 @@ export class PropertyDetailService {
   }
 
   /**
-   * Just the published coordinates for one listing, for the neighbours endpoint.
-   *
-   * A narrow query rather than reusing `bySlug`: the map needs two numbers, and building the
-   * whole property payload — units, images, sixty days of calendar, reviews — to read them
-   * would be five queries for a pair of decimals.
-   *
-   * Same WHERE clause as `bySlug`, so an unpublished or deleted listing has no location here
-   * either. A neighbours endpoint that answered for a draft would leak the existence of one.
-   */
-  async publicLocation(
-    slug: string,
-  ): Promise<{ latitude: string; longitude: string } | null> {
-    const rows = await this.db.execute<Record<string, unknown>>(sql`
-      SELECT p.public_latitude, p.public_longitude
-      FROM properties p
-      WHERE p.slug = ${slug}
-        AND p.status = 'published'
-        AND p.deleted_at IS NULL
-      LIMIT 1
-    `);
-
-    const row = rows.rows[0];
-    if (!row) return null;
-
-    const latitude = publicCoordinate(row['public_latitude']);
-    const longitude = publicCoordinate(row['public_longitude']);
-    if (!latitude || !longitude) return null;
-
-    return { latitude, longitude };
-  }
-
-  /**
    * What this listing is near, and how far — «وسط مدينة دمشق · ١٫٢ كم».
    *
    * ## Every distance here is computed from the PUBLISHED pair

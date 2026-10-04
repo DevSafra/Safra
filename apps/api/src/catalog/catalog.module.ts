@@ -7,7 +7,6 @@ import { notFound } from '../common/errors/app-error.js';
 import { Public } from '../rbac/decorators.js';
 import { CatalogService } from './catalog.service.js';
 import { PropertyDetailService } from './property-detail.service.js';
-import { NearbyService } from './nearby.service.js';
 import { PublicGroupTripsService } from './group-trips.service.js';
 
 /**
@@ -19,7 +18,6 @@ class CatalogController {
   constructor(
     private readonly catalog: CatalogService,
     private readonly properties: PropertyDetailService,
-    private readonly nearby: NearbyService,
     private readonly groupTrips: PublicGroupTripsService,
   ) {}
 
@@ -75,35 +73,6 @@ class CatalogController {
         : undefined;
 
     return this.properties.bySlug(slug, stay);
-  }
-
-  /**
-   * The listings around this one, for the map's price markers.
-   *
-   * ## A separate request, on purpose
-   *
-   * It could have ridden along inside the property payload. It does not, for two reasons.
-   * The property page is server-rendered and cached; the neighbour list is only ever needed
-   * once somebody opens the full-screen map, which most readers never do — putting it in the
-   * main payload would make every visitor pay for a feature a minority use. And it lets the
-   * map degrade honestly: if this call fails the map still draws, just without neighbours.
-   *
-   * ## It takes a SLUG, not a coordinate
-   *
-   * The centre is looked up from the listing rather than accepted from the caller. A
-   * caller-supplied centre would make this a general proximity oracle over the catalogue —
-   * ask it about a moving point and the answers map out the area. Anchored to a slug, it can
-   * only ever answer the question its own property page already answers.
-   */
-  @Public()
-  @Get('properties/:slug/nearby')
-  async nearbyListings(@Param('slug') slug: string) {
-    const location = await this.properties.publicLocation(slug);
-    if (!location) return { items: [] };
-
-    return {
-      items: await this.nearby.around(location.latitude, location.longitude, slug),
-    };
   }
 
   /**
@@ -201,12 +170,7 @@ class CatalogController {
 
 @Module({
   controllers: [CatalogController],
-  providers: [
-    CatalogService,
-    PropertyDetailService,
-    NearbyService,
-    PublicGroupTripsService,
-  ],
-  exports: [CatalogService, PropertyDetailService, NearbyService],
+  providers: [CatalogService, PropertyDetailService, PublicGroupTripsService],
+  exports: [CatalogService, PropertyDetailService],
 })
 export class CatalogModule {}

@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  ERROR,
   PUBLIC_COORDINATE_DECIMALS,
   PUBLIC_DISTANCE_STEP_METRES,
   distanceMetres,
@@ -9,7 +10,6 @@ import {
 } from '@safra/contracts';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
-import { NearbyService } from './nearby.service.js';
 import { PropertyDetailService } from './property-detail.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 
@@ -19,8 +19,8 @@ import { SettingsService } from '../settings/settings.service.js';
  * ## What is actually at risk here
  *
  * A listing's exact position is protected by ONE thing: it is never sent. The map features
- * added on 2026-09-23 put three new numbers next to it — a distance to a landmark, a
- * neighbour's marker, a «within N km» filter — and each is a way to leak the same secret
+ * added on 2026-09-23 put three new numbers next to it — a distance to a landmark and a
+ * «within N km» filter — and each is a way to leak the same secret
  * without ever printing a coordinate.
  *
  * The sharp one is trilateration. Distances are not opinions: three accurate ones to three
@@ -39,7 +39,6 @@ describeIfDb('location privacy', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   const db: Database = harness.db;
   const details = new PropertyDetailService(db, new SettingsService(db));
-  const nearby = new NearbyService(db);
 
   beforeEach(async () => {
     await harness.begin();
@@ -232,109 +231,24 @@ describeIfDb('location privacy', () => {
   });
 
   /**
-   * Neighbours are published at THEIR public precision.
-   *
-   * Mutated by selecting `p.latitude` in `nearby.service.ts`: the decimal-count assertion
-   * fails on the first neighbour that has a finer raw value.
-   */
-  it('gives every neighbour the same rounding as its own property page', async () => {
-    const listing = await aPlacedListing();
-
-    const here = await details.publicLocation(listing.slug);
-    expect(here).not.toBeNull();
-    if (!here) throw new Error('a published listing must have a public location');
-
-    const neighbours = await nearby.around(here.latitude, here.longitude, listing.slug);
-
-    for (const n of neighbours) {
-      expect(n.slug).not.toBe(listing.slug);
-      if (n.latitude === null || n.longitude === null) continue;
-      expect(n.latitude.split('.')[1]).toHaveLength(PUBLIC_COORDINATE_DECIMALS);
-      expect(n.longitude.split('.')[1]).toHaveLength(PUBLIC_COORDINATE_DECIMALS);
-    }
-  });
-
-  /**
-   * A draft listing is not a neighbour.
-   *
-   * ## The fixture is PLANTED, and it has to be
-   *
-   * Written first as «read the neighbours, assert each is published», it passed against a
-   * mutation that deleted the `status = 'published'` predicate outright. The database held
-   * sixty drafts inside the search box — but the query returns the twelve NEAREST, and those
-   * twelve happened to be published, so the defect was real and invisible.
-   *
-   * So the draft is planted at the exact centre, closer than anything else can be. If the
-   * filter goes, this row is the first result rather than a row somewhere past the limit.
-   * The published twin beside it is the control: it proves the planted row is reachable, so
-   * a failure to see the draft means the filter worked rather than that the fixture was out
-   * of range.
-   */
-  it('never offers a neighbour that is not published', async () => {
-    const listing = await aPlacedListing();
-    const here = await details.publicLocation(listing.slug);
-    if (!here) throw new Error('a published listing must have a public location');
-
-    const template = await db.execute<Record<string, unknown>>(sql`
-      SELECT partner_id, city_id, property_type_id, cancellation_policy_id
-      FROM properties WHERE slug = ${listing.slug} LIMIT 1
-    `);
-    const t = template.rows[0];
-    if (!t) throw new Error('the fixture listing vanished');
-
-    const plant = async (slug: string, status: string) => {
-      await db.execute(sql`
-        INSERT INTO properties
-          (partner_id, city_id, property_type_id, cancellation_policy_id,
-           slug, name_ar, name_en, name_de, address, latitude, longitude, status)
-        VALUES
-          (${t['partner_id']}, ${t['city_id']}, ${t['property_type_id']},
-           ${t['cancellation_policy_id']},
-           ${slug}, ${slug}, ${slug}, ${slug}, 'planted',
-           ${here.latitude}, ${here.longitude}, ${status})
-      `);
-    };
-
-    await plant('zz-privacy-probe-draft', 'draft');
-    await plant('zz-privacy-probe-published', 'published');
-
-    const neighbours = await nearby.around(here.latitude, here.longitude, listing.slug);
-    const slugs = neighbours.map((n) => n.slug);
-
-    /* The control: a published row planted at the same point IS returned. */
-    expect(slugs, 'the planted rows are out of the query’s reach').toContain(
-      'zz-privacy-probe-published',
-    );
-    /* The assertion: its draft twin, at the same point, is not. */
-    expect(slugs).not.toContain('zz-privacy-probe-draft');
-
-    /* And nothing else in the answer is unpublished either. */
-    if (slugs.length === 0) return;
-    const rows = await db.execute<{ slug: string; status: string }>(sql`
-      SELECT slug, status FROM properties
-      WHERE slug IN (${sql.join(
-        slugs.map((one) => sql`${one}`),
-        sql`, `,
-      )})
-    `);
-    for (const r of rows.rows) expect(r.status).toBe('published');
-  });
-
-  /**
    * A listing that is not published has no public location.
    *
    * With the opposite control in the same test, because «withheld» and «absent» are
-   * indistinguishable without one: a `publicLocation` that always returned null would pass
-   * the second half and fail the first.
+   * indistinguishable without one: a read that always refused would pass the second half and
+   * fail the first. Asked of the property page's own read since 2026-10-04, when the
+   * neighbours endpoint and its `publicLocation` were removed with the stay map's price pills.
    */
   it('withholds a location for an unpublished listing, and grants one for a published listing', async () => {
     const placed = await aPlacedListing();
 
-    expect(await details.publicLocation(placed.slug)).not.toBeNull();
+    const published = await details.bySlug(placed.slug);
+    expect(published?.latitude, 'a published listing has a public location').toBeTruthy();
 
     await db.execute(
       sql`UPDATE properties SET status = 'draft' WHERE slug = ${placed.slug}`,
     );
-    expect(await details.publicLocation(placed.slug)).toBeNull();
+    await expect(details.bySlug(placed.slug)).rejects.toMatchObject({
+      response: { code: ERROR.PROPERTY_NOT_FOUND },
+    });
   });
 });

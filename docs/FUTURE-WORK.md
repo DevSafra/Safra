@@ -3319,12 +3319,12 @@ than merely discouraged, and `nullif(latitude, '')` puts the old Gulf-of-Guinea 
 definition. The only index on coordinates is on the PUBLIC pair, which is what makes a precise
 geographic query unformulatable.
 
-| Piece                       | What it does                                                                                                                | What holds it honest                                                                                                         |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| **Price markers**           | Up to 12 neighbouring PLACES on the full-screen map, each a pill with its «from» price; a listing with no price draws a dot | `location-privacy.integration.test.ts` — every neighbour is published at its own ~100 m precision                            |
-| **Landmarks and distances** | «ما حول العقار»: 41 seeded landmarks across nine cities, nearest first, kind icons drawn not glyphed                        | The published distance must be **exactly reproducible from the published coordinates**, asserted per landmark                |
-| **Distance search**         | «قريب من» + a radius, and a `distance_asc` sort                                                                             | The filter compares the ROUNDED pair, so a binary search on `withinKm` cannot resolve below the rounding                     |
-| **Partner picker**          | A map the partner pans under a fixed pin, replacing two decimal-degree fields                                               | `properties-location-gap.integration.test.ts` — setting a null location is allowed on a published listing, moving one is not |
+| Piece                       | What it does                                                                                                            | What holds it honest                                                                                                         |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **Price markers**           | **Removed 2026-10-04**, see below. Up to 12 neighbouring places on a stay's full-screen map, each a pill with its price | Gone with the endpoint; the stay's own coordinates keep their tests in `location-privacy.integration.test.ts`                |
+| **Landmarks and distances** | «ما حول العقار»: 41 seeded landmarks across nine cities, nearest first, kind icons drawn not glyphed                    | The published distance must be **exactly reproducible from the published coordinates**, asserted per landmark                |
+| **Distance search**         | «قريب من» + a radius, and a `distance_asc` sort                                                                         | The filter compares the ROUNDED pair, so a binary search on `withinKm` cannot resolve below the rounding                     |
+| **Partner picker**          | A map the partner pans under a fixed pin, replacing two decimal-degree fields                                           | `properties-location-gap.integration.test.ts` — setting a null location is allowed on a published listing, moving one is not |
 
 **A distance is a coordinate wearing a disguise.** Three accurate distances to three known
 landmarks locate a building by trilateration, to whatever precision they carry — so a «how far is
@@ -3338,6 +3338,13 @@ decimal places.
 published coordinate and no zoom level will ever separate them. The neighbours query groups by
 point and the limit is a budget of PLACES, so one dense cluster cannot fill the map — measured on
 the dev database, where 60 co-located fixtures had crowded out every real neighbour.
+
+**Neighbours removed, 2026-10-04.** Bashar: «It should display only the current hotel/property/
+appartement». A stay's map now draws that stay's own area and the landmarks around it. The browser's
+neighbours request, its web proxy route, `GET /api/v1/properties/:slug/nearby`, `NearbyService` and
+`PropertyDetailService.publicLocation` are deleted, with the two tests that asked about neighbours.
+The test that an unpublished listing reveals no location now asks `bySlug`, the page's own read.
+The search results map keeps its price pills; that is a map OF stays.
 
 **The coordinate gap was the whole reason none of this was usable.** 67 of 2,017 published listings
 had coordinates — 3%. The cause was not partner reluctance: «خط العرض (اختياري)» asks somebody who

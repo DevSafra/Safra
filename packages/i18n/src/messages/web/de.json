@@ -365,8 +365,6 @@
     "distanceM": "{value} m",
     "showAllLandmarks": "Alle Orte anzeigen",
     "showFewerLandmarks": "Weniger anzeigen",
-    "nearbyStays": "Unterkünfte in der Nähe",
-    "nearbyStaysHint": "Preise pro Nacht, ab.",
     "nearbyCount": "{count} Unterkünfte hier",
     "noPrice": "Kein Preis angegeben",
     "markerLabel": "{name}: {price}",
