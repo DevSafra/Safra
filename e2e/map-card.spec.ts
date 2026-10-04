@@ -136,6 +136,23 @@ test("a stay's map shows that stay and no other", async ({ page }) => {
   /* Long enough for a neighbours request, had one been made, to answer and draw. */
   await page.waitForTimeout(3000);
 
+  /*
+    And it is FULL SCREEN: what is painted at every corner and the centre is the map, not the page.
+    The location card's clip-path once cut the overlay down to the card while its box still
+    measured the whole viewport, so a size check would have passed.
+  */
+  const covered = await dialog.evaluate((element) => {
+    const { innerWidth: w, innerHeight: h } = window;
+    return [
+      [4, 4],
+      [w - 4, 4],
+      [4, h - 4],
+      [w - 4, h - 4],
+      [w / 2, h / 2],
+    ].every(([x, y]) => element.contains(document.elementFromPoint(x!, y!)));
+  });
+  expect(covered, 'the full-screen map covers the screen').toBe(true);
+
   expect(neighbours, 'the map asked for other stays').toEqual([]);
   await expect(dialog.locator('a.pill-gold-hover')).toHaveCount(0);
   await expect(dialog.getByText('إقامات هنا')).toHaveCount(0);

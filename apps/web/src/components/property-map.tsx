@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type * as MapLibre from 'maplibre-gl';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 
@@ -520,20 +521,27 @@ export function PropertyMap({
         {labels.explore}
       </button>
 
-      {open ? (
-        <div
-          ref={overlay}
-          role="dialog"
-          aria-modal="true"
-          aria-label={labels.dialog}
-          /*
+      {/*
+        Portalled to <body> (Bashar, 2026-10-04: the full-screen map opened cut down to the
+        location card). The card carries a `clip-path` for Safari's corners, and a clip-path
+        clips EVERY descendant, `position: fixed` included, where `overflow` never did. Out of
+        the card, nothing an ancestor paints can trap the overlay again.
+      */}
+      {open
+        ? createPortal(
+            <div
+              ref={overlay}
+              role="dialog"
+              aria-modal="true"
+              aria-label={labels.dialog}
+              /*
             `z-[70]` is the slider's own layer, for the same reason: this has to cover the
             site header, which is sticky. Anything lower and the map opens underneath the
             navigation.
           */
-          className="fixed inset-0 z-[70] bg-bg"
-        >
-          {/*
+              className="fixed inset-0 z-[70] bg-bg"
+            >
+              {/*
             `h-full w-full`, NOT `absolute inset-0`.
 
             MapLibre adds `maplibregl-map` to its container and its own stylesheet declares
@@ -546,31 +554,31 @@ export function PropertyMap({
             An explicit height cannot be argued with, and it is why the thumbnail above —
             which has always carried `h-48 sm:h-56 lg:h-64` — never showed this.
           */}
-          <div ref={full} className="h-full w-full" />
+              <div ref={full} className="h-full w-full" />
 
-          {/*
+              {/*
             The listing's own area and the landmarks around it, and nothing else (Bashar,
             2026-10-04: «It should display only the current hotel»). It drew the neighbours'
             price pills too, and on a street of listings this listing's own disc was lost
             among a dozen other prices.
           */}
-          <MapLandmarks map={fullMap} landmarks={landmarks} />
+              <MapLandmarks map={fullMap} landmarks={landmarks} />
 
-          {/*
+              {/*
             Logical properties, so the close control sits opposite the panel in BOTH
             directions. On the Arabic screen that puts it physically left and the listing
             physically right, which is the arrangement in the reference.
           */}
-          <button
-            type="button"
-            onClick={close}
-            className="absolute end-4 top-4 z-10 inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border border-line bg-card px-4 text-sm font-bold text-text shadow-[var(--shadow-lift)] transition-[transform,box-shadow] duration-150 ease-out-strong hover:shadow-[var(--shadow-lift-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold active:scale-[0.97] motion-reduce:transition-none lg:min-h-0 lg:py-2"
-          >
-            {labels.close}
-            <CloseIcon />
-          </button>
+              <button
+                type="button"
+                onClick={close}
+                className="absolute end-4 top-4 z-10 inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border border-line bg-card px-4 text-sm font-bold text-text shadow-[var(--shadow-lift)] transition-[transform,box-shadow] duration-150 ease-out-strong hover:shadow-[var(--shadow-lift-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold active:scale-[0.97] motion-reduce:transition-none lg:min-h-0 lg:py-2"
+              >
+                {labels.close}
+                <CloseIcon />
+              </button>
 
-          {/*
+              {/*
             A sheet at the foot of a phone, a column beside the map from `lg` up. The panel
             is the CONTENT, so it takes the start side — physically right in Arabic.
 
@@ -579,18 +587,20 @@ export function PropertyMap({
             it, and ODbL requires that line to be legible rather than «hidden beneath UI».
             Measured, not eyeballed — the sheet's own rectangle against the attribution's.
           */}
-          <div className="absolute inset-x-3 bottom-7 z-10 lg:inset-x-auto lg:bottom-auto lg:start-4 lg:top-4 lg:w-[22rem]">
-            <PropertyMapCard
-              data={card}
-              onView={(event) => {
-                event.preventDefault();
-                setPending(card.viewHref.replace(/^#/, ''));
-                close();
-              }}
-            />
-          </div>
-        </div>
-      ) : null}
+              <div className="absolute inset-x-3 bottom-7 z-10 lg:inset-x-auto lg:bottom-auto lg:start-4 lg:top-4 lg:w-[22rem]">
+                <PropertyMapCard
+                  data={card}
+                  onView={(event) => {
+                    event.preventDefault();
+                    setPending(card.viewHref.replace(/^#/, ''));
+                    close();
+                  }}
+                />
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </figure>
   );
 }
