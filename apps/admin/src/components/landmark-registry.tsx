@@ -481,7 +481,7 @@ function LandmarkEditor({
               type="button"
               onClick={() => void save()}
               disabled={busy || !placed}
-              className="min-h-10 cursor-pointer rounded-lg bg-gold px-4 text-13 font-extrabold text-ink disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:py-2"
+              className="min-h-10 cursor-pointer btn-gold rounded-lg px-4 text-13 font-extrabold disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:py-2"
             >
               {t.sections.dialog.confirm}
             </button>

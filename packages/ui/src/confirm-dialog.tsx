@@ -126,7 +126,7 @@ export function ConfirmDialog({
             */
             ref={danger ? initial : undefined}
             onClick={() => onResolve(false)}
-            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-4 py-2 text-xs font-bold text-muted transition-colors hover:text-text lg:min-h-0"
+            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-4 py-2 text-xs font-bold text-muted transition-[color,transform] duration-150 ease-out-strong hover:text-text active:scale-[0.97] active:duration-75 motion-reduce:active:scale-100 lg:min-h-0"
           >
             {request.cancelLabel}
           </button>
@@ -136,8 +136,17 @@ export function ConfirmDialog({
           type="button"
           ref={danger && asks ? undefined : initial}
           onClick={() => onResolve(true)}
-          className={`inline-flex min-h-10 cursor-pointer items-center rounded-lg px-4.5 py-2 text-xs font-bold transition-opacity hover:opacity-90 lg:min-h-0 ${
-            danger ? 'bg-bad text-bg' : 'bg-gold text-ink'
+          /*
+            Gold is `btn-gold`, the one primary every app defines, and never a flat `bg-gold` block:
+            Bashar rejected that look twice (2026-09-10, and on this very button 2026-10-04). The
+            class owns its hover, its press and its shadow, so nothing here adds a transition to it.
+            Danger keeps its red and is given the same press, in the same 75ms down and 150ms back,
+            so the two tones answer a finger alike. A hover that FADES a primary is gone from both.
+          */
+          className={`inline-flex min-h-10 cursor-pointer items-center rounded-lg px-4.5 py-2 text-xs font-bold lg:min-h-0 ${
+            danger
+              ? 'bg-bad text-bg transition-[filter,transform] duration-150 ease-out-strong hover:brightness-110 active:scale-[0.97] active:duration-75 motion-reduce:active:scale-100'
+              : 'btn-gold'
           }`}
         >
           {request.confirmLabel}

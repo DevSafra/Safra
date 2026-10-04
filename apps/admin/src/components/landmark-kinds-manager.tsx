@@ -313,7 +313,7 @@ function KindEditor({
               type="button"
               onClick={() => void save()}
               disabled={busy}
-              className="min-h-10 cursor-pointer rounded-lg bg-gold px-4 text-13 font-extrabold text-ink disabled:opacity-50 lg:min-h-0 lg:py-2"
+              className="min-h-10 cursor-pointer btn-gold rounded-lg px-4 text-13 font-extrabold disabled:opacity-50 lg:min-h-0 lg:py-2"
             >
               {t.sections.dialog.confirm}
             </button>
