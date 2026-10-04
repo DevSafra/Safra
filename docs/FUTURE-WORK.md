@@ -115,6 +115,13 @@ deleting it; the reason something was blocked is often the reason it comes back.
 > sign-in requirement runs before the page can read the setting; and with several API instances,
 > one that did not handle the save keeps the old value in its 30-second settings cache, so it could
 > accept a submission for up to 30 seconds after the switch goes off.
+>
+> **Unexplained once, 2026-10-04:** the first full `pnpm e2e` after this landed failed
+> `about.spec.ts:26` because the partner section was missing from «عن سفرة», although the switch
+> was on in the database and was not changed until 335 tests later. It did not recur in four solo
+> runs, a replay of switch → 45 s idle → `about.spec`, or a second full run (603 passed, 0 failed).
+> Its page snapshot was overwritten before it was read, so the cause is unknown. If it comes back,
+> keep `test-results/` and read the snapshot before re-running.
 
 > ### Navbar trimmed to three, «عن سفرة» added, 2026-10-04
 >
