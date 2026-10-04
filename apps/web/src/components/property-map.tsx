@@ -7,16 +7,8 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 import { areaCircle, PUBLIC_MAP_MAX_ZOOM, PUBLIC_MAP_ZOOM } from '@safra/contracts';
 import { basemapBase } from '@safra/session';
 
-import { formatMoney } from '@/lib/localise';
-import type { Locale } from '@/i18n/routing';
-
 import { PropertyMapCard, type PropertyMapCardData } from './property-map-card';
-import {
-  MapLandmarks,
-  MapPriceMarkers,
-  type MapLandmark,
-  type NearbyStay,
-} from './map-price-markers';
+import { MapLandmarks, type MapLandmark } from './map-price-markers';
 
 /*
   MapLibre's own stylesheet, ~10 KB gzipped. Imported statically rather than with the
@@ -47,22 +39,6 @@ export interface PropertyMapLabels {
   readonly close: string;
   /** The full-screen map's accessible name. */
   readonly dialog: string;
-}
-
-/**
- * Everything the neighbours' price pills need that this component should not decide.
- *
- * Plain DATA, every field. This object is handed from a Server Component to a Client one,
- * and React refuses to serialise a function across that boundary — a `formatPrice` callback
- * and an `hrefFor` builder were the first version and made the property page answer 500 to
- * every request, with the build and the typecheck both green. The map now assembles the href
- * from a prefix and formats money itself; `formatMoney` is locale-driven and client-safe.
- */
-export interface NearbyConfig {
-  /** `/ar/property/` — the slug is appended. A prefix cannot be a function. */
-  readonly hrefPrefix: string;
-  /** Where a neighbour states no currency of its own. */
-  readonly fallbackCurrency: string;
 }
 
 /**
@@ -120,25 +96,19 @@ export interface NearbyConfig {
  * «الموقع» comes into view, and nothing at all to somebody who never reaches it.
  */
 export function PropertyMap({
-  slug,
   latitude,
   longitude,
   locale,
   labels,
   card,
-  nearby,
   landmarks,
 }: {
-  /** This listing, so the neighbours endpoint can anchor on it. */
-  readonly slug: string;
   readonly latitude: string;
   readonly longitude: string;
   readonly locale: string;
   readonly labels: PropertyMapLabels;
   /** The listing, for the panel beside the full-screen map. */
   readonly card: PropertyMapCardData;
-  /** Copy and link-building for the neighbours' price pills. */
-  readonly nearby: NearbyConfig;
   /**
    * What the listing is measured against, drawn on both maps.
    *
@@ -175,13 +145,7 @@ export function PropertyMap({
    * by construction, so the ordering is a guarantee rather than a guess about frames.
    */
   const [pending, setPending] = useState<string | null>(null);
-  /**
-   * The neighbours, and the map they are drawn over.
-   *
-   * Both are state rather than refs because the overlay RENDERS from them — a ref would
-   * update without telling React, and the pills would appear one interaction late.
-   */
-  const [stays, setStays] = useState<readonly NearbyStay[]>([]);
+  /* The full-screen map's instance: the landmarks are projected through it, so it is state. */
   const [fullMap, setFullMap] = useState<MapLibreMap | null>(null);
   /*
     The THUMBNAIL's instance too, so the landmarks are on the picture a reader meets first.
@@ -452,39 +416,6 @@ export function PropertyMap({
     };
   }, [open, mount]);
 
-  /**
-   * The neighbours, fetched the first time the full-screen map opens.
-   *
-   * Not part of the property payload, and not fetched on the thumbnail. Most readers never
-   * open this map, and a request nobody needs is a request nobody should pay for — the same
-   * reasoning that keeps MapLibre itself behind an IntersectionObserver.
-   *
-   * A failure is silent BY DESIGN: the map still draws the listing's own area, and a reader
-   * who came to see where a hotel is does not need to be told that a decoration around it
-   * did not arrive. `stays` simply stays empty.
-   */
-  useEffect(() => {
-    if (!open || stays.length > 0) return;
-
-    const abort = new AbortController();
-
-    void (async () => {
-      try {
-        const response = await fetch(`/api/property/${encodeURIComponent(slug)}/nearby`, {
-          signal: abort.signal,
-        });
-        if (!response.ok) return;
-
-        const body: unknown = await response.json();
-        setStays(readNearby(body, locale, nearby.fallbackCurrency));
-      } catch {
-        /* Aborted, offline, or malformed. The map is still a map. */
-      }
-    })();
-
-    return () => abort.abort();
-  }, [open, slug, locale, stays.length, nearby]);
-
   const close = useCallback(() => {
     setOpen(false);
     /* Back to the button that opened it, not to the top of the document. */
@@ -618,15 +549,12 @@ export function PropertyMap({
           <div ref={full} className="h-full w-full" />
 
           {/*
-            The neighbours' price pills — React elements positioned from `map.project()`,
-            deliberately NOT `maplibre.Marker`. A pill carries a partner-supplied name, and
-            MapLibre v5's marker path runs through the sanitiser that GHSA-jrc7-96c5-q579
-            bypasses. See the note at the head of `map-price-markers.tsx`.
+            The listing's own area and the landmarks around it, and nothing else (Bashar,
+            2026-10-04: «It should display only the current hotel»). It drew the neighbours'
+            price pills too, and on a street of listings this listing's own disc was lost
+            among a dozen other prices.
           */}
-          {/* Under the pills — a landmark is the reference frame, a listing is the choice. */}
           <MapLandmarks map={fullMap} landmarks={landmarks} />
-
-          <MapPriceMarkers map={fullMap} stays={stays} hrefPrefix={nearby.hrefPrefix} />
 
           {/*
             Logical properties, so the close control sits opposite the panel in BOTH
@@ -679,73 +607,6 @@ export function PropertyMap({
  * it to share one path would make a public API out of an implementation detail. If a third
  * cross appears, that is the moment to lift all three into one place.
  */
-/**
- * Narrows the neighbours endpoint's answer into what the overlay draws.
- *
- * Hand-written rather than a Zod schema, because this runs in the browser on a path that
- * must never throw: a malformed field drops ONE pill, where a parse failure would drop the
- * whole set. A listing with no coordinates or no price is not an error either — it is a
- * listing whose partner has not finished, and it simply does not get a marker.
- */
-function readNearby(
-  body: unknown,
-  locale: string,
-  fallbackCurrency: string,
-): NearbyStay[] {
-  if (typeof body !== 'object' || body === null) return [];
-  const items = (body as { items?: unknown }).items;
-  if (!Array.isArray(items)) return [];
-
-  const out: NearbyStay[] = [];
-
-  for (const raw of items) {
-    if (typeof raw !== 'object' || raw === null) continue;
-    const item = raw as Record<string, unknown>;
-
-    const slug = item['slug'];
-    const latitude = item['latitude'];
-    const longitude = item['longitude'];
-    if (typeof slug !== 'string' || typeof latitude !== 'string') continue;
-    if (typeof longitude !== 'string') continue;
-
-    const names = item['name'];
-    const name =
-      typeof names === 'object' && names !== null
-        ? ((names as Record<string, unknown>)[locale] ??
-          (names as Record<string, unknown>)['ar'])
-        : null;
-
-    const price = item['fromPrice'];
-    const currency = item['currencyCode'];
-
-    const here = item['staysHere'];
-
-    out.push({
-      slug,
-      name: typeof name === 'string' ? name : slug,
-      latitude,
-      longitude,
-      /*
-        «No amount is ever written without its currency» holds on a map pill too, so the
-        currency is never dropped — a neighbour that states none falls back to the platform
-        default rather than printing a bare number.
-      */
-      price:
-        typeof price === 'string'
-          ? formatMoney(
-              price,
-              typeof currency === 'string' ? currency : fallbackCurrency,
-              locale as Locale,
-            )
-          : null,
-      /* A missing or nonsensical count reads as one listing, never as zero. */
-      staysHere: typeof here === 'number' && here >= 1 ? here : 1,
-    });
-  }
-
-  return out;
-}
-
 function CloseIcon() {
   return (
     <svg

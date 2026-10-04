@@ -101,3 +101,42 @@ test('no dot is drawn over a price pill on a dense map', async ({ page }) => {
   );
   expect(covered, 'pills with something drawn over their centre').toEqual([]);
 });
+
+/**
+ * A stay's own map shows that stay and the landmarks it is measured against, and no other stay
+ * (Bashar, 2026-10-04: «It should display only the current hotel/property/appartement»). It drew
+ * a dozen neighbours' price pills around the listing's own disc on a busy street, which made the
+ * page about everything nearby rather than about this place.
+ *
+ * Asked on a listing in Aleppo, where the neighbours are dense, so a pill would have somewhere to
+ * come from. The map is checked to have drawn, so an empty dialog cannot pass.
+ */
+test("a stay's map shows that stay and no other", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/ar/city/aleppo');
+  const href = await page
+    .locator('main article h3 a[href*="/property/"]')
+    .first()
+    .getAttribute('href');
+  expect(href, 'a stay in Aleppo to open').toBeTruthy();
+
+  const neighbours: string[] = [];
+  page.on('request', (request) => {
+    if (/\/nearby(\?|$)/.test(new URL(request.url()).pathname + '?'))
+      neighbours.push(request.url());
+  });
+
+  await page.goto(href!);
+  const location = page.locator('#location figure');
+  await location.scrollIntoViewIfNeeded();
+  await location.getByRole('button', { name: 'اعرض على الخريطة' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'خريطة موقع العقار' });
+  await expect(dialog.locator('canvas').first()).toBeVisible({ timeout: 15_000 });
+  /* Long enough for a neighbours request, had one been made, to answer and draw. */
+  await page.waitForTimeout(3000);
+
+  expect(neighbours, 'the map asked for other stays').toEqual([]);
+  await expect(dialog.locator('a.pill-gold-hover')).toHaveCount(0);
+  await expect(dialog.getByText('إقامات هنا')).toHaveCount(0);
+});

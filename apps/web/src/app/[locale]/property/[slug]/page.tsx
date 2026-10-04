@@ -936,25 +936,9 @@ export default async function PropertyPage({
                 */}
                   {property.latitude && property.longitude ? (
                     <PropertyMap
-                      slug={property.slug}
                       latitude={property.latitude}
                       longitude={property.longitude}
                       locale={locale}
-                      /*
-                      The neighbours' pills. The price FORMATTER is passed rather than the
-                      formatted strings, because the neighbours are fetched in the browser
-                      and only this page knows the locale's money rules — and «no amount is
-                      ever written without its currency» has to hold on a map marker too.
-
-                      No customer fee is applied, deliberately: these are «from» prices for
-                      OTHER listings, each with its own fee-bearing units, and a fee computed
-                      here would be this listing's arithmetic printed over somebody else's
-                      price. The label says «من», and the number is the advertised floor.
-                    */
-                      nearby={{
-                        hrefPrefix: `/${locale}/property/`,
-                        fallbackCurrency: DEFAULT_MONEY_CURRENCY,
-                      }}
                       /*
                       The same rows the list below renders, so the map and the words cannot
                       disagree about which places matter or how far they are.
