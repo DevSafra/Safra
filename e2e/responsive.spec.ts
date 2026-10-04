@@ -534,7 +534,7 @@ test.describe('the customer site', () => {
     const menu = page.getByRole('dialog');
 
     await expect(menu.getByRole('navigation')).toBeVisible();
-    await expect(menu.getByRole('link', { name: 'الإقامات' })).toBeVisible();
+    await expect(menu.getByRole('link', { name: 'تواصل معنا' })).toBeVisible();
   });
 });
 
@@ -583,7 +583,7 @@ test.describe('the phone menu', () => {
     /* The two destinations, the partner invitation, and a way in. Nothing is only on a desktop. */
     for (const name of [
       'الرئيسية',
-      'الإقامات',
+      'تواصل معنا',
       'سجّل كشريك',
       'تسجيل الدخول',
       'إنشاء حساب',
@@ -678,8 +678,8 @@ test.describe('the phone menu', () => {
     await page.setViewportSize({ width: 390, height: 860 });
     await page.goto('/ar');
     await page.locator('header [data-menu="mobile"]').click();
-    await page.getByRole('dialog').getByRole('link', { name: 'الإقامات' }).click();
-    await page.waitForURL('**/search**');
+    await page.getByRole('dialog').getByRole('link', { name: 'تواصل معنا' }).click();
+    await page.waitForURL('**/contact');
 
     /*
       The page behind a modal is scroll-locked and the bar is lifted over the overlay. A navigation

@@ -143,49 +143,36 @@ test.describe('public routes', () => {
  * browser sees the console error and the lost client-side routing, which is why it lives here.
  */
 /**
- * The destinations Bashar asked for, in his order, each reaching a real page.
+ * The navbar carries exactly the destinations Bashar left in it: «الرئيسية» and «تواصل معنا».
  *
- * «الرئيسية + سياحة علاجية + الإقامات + المدن + جروبات + تواصل معنا» (2026-09-27); «المدن» removed
- * with its page on 2026-10-04.
+ * It held six from 2026-09-27 («الرئيسية + سياحة علاجية + الإقامات + المدن + جروبات + تواصل معنا»);
+ * «المدن» went with its page on 2026-10-04 and the other three the same day («remove سياحة علاجية +
+ * الإقامات + جروبات from the navbar menu»). Their pages stay.
  *
  * ## Why this is not covered by the crawl above
  *
- * That test follows every link and refuses a 4xx — so it would catch one of these pointing at a
- * route that does not exist, and it is what makes the build fail if somebody adds a seventh item
- * with no page behind it. What it cannot see is an item DISAPPEARING: a nav with five links whose
- * five pages all answer 200 is a passing crawl and a broken instruction.
- *
- * The ORDER is asserted too, and deliberately. سياحة علاجية sits second, ahead of الإقامات, which
- * is not where a search engine would put it — it is where he put it, and that is a business
- * decision about what SAFRA leads with. An assertion is how it survives somebody later
- * «improving» it.
+ * That test follows every link and refuses a 4xx, so it catches an item pointing at nothing. What
+ * it cannot see is an item APPEARING or DISAPPEARING: a nav whose links all answer 200 is a passing
+ * crawl whatever it lists. So the list is asserted exactly, on the bar AND in the phone menu, and
+ * the phone half reads the menu's own navigation rather than every link on the page, where
+ * «الإقامات» also lives in the footer and would make an absence impossible to see.
  *
  * ## Read from the markup, not from the catalogue
  *
  * The labels are written out rather than imported from `web/ar.json`. A test that reads the same
- * constant the component renders passes whatever that constant says — including after somebody
- * renames جروبات to something else — which is exactly the change this exists to notice.
+ * constant the component renders passes whatever that constant says.
  */
-test('the navbar carries the five destinations, in order', async ({ page }) => {
+test('the navbar carries only home and contact, on the bar and in the phone menu', async ({
+  page,
+}) => {
+  const expected = ['الرئيسية', 'تواصل معنا'];
   await page.goto('/ar');
 
   const items = await page
     .locator('header nav a')
     .evaluateAll((links) => links.map((link) => (link.textContent ?? '').trim()));
+  expect(items).toStrictEqual(expected);
 
-  expect(items).toStrictEqual([
-    'الرئيسية',
-    'سياحة علاجية',
-    'الإقامات',
-    'جروبات',
-    'تواصل معنا',
-  ]);
-
-  /*
-    And the same five on a phone, where they live in the drawer rather than on the bar. The bar is
-    `hidden` below `lg`, so a reader on a telephone reaches them only through the menu — a set that
-    is complete on a desktop and short on a phone is the failure this second half catches.
-  */
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
   await page
@@ -193,13 +180,15 @@ test('the navbar carries the five destinations, in order', async ({ page }) => {
     .first()
     .click();
 
-  const inDrawer = await page
-    .locator('a')
-    .evaluateAll((links) => links.map((link) => (link.textContent ?? '').trim()));
-
-  for (const label of ['الرئيسية', 'سياحة علاجية', 'الإقامات', 'جروبات', 'تواصل معنا']) {
-    expect(inDrawer, `«${label}» is reachable on a phone`).toContain(label);
-  }
+  const menu = page
+    .getByRole('navigation', { name: 'الرئيسية' })
+    .filter({ visible: true });
+  await expect(menu).toHaveCount(1);
+  expect(
+    await menu
+      .locator('a')
+      .evaluateAll((links) => links.map((link) => (link.textContent ?? '').trim())),
+  ).toStrictEqual(expected);
 });
 
 /**

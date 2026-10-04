@@ -133,23 +133,12 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
   const session = await getSession();
 
   /*
-    The six destinations, in the order Bashar wrote them (2026-09-27):
-    «الرئيسية + سياحة علاجية + الإقامات + المدن + جروبات + تواصل معنا».
-
-    His order is kept exactly, including سياحة علاجية sitting second — ahead of الإقامات, which is
-    what most people came to do. That is his call to make about what the business leads with, and
-    reordering it to what a search engine would want would be substituting my judgement for his on
-    the one thing here that is a business decision rather than a mechanic.
-
-    Two of them are placeholders today and one carries invented contact details; each page says so
-    in its own docblock, and `docs/FUTURE-WORK.md` carries what has to close before launch. The
-    pages exist rather than the links 404ing, which `tools/page-links` would fail the build for.
+    Two destinations (Bashar, 2026-10-04: «remove سياحة علاجية + الإقامات + جروبات from the navbar
+    menu»). It carried six from 2026-09-27; «المدن» went with its page the same day as these three,
+    and the pages behind the three stay, reached from the home page's service cards and the footer.
   */
   const links = [
     { href: `/${locale}`, label: t('home') },
-    { href: `/${locale}/medical-tourism`, label: t('medicalTourism') },
-    { href: `/${locale}/search`, label: t('stays') },
-    { href: `/${locale}/groups`, label: t('groups') },
     { href: `/${locale}/contact`, label: t('contact') },
   ];
 
@@ -208,7 +197,10 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
         </Link>
 
         {/*
-          `lg`, not `md`, since the menu grew from two items to six (Bashar, 2026-09-27).
+          `lg`, not `md`, since the menu grew from two items to six (Bashar, 2026-09-27). Kept at
+          `lg` when it went down to two on 2026-10-04: the widths below already hand the menu to
+          the drawer, and moving the breakpoint back is a layout change nobody asked for. What
+          follows is the record of the six-item bar that decided it.
 
           It was `md:flex` and that was right for two links. Measured at 768 with six: «سياحة
           علاجية» and «تواصل معنا» wrapped INSIDE themselves onto two lines each, the wordmark
@@ -236,7 +228,7 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
           /*
             Tighter between `lg` and `xl`, and the original from `xl`.
 
-            Six Arabic labels, the wordmark, the language picker and both account controls do not
+            When it held six: six Arabic labels, the wordmark, the language picker and both account controls do not
             fit a 1024px row at `px-3`: «سياحة علاجية» and «تواصل معنا» each broke onto a second
             line, which is the one failure a page-overflow check cannot see. 8px of horizontal
             padding buys the ~70px those two needed, and it is spent only where it is needed —
@@ -257,7 +249,7 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
           the first thing they give up and the last thing they add back, because a partner signing
           a property up is not doing it from a handset between trains.
 
-          Measured, not guessed: at 768px the six items came to ~735px inside a 736px bar, so the
+          Measured, not guessed, with the six-item menu: at 768px the six came to ~735px inside a 736px bar, so the
           row wrapped and «تسجيل الدخول» fell to a second line 44px below the rest. Dropping this
           one link is 98px back and the bar closes to a single row at 768 and 1024 alike.
 
