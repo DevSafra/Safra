@@ -96,6 +96,26 @@ deleting it; the reason something was blocked is often the reason it comes back.
 
 ## 1. Where the project stands
 
+> ### «سجّل كشريك» can be switched off from الإعدادات, 2026-10-04
+>
+> Bashar: a toggle on the settings page that activates and deactivates the partner sign-up form;
+> when it is off, «hide the سجل كشريك on the entire system and adding a new partner will be only
+> manual through the super admin dashboard». The setting is `partner.applications_open` (boolean,
+> seeded `true`, in the «الشركاء» card, audited like every other row). Off: the header and
+> phone-menu link, the footer link, the account sidebar link and the partner sections of الرئيسية
+> and «عن سفرة» are not drawn, `/[locale]/partners/join` answers 404, and the API refuses a
+> submission with `partner_application.closed` (403) before reading anything about the caller.
+> Requests already filed stay in «طلبات الشراكة» and are decided as before; a rejection sent while
+> the form is closed carries no «apply again» link (`partnerApplicationRejectedClosed`). The
+> console's «شريك جديد» and onboarding do not read the switch. Held by
+> `partner-application.integration.test.ts` (both directions, mutation-tested) and
+> `e2e/partner-applications-switch.spec.ts` (every surface, closed and reopened, plus a hand-built
+> POST). **Two known edges, both low:** an anonymous visitor following an old link to
+> `/partners/join` is sent to sign in first and meets the 404 after, because the middleware's
+> sign-in requirement runs before the page can read the setting; and with several API instances,
+> one that did not handle the save keeps the old value in its 30-second settings cache, so it could
+> accept a submission for up to 30 seconds after the switch goes off.
+
 > ### Navbar trimmed to three, «عن سفرة» added, 2026-10-04
 >
 > Bashar: «remove سياحة علاجية + الإقامات + جروبات from the navbar menu», then «create a new page
