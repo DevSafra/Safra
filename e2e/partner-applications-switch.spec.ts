@@ -122,35 +122,51 @@ test('closed: «سجّل كشريك» is nowhere on the site and the API refuses
     expect(join?.status(), 'the page itself').toBe(open ? 200 : 404);
   };
 
-  try {
-    await setOpen(page, false);
-    await surfaces(false);
+  /*
+    The switch as somebody left it, put back at the end. It used to finish ON whatever it found, and
+    on 2026-10-04 that silently turned the form back on while a person testing the console had
+    deliberately turned it off. A spec may borrow shared state; it must not decide it.
+  */
+  await page.goto('/settings');
+  const initial =
+    (await page
+      .locator(`[data-setting-row="${KEY}"]`)
+      .getByRole('switch')
+      .getAttribute('aria-checked')) === 'true';
 
-    /*
+  try {
+    try {
+      await setOpen(page, false);
+      await surfaces(false);
+
+      /*
       The tampered path: the form's own endpoint, with a valid session and a valid body. The page
       that would send it is gone, so this is the request somebody builds by hand.
     */
-    const posted = await customer.request.post(`${WEB}/ar/api/partner-applications`, {
-      data: {
-        contactName: 'اختبار الإغلاق',
-        phone: '+963116414444',
-        legalName: 'شركة اختبار الإغلاق',
-        displayName: 'اختبار الإغلاق',
-        partnerTypeCode: 'accommodation',
-        citySlug: 'damascus',
-        address: 'شارع الاختبار 1',
-        preferredLocale: 'ar',
-      },
-    });
+      const posted = await customer.request.post(`${WEB}/ar/api/partner-applications`, {
+        data: {
+          contactName: 'اختبار الإغلاق',
+          phone: '+963116414444',
+          legalName: 'شركة اختبار الإغلاق',
+          displayName: 'اختبار الإغلاق',
+          partnerTypeCode: 'accommodation',
+          citySlug: 'damascus',
+          address: 'شارع الاختبار 1',
+          preferredLocale: 'ar',
+        },
+      });
 
-    expect(posted.status()).toBe(403);
-    expect(((await posted.json()) as { code?: string }).code).toBe(
-      ERROR.PARTNER_APPLICATIONS_CLOSED,
-    );
+      expect(posted.status()).toBe(403);
+      expect(((await posted.json()) as { code?: string }).code).toBe(
+        ERROR.PARTNER_APPLICATIONS_CLOSED,
+      );
+    } finally {
+      /* On for the second half, whatever happened above. */
+      await setOpen(page, true);
+    }
+
+    await surfaces(true);
   } finally {
-    /* Back on, whatever happened above: the suite shares one database. */
-    await setOpen(page, true);
+    await setOpen(page, initial);
   }
-
-  await surfaces(true);
 });

@@ -89,6 +89,35 @@ describeIfDb('PartnerApplicationService', () => {
   let issued: { userId: string; purpose: string }[];
   let revoked: string[];
 
+  /*
+    The public partner form's switch, written inside the rolled-back transaction.
+
+    Every test sets it rather than reading whatever the shared database holds: the switch lives on
+    الإعدادات, and a person testing the console turned it off while this suite ran (2026-10-04), which
+    refused every submission below and failed 25 tests that have nothing to do with the switch.
+  */
+  const setOpen = async (open: boolean) => {
+    /*
+      UPDATE first, INSERT only if there was nothing to update. A DELETE would fail on any
+      database where the switch was ever saved from the console: `settings_history` points at the
+      row, which is exactly the database this suite runs against after an e2e pass.
+    */
+    const updated = await db.execute(sql`
+      UPDATE settings SET value = ${JSON.stringify(open)}::jsonb
+      WHERE key = ${PARTNER_APPLICATIONS_OPEN_SETTING} AND scope = 'global'
+    `);
+
+    if (updated.rowCount === 0) {
+      await db.execute(sql`
+        INSERT INTO settings (key, scope, value, value_schema)
+        VALUES (${PARTNER_APPLICATIONS_OPEN_SETTING}, 'global', ${JSON.stringify(open)}::jsonb, 'boolean')
+      `);
+    }
+
+    /* What `SettingsAdminService` does after a console save; without it the 30-second cache wins. */
+    settings.invalidate(PARTNER_APPLICATIONS_OPEN_SETTING);
+  };
+
   beforeEach(async () => {
     await harness.begin();
     db = harness.db;
@@ -164,6 +193,7 @@ describeIfDb('PartnerApplicationService', () => {
     );
 
     await seed(db);
+    await setOpen(true);
   });
 
   afterEach(async () => {
@@ -589,28 +619,6 @@ describeIfDb('PartnerApplicationService', () => {
     rolled-back transaction, so neither direction depends on what the database was seeded with.
   */
   describe('when the super admin closes the public form', () => {
-    const setOpen = async (open: boolean) => {
-      /*
-        UPDATE first, INSERT only if there was nothing to update. A DELETE would fail on any
-        database where the switch was ever saved from the console: `settings_history` points at the
-        row, which is exactly the database this suite runs against after an e2e pass.
-      */
-      const updated = await db.execute(sql`
-        UPDATE settings SET value = ${JSON.stringify(open)}::jsonb
-        WHERE key = ${PARTNER_APPLICATIONS_OPEN_SETTING} AND scope = 'global'
-      `);
-
-      if (updated.rowCount === 0) {
-        await db.execute(sql`
-          INSERT INTO settings (key, scope, value, value_schema)
-          VALUES (${PARTNER_APPLICATIONS_OPEN_SETTING}, 'global', ${JSON.stringify(open)}::jsonb, 'boolean')
-        `);
-      }
-
-      /* What `SettingsAdminService` does after a console save; without it the 30-second cache wins. */
-      settings.invalidate(PARTNER_APPLICATIONS_OPEN_SETTING);
-    };
-
     const filed = async () =>
       db.execute<{ n: number }>(sql`
         SELECT count(*)::int AS n FROM partner_applications
