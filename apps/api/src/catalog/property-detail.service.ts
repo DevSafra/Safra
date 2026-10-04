@@ -470,7 +470,7 @@ export class PropertyDetailService {
           days.date,
           u.id AS unit_id,
           CASE
-            WHEN b.id IS NOT NULL THEN 'booked'
+            WHEN b.booking_id IS NOT NULL THEN 'booked'
             ELSE COALESCE(ad.status::text, 'available')
           END AS status,
           COALESCE(ad.price, u.base_price) AS price
@@ -478,7 +478,10 @@ export class PropertyDetailService {
         CROSS JOIN units u
         JOIN properties p ON p.id = u.property_id
         LEFT JOIN availability_days ad ON ad.unit_id = u.id AND ad.date = days.date
-        LEFT JOIN bookings b
+        -- booking_units, not bookings, like every other reader of «is this room taken?»: a
+        -- booking of three doubles NAMES one and HOLDS three, so reading the booking row showed
+        -- the other two as open on the calendar while they were sold (Bashar, 2026-10-04).
+        LEFT JOIN booking_units b
           ON b.unit_id = u.id
          AND b.status IN ${BLOCKING_STATUS_SQL}
          AND days.date >= b.check_in AND days.date < b.check_out

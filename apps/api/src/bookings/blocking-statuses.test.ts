@@ -68,4 +68,27 @@ describe('the statuses that hold a room', () => {
       'These files list the statuses that hold a room by hand. Use `IN ${BLOCKING_STATUS_SQL}` from bookings/booking-state.',
     ).toEqual([]);
   });
+
+  /*
+    The other half of the question: WHICH ROWS hold a room. A booking of three doubles names one
+    room on `bookings` and holds all three on `booking_units`, so a reader of `bookings` shows two
+    sold rooms as open (Bashar, 2026-10-04: the property page's calendar did exactly that). Asked of
+    every use of the fragment: the table it filters, the nearest one named before it, is
+    `booking_units`.
+  */
+  it('are asked of booking_units, never of the booking row', () => {
+    const uses = sources(SRC).flatMap((file) => {
+      const text = readFileSync(file, 'utf8');
+      return [...text.matchAll(/IN \$\{BLOCKING_STATUS_SQL\}/g)].map((match) => {
+        const before = text.slice(0, match.index);
+        const tables = [
+          ...before.matchAll(/\b(?:FROM|JOIN)\s+(booking_units|bookings)\b/g),
+        ];
+        return { file: file.slice(SRC.length), table: tables.at(-1)?.[1] ?? 'none' };
+      });
+    });
+
+    expect(uses.length, 'the sweep found the readers').toBeGreaterThanOrEqual(7);
+    expect(uses.filter((use) => use.table !== 'booking_units')).toEqual([]);
+  });
 });
