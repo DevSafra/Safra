@@ -704,14 +704,36 @@ body {
  * Unlayered on purpose: it beats Tailwind's utilities, so a stray `shadow-*` or `hover:opacity-*` on
  * one button cannot quietly give it a different finish from the other forty-two.
  */
+/*
+  The gold button's shadow, per THEME, as two variables (2026-10-04).
+
+  The `.btn-gold` rules below are identical in all three apps, held so by
+  `packages/ui/src/no-flat-gold.test.ts`. The THEMES are not: the customer site is light unless `data-theme='dark'`, while the console and the partner portal are night unless `data-theme='light'`. So the face is shared and only
+  the shadow under it is set here — a warm glow on a light page, depth on a night one, because a gold
+  glow on a dark page reads as a halo rather than a shadow.
+*/
+:root {
+  --btn-gold-shadow:
+    inset 0 1px 0 rgb(255 247 224 / 0.55), inset 0 -1px 0 rgb(110 74 16 / 0.28),
+    0 1px 2px rgb(92 62 12 / 0.24), 0 6px 14px -6px rgb(168 116 32 / 0.55);
+  --btn-gold-shadow-hover:
+    inset 0 1px 0 rgb(255 247 224 / 0.65), inset 0 -1px 0 rgb(110 74 16 / 0.28),
+    0 2px 4px rgb(92 62 12 / 0.26), 0 12px 24px -8px rgb(168 116 32 / 0.62);
+}
+
+:root[data-theme='dark'] {
+  --btn-gold-shadow:
+    inset 0 1px 0 rgb(255 247 224 / 0.5), inset 0 -1px 0 rgb(110 74 16 / 0.3),
+    0 1px 2px rgb(0 0 0 / 0.5), 0 8px 18px -8px rgb(0 0 0 / 0.7);
+  --btn-gold-shadow-hover:
+    inset 0 1px 0 rgb(255 247 224 / 0.6), inset 0 -1px 0 rgb(110 74 16 / 0.3),
+    0 2px 5px rgb(0 0 0 / 0.55), 0 14px 28px -10px rgb(0 0 0 / 0.75);
+}
+
 .btn-gold {
   background-image: linear-gradient(135deg, #f0cb7c, #c4923e);
   color: #241a05;
-  box-shadow:
-    inset 0 1px 0 rgb(255 247 224 / 0.55),
-    inset 0 -1px 0 rgb(110 74 16 / 0.28),
-    0 1px 2px rgb(92 62 12 / 0.24),
-    0 6px 14px -6px rgb(168 116 32 / 0.55);
+  box-shadow: var(--btn-gold-shadow);
   transition:
     filter 160ms var(--ease-out-strong),
     box-shadow 200ms var(--ease-out-strong),
@@ -723,11 +745,7 @@ body {
       [aria-disabled='true']
     ):hover {
     filter: brightness(1.06) saturate(1.04);
-    box-shadow:
-      inset 0 1px 0 rgb(255 247 224 / 0.65),
-      inset 0 -1px 0 rgb(110 74 16 / 0.28),
-      0 2px 4px rgb(92 62 12 / 0.26),
-      0 12px 24px -8px rgb(168 116 32 / 0.62);
+    box-shadow: var(--btn-gold-shadow-hover);
   }
 }
 
@@ -740,28 +758,6 @@ body {
     inset 0 1px 2px rgb(92 62 12 / 0.35),
     0 1px 1px rgb(92 62 12 / 0.18);
   transition-duration: 90ms;
-}
-
-/* Night: the same face, but depth rather than a warm glow under it. */
-:root[data-theme='dark'] .btn-gold {
-  box-shadow:
-    inset 0 1px 0 rgb(255 247 224 / 0.5),
-    inset 0 -1px 0 rgb(110 74 16 / 0.3),
-    0 1px 2px rgb(0 0 0 / 0.5),
-    0 8px 18px -8px rgb(0 0 0 / 0.7);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  :root[data-theme='dark']
-    :is(a, button, summary, label, [role='button']).btn-gold:not(:disabled):not(
-      [aria-disabled='true']
-    ):hover {
-    box-shadow:
-      inset 0 1px 0 rgb(255 247 224 / 0.6),
-      inset 0 -1px 0 rgb(110 74 16 / 0.3),
-      0 2px 5px rgb(0 0 0 / 0.55),
-      0 14px 28px -10px rgb(0 0 0 / 0.75);
-  }
 }
 
 /* Reduced motion keeps the light and the shadow, and drops the movement. */
