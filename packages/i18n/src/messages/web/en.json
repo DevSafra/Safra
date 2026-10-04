@@ -33,8 +33,6 @@
     "trustVerified": "Partners verified before listing",
     "trustPayment": "You pay SAFRA, never the property",
     "trustCompensation": "Automatic compensation when plans fall through",
-    "destinationsTitle": "Destinations",
-    "destinationsSubtitle": "Cities that stay up with you",
     "cityStays": "{count, plural, =0 {No stays} one {1 stay} other {# stays}}",
     "sliderPrevious": "Previous destinations",
     "sliderNext": "Next destinations",
@@ -46,7 +44,6 @@
     "recommendedPrevious": "Previous stays",
     "recommendedNext": "Next stays",
     "groupsSubtitle": "Rather not travel alone? Group trips SAFRA plans itself",
-    "citiesAll": "All cities",
     "groupsAll": "All group trips",
     "groupsPrevious": "Earlier trips in the row",
     "groupsNext": "Later trips in the row",
@@ -65,7 +62,27 @@
     "partnersSubtitle": "List your hotel or home on SAFRA",
     "partnersBody": "A free management dashboard, your calendar and prices in your hands, regular transfers, and only {rate} commission deducted from your payouts.",
     "partnersBodyNoRate": "A free management dashboard, your calendar and prices in your hands, and regular transfers.",
-    "partnersCta": "Register as a partner"
+    "partnersCta": "Register as a partner",
+    "services": {
+      "label": "SAFRA services",
+      "soon": "Coming soon",
+      "names": {
+        "rides": "Safra Rides",
+        "stay": "Safra Stay",
+        "medical": "Safra Medical",
+        "trips": "Safra Trips",
+        "umrah": "Safra Umrah",
+        "realEstate": "Safra Real Estate"
+      },
+      "covers": {
+        "rides": "Transport",
+        "stay": "Hotels and stays",
+        "medical": "Treatment and medical tourism",
+        "trips": "Trips and tours",
+        "umrah": "Umrah and visits",
+        "realEstate": "Property and investment"
+      }
+    }
   },
   "search": {
     "destination": "Destination",

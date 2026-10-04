@@ -44,11 +44,6 @@ test('the home page offers every upcoming group trip in a slider, and no finishe
     'href',
     '/ar/groups',
   );
-
-  /* The destinations row carries the same way to the whole set (Bashar, 2026-10-02). */
-  await expect(
-    page.getByRole('region', { name: 'الوجهات' }).getByRole('link', { name: 'كل المدن' }),
-  ).toHaveAttribute('href', '/ar/city');
 });
 
 /*

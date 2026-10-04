@@ -33,8 +33,6 @@
     "trustVerified": "شركاء موثّقون قبل النشر",
     "trustPayment": "الدفع لسفرة، لا للعقار",
     "trustCompensation": "تعويض تلقائي عند خيبة الأمل",
-    "destinationsTitle": "الوجهات",
-    "destinationsSubtitle": "مدن تسهر معك",
     "cityStays": "{count, plural, zero {لا إقامات} one {إقامة واحدة} two {إقامتان} few {# إقامات} many {# إقامة} other {# إقامة}}",
     "sliderPrevious": "الوجهات السابقة",
     "sliderNext": "الوجهات التالية",
@@ -46,7 +44,6 @@
     "recommendedPrevious": "إقامات سابقة",
     "recommendedNext": "إقامات تالية",
     "groupsSubtitle": "لا تريد السفر لوحدك؟ رحلات جماعية تُعدّها سفرة بنفسها",
-    "citiesAll": "كل المدن",
     "groupsAll": "كل الرحلات الجماعية",
     "groupsPrevious": "الرحلات التي قبلها",
     "groupsNext": "الرحلات التي بعدها",
@@ -65,7 +62,27 @@
     "partnersSubtitle": "أدرج فندقك أو بيتك على سفرة",
     "partnersBody": "لوحة إدارة مجانية، تقويم وأسعار بيدك، تحويلات منتظمة، وعمولة {rate} فقط تُخصم من مستحقاتك.",
     "partnersBodyNoRate": "لوحة إدارة مجانية، تقويم وأسعار بيدك، وتحويلات منتظمة.",
-    "partnersCta": "سجّل كشريك"
+    "partnersCta": "سجّل كشريك",
+    "services": {
+      "label": "خدمات سفرة",
+      "soon": "قريباً",
+      "names": {
+        "rides": "Safra Rides",
+        "stay": "Safra Stay",
+        "medical": "Safra Medical",
+        "trips": "Safra Trips",
+        "umrah": "Safra Umrah",
+        "realEstate": "Safra Real Estate"
+      },
+      "covers": {
+        "rides": "خدمات النقل",
+        "stay": "الفنادق والإقامات",
+        "medical": "العلاج والسياحة الطبية",
+        "trips": "الرحلات والجولات",
+        "umrah": "العمرة والزيارات",
+        "realEstate": "العقارات والاستثمار"
+      }
+    }
   },
   "search": {
     "destination": "الوجهة",

@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation';
 
 import { SearchForm } from '@/components/search-form';
 import { CardSlider } from '@/components/card-slider';
-import { CityCard } from '@/components/city-card';
+import { ServiceCards } from '@/components/service-cards';
 import { GroupTripCard } from '@/components/group-trip-card';
 import { PropertyCard } from '@/components/property-card';
 import {
@@ -61,7 +61,8 @@ const TRIP_FEATURES = [
  * `SAFRA - موقع سفرة 20.08.html` is the approved design and this page follows its SECTIONS and its
  * copy: a centred hero over a radial glow, the search bar with the trip features under it, then
  * destinations, stay types, «موصى به من سفرة», the three pledges, and the partner band. The four
- * booking steps gave their place to the group trips (Bashar, 2026-10-02). Two earlier attempts invented compositions of their own instead of reading it; the
+ * booking steps gave their place to the group trips (Bashar, 2026-10-02), and the destinations to
+ * SAFRA's six services when the cities page was removed (2026-10-04). Two earlier attempts invented compositions of their own instead of reading it; the
  * prototype is the brief and this follows it.
  *
  * What is taken from booking.com is the DISCIPLINE rather than the shape: one card pattern used
@@ -261,56 +262,36 @@ export default async function HomePage({
         </div>
       </section>
 
-      {/* ── Destinations (§5.4) ──────────────────────────────────────────── */}
-      <section aria-label={t('destinationsTitle')} className="bg-bg">
+      {/* ── SAFRA's services ──────────────────────────────────────────────── */}
+      {/*
+        The six services, where «مدن تسهر معك» and its city slider were (Bashar, 2026-10-04: the
+        cities page is gone, «I do not need it anymore», and screenshot «14.59.04» takes its place).
+        No heading, as the reference has none: the six drawings and names are the statement.
+      */}
+      <section aria-label={t('services.label')} className="bg-bg">
         <div className="mx-auto max-w-7xl px-4 py-10 sm:py-12">
-          {/*
-            The way to every city beside the heading (Bashar, 2026-10-02), the same shape as
-            «كل الرحلات الجماعية» on the trips row: the slider shows a choice, the link the whole set.
-          */}
-          <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-            <SectionHeading eyebrow={t('destinationsTitle')}>
-              {t('destinationsSubtitle')}
-            </SectionHeading>
-            <Link
-              href={`/${locale}/city`}
-              className="inline-flex min-h-10 items-center gap-1.5 text-14 font-semibold text-sky underline-offset-4 transition-colors duration-150 ease-out hover:text-gold-read hover:underline lg:min-h-0"
-            >
-              {t('citiesAll')}
-            </Link>
-          </div>
-
-          {/*
-            A SLIDER, the way booking.com moves through its destination rows (Bashar, 2026-09-02).
-
-            It was a five-across grid, which is the prototype's arrangement and is right for nine
-            cities and wrong for the tenth: a grid has to be re-chosen every time staff open a
-            market, and a row of nine in five columns leaves four in the second row looking like an
-            afterthought. A slider takes any number, shows the same card at every width, and the
-            cut card at the edge is what says there is more — which no grid can say.
-
-            The arrows live in `CardSlider`, the one client component on this page. Without
-            JavaScript the row is still a scrollable rail, which is exactly what it was before.
-
-            THREE across at `lg`, not four (Bashar, 2026-09-02). The width is chosen against the
-            container rather than picked by eye: the rail is 1152px inside `max-w-7xl` less its
-            own 16px of padding either side, so 3 × 21rem + 2 × 1rem gap = 1040 of 1120 — three
-            whole cards and 80px of the fourth. That peek is deliberate and is the only thing on a
-            horizontal row that says there is more; a width that divided exactly would end the row
-            flush with the container edge and read as «there are three destinations».
-          */}
-          <div className="mt-5">
-            <CardSlider labels={{ previous: t('sliderPrevious'), next: t('sliderNext') }}>
-              {cities.map((city) => (
-                <li
-                  key={city.slug}
-                  className="w-[13rem] shrink-0 snap-start sm:w-[16rem] lg:w-[21rem]"
-                >
-                  <CityCard city={city} locale={locale} stays={t} />
-                </li>
-              ))}
-            </CardSlider>
-          </div>
+          <ServiceCards
+            locale={locale}
+            copy={{
+              names: {
+                rides: t('services.names.rides'),
+                stay: t('services.names.stay'),
+                medical: t('services.names.medical'),
+                trips: t('services.names.trips'),
+                umrah: t('services.names.umrah'),
+                realEstate: t('services.names.realEstate'),
+              },
+              covers: {
+                rides: t('services.covers.rides'),
+                stay: t('services.covers.stay'),
+                medical: t('services.covers.medical'),
+                trips: t('services.covers.trips'),
+                umrah: t('services.covers.umrah'),
+                realEstate: t('services.covers.realEstate'),
+              },
+              soon: t('services.soon'),
+            }}
+          />
         </div>
       </section>
 
@@ -366,7 +347,7 @@ export default async function HomePage({
               did, and renders the two SAFRA badges the prototype shows.
             */}
             {/*
-              The same `CardSlider` the destinations use (Bashar, 2026-09-02), so the two rows on
+              The same `CardSlider` the group trips use (Bashar, 2026-09-02), so the rows on
               this page behave identically — one arrow control, one keyboard story, one set of
               rules about when an arrow disappears. A second carousel written separately is how
               two rows on one page come to scroll by different amounts.
@@ -425,7 +406,7 @@ export default async function HomePage({
             </div>
 
             {/*
-              The same `CardSlider` and the same widths as the destinations, so the three rows on
+              The same `CardSlider` and the same widths as «موصى به من سفرة», so the rows on
               this page scroll alike. `GroupTripCard` unchanged from the groups page: one card for
               one object, so a trip cannot read differently on the front page.
             */}
@@ -588,11 +569,11 @@ async function recommendedStays(today: string, tomorrow: string) {
 /**
  * A section's label and its heading.
  *
- * The small gold label above the heading is the prototype's, on every section — «الوجهات» over
- * «مدن تسهر معك». An earlier attempt deleted all five as a category of ornament; they are not
+ * The small gold label above the heading is the prototype's, on every section — «أنواع الإقامة»
+ * over its sentence. An earlier attempt deleted all five as a category of ornament; they are not
  * ornament here, they are the section's NAME, and the heading under each one is a sentence rather
- * than a label. The keys were always there for this: `destinationsTitle` is the label and
- * `destinationsSubtitle` is the heading.
+ * than a label: `typesTitle` is the label and `typesSubtitle` the heading. The services row is the
+ * one section without either, because the reference it was built from has none.
  */
 function SectionHeading({
   eyebrow,
