@@ -6,7 +6,12 @@
 > **How to use it in a new session:** read §1 for where things stand, §3 for who must act
 > on what, then §4–§9 for the item you are picking up, and §10 for the security position.
 
-**Last updated:** 2026-08-25 — **the pagination bar's JSON screen, `O-sec-7` closed, and three
+**Last updated:** 2026-10-04 — **the customer site's navigation and home page reshaped on
+Bashar's instruction** (see the first entries of §1: the navbar is «الرئيسية · عن سفرة · تواصل
+معنا», the cities index is gone, the home page shows six service cards, and «عن سفرة» exists).
+`main` is at `22ddebad`, pushed; `pnpm verify` 313 files, 4,488 tests, 0 failed, 0 skipped.
+
+**Previously, 2026-08-25 — the pagination bar's JSON screen, `O-sec-7` closed, and three
 register claims that had outlived themselves.**
 Bashar met a bare `{"message":"Unknown table or size."}` where a table should have been. The cause
 was one word — the save endpoint read the literal `size` while five namespaced tables post
@@ -90,6 +95,17 @@ deleting it; the reason something was blocked is often the reason it comes back.
 ---
 
 ## 1. Where the project stands
+
+> ### Navbar trimmed to three, «عن سفرة» added, 2026-10-04
+>
+> Bashar: «remove سياحة علاجية + الإقامات + جروبات from the navbar menu», then «create a new page
+> "عن سفرة" and add it to the navbar menu between الرئيسية and تواصل معنا». The navbar (bar and phone
+> menu) is now «الرئيسية · عن سفرة · تواصل معنا», held exactly by `public-routes.spec.ts`. The three
+> removed pages stay, reached from the home page's service cards and the footer. `/[locale]/about`
+> is composed ONLY of copy SAFRA already publishes (the footer's description, the hero promise, the
+> three pledges, the six services, the partner offer); the only new words are its name. **Open:
+> the company's own story** — when Bashar writes it, it goes in the page's opening section. The
+> pledge cards are one component (`pledge-cards.tsx`) shared with the home page.
 
 > ### Cities index removed, services row added, 2026-10-04
 >
