@@ -116,12 +116,15 @@ deleting it; the reason something was blocked is often the reason it comes back.
 > one that did not handle the save keeps the old value in its 30-second settings cache, so it could
 > accept a submission for up to 30 seconds after the switch goes off.
 >
-> **Unexplained once, 2026-10-04:** the first full `pnpm e2e` after this landed failed
-> `about.spec.ts:26` because the partner section was missing from «عن سفرة», although the switch
-> was on in the database and was not changed until 335 tests later. It did not recur in four solo
-> runs, a replay of switch → 45 s idle → `about.spec`, or a second full run (603 passed, 0 failed).
-> Its page snapshot was overwritten before it was read, so the cause is unknown. If it comes back,
-> keep `test-results/` and read the snapshot before re-running.
+> **Explained, 2026-10-04:** two full `pnpm e2e` runs failed `about.spec.ts:26` because «عن سفرة»
+> had no partner section. The cause was not the cache: somebody using the console, signed in with
+> the same staff account the suite uses, had turned the switch off. The API log shows a lone close
+> and no test pattern around it. Three test defects let that hurt: the integration tests read the live
+> switch (25 failed when it was off), `partner-applications-switch.spec.ts` always finished by
+> turning it ON (overriding the person's choice), and `about.spec.ts` demanded the link in either
+> state. Now the integration tests set the switch inside their own transaction, the spec restores
+> the value it found, and `about.spec.ts` asserts whichever state the switch is in. All three were
+> checked with the switch left off.
 
 > ### Navbar trimmed to three, «عن سفرة» added, 2026-10-04
 >
