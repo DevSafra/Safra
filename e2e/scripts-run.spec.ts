@@ -16,7 +16,6 @@ import { expect, test } from '@playwright/test';
 const BASE = 'http://localhost:3000';
 const PAGES = [
   '/ar',
-  '/ar/city',
   '/ar/city/damascus',
   '/ar/contact',
   '/ar/medical-tourism',
@@ -26,7 +25,7 @@ const PAGES = [
   '/ar/privacy',
   '/ar/find-booking',
   '/ar/partners/join',
-  '/en/city',
+  '/en/city/damascus',
   '/en/contact',
 ];
 

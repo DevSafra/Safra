@@ -91,6 +91,18 @@ deleting it; the reason something was blocked is often the reason it comes back.
 
 ## 1. Where the project stands
 
+> ### Cities index removed, services row added, 2026-10-04
+>
+> Bashar: remove «المدن» «completely … I do not need it anymore», and put screenshot «14.59.04» in
+> place of «مدن تسهر معك». `/[locale]/city` now answers 404; each city's own page stays, as do the
+> footer's links to them. The navbar item, the home page's city slider and «كل المدن», the
+> placeholder pages' second button, and the «المدن» step of every breadcrumb (visible and
+> structured data) are gone. The home page shows six service cards instead (`service-cards.tsx`).
+> **Open: three of the six have no page** — Safra Rides, Safra Umrah and Safra Real Estate are
+> shown marked «قريباً» and are not links (Bashar's choice). Each gets an `href` on its line in `ServiceCards`
+> and loses the word on the day its page exists; `e2e/home-services.spec.ts` asserts the current
+> three are not links, so that test changes with them.
+
 > ### Accepted risk, 2026-10-04: GHSA-vfj7-8cjw-p6xm, `braces` (high), ignored by the audit
 >
 > A stack-exhaustion DoS in `braces` ≤3.0.3 with **no patched version** (`<0.0.0`), so `pnpm verify`

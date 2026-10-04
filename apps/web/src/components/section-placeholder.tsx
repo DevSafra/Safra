@@ -39,7 +39,6 @@ export function SectionPlaceholder({
   title,
   body,
   browseLabel,
-  citiesLabel,
 }: {
   readonly locale: Locale;
   /*
@@ -54,7 +53,6 @@ export function SectionPlaceholder({
   readonly title: string;
   readonly body: string;
   readonly browseLabel: string;
-  readonly citiesLabel: string;
 }) {
   return (
     <div className="mx-auto max-w-4xl px-4 py-14 sm:py-20">
@@ -78,7 +76,7 @@ export function SectionPlaceholder({
           </p>
 
           {/*
-            Two ways onward, because a reader who pressed a navbar item wanted to browse something.
+            A way onward, because a reader who pressed a navbar item wanted to browse something.
             `min-h-11` on both: an anchor styled as a control gets the touch floor spelled out —
             `min-height` does nothing to an inline element.
           */}
@@ -88,12 +86,6 @@ export function SectionPlaceholder({
               className="inline-flex min-h-11 items-center rounded-lg btn-gold px-5 text-15 font-bold"
             >
               {browseLabel}
-            </Link>
-            <Link
-              href={`/${locale}/city`}
-              className="inline-flex min-h-11 items-center rounded-lg border border-line px-5 text-15 font-semibold text-muted transition-colors duration-200 ease-out-strong hover:border-gold/60 hover:text-gold-read"
-            >
-              {citiesLabel}
             </Link>
           </div>
         </div>

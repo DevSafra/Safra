@@ -19,7 +19,6 @@
     "breadcrumb": "Breadcrumb",
     "themeToLight": "Switch to light mode",
     "themeToDark": "Switch to dark mode",
-    "cities": "Cities",
     "medicalTourism": "Medical tourism",
     "groups": "Groups",
     "contact": "Contact"
@@ -937,23 +936,16 @@
     "unrated": "Not rated",
     "filterAny": "Any rating"
   },
-  "cities": {
-    "title": "Cities",
-    "subtitle": "Every destination SAFRA has stays in, in one place.",
-    "empty": "No cities are published yet."
-  },
   "medicalTourism": {
     "title": "Medical tourism",
     "body": "A section for stays that accompany a course of treatment, close to the hospitals and clinics. It is not open yet, and we would rather say so than promise something we have not verified where people’s health is concerned.",
-    "browse": "Browse stays",
-    "cities": "Browse cities"
+    "browse": "Browse stays"
   },
   "groups": {
     "title": "Group trips",
     "body": "Trips SAFRA puts together itself, with the destination, the dates and the stay arranged in advance.",
     "empty": "No group trip is announced right now. Browse the stays in the meantime.",
     "browse": "Browse stays",
-    "cities": "Browse cities",
     "seats": "{n, plural, one {# seat} other {# seats}}",
     "priceFrom": "From {amount}",
     "priceOnRequest": "Price on request",

@@ -1,13 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * A page inside a city says it is inside «المدن» (Bashar, 2026-10-02, screenshot «15.21.28»: the
- * city page read «الرئيسية › دمشق», and «the correct path would be الرئيسية - المدن - دمشق»).
+ * A page inside a city says which city, straight under «الرئيسية» (Bashar, 2026-10-04).
  *
- * Every page whose trail passes through a city, not only the one reported: the city itself, a stay
- * in it and a landmark in it all skipped the index. Asked of the visible trail AND of the
- * `BreadcrumbList` a search engine reads, because the two are written separately in each page and
- * a fix to one leaves the other telling the old story.
+ * The trail read «الرئيسية › المدن › دمشق» from 2026-10-02 until the cities index was removed («I do
+ * not need it anymore»); a step leading to a page that no longer exists would mislead, so it went
+ * from every trail that carried it. Asked of the city itself, a stay in it and a landmark in it,
+ * and of the `BreadcrumbList` a search engine reads as well as the visible trail, because the two
+ * are written separately in each page and a fix to one leaves the other telling the old story.
  */
 test.use({ baseURL: 'http://localhost:3000' });
 
@@ -44,22 +44,22 @@ const CASES = [
   {
     name: 'a city',
     path: () => '/ar/city/damascus',
-    expected: ['الرئيسية', 'المدن', 'دمشق'],
+    expected: ['الرئيسية', 'دمشق'],
   },
   {
     name: 'a city, in English',
     path: () => '/en/city/damascus',
-    expected: ['Home', 'Cities', 'Damascus'],
+    expected: ['Home', 'Damascus'],
   },
   {
     name: 'a stay in a city',
     path: () => '/ar/property/grand-umayyad-hotel',
-    expected: ['الرئيسية', 'المدن', 'دمشق', 'فندق أمية الكبير'],
+    expected: ['الرئيسية', 'دمشق', 'فندق أمية الكبير'],
   },
 ];
 
 for (const { name, path, expected } of CASES) {
-  test(`${name} sits under «المدن» in its trail and in its structured data`, async ({
+  test(`${name} sits under its city in its trail and in its structured data`, async ({
     page,
   }) => {
     await page.goto(path());
@@ -68,23 +68,17 @@ for (const { name, path, expected } of CASES) {
   });
 }
 
-test('a landmark sits under «المدن», then its city', async ({ page }) => {
+test('a landmark sits under its city', async ({ page }) => {
   await page.goto(`/ar/landmark/${await damascusLandmark(page)}`);
   const steps = await trail(page);
-  expect(steps.slice(0, 3)).toEqual(['الرئيسية', 'المدن', 'دمشق']);
-  expect(steps).toHaveLength(4);
-  expect((await structuredTrail(page)).slice(0, 3)).toEqual([
-    'الرئيسية',
-    'المدن',
-    'دمشق',
-  ]);
+  expect(steps.slice(0, 2)).toEqual(['الرئيسية', 'دمشق']);
+  expect(steps).toHaveLength(3);
+  expect((await structuredTrail(page)).slice(0, 2)).toEqual(['الرئيسية', 'دمشق']);
 });
 
-test('«المدن» in the trail opens the cities index', async ({ page }) => {
+test('no trail names the removed cities index', async ({ page }) => {
   await page.goto('/ar/city/damascus');
-  await page
-    .getByRole('navigation', { name: 'مسار التنقل' })
-    .getByRole('link', { name: 'المدن' })
-    .click();
-  await expect(page).toHaveURL(/\/ar\/city$/);
+  await expect(
+    page.getByRole('navigation', { name: 'مسار التنقل' }).locator('a[href$="/city"]'),
+  ).toHaveCount(0);
 });

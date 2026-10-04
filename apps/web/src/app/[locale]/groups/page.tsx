@@ -73,7 +73,6 @@ export default async function GroupsPage({
         title={t('title')}
         body={t('empty')}
         browseLabel={t('browse')}
-        citiesLabel={t('cities')}
       />
     );
   }

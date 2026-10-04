@@ -143,9 +143,10 @@ test.describe('public routes', () => {
  * browser sees the console error and the lost client-side routing, which is why it lives here.
  */
 /**
- * The six destinations Bashar asked for, in his order, each reaching a real page.
+ * The destinations Bashar asked for, in his order, each reaching a real page.
  *
- * «الرئيسية + سياحة علاجية + الإقامات + المدن + جروبات + تواصل معنا» (2026-09-27).
+ * «الرئيسية + سياحة علاجية + الإقامات + المدن + جروبات + تواصل معنا» (2026-09-27); «المدن» removed
+ * with its page on 2026-10-04.
  *
  * ## Why this is not covered by the crawl above
  *
@@ -165,7 +166,7 @@ test.describe('public routes', () => {
  * constant the component renders passes whatever that constant says — including after somebody
  * renames جروبات to something else — which is exactly the change this exists to notice.
  */
-test('the navbar carries the six destinations, in order', async ({ page }) => {
+test('the navbar carries the five destinations, in order', async ({ page }) => {
   await page.goto('/ar');
 
   const items = await page
@@ -176,13 +177,12 @@ test('the navbar carries the six destinations, in order', async ({ page }) => {
     'الرئيسية',
     'سياحة علاجية',
     'الإقامات',
-    'المدن',
     'جروبات',
     'تواصل معنا',
   ]);
 
   /*
-    And the same six on a phone, where they live in the drawer rather than on the bar. The bar is
+    And the same five on a phone, where they live in the drawer rather than on the bar. The bar is
     `hidden` below `lg`, so a reader on a telephone reaches them only through the menu — a set that
     is complete on a desktop and short on a phone is the failure this second half catches.
   */
@@ -197,14 +197,7 @@ test('the navbar carries the six destinations, in order', async ({ page }) => {
     .locator('a')
     .evaluateAll((links) => links.map((link) => (link.textContent ?? '').trim()));
 
-  for (const label of [
-    'الرئيسية',
-    'سياحة علاجية',
-    'الإقامات',
-    'المدن',
-    'جروبات',
-    'تواصل معنا',
-  ]) {
+  for (const label of ['الرئيسية', 'سياحة علاجية', 'الإقامات', 'جروبات', 'تواصل معنا']) {
     expect(inDrawer, `«${label}» is reachable on a phone`).toContain(label);
   }
 });

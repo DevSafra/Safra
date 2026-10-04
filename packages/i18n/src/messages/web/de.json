@@ -19,7 +19,6 @@
     "breadcrumb": "Brotkrümelnavigation",
     "themeToLight": "Zum hellen Design wechseln",
     "themeToDark": "Zum dunklen Design wechseln",
-    "cities": "Städte",
     "medicalTourism": "Medizintourismus",
     "groups": "Gruppen",
     "contact": "Kontakt"
@@ -937,23 +936,16 @@
     "unrated": "Nicht klassifiziert",
     "filterAny": "Alle Klassifizierungen"
   },
-  "cities": {
-    "title": "Städte",
-    "subtitle": "Alle Reiseziele, an denen SAFRA Unterkünfte hat, an einem Ort.",
-    "empty": "Es sind noch keine Städte veröffentlicht."
-  },
   "medicalTourism": {
     "title": "Medizintourismus",
     "body": "Ein Bereich für Unterkünfte, die eine Behandlung begleiten, in der Nähe der Kliniken und Zentren. Er ist noch nicht eröffnet, und wo es um die Gesundheit von Menschen geht, sagen wir das lieber, als etwas zu versprechen, das wir nicht geprüft haben.",
-    "browse": "Unterkünfte ansehen",
-    "cities": "Städte ansehen"
+    "browse": "Unterkünfte ansehen"
   },
   "groups": {
     "title": "Gruppenreisen",
     "body": "Reisen, die SAFRA selbst zusammenstellt: Ziel, Termine und Unterkunft sind im Voraus organisiert.",
     "empty": "Derzeit ist keine Gruppenreise ausgeschrieben. Sehen Sie sich solange die Unterkünfte an.",
     "browse": "Unterkünfte ansehen",
-    "cities": "Städte ansehen",
     "seats": "{n, plural, one {# Platz} other {# Plätze}}",
     "priceFrom": "Ab {amount}",
     "priceOnRequest": "Preis auf Anfrage",

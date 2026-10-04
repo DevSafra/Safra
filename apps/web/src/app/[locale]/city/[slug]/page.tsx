@@ -118,7 +118,6 @@ export default async function CityPage({
     }),
     breadcrumbGraph([
       { name: t('backHome'), url: `${origin}/${locale}` },
-      { name: tnav('cities'), url: `${origin}/${locale}/city` },
       { name, url: `${origin}/${locale}/city/${city.slug}` },
     ]),
   ];
@@ -169,11 +168,7 @@ export default async function CityPage({
         <div className="relative mx-auto max-w-7xl px-4 py-10 sm:py-14">
           <Breadcrumb
             label={tnav('breadcrumb')}
-            items={[
-              { label: t('backHome'), href: `/${locale}` },
-              { label: tnav('cities'), href: `/${locale}/city` },
-              { label: name },
-            ]}
+            items={[{ label: t('backHome'), href: `/${locale}` }, { label: name }]}
           />
 
           <p className="mt-4 text-sm tracking-wide text-sky">

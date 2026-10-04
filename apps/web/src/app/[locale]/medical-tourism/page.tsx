@@ -56,7 +56,6 @@ export default async function MedicalTourismPage({
       title={t('title')}
       body={t('body')}
       browseLabel={t('browse')}
-      citiesLabel={t('cities')}
     />
   );
 }

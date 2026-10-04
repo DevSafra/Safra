@@ -58,3 +58,11 @@ test('the English home page names each service in English beneath its brand', as
   await expect(row.locator('[data-service="stay"]')).toContainText('Hotels and stays');
   await expect(row.locator('[data-service="rides"]')).toContainText('Coming soon');
 });
+
+test('the cities page is gone, in every language', async ({ request }) => {
+  for (const path of ['/ar/city', '/en/city', '/de/city']) {
+    expect((await request.get(path)).status(), path).toBe(404);
+  }
+  /* A city's own page stays: it is what the stays are listed on. */
+  expect((await request.get('/ar/city/damascus')).status()).toBe(200);
+});

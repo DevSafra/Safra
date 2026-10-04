@@ -77,7 +77,7 @@ export function GroupTripCard({
                   Empty where staff have written none: the trip's title is the next element in the
                   reading order, so a screen reader that also announced the picture would hear the
                   trip twice. Where alt text exists it is used, because then it says something the
-                  title does not. The rule `city-card.tsx` states, applied to the same shape.
+                  title does not.
                 */
                 alt={localisedText(trip.cover.alt, locale)}
                 {...(trip.cover.width !== null && trip.cover.height !== null

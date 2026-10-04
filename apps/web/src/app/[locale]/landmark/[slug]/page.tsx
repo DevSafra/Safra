@@ -241,7 +241,6 @@ export default async function LandmarkPage({
     }),
     breadcrumbGraph([
       { name: tnav('home'), url: `${origin}/${locale}` },
-      { name: tnav('cities'), url: `${origin}/${locale}/city` },
       { name: cityName, url: `${origin}/${locale}/city/${landmark.citySlug}` },
       { name, url: `${origin}/${locale}/landmark/${landmark.slug}` },
     ]),
@@ -268,7 +267,6 @@ export default async function LandmarkPage({
             label={tnav('breadcrumb')}
             items={[
               { label: tnav('home'), href: `/${locale}` },
-              { label: tnav('cities'), href: `/${locale}/city` },
               { label: cityName, href: `/${locale}/city/${landmark.citySlug}` },
               { label: name },
             ]}

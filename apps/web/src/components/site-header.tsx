@@ -149,7 +149,6 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
     { href: `/${locale}`, label: t('home') },
     { href: `/${locale}/medical-tourism`, label: t('medicalTourism') },
     { href: `/${locale}/search`, label: t('stays') },
-    { href: `/${locale}/city`, label: t('cities') },
     { href: `/${locale}/groups`, label: t('groups') },
     { href: `/${locale}/contact`, label: t('contact') },
   ];
