@@ -9,7 +9,7 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run build --filter='./packages/*' && eslint .",
-    "typecheck": "turbo run typecheck && tsc -p e2e/tsconfig.json --noEmit && tsc -p tools/suite-coverage/tsconfig.json --noEmit",
+    "typecheck": "turbo run typecheck && tsc -p e2e/tsconfig.json --noEmit && tsc -p tools/suite-coverage/tsconfig.json --noEmit && tsc -p tools/audit-exemptions/tsconfig.json --noEmit",
     "test": "sh -c 'set -a; [ -f ./.env ] && . ./.env; set +a; turbo run build --filter=\"./packages/*\" && node scripts/test-run.mjs'",
     "test:e2e": "turbo run test:e2e",
     "format": "prettier --write \"**/*.{ts,tsx,md,json,yaml,yml}\"",
@@ -69,7 +69,8 @@
     },
     "auditConfig": {
       "ignoreGhsas": [
-        "GHSA-jrc7-96c5-q579"
+        "GHSA-jrc7-96c5-q579",
+        "GHSA-vfj7-8cjw-p6xm"
       ]
     }
   }

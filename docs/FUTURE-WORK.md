@@ -91,6 +91,16 @@ deleting it; the reason something was blocked is often the reason it comes back.
 
 ## 1. Where the project stands
 
+> ### Accepted risk, 2026-10-04: GHSA-vfj7-8cjw-p6xm, `braces` (high), ignored by the audit
+>
+> A stack-exhaustion DoS in `braces` ≤3.0.3 with **no patched version** (`<0.0.0`), so `pnpm verify`
+> failed every commit with nothing to upgrade. Ignored in `package.json` by Bashar's decision. The
+> grounds: its only path is `@next/eslint-plugin-next › fast-glob › micromatch › braces`, a DEV
+> dependency of the root, fed patterns from our own lint config; nothing that ships contains it.
+> **`tools/audit-exemptions/braces-dev-only.test.ts` holds that to account**: it walks every
+> shipped dependency from the lockfile and fails the day `braces` becomes reachable, and fails again
+> when `braces` leaves the lockfile, which is the day the ignore comes out.
+
 > ### Refund destination audit, 2026-10-02: the offline rail fixed the same day
 >
 > Bashar asked for proof that «a customer refund must always be returned to the exact same payment
