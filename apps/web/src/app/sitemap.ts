@@ -90,6 +90,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
 
     entries.push({
+      url: `${base}/${locale}/about`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      /* What SAFRA is and promises: found by somebody checking who they are about to pay. */
+      priority: 0.5,
+    });
+
+    entries.push({
       url: `${base}/${locale}/groups`,
       lastModified: now,
       changeFrequency: 'weekly',

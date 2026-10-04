@@ -143,11 +143,13 @@ test.describe('public routes', () => {
  * browser sees the console error and the lost client-side routing, which is why it lives here.
  */
 /**
- * The navbar carries exactly the destinations Bashar left in it: «الرئيسية» and «تواصل معنا».
+ * The navbar carries exactly the destinations Bashar left in it: «الرئيسية», «عن سفرة» and
+ * «تواصل معنا».
  *
  * It held six from 2026-09-27 («الرئيسية + سياحة علاجية + الإقامات + المدن + جروبات + تواصل معنا»);
  * «المدن» went with its page on 2026-10-04 and the other three the same day («remove سياحة علاجية +
- * الإقامات + جروبات from the navbar menu»). Their pages stay.
+ * الإقامات + جروبات from the navbar menu»). Their pages stay. «عن سفرة» was added the same day,
+ * «between الرئيسية and تواصل معنا», and the order is asserted with it.
  *
  * ## Why this is not covered by the crawl above
  *
@@ -162,10 +164,10 @@ test.describe('public routes', () => {
  * The labels are written out rather than imported from `web/ar.json`. A test that reads the same
  * constant the component renders passes whatever that constant says.
  */
-test('the navbar carries only home and contact, on the bar and in the phone menu', async ({
+test('the navbar carries home, about and contact, on the bar and in the phone menu', async ({
   page,
 }) => {
-  const expected = ['الرئيسية', 'تواصل معنا'];
+  const expected = ['الرئيسية', 'عن سفرة', 'تواصل معنا'];
   await page.goto('/ar');
 
   const items = await page

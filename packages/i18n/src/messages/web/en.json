@@ -6,6 +6,7 @@
   },
   "nav": {
     "home": "Home",
+    "about": "About SAFRA",
     "stays": "Stays",
     "partner": "Partner dashboard",
     "admin": "Admin",
@@ -973,5 +974,8 @@
     "supportTitle": "Have a booking? Open a support ticket",
     "supportBody": "A support ticket reaches the SAFRA team with your booking reference attached, so you do not have to explain it from the start. It is the fastest and the most precise channel.",
     "supportAction": "Open a support ticket"
+  },
+  "about": {
+    "title": "About SAFRA"
   }
 }

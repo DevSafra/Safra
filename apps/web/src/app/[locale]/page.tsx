@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 
 import { SearchForm } from '@/components/search-form';
 import { CardSlider } from '@/components/card-slider';
+import { PledgeCards } from '@/components/pledge-cards';
 import { ServiceCards } from '@/components/service-cards';
 import { GroupTripCard } from '@/components/group-trip-card';
 import { PropertyCard } from '@/components/property-card';
@@ -27,7 +28,6 @@ import { formatCustomerFee, partnerRate, todayInDamascus } from '@/lib/settings'
 import { dayAfter, night, retryFrom } from '@/lib/bookable-night';
 import { dynamicMessage } from '@/lib/dynamic-message';
 import { getGroupTrips, upcomingTrips } from '@/lib/group-trips';
-import { ORNAMENT_BRAND, ORNAMENT_CRESCENT, ORNAMENT_STAR } from '@safra/ui';
 
 export const revalidate = 300;
 
@@ -124,36 +124,12 @@ export default async function HomePage({
     { icon: CompensationIcon, label: t('trustCompensation') },
   ];
 
-  /*
-    An icon per pledge (Bashar, 2026-09-03), drawn in the product's own 1.75 stroke rather than the
-    three brand ornaments that were here. The ornaments are beautiful and interchangeable — a
-    crescent, a star and the brand mark say «SAFRA» three times and say nothing about the promise
-    underneath. A shield, a badge and a returning arrow say which promise this is before the heading
-    is read, which is the only reason to put a mark above a heading at all.
-  */
+  /* Drawn by `PledgeCards`, which «عن سفرة» shares, with each pledge's icon fixed to it there. */
   const pledges = [
-    {
-      icon: VerifiedIcon,
-      ornament: ORNAMENT_CRESCENT,
-      ordinal: t('pledgeOrdinal1'),
-      title: t('pledge1Title'),
-      body: t('pledge1Body'),
-    },
-    {
-      icon: CompensationIcon,
-      ornament: ORNAMENT_STAR,
-      ordinal: t('pledgeOrdinal2'),
-      title: t('pledge2Title'),
-      body: t('pledge2Body'),
-    },
-    {
-      icon: WalletIcon,
-      ornament: ORNAMENT_BRAND,
-      ordinal: t('pledgeOrdinal3'),
-      title: t('pledge3Title'),
-      body: t('pledge3Body'),
-    },
-  ];
+    { ordinal: t('pledgeOrdinal1'), title: t('pledge1Title'), body: t('pledge1Body') },
+    { ordinal: t('pledgeOrdinal2'), title: t('pledge2Title'), body: t('pledge2Body') },
+    { ordinal: t('pledgeOrdinal3'), title: t('pledge3Title'), body: t('pledge3Body') },
+  ] as const;
 
   /*
     The night every link into search carries — the one the API said was bookable, not the one the
@@ -445,32 +421,9 @@ export default async function HomePage({
             {t('pledgesSubtitle')}
           </SectionHeading>
 
-          <ul className="mt-7 grid gap-3 md:grid-cols-3">
-            {pledges.map((pledge) => (
-              <li
-                key={pledge.title}
-                className="rounded-card border border-line bg-card p-5 text-center"
-              >
-                {/*
-                  The ornaments are the brand's own glyphs, not icons standing in for a set — the
-                  prototype marks the three pledges with exactly these three, and `docs/i18n.md`
-                  records why they are constants in `@safra/ui` rather than copy.
-                */}
-                <span
-                  aria-hidden
-                  className="inline-flex size-11 items-center justify-center rounded-full border border-gold/40 bg-gold/10 text-gold-read [&_svg]:size-5"
-                >
-                  <pledge.icon />
-                </span>
-                <p className="mt-3 text-14 tracking-wide text-faint">{pledge.ordinal}</p>
-                <h3 className="mt-1 text-lg font-bold text-balance text-text">
-                  {pledge.title}
-                </h3>
-                <div className="gold-rule mx-auto mt-3 w-12" />
-                <p className="mt-3 text-14 leading-relaxed text-muted">{pledge.body}</p>
-              </li>
-            ))}
-          </ul>
+          <div className="mt-7">
+            <PledgeCards pledges={pledges} />
+          </div>
         </div>
       </section>
 

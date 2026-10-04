@@ -31,6 +31,7 @@ const notBold = (weights: Array<[string, number]>) =>
 test('every page title and section heading is bold', async ({ page }) => {
   const paths = [
     '/ar',
+    '/ar/about',
     '/ar/city/damascus',
     '/ar/groups',
     '/ar/groups/coastal-syria-spring',

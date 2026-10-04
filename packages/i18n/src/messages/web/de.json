@@ -6,6 +6,7 @@
   },
   "nav": {
     "home": "Startseite",
+    "about": "Über SAFRA",
     "stays": "Unterkünfte",
     "partner": "Partner-Dashboard",
     "admin": "Verwaltung",
@@ -973,5 +974,8 @@
     "supportTitle": "Sie haben eine Buchung? Öffnen Sie ein Support-Ticket",
     "supportBody": "Ein Support-Ticket erreicht das SAFRA-Team mit Ihrer Buchungsnummer, Sie müssen also nicht von vorn erklären. Das ist der schnellste und genaueste Kanal.",
     "supportAction": "Support-Ticket öffnen"
+  },
+  "about": {
+    "title": "Über SAFRA"
   }
 }

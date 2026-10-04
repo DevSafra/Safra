@@ -16,6 +16,7 @@ import { expect, test } from '@playwright/test';
 const BASE = 'http://localhost:3000';
 const PAGES = [
   '/ar',
+  '/ar/about',
   '/ar/city/damascus',
   '/ar/contact',
   '/ar/medical-tourism',
@@ -27,6 +28,7 @@ const PAGES = [
   '/ar/partners/join',
   '/en/city/damascus',
   '/en/contact',
+  '/en/about',
 ];
 
 test('every public page runs its scripts and applies the chosen theme', async ({

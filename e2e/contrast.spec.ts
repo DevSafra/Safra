@@ -49,6 +49,7 @@ import { STAFF_STATE } from './staff.js';
 /** One page per shape: marketing, results, a record, prose, a form. */
 const CUSTOMER = [
   '/ar',
+  '/ar/about',
   '/ar/search?checkIn=2026-09-03&checkOut=2026-09-04&adults=2',
   '/ar/city/damascus',
   '/ar/property/qasr-al-sharq-apartments',

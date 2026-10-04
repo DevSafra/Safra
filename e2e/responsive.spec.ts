@@ -57,6 +57,8 @@ const CONSOLE = [
 
 const CUSTOMER = [
   '/ar',
+  /* «عن سفرة», added 2026-10-04: two card grids and a two-button band, all of which stack. */
+  '/ar/about',
   '/ar/search',
   '/ar/city/petra',
   /*
@@ -534,7 +536,7 @@ test.describe('the customer site', () => {
     const menu = page.getByRole('dialog');
 
     await expect(menu.getByRole('navigation')).toBeVisible();
-    await expect(menu.getByRole('link', { name: 'تواصل معنا' })).toBeVisible();
+    await expect(menu.getByRole('link', { name: 'عن سفرة' })).toBeVisible();
   });
 });
 
@@ -580,9 +582,10 @@ test.describe('the phone menu', () => {
 
     await expect(menu).toBeVisible();
 
-    /* The two destinations, the partner invitation, and a way in. Nothing is only on a desktop. */
+    /* The three destinations, the partner invitation, and a way in. Nothing is only on a desktop. */
     for (const name of [
       'الرئيسية',
+      'عن سفرة',
       'تواصل معنا',
       'سجّل كشريك',
       'تسجيل الدخول',
@@ -678,8 +681,8 @@ test.describe('the phone menu', () => {
     await page.setViewportSize({ width: 390, height: 860 });
     await page.goto('/ar');
     await page.locator('header [data-menu="mobile"]').click();
-    await page.getByRole('dialog').getByRole('link', { name: 'تواصل معنا' }).click();
-    await page.waitForURL('**/contact');
+    await page.getByRole('dialog').getByRole('link', { name: 'عن سفرة' }).click();
+    await page.waitForURL('**/about');
 
     /*
       The page behind a modal is scroll-locked and the bar is lifted over the overlay. A navigation

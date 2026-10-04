@@ -133,12 +133,14 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
   const session = await getSession();
 
   /*
-    Two destinations (Bashar, 2026-10-04: «remove سياحة علاجية + الإقامات + جروبات from the navbar
-    menu»). It carried six from 2026-09-27; «المدن» went with its page the same day as these three,
-    and the pages behind the three stay, reached from the home page's service cards and the footer.
+    Three destinations (Bashar, 2026-10-04): «remove سياحة علاجية + الإقامات + جروبات from the
+    navbar menu», then «عن سفرة» «between الرئيسية and تواصل معنا». It carried six from 2026-09-27;
+    «المدن» went with its page the same day, and the pages behind the other three stay, reached from
+    the home page's service cards and the footer.
   */
   const links = [
     { href: `/${locale}`, label: t('home') },
+    { href: `/${locale}/about`, label: t('about') },
     { href: `/${locale}/contact`, label: t('contact') },
   ];
 
@@ -198,7 +200,7 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
 
         {/*
           `lg`, not `md`, since the menu grew from two items to six (Bashar, 2026-09-27). Kept at
-          `lg` when it went down to two on 2026-10-04: the widths below already hand the menu to
+          `lg` when it went down to three on 2026-10-04: the widths below already hand the menu to
           the drawer, and moving the breakpoint back is a layout change nobody asked for. What
           follows is the record of the six-item bar that decided it.
 
