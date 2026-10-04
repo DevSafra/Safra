@@ -2,9 +2,11 @@ import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
 import { SidebarBackdrop, SidebarToggle, ThemeToggle } from '@safra/ui';
+import { partnerApplicationsOpen } from '@safra/contracts';
 
 import { SignOutButton } from '@/components/sign-out-button';
 import type { AccountSummary } from '@/lib/account';
+import { getPublicSettings } from '@/lib/catalog';
 import { dynamicMessage } from '@/lib/dynamic-message';
 import { formatMoney } from '@/lib/localise';
 import type { Locale } from '@/i18n/routing';
@@ -122,6 +124,8 @@ export async function AccountShell({
   const tn = await getTranslations('nav');
   /* The footer owns this label — one word for one destination, wherever it is offered. */
   const tf = await getTranslations('footer');
+  /* The super admin's switch for «انضم كشريك» (2026-10-04); closed, the link below is not drawn. */
+  const partnersOpen = partnerApplicationsOpen(await getPublicSettings());
 
   /*
     §6 marks exactly three items. Each is omitted rather than shown as «0»: an absent badge says
@@ -247,12 +251,14 @@ export async function AccountShell({
             Separated by a rule and given no `aria-current`, so it never reads as the section you
             are in.
           */}
-          <Link
-            href={`/${locale}/partners/join`}
-            className="mt-2 inline-flex min-h-10 items-center border-t border-line px-3 pt-3 text-sm text-muted transition-colors hover:bg-line/40 hover:text-gold-read lg:min-h-0 lg:py-2"
-          >
-            {tf('becomePartner')}
-          </Link>
+          {partnersOpen ? (
+            <Link
+              href={`/${locale}/partners/join`}
+              className="mt-2 inline-flex min-h-10 items-center border-t border-line px-3 pt-3 text-sm text-muted transition-colors hover:bg-line/40 hover:text-gold-read lg:min-h-0 lg:py-2"
+            >
+              {tf('becomePartner')}
+            </Link>
+          ) : null}
         </nav>
 
         {/*

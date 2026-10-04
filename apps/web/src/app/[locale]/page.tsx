@@ -24,6 +24,7 @@ import {
   type PropertyType,
 } from '@/lib/catalog';
 import { searchSafely } from '@/lib/api';
+import { partnerApplicationsOpen } from '@safra/contracts';
 import { formatCustomerFee, partnerRate, todayInDamascus } from '@/lib/settings';
 import { dayAfter, night, retryFrom } from '@/lib/bookable-night';
 import { dynamicMessage } from '@/lib/dynamic-message';
@@ -427,40 +428,46 @@ export default async function HomePage({
         </div>
       </section>
 
-      {/* ── Partner recruitment (§8.3) ───────────────────────────────────── */}
-      <section aria-label={t('partnersTitle')} className="bg-bg">
-        <div className="mx-auto max-w-7xl px-4 py-10 sm:py-12">
-          <div className="grid gap-6 rounded-card border border-line bg-card p-6 sm:p-7 lg:grid-cols-[1fr_auto] lg:items-center lg:gap-12">
-            <div>
-              {/* Gold, 12px/700 — the same label treatment every other section on this page has. */}
-              <p className="text-13 font-bold tracking-[0.08em] text-gold-read">
-                {t('partnersTitle')}
-              </p>
-              {/*
+      {/*
+        ── Partner recruitment (§8.3) ─────────────────────────────────────
+
+        The whole section, not only its button, goes when the super admin closes the form
+        (2026-10-04): an offer to list a property with nothing to press is a dead end.
+      */}
+      {partnerApplicationsOpen(settings) ? (
+        <section aria-label={t('partnersTitle')} className="bg-bg">
+          <div className="mx-auto max-w-7xl px-4 py-10 sm:py-12">
+            <div className="grid gap-6 rounded-card border border-line bg-card p-6 sm:p-7 lg:grid-cols-[1fr_auto] lg:items-center lg:gap-12">
+              <div>
+                {/* Gold, 12px/700 — the same label treatment every other section on this page has. */}
+                <p className="text-13 font-bold tracking-[0.08em] text-gold-read">
+                  {t('partnersTitle')}
+                </p>
+                {/*
                 Bigger (Bashar, 2026-09-03: «too small — make the font and the button bigger»). This
                 is the one place on the page addressed to somebody with a building to list rather
                 than a night to book, and it was set two steps below every other section heading, so
                 it read as a footnote to the page instead of an offer on it.
               */}
-              <h2 className="mt-1 font-display text-2xl font-bold text-balance text-text sm:text-28">
-                {t('partnersSubtitle')}
-              </h2>
-              <p className="mt-3 max-w-[62ch] text-16 leading-relaxed text-muted">
-                {/*
+                <h2 className="mt-1 font-display text-2xl font-bold text-balance text-text sm:text-28">
+                  {t('partnersSubtitle')}
+                </h2>
+                <p className="mt-3 max-w-[62ch] text-16 leading-relaxed text-muted">
+                  {/*
                   The commission comes from settings, never a hardcoded string. The super admin
                   edits it from the Rules Engine page (P-005), and this text has to follow
                   whatever they set. With no rate configured the sentence drops its commission
                   clause rather than printing a dash where a percentage belongs.
                 */}
-                {partnerRate(settings) === null
-                  ? t('partnersBodyNoRate')
-                  : t('partnersBody', {
-                      rate: formatCustomerFee(settings, 'partnerRate', locale),
-                    })}
-              </p>
-            </div>
+                  {partnerRate(settings) === null
+                    ? t('partnersBodyNoRate')
+                    : t('partnersBody', {
+                        rate: formatCustomerFee(settings, 'partnerRate', locale),
+                      })}
+                </p>
+              </div>
 
-            {/*
+              {/*
               One button, not the prototype's two. Its "try the partner dashboard" control points
               at the partner PORTAL, which is a separate application on a different origin and has
               no address configured anywhere in this app — so the second button could only have
@@ -471,15 +478,16 @@ export default async function HomePage({
               foreground rescues it; the gradient rescues it by carrying its own dark foreground
               rather than borrowing the page's, and it measures 6.1:1 at its dark end.
             */}
-            <Link
-              href={`/${locale}/partners/join`}
-              className="btn-gold inline-flex min-h-12 items-center justify-center justify-self-start rounded-lg px-8 text-16 font-bold sm:min-h-[52px]"
-            >
-              {t('partnersCta')}
-            </Link>
+              <Link
+                href={`/${locale}/partners/join`}
+                className="btn-gold inline-flex min-h-12 items-center justify-center justify-self-start rounded-lg px-8 text-16 font-bold sm:min-h-[52px]"
+              >
+                {t('partnersCta')}
+              </Link>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
     </>
   );
 }

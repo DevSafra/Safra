@@ -1,11 +1,14 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+
+import { partnerApplicationsOpen } from '@safra/contracts';
 import { getTranslations } from 'next-intl/server';
 
 import { dialOptions } from '@/lib/dial-options';
 import { PartnerApplicationForm } from '@/components/partner-application-form';
 import { isLocale } from '@/i18n/routing';
 import { requireSignedIn } from '@/lib/account-page';
-import { getCities, getPartnerTypes } from '@/lib/catalog';
+import { getCities, getPartnerTypes, getPublicSettings } from '@/lib/catalog';
 import { localisedName } from '@/lib/localise';
 
 /**
@@ -38,6 +41,13 @@ import { localisedName } from '@/lib/localise';
  * address. The first two used to happen here in effect — `POST /partner/register` created a
  * partner outright — and the third stopped being a question the moment a session was required.
  *
+ * ## Not there at all while the super admin has closed it (Bashar, 2026-10-04)
+ *
+ * `partner.applications_open` off means «سجّل كشريك» is hidden on the whole site and partners are
+ * added only from the console, so this page answers 404 rather than a form that would be refused.
+ * Checked before the sign-in requirement, so a signed-in reader and the page itself agree. The API
+ * refuses the submission independently; this is what a reader sees, not what protects anything.
+ *
  * ## Rendered per request, never statically
  *
  * It depends on who is asking, so there is no `generateStaticParams` and no `revalidate`. The
@@ -65,6 +75,9 @@ export default async function JoinAsPartnerPage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale: requested } = await params;
+
+  if (!partnerApplicationsOpen(await getPublicSettings())) notFound();
+
   /* A LITERAL path, never one from the URL — see the note on `requireSignedIn`. */
   const { session, locale } = await requireSignedIn(requested, '/partners/join');
 

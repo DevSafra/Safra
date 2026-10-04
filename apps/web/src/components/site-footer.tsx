@@ -3,9 +3,13 @@ import { getTranslations } from 'next-intl/server';
 
 import type { Locale } from '@/i18n/routing';
 import { HeaderMenus } from '@/components/header-menus';
-import { getCities } from '@/lib/catalog';
+import { getCities, getPublicSettings } from '@/lib/catalog';
 import { localisedName } from '@/lib/localise';
-import { CUSTOMER_FACING_METHODS, type CustomerFacingMethod } from '@safra/contracts';
+import {
+  CUSTOMER_FACING_METHODS,
+  partnerApplicationsOpen,
+  type CustomerFacingMethod,
+} from '@safra/contracts';
 import { ORNAMENT_BRAND } from '@safra/ui';
 
 /**
@@ -97,10 +101,11 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
   const payment = await getTranslations('paymentMethods');
 
   /*
-    The cities alone now. The currency catalogue and the chosen-currency cookie fed a picker that
-    no longer exists — the platform prices in one currency (Bashar, 2026-09-14).
+    The cities, and the public settings for one switch: whether «انضم كشريك» is offered at all. The
+    currency catalogue and the chosen-currency cookie fed a picker that no longer exists — the
+    platform prices in one currency (Bashar, 2026-09-14).
   */
-  const cities = await getCities();
+  const [cities, settings] = await Promise.all([getCities(), getPublicSettings()]);
 
   const destinations = {
     title: t('links'),
@@ -112,7 +117,10 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
           was removed (Bashar, 2026-09-03). The reference puts «للمضيفين» last in its own links
           column, and it is an invitation to use the site rather than a way to get help with it.
         */
-      { href: `/${locale}/partners/join`, label: t('becomePartner') },
+      /* Only while the super admin keeps the form open (2026-10-04); closed, the page is a 404. */
+      ...(partnerApplicationsOpen(settings)
+        ? [{ href: `/${locale}/partners/join`, label: t('becomePartner') }]
+        : []),
       /*
           A PUBLIC route, and the only one in this footer that a signed-out visitor needs more than
           a signed-in one: somebody who booked as a guest and lost the reference has no account to

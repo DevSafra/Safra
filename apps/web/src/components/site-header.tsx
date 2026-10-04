@@ -11,6 +11,7 @@ import { MenuContents } from '@/components/menu-contents';
 import { MobileMenu } from '@/components/mobile-menu';
 import { HeaderShell } from '@/components/header-shell';
 import { ORNAMENT_BRAND } from '@safra/ui';
+import { partnerApplicationsOpen } from '@safra/contracts';
 
 /**
  * Site header.
@@ -113,7 +114,10 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
     `getPublicSettings` is TAGGED, so an edit in the console reaches this banner on the next render
     rather than waiting out a cache — the same mechanism the customer-fee note already relies on.
   */
-  const announcement = announcementFor(await getPublicSettings(), locale);
+  const settings = await getPublicSettings();
+  const announcement = announcementFor(settings, locale);
+  /* «سجّل كشريك» exists only while the super admin keeps the form open (2026-10-04). */
+  const partnersOpen = partnerApplicationsOpen(settings);
 
   const t = await getTranslations('nav');
   const brand = await getTranslations('brand');
@@ -261,12 +265,14 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
           «لوحة الشريك» included. It was 14px/400 in `--text/85`, which is a different size, a
           different weight AND a different colour from the two links it sits beside.
         */}
-        <Link
-          href={`/${locale}/partners/join`}
-          className="hidden min-h-10 items-center rounded-lg px-3 py-2 text-14 font-semibold text-muted transition-colors hover:bg-gold/10 hover:text-text sm:h-11 xl:inline-flex"
-        >
-          {home('partnersCta')}
-        </Link>
+        {partnersOpen ? (
+          <Link
+            href={`/${locale}/partners/join`}
+            className="hidden min-h-10 items-center rounded-lg px-3 py-2 text-14 font-semibold text-muted transition-colors hover:bg-gold/10 hover:text-text sm:h-11 xl:inline-flex"
+          >
+            {home('partnersCta')}
+          </Link>
+        ) : null}
 
         {/*
           Everything from here is the desktop bar's own. Below `md` these same controls are inside
@@ -347,7 +353,7 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
           <MenuContents
             locale={locale}
             links={links}
-            partnerLabel={home('partnersCta')}
+            partnerLabel={partnersOpen ? home('partnersCta') : null}
             navLabel={t('home')}
             session={session}
             accountLabel={auth('account')}

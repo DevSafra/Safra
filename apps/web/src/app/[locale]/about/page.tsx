@@ -6,6 +6,8 @@ import { notFound } from 'next/navigation';
 import { PledgeCards } from '@/components/pledge-cards';
 import { ServiceCards } from '@/components/service-cards';
 import { isLocale, routing } from '@/i18n/routing';
+import { getPublicSettings } from '@/lib/catalog';
+import { partnerApplicationsOpen } from '@safra/contracts';
 
 /**
  * «عن سفرة» (Bashar, 2026-10-04: «create a new page "عن سفرة" and add it to the navbar menu between
@@ -59,6 +61,8 @@ export default async function AboutPage({
   const home = await getTranslations('home');
   const footer = await getTranslations('footer');
   const nav = await getTranslations('nav');
+  /* Closed on الإعدادات (2026-10-04), the partner offer below is not made at all. */
+  const partnersOpen = partnerApplicationsOpen(await getPublicSettings());
 
   return (
     <>
@@ -144,37 +148,39 @@ export default async function AboutPage({
         people behind it. The partner offer is the home page's, without the commission rate, which
         lives in settings and is quoted where the page reads them.
       */}
-      <section aria-labelledby="about-partners" className="bg-bg">
-        <div className="mx-auto max-w-7xl px-4 pb-14 sm:pb-16">
-          <div className="grid gap-6 rounded-card border border-line bg-card p-6 sm:p-7 lg:grid-cols-[1fr_auto] lg:items-center lg:gap-12">
-            <div>
-              <h2
-                id="about-partners"
-                className="font-display text-26 leading-snug font-bold text-balance text-text sm:text-32"
-              >
-                {home('partnersSubtitle')}
-              </h2>
-              <p className="mt-3 max-w-[62ch] text-16 leading-relaxed text-muted">
-                {home('partnersBodyNoRate')}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href={`/${locale}/partners/join`}
-                className="btn-gold inline-flex min-h-12 items-center justify-center rounded-lg px-8 text-16 font-bold"
-              >
-                {home('partnersCta')}
-              </Link>
-              <Link
-                href={`/${locale}/contact`}
-                className="inline-flex min-h-12 items-center justify-center rounded-lg border border-line px-6 text-16 font-semibold text-text transition-colors duration-200 ease-out-strong hover:border-gold/60 hover:text-gold-read"
-              >
-                {nav('contact')}
-              </Link>
+      {partnersOpen ? (
+        <section aria-labelledby="about-partners" className="bg-bg">
+          <div className="mx-auto max-w-7xl px-4 pb-14 sm:pb-16">
+            <div className="grid gap-6 rounded-card border border-line bg-card p-6 sm:p-7 lg:grid-cols-[1fr_auto] lg:items-center lg:gap-12">
+              <div>
+                <h2
+                  id="about-partners"
+                  className="font-display text-26 leading-snug font-bold text-balance text-text sm:text-32"
+                >
+                  {home('partnersSubtitle')}
+                </h2>
+                <p className="mt-3 max-w-[62ch] text-16 leading-relaxed text-muted">
+                  {home('partnersBodyNoRate')}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href={`/${locale}/partners/join`}
+                  className="btn-gold inline-flex min-h-12 items-center justify-center rounded-lg px-8 text-16 font-bold"
+                >
+                  {home('partnersCta')}
+                </Link>
+                <Link
+                  href={`/${locale}/contact`}
+                  className="inline-flex min-h-12 items-center justify-center rounded-lg border border-line px-6 text-16 font-semibold text-text transition-colors duration-200 ease-out-strong hover:border-gold/60 hover:text-gold-read"
+                >
+                  {nav('contact')}
+                </Link>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
     </>
   );
 }

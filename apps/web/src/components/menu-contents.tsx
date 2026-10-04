@@ -41,7 +41,8 @@ export function MenuContents({
 }: {
   readonly locale: Locale;
   readonly links: readonly { href: string; label: string }[];
-  readonly partnerLabel: string;
+  /** Null while the partner form is closed on الإعدادات: the row is then not drawn at all. */
+  readonly partnerLabel: string | null;
   /** Names the list of destinations for a screen reader — the same label the bar's nav carries. */
   readonly navLabel: string;
   readonly session: { user: { email: string } } | null;
@@ -65,9 +66,10 @@ export function MenuContents({
         linkClassName="min-h-12 w-full px-3 text-16"
       />
 
-      <Link
-        href={`/${locale}/partners/join`}
-        /*
+      {partnerLabel === null ? null : (
+        <Link
+          href={`/${locale}/partners/join`}
+          /*
         `min-h-12`, not `min-h-11`, and 44 was the bug rather than the target.
 
         `table-overflow`'s sibling assertion in `responsive.spec.ts` requires every menu row to be
@@ -78,10 +80,11 @@ export function MenuContents({
         48 is also what the four rows around them already used, so this is one row height in the
         sheet rather than two, which is the reason to prefer it over nudging the assertion.
       */
-        className="inline-flex min-h-12 w-full items-center rounded-lg px-3 text-16 font-semibold text-muted transition-colors duration-200 ease-out-strong hover:bg-gold/10 hover:text-text"
-      >
-        {partnerLabel}
-      </Link>
+          className="inline-flex min-h-12 w-full items-center rounded-lg px-3 text-16 font-semibold text-muted transition-colors duration-200 ease-out-strong hover:bg-gold/10 hover:text-text"
+        >
+          {partnerLabel}
+        </Link>
+      )}
 
       {/*
         The language, shown OPEN with the current one filled in (Bashar, 2026-09-03: «I do not see
