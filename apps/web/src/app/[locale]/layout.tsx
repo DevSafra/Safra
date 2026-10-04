@@ -46,7 +46,7 @@ export async function generateMetadata({
     */
     metadataBase: siteUrl(),
     title: { default: title, template: `%s · ${t('name')}` },
-    description: home('heroPromise'),
+    description: [home('heroPromiseLead'), home('heroPromiseCare')].join(' '),
     // §5.4 targets SEO, so each page declares its language alternates explicitly
     // rather than relying on a crawler to infer them.
     alternates: {

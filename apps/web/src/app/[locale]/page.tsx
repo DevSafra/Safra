@@ -206,8 +206,17 @@ export default async function HomePage({
             does not describe. `--color-handoff-muted` is the file's value to the byte in the light
             theme and this product's own muted (8.11:1) in the dark one.
           */}
-          <p className="mx-auto mt-4 max-w-[62ch] text-17 leading-[1.8] font-medium text-handoff-muted">
-            {t('heroSubtitle')} {t('heroPromise')}
+          {/*
+            Two lines, as Bashar set them out (2026-10-04): what you can book and the payment
+            promise on the first, the care promise on its own line beneath it. The break is a
+            BLOCK span rather than a `<br>`, so the second sentence always starts its own line and
+            a phone still wraps the first one wherever it must. No `max-w-[62ch]` any more: at 62
+            characters the first sentence wrapped on every desktop, and the line he asked for only
+            exists if it can be one line where the screen allows.
+          */}
+          <p className="mx-auto mt-4 text-17 leading-[1.8] font-medium text-handoff-muted">
+            {t('heroSubtitle')} {t('heroPromiseLead')}
+            <span className="block">{t('heroPromiseCare')}</span>
           </p>
 
           <div className="mt-6 text-start">

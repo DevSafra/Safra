@@ -75,7 +75,7 @@ export default async function AboutPage({
             {footer('about')}
           </p>
           <p className="mx-auto mt-3 max-w-[62ch] text-16 leading-relaxed text-muted">
-            {home('heroPromise')}
+            {home('heroPromiseLead')} {home('heroPromiseCare')}
           </p>
           <p className="mt-6 text-14 font-semibold text-gold-read">{footer('madeFor')}</p>
         </div>
