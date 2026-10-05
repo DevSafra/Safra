@@ -96,6 +96,38 @@ deleting it; the reason something was blocked is often the reason it comes back.
 
 ## 1. Where the project stands
 
+> ### Bug audit of the week's changes, 2026-10-04: thirteen fixed
+>
+> Bashar: «Can you check for any bugs on backend or frontend?», then «fix all of them». Everything
+> changed since `8be91ccb` (about 100 commits) was reviewed in four parts and every finding was
+> verified against the code before it was reported. Each fix carries a test watched to fail first.
+>
+> - **Money:** two refunds in the same second were both paid (the booking row is now locked and the
+>   refunded total re-read; the second is refused with `refund.quote_changed`); a mistyped source
+>   account at bank-transfer settlement was committed before the comparison and could never be
+>   corrected (now recorded only with the settlement); the settlement audit row said USD for every
+>   refund; a split payment was marked refunded once the WALLET share came back.
+> - **Partners:** one retired FAQ question froze every FAQ save on a listing that had answered it;
+>   an emptied answer stayed public (the save now carries `cleared`).
+> - **Search:** «الأعلى تقييماً» chose its page by recommendation score; a withdrawn city could empty
+>   the nationwide page; building-level amenity filters were dropped from scroll batches and the map
+>   (one allow-list, `allowedAmenityCodes`, for the page and both routes).
+> - **Console:** Arabic-Indic digits saved seats as «no limit» and positions as 0, and were refused
+>   in trip dates and prices (`westernDigits` in `@safra/contracts`); an impossible trip date was a 500.
+> - **Site:** hearts on a restored list showed the state they arrived with; the map and thumbnail
+>   labelled places in Arabic on /en and /de; past trips listed oldest first so the cap dropped the
+>   newest; «near a type of place» was shown while ignored beside a landmark.
+>
+> **The four low findings, fixed the same day** (Bashar: «fix everything please»): confirming a
+> bank transfer now captures only a pending BANK-TRANSFER attempt, so an abandoned card attempt is
+> no longer marked paid; on الكتالوج «اختياري» has its own colour, the amenities filter column has
+> its own words («في التصفية»/«خارج التصفية»), and an inactive row reads «معطَّل» because «موقوف»
+> is a red suspension on الكوبونات; a missing English question says «يُعرض بالعربية» instead of
+> «—»; and every console route reads its body through `jsonBody`, so a malformed body is a
+> coded 400 rather than a 500 (30 routes, plus the customer coupon preview). Identifier columns are
+> `<code>` elements, which the navigation sweep now reads as declared identifiers. The sweep
+> also covers /catalogue, /groups and /landmarks, which it never visited before.
+
 > ### «سجّل كشريك» can be switched off from الإعدادات, 2026-10-04
 >
 > Bashar: a toggle on the settings page that activates and deactivates the partner sign-up form;
