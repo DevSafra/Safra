@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 
-import { proxy } from '@/lib/proxy';
+import { jsonBody, proxy } from '@/lib/proxy';
 
 /**
  * Raises a violation — `VIOLATION_MANAGE`.
@@ -16,6 +16,6 @@ export async function POST(
 
   return proxy(`/admin/partners/${encodeURIComponent(reference)}/violations`, {
     method: 'POST',
-    body: await request.json(),
+    body: await jsonBody(request),
   });
 }

@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 
-import { proxy } from '@/lib/proxy';
+import { jsonBody, proxy } from '@/lib/proxy';
 
 /**
  * Renames a staff member — `PATCH /admin/staff/:userId`, `{ fullName }`.
@@ -17,6 +17,6 @@ export async function PATCH(
 
   return proxy(`/admin/staff/${encodeURIComponent(userId)}`, {
     method: 'PATCH',
-    body: await request.json(),
+    body: await jsonBody(request),
   });
 }

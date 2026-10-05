@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 
-import { proxy } from '@/lib/proxy';
+import { jsonBody, proxy } from '@/lib/proxy';
 
 /** Pauses or resumes a coupon — `COUPON_MANAGE`, without touching its dates. */
 export async function POST(
@@ -11,6 +11,6 @@ export async function POST(
 
   return proxy(`/admin/coupons/${encodeURIComponent(code)}/active`, {
     method: 'POST',
-    body: await request.json(),
+    body: await jsonBody(request),
   });
 }

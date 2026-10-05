@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 
-import { proxy } from '@/lib/proxy';
+import { jsonBody, proxy } from '@/lib/proxy';
 
 /**
  * Issues a gift card — `GIFT_CARD_MANAGE`. §9.3's «+ إنشاء بطاقة هدية».
@@ -12,6 +12,6 @@ import { proxy } from '@/lib/proxy';
 export async function POST(request: NextRequest) {
   return proxy('/admin/gift-cards', {
     method: 'POST',
-    body: await request.json(),
+    body: await jsonBody(request),
   });
 }

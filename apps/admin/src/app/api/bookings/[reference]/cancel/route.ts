@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 
-import { proxy } from '@/lib/proxy';
+import { jsonBody, proxy } from '@/lib/proxy';
 
 /**
  * Staff cancellation of a live booking (§9.4) — `BOOKING_CANCEL`.
@@ -21,6 +21,6 @@ export async function POST(
 
   return proxy(`/bookings/${encodeURIComponent(reference)}/cancel`, {
     method: 'POST',
-    body: await request.json(),
+    body: await jsonBody(request),
   });
 }

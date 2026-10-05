@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 
-import { proxy } from '@/lib/proxy';
+import { jsonBody, proxy } from '@/lib/proxy';
 
 /**
  * Appends a staff note to a booking — `BOOKING_ADD_INTERNAL_NOTE`.
@@ -17,6 +17,6 @@ export async function POST(
 
   return proxy(`/admin/bookings/${encodeURIComponent(reference)}/notes`, {
     method: 'POST',
-    body: await request.json(),
+    body: await jsonBody(request),
   });
 }

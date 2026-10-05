@@ -1,4 +1,4 @@
-import { proxy } from '@/lib/proxy';
+import { jsonBody, proxy } from '@/lib/proxy';
 
 /**
  * Marks payment captured and starts the partner's clock (§6.3 step 5) — `BOOKING_UPDATE_STATUS`.
@@ -20,6 +20,6 @@ export async function POST(
 
   return proxy(`/bookings/${encodeURIComponent(reference)}/capture-payment`, {
     method: 'POST',
-    body: await request.json(),
+    body: await jsonBody(request),
   });
 }

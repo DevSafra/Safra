@@ -1,6 +1,6 @@
 import type { NextResponse } from 'next/server';
 
-import { proxy } from '@/lib/proxy';
+import { jsonBody, proxy } from '@/lib/proxy';
 
 /**
  * Finance confirming an offline refund has actually been sent (finding 222).
@@ -33,6 +33,6 @@ export async function POST(
   */
   return proxy(`/payments/refunds/${encodeURIComponent(refundId)}/settle`, {
     method: 'POST',
-    body: await request.json(),
+    body: await jsonBody(request),
   });
 }

@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 
-import { proxy } from '@/lib/proxy';
+import { jsonBody, proxy } from '@/lib/proxy';
 
 /**
  * Lifts a suspension — `PARTNER_SUSPEND`, reason required. Lifting an enforcement action is a decision with a record, so it asks for a reason exactly as suspending does.
@@ -16,6 +16,6 @@ export async function POST(
 
   return proxy(`/admin/partners/${encodeURIComponent(reference)}/unsuspend`, {
     method: 'POST',
-    body: await request.json(),
+    body: await jsonBody(request),
   });
 }

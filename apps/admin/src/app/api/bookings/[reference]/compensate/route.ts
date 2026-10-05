@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 
-import { proxy } from '@/lib/proxy';
+import { jsonBody, proxy } from '@/lib/proxy';
 
 /**
  * Credits this booking's customer — `WALLET_ADJUST`. §9.4's «تعويض».
@@ -17,6 +17,6 @@ export async function POST(
 
   return proxy(`/admin/bookings/${encodeURIComponent(reference)}/compensate`, {
     method: 'POST',
-    body: await request.json(),
+    body: await jsonBody(request),
   });
 }

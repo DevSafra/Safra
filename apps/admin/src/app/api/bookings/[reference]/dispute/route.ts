@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 
-import { proxy } from '@/lib/proxy';
+import { jsonBody, proxy } from '@/lib/proxy';
 
 /**
  * Opens a dispute on this booking — `DISPUTE_MANAGE`. §9.4's «فتح نزاع».
@@ -17,10 +17,13 @@ export async function POST(
   { params }: { params: Promise<{ reference: string }> },
 ) {
   const { reference } = await params;
-  const body: unknown = await request.json();
+  const body = await jsonBody(request);
 
   return proxy('/admin/disputes', {
     method: 'POST',
-    body: { ...(body as Record<string, unknown>), bookingReference: reference },
+    body:
+      body === null || typeof body !== 'object'
+        ? body
+        : { ...(body as Record<string, unknown>), bookingReference: reference },
   });
 }

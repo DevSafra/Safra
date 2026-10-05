@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 
-import { proxy } from '@/lib/proxy';
+import { jsonBody, proxy } from '@/lib/proxy';
 
 /** Voids a live card — `GIFT_CARD_MANAGE`. §9.3's «إلغاء». */
 export async function POST(
@@ -11,6 +11,6 @@ export async function POST(
 
   return proxy(`/admin/gift-cards/${encodeURIComponent(reference)}/cancel`, {
     method: 'POST',
-    body: await request.json(),
+    body: await jsonBody(request),
   });
 }

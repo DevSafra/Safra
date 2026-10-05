@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 
-import { proxy } from '@/lib/proxy';
+import { jsonBody, proxy } from '@/lib/proxy';
 
 /**
  * What a refund would return, and then issuing it (§7.4) — `REFUND_READ` / `REFUND_CREATE`.
@@ -36,6 +36,6 @@ export async function POST(
 
   return proxy(`/payments/${encodeURIComponent(reference)}/refund`, {
     method: 'POST',
-    body: await request.json(),
+    body: await jsonBody(request),
   });
 }

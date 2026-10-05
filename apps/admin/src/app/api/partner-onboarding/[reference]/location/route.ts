@@ -1,6 +1,6 @@
 import type { NextResponse } from 'next/server';
 
-import { proxy } from '@/lib/proxy';
+import { jsonBody, proxy } from '@/lib/proxy';
 
 /**
  * §8.1's «الموقع على الخريطة», saved from the onboarding screen.
@@ -19,6 +19,6 @@ export async function POST(
   return proxy(`/admin/partner-onboarding/${encodeURIComponent(reference)}/location`, {
     method: 'POST',
     /* Parsed and re-serialised by `proxy`, which owns the JSON headers. */
-    body: (await request.json()) as unknown,
+    body: await jsonBody(request),
   });
 }

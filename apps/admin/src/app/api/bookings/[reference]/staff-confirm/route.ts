@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 
-import { proxy } from '@/lib/proxy';
+import { jsonBody, proxy } from '@/lib/proxy';
 
 /**
  * SAFRA confirms on the partner's behalf (§6.3 step 7) — `BOOKING_UPDATE_STATUS`.
@@ -21,6 +21,6 @@ export async function POST(
 
   return proxy(`/bookings/${encodeURIComponent(reference)}/staff-confirm`, {
     method: 'POST',
-    body: await request.json(),
+    body: await jsonBody(request),
   });
 }

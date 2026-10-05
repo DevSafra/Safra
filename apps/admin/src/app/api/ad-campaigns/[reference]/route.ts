@@ -1,6 +1,6 @@
 import type { NextResponse } from 'next/server';
 
-import { proxy } from '@/lib/proxy';
+import { jsonBody, proxy } from '@/lib/proxy';
 
 /**
  * Editing a campaign's CREATIVE — the three headlines and the target.
@@ -17,6 +17,6 @@ export async function PATCH(
 
   return proxy(`/admin/ad-campaigns/${encodeURIComponent(reference)}`, {
     method: 'PATCH',
-    body: await request.json(),
+    body: await jsonBody(request),
   });
 }

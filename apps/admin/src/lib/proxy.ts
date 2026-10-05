@@ -2,7 +2,12 @@ import 'server-only';
 
 import { NextResponse } from 'next/server';
 
+import { ERROR } from '@safra/contracts';
+
+import { MALFORMED_BODY } from './json-body';
 import { getStaffSession } from './session-server';
+
+export { jsonBody } from './json-body';
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
 
@@ -22,6 +27,11 @@ export async function proxy(
 
   if (!session) {
     return NextResponse.json({ message: 'Not signed in.' }, { status: 401 });
+  }
+
+  /* A body the route could not parse is the CALLER's fault: a coded 400, never a 500. */
+  if (init.body === MALFORMED_BODY) {
+    return NextResponse.json({ code: ERROR.REQUEST_MALFORMED_BODY }, { status: 400 });
   }
 
   try {

@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 
-import { proxy } from '@/lib/proxy';
+import { jsonBody, proxy } from '@/lib/proxy';
 
 /**
  * Suspends a partner — `PARTNER_SUSPEND`, reason required. Stops NEW trade: listings leave search, no new bookings, payouts frozen. Confirmed bookings continue and the partner can still sign in and read why.
@@ -16,6 +16,6 @@ export async function POST(
 
   return proxy(`/admin/partners/${encodeURIComponent(reference)}/suspend`, {
     method: 'POST',
-    body: await request.json(),
+    body: await jsonBody(request),
   });
 }

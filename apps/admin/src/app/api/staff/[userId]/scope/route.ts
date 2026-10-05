@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 
-import { proxy } from '@/lib/proxy';
+import { jsonBody, proxy } from '@/lib/proxy';
 
 /**
  * Sets one staff member's scope — `PUT /admin/staff/:userId/scope`.
@@ -19,6 +19,6 @@ export async function PUT(
 
   return proxy(`/admin/staff/${encodeURIComponent(userId)}/scope`, {
     method: 'PUT',
-    body: await request.json(),
+    body: await jsonBody(request),
   });
 }

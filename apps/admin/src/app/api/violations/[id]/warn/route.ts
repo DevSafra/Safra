@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 
-import { proxy } from '@/lib/proxy';
+import { jsonBody, proxy } from '@/lib/proxy';
 
 /**
  * Warns the partner — `VIOLATION_MANAGE`. 'Recorded' means it happened; 'warned' means somebody TOLD them, which is the fact an appeal turns on.
@@ -13,6 +13,6 @@ export async function POST(
 
   return proxy(`/admin/violations/${encodeURIComponent(id)}/warn`, {
     method: 'POST',
-    body: await request.json(),
+    body: await jsonBody(request),
   });
 }
