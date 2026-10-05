@@ -520,6 +520,12 @@ export const ERROR = {
     gateway refund is confirmed by its webhook, and letting a person pre-empt that would post a
     reversal claiming money moved when no bank had said so.
   */
+  /**
+   * Another refund on the same booking was written while this one was being quoted, so the figure
+   * this request computed is no longer what is owed. The booking row is locked while a refund is
+   * written; whoever arrives second is refused here and asked to look again, never paid twice.
+   */
+  REFUND_QUOTE_CHANGED: 'refund.quote_changed',
   REFUND_NOT_FOUND: 'refund.not_found',
   REFUND_NOT_PENDING: 'refund.not_pending',
   REFUND_NOT_OFFLINE: 'refund.not_offline',

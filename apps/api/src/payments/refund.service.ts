@@ -15,7 +15,6 @@ import { describeError } from '../common/errors/safe-error.js';
 import { PaymentProviderRegistry } from './providers/provider.registry.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import {
-  DEFAULT_MONEY_CURRENCY,
   ERROR,
   WALLET_NOTE,
   normaliseBankAccount,
@@ -192,6 +191,31 @@ export class RefundService {
     }
 
     const refundId = await this.db.transaction(async (tx) => {
+      /*
+        One refund per booking at a time (audit 2026-10-04).
+
+        The quote was computed BEFORE this transaction, from what had already been refunded at that
+        moment. Two requests in the same second (a double-click, two officers) both quoted the same
+        figure against the same "nothing refunded yet", and both inserted it: the trigger in
+        post/0026 caps a refund at what the payment took, not at what the policy owes, so a 50% tier
+        paid out twice. Locking the booking row makes the second request wait for the first to
+        commit, and re-reading the refunded total under that lock tells it the quote is stale.
+      */
+      await tx.execute(sql`SELECT id FROM bookings WHERE id = ${booking.id} FOR UPDATE`);
+
+      const current = await tx.execute<{ total: string }>(sql`
+        SELECT COALESCE(SUM(amount), 0)::text AS total
+        FROM refunds
+        WHERE booking_id = ${booking.id} AND status IN ('pending','processing','completed')
+      `);
+
+      if (
+        toMinor(current.rows[0]?.total ?? '0', MONEY_SCALE) !==
+        toMinor(quote.alreadyRefunded, MONEY_SCALE)
+      ) {
+        throw conflict(ERROR.REFUND_QUOTE_CHANGED);
+      }
+
       const inserted = await tx.execute<{ id: string }>(sql`
         INSERT INTO refunds
           (payment_id, booking_id, amount, wallet_amount, currency_id,
@@ -661,15 +685,17 @@ export class RefundService {
       provider: string;
       status: string;
       amount: string;
+      currency_code: string;
       reference: string;
       payer_account_encrypted: string | null;
     }>(sql`
       SELECT r.booking_id::text, r.payment_id::text, p.provider::text AS provider,
-             r.status::text AS status, r.amount::text AS amount, b.reference,
-             p.payer_account_encrypted
+             r.status::text AS status, r.amount::text AS amount, cur.code AS currency_code,
+             b.reference, p.payer_account_encrypted
         FROM refunds r
         JOIN payments p ON p.id = r.payment_id
         JOIN bookings b ON b.id = r.booking_id
+        JOIN currencies cur ON cur.id = r.currency_id
        WHERE r.id = ${refundId}::uuid
          AND r.deleted_at IS NULL
          -- Scope, as a WHERE clause: "not in your cities" answers the same as "not there".
@@ -699,28 +725,31 @@ export class RefundService {
       the statement of the INCOMING transfer; without it there is nothing to check a destination
       against, and a refund to an account nobody can vouch for is the thing this exists to stop.
     */
-    let source = refund.payer_account_encrypted;
+    const destination = normaliseBankAccount(input.destinationAccount);
 
-    if (!source) {
-      if (!input.sourceAccount) throw conflict(ERROR.REFUND_SOURCE_UNKNOWN);
+    /*
+      Compared BEFORE anything is written (audit 2026-10-04).
 
-      const recorded = normaliseBankAccount(input.sourceAccount);
-      const written = await this.db.execute<{ payer_account_encrypted: string }>(sql`
-        UPDATE payments
-           SET payer_account_encrypted = ${this.crypto.encrypt(recorded)},
-               payer_account_last4 = ${recorded.slice(-4)},
-               updated_at = now()
-         WHERE id = ${refund.payment_id}::uuid AND payer_account_encrypted IS NULL
-        RETURNING payer_account_encrypted
-      `);
+      Where no source is on record, the typed one is checked against the destination first and
+      recorded only inside the settlement transaction below. It used to be written here, outside
+      that transaction and before the comparison, so a mistyped digit was committed even though the
+      settlement was refused, and post/0027's set-once rule then made the typo permanent.
+    */
+    const recordedSource = refund.payer_account_encrypted
+      ? null
+      : input.sourceAccount
+        ? normaliseBankAccount(input.sourceAccount)
+        : null;
 
-      /* Somebody recorded one between the read and here: theirs stands, and this asks again. */
-      if (!written.rows[0]) throw conflict(ERROR.PAYMENT_PAYER_ACCOUNT_SET);
-
-      source = written.rows[0].payer_account_encrypted;
+    if (!refund.payer_account_encrypted && !recordedSource) {
+      throw conflict(ERROR.REFUND_SOURCE_UNKNOWN);
     }
 
-    if (this.crypto.decrypt(source) !== normaliseBankAccount(input.destinationAccount)) {
+    const source = refund.payer_account_encrypted
+      ? this.crypto.decrypt(refund.payer_account_encrypted)
+      : recordedSource;
+
+    if (source !== destination) {
       /* A security event, logged by id and never by account number. */
       this.logger.warn(
         `Refund ${refundId} on ${refund.reference}: settlement refused, the destination is not ` +
@@ -730,6 +759,20 @@ export class RefundService {
     }
 
     await this.db.transaction(async (tx) => {
+      /* Recorded with the settlement it vouches for, so a refused attempt leaves nothing behind. */
+      if (recordedSource) {
+        const written = await tx.execute(sql`
+          UPDATE payments
+             SET payer_account_encrypted = ${this.crypto.encrypt(recordedSource)},
+                 payer_account_last4 = ${recordedSource.slice(-4)},
+                 updated_at = now()
+           WHERE id = ${refund.payment_id}::uuid AND payer_account_encrypted IS NULL
+        `);
+
+        /* Somebody recorded one between the read and here: theirs stands, and this asks again. */
+        if (written.rowCount === 0) throw conflict(ERROR.PAYMENT_PAYER_ACCOUNT_SET);
+      }
+
       /*
         The destination is the payment's OWN ciphertext, copied, not what was typed encrypted
         afresh: post/0027_bank_transfer_refund.sql then proves it is the same account by comparing
@@ -758,7 +801,7 @@ export class RefundService {
                END,
                updated_at = now()
           FROM (
-            SELECT COALESCE(SUM(amount), 0) AS refunded
+            SELECT COALESCE(SUM(amount - wallet_amount), 0) AS refunded
               FROM refunds
              WHERE payment_id = ${refund.payment_id}::uuid
                AND status IN ('pending','processing','completed')
@@ -787,7 +830,8 @@ export class RefundService {
           after: {
             refundId,
             amount: refund.amount,
-            currency: DEFAULT_MONEY_CURRENCY,
+            /* The refund's own currency: an SYP refund logged as USD read four orders out. */
+            currency: refund.currency_code,
             provider: refund.provider,
             /* The bank's reference, never the account: an account number is not for the audit log. */
             transferReference: input.transferReference,
@@ -814,7 +858,13 @@ export class RefundService {
           END,
           updated_at = now()
       FROM (
-        SELECT COALESCE(SUM(amount), 0) AS refunded
+        /*
+          The share that came back THROUGH this payment. A refund's wallet share returns to stored
+          value, not to the payment, and \`payments.amount\` is only the gateway or transfer share of a
+          split booking, so counting the wallet share marked a payment refunded while its own money
+          was still out (audit 2026-10-04).
+        */
+        SELECT COALESCE(SUM(amount - wallet_amount), 0) AS refunded
         FROM refunds
         WHERE payment_id = ${paymentId} AND status IN ('pending','processing','completed')
       ) r

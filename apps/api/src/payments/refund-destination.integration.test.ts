@@ -449,8 +449,13 @@ describeIfDb('a refund returns through the payment it refunds', () => {
   /*
     A transfer confirmed before the sender's account was recorded. Nothing to check a destination
     against, so it is refused until the account is supplied, once, from the incoming statement.
+
+    A REFUSED attempt records nothing (audit 2026-10-04). It used to write the typed source before
+    comparing it, outside the settlement transaction, so one mistyped digit was committed for good:
+    post/0027 then forbids replacing it, and the refund could only ever go to the typo or stay
+    «processing» until somebody edited the database by hand.
   */
-  it('asks for the sender’s account where none is recorded, records it once, then holds to it', async () => {
+  it('asks for the sender’s account where none is recorded, and records it only when the refund settles', async () => {
     const fixture = await seed({
       total: '90.00',
       wallet: '0.00',
@@ -463,11 +468,12 @@ describeIfDb('a refund returns through the payment it refunds', () => {
 
     await expect(
       refunds.settle(issued.refundId, undefined, {
-        destinationAccount: 'SY11 1111 1111 1111',
+        destinationAccount: 'SY22 2222 2222 2222',
         transferReference: 'TRX-OUT-3',
       }),
     ).rejects.toSatisfy((error) => codeOf(error) === ERROR.REFUND_SOURCE_UNKNOWN);
 
+    /* The officer mistypes the incoming account; the destination is right. */
     await expect(
       refunds.settle(issued.refundId, undefined, {
         sourceAccount: 'SY11 1111 1111 1111',
@@ -476,20 +482,87 @@ describeIfDb('a refund returns through the payment it refunds', () => {
       }),
     ).rejects.toSatisfy((error) => codeOf(error) === ERROR.REFUND_DESTINATION_MISMATCH);
 
-    /* The source was recorded by that attempt, and a different one cannot replace it. */
-    await expect(
-      refunds.settle(issued.refundId, undefined, {
-        sourceAccount: 'SY22 2222 2222 2222',
-        destinationAccount: 'SY22 2222 2222 2222',
-        transferReference: 'TRX-OUT-3',
-      }),
-    ).rejects.toSatisfy((error) => codeOf(error) === ERROR.REFUND_DESTINATION_MISMATCH);
+    const untouched = await db.execute<{
+      last4: string | null;
+      account: string | null;
+    }>(sql`
+      SELECT payer_account_last4 AS last4, payer_account_encrypted AS account
+        FROM payments WHERE id = (SELECT payment_id FROM refunds WHERE id = ${issued.refundId}::uuid)
+    `);
+    expect(untouched.rows[0]?.account, 'a refused attempt recorded the typo').toBeNull();
 
+    /* Corrected, it settles, and the account is recorded with it. */
     await refunds.settle(issued.refundId, undefined, {
-      destinationAccount: 'SY11 1111 1111 1111',
+      sourceAccount: 'SY22 2222 2222 2222',
+      destinationAccount: 'SY22 2222 2222 2222',
       transferReference: 'TRX-OUT-3',
     });
     expect((await refundRow(issued.refundId)).status).toBe('completed');
+
+    const recorded = await db.execute<{ last4: string | null }>(sql`
+      SELECT payer_account_last4 AS last4
+        FROM payments WHERE id = (SELECT payment_id FROM refunds WHERE id = ${issued.refundId}::uuid)
+    `);
+    expect(recorded.rows[0]?.last4).toBe('2222');
+  });
+
+  /*
+    The settlement's audit row names the refund's OWN currency (audit 2026-10-04). It printed USD
+    for every refund, so an SYP refund read in the audit log as dollars: four orders of magnitude.
+  */
+  it('records a settled refund in the audit log in its own currency', async () => {
+    const fixture = await seed({
+      total: '90.00',
+      wallet: '0.00',
+      payment: 'bank_transfer',
+      currency: 'SYP',
+    });
+    const issued = await refunds.refundInFull(
+      fixture.reference,
+      'system.partner_no_response',
+    );
+
+    await refunds.settle(issued.refundId, undefined, {
+      sourceAccount: 'SY33 3333 3333 3333',
+      destinationAccount: 'SY33 3333 3333 3333',
+      transferReference: 'TRX-OUT-SYP',
+    });
+
+    const logged = await db.execute<{ currency: string | null }>(sql`
+      SELECT after->>'currency' AS currency FROM audit_log
+       WHERE action = 'refund.settled' AND after->>'refundId' = ${issued.refundId}
+       ORDER BY created_at DESC LIMIT 1
+    `);
+
+    expect(logged.rows[0]?.currency).toBe('SYP');
+  });
+
+  /*
+    A payment taken partly from the wallet is not «fully refunded» until the TRANSFER share is back
+    (audit 2026-10-04). The status compared every refund, wallet share included, against the
+    payment's own amount (the transfer share only), so half a refund paid from the wallet marked it
+    refunded and a later top-up found no captured payment to refund against.
+  */
+  it('keeps a split payment open for a top-up until the transferred share is returned', async () => {
+    const fixture = await seed({
+      total: '100.00',
+      wallet: '60.00',
+      payment: 'bank_transfer',
+    });
+
+    const half = await refunds.execute(fixture.reference, 'Customer request', undefined);
+    expect(half.amount).toBe('50.000');
+
+    const status = await db.execute<{ status: string }>(sql`
+      SELECT status::text AS status FROM payments WHERE id = ${fixture.paymentId}::uuid
+    `);
+    expect(status.rows[0]?.status).toBe('partially_refunded');
+
+    const rest = await refunds.refundInFull(
+      fixture.reference,
+      'system.partner_no_response',
+    );
+    expect(rest.amount).toBe('50.000');
   });
 
   it('refuses completing a bank transfer refund in SQL without the sender’s account', async () => {
@@ -587,6 +660,7 @@ describeIfDb('a refund returns through the payment it refunds', () => {
     payment: 'bank_transfer' | 'wallet' | null;
     paymentStatus?: 'captured' | 'requires_action';
     status?: 'cancelled' | 'pending_payment';
+    currency?: string;
   }): Promise<{
     reference: string;
     bookingId: string;
@@ -598,7 +672,7 @@ describeIfDb('a refund returns through the payment it refunds', () => {
     const made = await db.execute<{ reference: string; booking_id: string }>(sql`
       WITH ref AS (
         SELECT (SELECT id FROM cities WHERE deleted_at IS NULL LIMIT 1) AS city_id,
-               (SELECT id FROM currencies WHERE code = 'USD')           AS currency_id,
+               (SELECT id FROM currencies WHERE code = ${options.currency ?? 'USD'}) AS currency_id,
                (SELECT id FROM property_types LIMIT 1)                  AS type_id,
                (SELECT id FROM partner_types LIMIT 1)                   AS partner_type_id,
                (SELECT id FROM cancellation_policies LIMIT 1)           AS policy_id

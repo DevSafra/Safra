@@ -367,6 +367,8 @@ export const en = {
   'booking.not_payable_in_status': 'This booking cannot be paid in its current state.',
   'payment.refund_unavailable':
     'Refunds through the original payment method are temporarily unavailable.',
+  'refund.quote_changed':
+    'Another refund on this booking changed the refundable amount. Reload and check the figure.',
   'refund.not_found': 'No refund with that identifier.',
   'refund.not_pending': 'That refund is not in progress, so there is nothing to confirm.',
   'refund.not_offline':

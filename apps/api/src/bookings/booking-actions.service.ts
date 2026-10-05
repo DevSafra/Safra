@@ -399,13 +399,20 @@ export class BookingActionsService {
     };
 
     /*
-      The NEWEST outstanding intent. A booking can accumulate more than one if a customer
-      abandoned a rail and started another, and the last one is the rail they actually used.
+      The NEWEST outstanding BANK-TRANSFER intent. A booking can accumulate more than one if a
+      customer abandoned a rail and started another, and the last transfer is the one they made.
+
+      Bank transfers only (audit 2026-10-04). Finance is confirming money that arrived by TRANSFER;
+      a card attempt abandoned at 3-D Secure is not it, and capturing one recorded a card payment
+      that never took money, dropped the sender's account (written on a transfer only), and would
+      have sent a refund to the card provider. With no transfer intent, the transfer is recorded
+      fresh by markPaid's fallback, account and all.
     */
     const pending = await this.db.execute<{ id: string }>(sql`
       SELECT id::text
         FROM payments
        WHERE booking_id = ${booking.id}
+         AND method = 'bank_transfer'
          AND status IN ('requires_action', 'initiated', 'authorized')
          AND deleted_at IS NULL
        ORDER BY created_at DESC

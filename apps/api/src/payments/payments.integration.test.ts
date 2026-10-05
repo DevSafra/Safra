@@ -598,6 +598,41 @@ describeIfDb('payment collection, webhooks and refunds', () => {
       ).rejects.toThrow(/no refundable amount/i);
     });
 
+    /*
+      Two refunds in the same second (a double-click, or two finance officers), audit 2026-10-04.
+
+      The quote is read before the write, so without a lock both requests quoted the same figure
+      with nothing yet refunded and both inserted it. The booking row is now locked while a refund
+      is written and the refunded total re-read under that lock: one request is paid, the other is
+      refused with a code a person can act on, and the money goes back once.
+    */
+    it('pays one of two simultaneous refunds and refuses the other', async () => {
+      const results = await Promise.allSettled([
+        refunds.execute(booking.reference, 'First', undefined),
+        refunds.execute(booking.reference, 'Second', undefined),
+      ]);
+
+      const paid = results.filter((r) => r.status === 'fulfilled');
+      const refused = results.filter((r) => r.status === 'rejected');
+
+      expect(paid).toHaveLength(1);
+      expect(refused).toHaveLength(1);
+      expect((refused[0] as PromiseRejectedResult).reason).toMatchObject({
+        response: {
+          code: expect.stringMatching(
+            /^(refund\.quote_changed|booking\.no_refundable_amount)$/,
+          ),
+        },
+      });
+
+      const total = await db.execute<{ refunded: string }>(sql`
+        SELECT COALESCE(SUM(amount), 0)::text AS refunded FROM refunds
+        WHERE booking_id = ${booking.id}::uuid
+      `);
+
+      expect(total.rows[0]?.refunded).toBe('200.000');
+    });
+
     it('marks the payment refunded once the full base is returned', async () => {
       await refunds.execute(booking.reference, 'Full', undefined);
 
@@ -1094,6 +1129,42 @@ describeIfDb('payment collection, webhooks and refunds', () => {
       expect(rows.rows).toHaveLength(1);
       expect(rows.rows[0]!.status).toBe('captured');
       expect(await bookingStatus(db, booking.id)).toBe('pending_confirmation');
+    });
+
+    /*
+      A CARD attempt abandoned at 3-D Secure is not the transfer (audit 2026-10-04).
+
+      It captured the newest outstanding attempt of ANY method, so a customer who gave up on a card
+      and then wired the money had the card attempt marked captured, the sender's account dropped
+      (it is only written on a bank transfer), and a later refund sent to the card provider against
+      a charge that never took a penny. Only a bank-transfer attempt is the transfer.
+    */
+    it('records the transfer rather than capturing an abandoned card attempt', async () => {
+      const card = await openPayment(
+        db,
+        booking.id,
+        `SAFRA-TEST-CARD-${crypto.randomUUID()}`,
+      );
+
+      await actions.recordPaymentReceived(booking.reference, undefined, TEST_PAYER);
+
+      const rows = await db.execute<{
+        id: string;
+        method: string;
+        status: string;
+        last4: string | null;
+      }>(sql`
+        SELECT id::text, method::text, status::text, payer_account_last4 AS last4
+          FROM payments WHERE booking_id = ${booking.id}::uuid ORDER BY created_at
+      `);
+
+      const captured = rows.rows.filter((row) => row.status === 'captured');
+
+      expect(captured, 'one captured payment').toHaveLength(1);
+      expect(captured[0]!.id, 'not the abandoned card').not.toBe(card);
+      expect(captured[0]!.method).toBe('bank_transfer');
+      expect(captured[0]!.last4, 'the sender’s account is recorded').not.toBeNull();
+      expect(rows.rows.find((row) => row.id === card)?.status).toBe('requires_action');
     });
   });
 
