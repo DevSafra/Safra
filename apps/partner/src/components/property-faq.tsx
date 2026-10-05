@@ -95,12 +95,22 @@ export function PropertyFaq({
           answerDe: (pair.value?.de ?? '').trim() || null,
         }));
 
+      /*
+        A box that HAD a saved answer and is now empty is a removal, sent as such (audit 2026-10-04).
+        It used to be left out like an unanswered one, so the old answer stayed on the public page
+        while this form said «تم الحفظ».
+      */
+      const cleared = questions
+        .filter((question) => (question.answerAr ?? '').trim() !== '')
+        .filter((question) => (answers[question.id]?.ar ?? '').trim() === '')
+        .map((question) => question.id);
+
       const response = await fetch(
         `/api/properties/${encodeURIComponent(reference)}/faq`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ answers: payload }),
+          body: JSON.stringify({ answers: payload, cleared }),
         },
       );
 

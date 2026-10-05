@@ -59,6 +59,7 @@ const NEEDS_PARTNER_SESSION = new RegExp(
     'property-submission',
     'partner-responsive',
     'partner-settings',
+    'partner-faq',
     'amenities-end-to-end',
     'bed-type-end-to-end',
     'property-amenities-chain',

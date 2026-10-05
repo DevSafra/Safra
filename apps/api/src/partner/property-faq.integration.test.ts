@@ -262,4 +262,78 @@ describeIfDb('the property FAQ', () => {
     expect(answered).toHaveLength(1);
     expect(answered[0]?.answerAr).toBe('الثانية');
   });
+
+  /*
+    A question retired AFTER it was answered (audit 2026-10-04).
+
+    The portal keeps showing that answer and says «إجابتك تبقى ظاهرة ويمكنك تعديلها», and the form
+    sends it back with every save. The write only accepted ACTIVE questions, so the retired one
+    found no row, threw, and rolled back the whole save: one retired question froze every answer on
+    the listing, required ones included. Editing an existing answer is allowed; a NEW answer to a
+    retired question is still refused (the test above).
+  */
+  it('lets a partner edit an answer to a question retired since, alongside other answers', async () => {
+    const reference = await aDraft();
+    const retiring = await aQuestion(false);
+    const active = await aQuestion(true);
+
+    await service.saveFaqAnswers(partner(), reference, {
+      answers: [
+        { questionId: retiring, answerAr: 'قبل', answerEn: null, answerDe: null },
+      ],
+    });
+    await db.execute(
+      sql`UPDATE property_faq_questions SET is_active = false WHERE id = ${retiring}::uuid`,
+    );
+
+    await service.saveFaqAnswers(partner(), reference, {
+      answers: [
+        { questionId: retiring, answerAr: 'بعد', answerEn: null, answerDe: null },
+        { questionId: active, answerAr: 'نعم', answerEn: null, answerDe: null },
+      ],
+    });
+
+    const { questions } = await service.faqForOwn(partner(), reference);
+
+    expect(questions.find((q) => q.id === retiring)?.answerAr).toBe('بعد');
+    expect(questions.find((q) => q.id === active)?.answerAr).toBe('نعم');
+  });
+
+  /*
+    Emptying an answer removes it (audit 2026-10-04). The form left an emptied box out of the
+    payload and the API only upserted, so «تم الحفظ» appeared and the old answer stayed public.
+  */
+  it('removes an answer the partner cleared', async () => {
+    const reference = await aDraft();
+    const questionId = await aQuestion(false);
+
+    await service.saveFaqAnswers(partner(), reference, {
+      answers: [{ questionId, answerAr: 'خطأ', answerEn: null, answerDe: null }],
+    });
+    await service.saveFaqAnswers(partner(), reference, {
+      answers: [],
+      cleared: [questionId],
+    });
+
+    const { questions } = await service.faqForOwn(partner(), reference);
+
+    expect(questions.find((q) => q.id === questionId)?.answerAr ?? null).toBeNull();
+  });
+
+  /* The opposite control: clearing names this listing's answer and nobody else's. */
+  it('clears nothing on another partner’s listing', async () => {
+    const reference = await aDraft();
+    const questionId = await aQuestion(false);
+
+    await service.saveFaqAnswers(partner(), reference, {
+      answers: [{ questionId, answerAr: 'باقية', answerEn: null, answerDe: null }],
+    });
+
+    await expect(
+      service.saveFaqAnswers(other(), reference, { answers: [], cleared: [questionId] }),
+    ).rejects.toBeTruthy();
+
+    const { questions } = await service.faqForOwn(partner(), reference);
+    expect(questions.find((q) => q.id === questionId)?.answerAr).toBe('باقية');
+  });
 });

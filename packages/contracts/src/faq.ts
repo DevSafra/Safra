@@ -160,7 +160,15 @@ export const propertyFaqAnswerSchema = z
  * unbounded array is a free write amplification.
  */
 export const propertyFaqAnswersSchema = z
-  .object({ answers: z.array(propertyFaqAnswerSchema).max(100) })
+  .object({
+    answers: z.array(propertyFaqAnswerSchema).max(100),
+    /*
+      Questions whose answer the partner EMPTIED (audit 2026-10-04). An empty box cannot travel as
+      an answer, because `answerAr` is required, so before this a cleared answer was simply left
+      out and stayed on the public listing while the form said «تم الحفظ».
+    */
+    cleared: z.array(z.string().uuid()).max(100).default([]),
+  })
   .strict();
 
 export type FaqQuestionCreateInput = z.infer<typeof faqQuestionCreateSchema>;
@@ -168,4 +176,5 @@ export type FaqQuestionUpdateInput = z.infer<typeof faqQuestionUpdateSchema>;
 export type GeneralFaqCreateInput = z.infer<typeof generalFaqCreateSchema>;
 export type GeneralFaqUpdateInput = z.infer<typeof generalFaqUpdateSchema>;
 export type PropertyFaqAnswerInput = z.infer<typeof propertyFaqAnswerSchema>;
-export type PropertyFaqAnswersInput = z.infer<typeof propertyFaqAnswersSchema>;
+/** The INPUT shape: `cleared` is optional to a caller, and the schema defaults it to empty. */
+export type PropertyFaqAnswersInput = z.input<typeof propertyFaqAnswersSchema>;

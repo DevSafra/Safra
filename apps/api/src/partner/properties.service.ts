@@ -1468,7 +1468,47 @@ export class PropertiesService {
           RETURNING id
         `);
 
-        if (written.rows.length === 0) throw badRequest(ERROR.FAQ_QUESTION_UNAVAILABLE);
+        if (written.rows.length > 0) continue;
+
+        /*
+          A question retired AFTER this listing answered it (audit 2026-10-04). The portal shows that
+          answer and promises «يمكنك تعديلها», and the form sends it with every save, so refusing it
+          here rolled back the whole save. Editing the EXISTING answer is allowed; a retired question
+          with no answer on this listing still finds nothing and is refused below.
+        */
+        const edited = await tx.execute<{ id: string }>(sql`
+          UPDATE property_faq_answers a
+             SET answer_ar = ${answer.answerAr},
+                 answer_en = ${answer.answerEn ?? null},
+                 answer_de = ${answer.answerDe ?? null},
+                 updated_at = now()
+            FROM property_faq_questions q
+           WHERE a.property_id = ${property.id}
+             AND a.question_id = ${answer.questionId}
+             AND a.deleted_at IS NULL
+             AND q.id = a.question_id
+             AND q.deleted_at IS NULL
+          RETURNING a.id
+        `);
+
+        if (edited.rows.length === 0) throw badRequest(ERROR.FAQ_QUESTION_UNAVAILABLE);
+      }
+
+      /*
+        Answers the partner emptied, removed (audit 2026-10-04). Scoped to THIS listing, which
+        `findOwned` has already proved is theirs, so a question id names nobody else's answer.
+        Soft-deleted, which the partial unique index ignores, so answering again later inserts anew.
+      */
+      const cleared = input.cleared ?? [];
+
+      if (cleared.length > 0) {
+        await tx.execute(sql`
+          UPDATE property_faq_answers
+             SET deleted_at = now(), updated_at = now()
+           WHERE property_id = ${property.id}
+             AND question_id IN ${cleared}
+             AND deleted_at IS NULL
+        `);
       }
     });
 
