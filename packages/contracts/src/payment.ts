@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ERROR } from './error-codes.js';
+import { westernDigits } from './digits.js';
 
 /**
  * Every payment rail the system knows. Mirrors the `payment_method` database enum.
@@ -117,9 +118,7 @@ export type StartPaymentRequest = z.infer<typeof startPaymentSchema>;
  * a refund may be sent (2026-10-02: a refund returns to the account the money came from).
  */
 export function normaliseBankAccount(value: string): string {
-  return value
-    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
-    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
+  return westernDigits(value)
     .replace(/[\s\-._]/g, '')
     .toUpperCase();
 }

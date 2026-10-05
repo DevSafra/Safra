@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
 import { ERROR } from './error-codes.js';
+import { westernDigits } from './digits.js';
+import { calendarDateSchema } from './search.js';
 
 /**
  * جروبات — the trips SAFRA puts together (Bashar, 2026-09-27; built 2026-09-28).
@@ -51,8 +53,14 @@ const optional = (max: number) =>
     /* LAST, so the KEY itself is optional — a transform inside `.nullish()` makes it required. */
     .optional();
 
-/** `YYYY-MM-DD`, the shape every date on the wire takes here. */
-const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, ERROR.REQUEST_VALIDATION_FAILED);
+/**
+ * `YYYY-MM-DD`, a REAL date, typed in either digit set (audit 2026-10-04).
+ *
+ * Through `calendarDateSchema` so «2026-02-30» is refused with a code rather than reaching Postgres
+ * and coming back as a 500, and through `westernDigits` so «٢٠٢٦-١٠-٠٤» from an Arabic keyboard is
+ * the date it says.
+ */
+const day = z.string().trim().transform(westernDigits).pipe(calendarDateSchema);
 
 export const GROUP_TRIP_STATUSES = ['draft', 'published', 'archived'] as const;
 export type GroupTripStatus = (typeof GROUP_TRIP_STATUSES)[number];
@@ -82,7 +90,9 @@ const priceBase = {
   /** A decimal string, because money is never a float on this platform. */
   priceFrom: z
     .string()
-    .regex(/^\d{1,12}(\.\d{1,3})?$/, ERROR.REQUEST_VALIDATION_FAILED)
+    .trim()
+    .transform(westernDigits)
+    .pipe(z.string().regex(/^\d{1,12}(\.\d{1,3})?$/, ERROR.REQUEST_VALIDATION_FAILED))
     .nullable()
     .transform((value) => value || null)
     .optional(),

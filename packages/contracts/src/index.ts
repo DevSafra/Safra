@@ -21,6 +21,7 @@ export * from './group-trip.js';
 export * from './customer-fee.js';
 export * from './operating-rules.js';
 export * from './partner-applications.js';
+export * from './digits.js';
 export * from './invoice.js';
 export * from './pagination.js';
 export * from './payment.js';

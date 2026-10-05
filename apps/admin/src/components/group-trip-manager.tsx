@@ -13,6 +13,7 @@ import { TablePagination } from '@/components/table-pagination';
 import type { GroupTripRow } from '@/lib/api';
 import { amount, dateRange } from '@/lib/format';
 import { apiErrorOf, label, t } from '@/lib/strings';
+import { wholeNumber } from '@/lib/numeric-input';
 
 /**
  * جروبات — the console's registry of announced trips (Bashar, 2026-09-27).
@@ -261,7 +262,7 @@ function GroupTripForm({
         endsOn,
         priceFrom: priceFrom || null,
         currencyCode: currencyCode || null,
-        seats: seats ? Number(seats) : null,
+        seats: wholeNumber(seats),
         ...(trip ? { status } : {}),
         /*
           Only when editing. A create has no row yet, so it can have no cover and therefore no alt
