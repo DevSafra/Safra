@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 
 import { PUBLIC_MAP_MAX_ZOOM } from '@safra/contracts';
@@ -108,6 +108,7 @@ export function SearchMap({
   readonly variant?: 'default' | 'thumbnail' | 'compact';
 }) {
   const t = useTranslations('search');
+  const locale = useLocale();
   const router = useRouter();
 
   const container = useRef<HTMLDivElement | null>(null);
@@ -219,7 +220,8 @@ export function SearchMap({
 
         const instance = new maplibre.Map({
           container: container.current,
-          style: basemapStyle(basemaps, theme, 'ar'),
+          /* The page's language, not Arabic for every reader (audit 2026-10-04). */
+          style: basemapStyle(basemaps, theme, locale),
           /*
             FITTED to the results rather than centred on one of them, because the question this
             map answers is «where are my options», not «where is this». A single result falls
@@ -328,7 +330,7 @@ export function SearchMap({
       setFeed(null);
       dispose?.();
     };
-  }, [open, theme, pageBbox, load]);
+  }, [open, theme, locale, pageBbox, load]);
 
   /*
     A filter changed from inside the map navigates the page, which hands this component a new feed
@@ -511,6 +513,7 @@ export function SearchMap({
             stays={stays}
             whenEmpty={whenEmpty}
             theme={theme}
+            locale={locale}
             label={t('mapShow')}
             onOpen={(button) => {
               opener.current = button;

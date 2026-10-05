@@ -34,12 +34,15 @@ import type { NearbyStay } from './map-price-markers';
 export function MapThumbnail({
   stays,
   theme,
+  locale,
   label,
   onOpen,
   whenEmpty,
 }: {
   readonly stays: readonly NearbyStay[];
   readonly theme: 'light' | 'dark';
+  /** The page's language, for the map's own labels (audit 2026-10-04: always Arabic before). */
+  readonly locale: string;
   readonly label: string;
   readonly onOpen: (button: HTMLButtonElement) => void;
   readonly whenEmpty?: MapBounds | undefined;
@@ -80,7 +83,7 @@ export function MapThumbnail({
         if (cancelled || !canvas.current) return;
 
         const tokens = getComputedStyle(document.documentElement);
-        const style = basemapStyle(basemaps, theme, 'ar');
+        const style = basemapStyle(basemaps, theme, locale);
         const source = style.sources['protomaps'];
         setNotice(
           source && 'attribution' in source ? (source.attribution ?? null) : null,
@@ -169,7 +172,7 @@ export function MapThumbnail({
       setPicture(null);
       dispose?.();
     };
-  }, [near, theme, stays, whenEmpty]);
+  }, [near, theme, locale, stays, whenEmpty]);
 
   return (
     <div
