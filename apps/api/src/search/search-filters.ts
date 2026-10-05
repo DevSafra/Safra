@@ -81,6 +81,19 @@ export function buildSearchFilters(
   const scope = sql`u.is_active
           AND u.deleted_at IS NULL
           AND p.deleted_at IS NULL
+          /*
+            An OPEN city in an OPEN country, here in the shared scope (audit 2026-10-04).
+
+            It was only checked later, in the candidates step, after the fast path had already
+            chosen its window of properties from this scope. A withdrawn city with the best scores
+            filled that window and was then dropped whole, so a nationwide page came back empty
+            while the facet counts, which do check, said stays existed. Primary-key lookups.
+          */
+          AND EXISTS (
+            SELECT 1 FROM cities ci_open
+            JOIN countries co_open ON co_open.id = ci_open.country_id AND co_open.is_active
+            WHERE ci_open.id = p.city_id AND ci_open.is_active
+          )
           -- §8.1 / P-002: only verified, published inventory is ever searchable.
           AND p.status = 'published'
           /*

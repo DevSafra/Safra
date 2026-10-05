@@ -108,6 +108,19 @@ function oneOf<T extends number | string>(
 }
 
 /**
+ * The amenity codes a search may filter on: every filterable amenity, whatever its catalogue count.
+ *
+ * ONE definition for the results page and the two routes behind it (the next batch and the full
+ * map), because they drifted (audit 2026-10-04): the routes still kept only amenities whose
+ * \`propertyCount\` was above zero, and that count covers room-level links only. A pool declared on
+ * the BUILDING was therefore honoured on the first twenty results and silently dropped from every
+ * batch loaded by scrolling and from the map, which showed stays without one.
+ */
+export function allowedAmenityCodes(amenities: readonly { code: string }[]): Set<string> {
+  return new Set(amenities.map((one) => one.code));
+}
+
+/**
  * A date, or nothing. `??` alone could not tell an EMPTY string from an absent one, and `?checkIn=`
  * once put '' into every date path: a 500 on the server and a blank «Application error» in the
  * browser. Validated by shape, which is an allow-list; the API stays the authority on whether the
@@ -137,7 +150,13 @@ export function parseSearch(
 
   /* A landmark or kind belongs to a city, so one named without a city is dropped. */
   const nearLandmark = citySlug ? first(query['nearLandmark']) || undefined : undefined;
-  const nearKind = citySlug ? first(query['nearKind']) || undefined : undefined;
+  /*
+    One near criterion: a landmark, or failing that a type of place (audit 2026-10-04). The API takes
+    one or the other, so a URL carrying both reads as the landmark and the panel shows the type as
+    «any», rather than showing a choice the search is ignoring.
+  */
+  const nearKind =
+    citySlug && !nearLandmark ? first(query['nearKind']) || undefined : undefined;
   const withinKm = Math.min(
     MAX_SEARCH_RADIUS_KM,
     Math.max(0.5, Number(first(query['withinKm'])) || DEFAULT_SEARCH_RADIUS_KM),

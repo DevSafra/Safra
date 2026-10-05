@@ -680,6 +680,74 @@ describeIfDb('SearchService', () => {
     expect(page.items[0]?.slug).toBe(cheapest);
   });
 
+  /** A third property in the fixtures' city, with the score and rating a test needs. */
+  const addProperty = async (rating: string, score: string): Promise<string> => {
+    const made = await db.execute<{ slug: string }>(sql`
+      WITH pr AS (
+        INSERT INTO properties (partner_id, city_id, property_type_id, cancellation_policy_id,
+                                slug, name_ar, name_en, name_de, address, status,
+                                rating, recommendation_score)
+        SELECT ${partnerId}::uuid, p.city_id, p.property_type_id, p.cancellation_policy_id,
+               'search-extra-' || substr(gen_random_uuid()::text, 1, 8),
+               'ثالث', 'Third', 'Dritte', 'x', 'published', ${rating}, ${score}
+        FROM properties p WHERE p.slug = ${cheapPropertySlug}
+        RETURNING id, slug
+      ), un AS (
+        INSERT INTO units (property_id, name_ar, name_en, name_de, max_guests, base_price,
+                           currency_id, min_nights, is_active)
+        SELECT pr.id, 'و', 'U', 'E', 2, '50.00', u.currency_id, 1, true
+        FROM pr, units u WHERE u.id = ${cheapUnitId}::uuid
+        RETURNING id
+      )
+      SELECT pr.slug FROM pr, un
+    `);
+
+    return made.rows[0]!.slug;
+  };
+
+  /*
+    «الأعلى تقييماً» ranks by RATING (audit 2026-10-04).
+
+    The fast path chose the page's properties by recommendation score whatever the sort, and the
+    outer query sorted by rating only inside that window. A 5.0 with a low score sat outside it,
+    behind 3.5s, and on later pages sorted into a slot already passed, so it never appeared.
+  */
+  it('puts the best-rated stay first on the rating sort, whatever its recommendation score', async () => {
+    await db.execute(sql`
+      UPDATE properties
+         SET recommendation_score =
+               CASE slug WHEN ${cheapPropertySlug} THEN 9.000 ELSE 8.000 END::numeric,
+             rating = CASE slug WHEN ${cheapPropertySlug} THEN 3.0 ELSE 3.5 END::numeric
+       WHERE slug IN (${cheapPropertySlug}, ${dearPropertySlug})
+    `);
+    const best = await addProperty('5.0', '1.000');
+
+    const page = await search.search(query({ sort: 'rating_desc', limit: 1 }));
+
+    expect(page.items[0]?.slug).toBe(best);
+  });
+
+  /*
+    A withdrawn city does not empty the nationwide list (audit 2026-10-04).
+
+    The fast path's window was drawn from a scope that never asked whether the city or country was
+    open; those checks ran later, after the window was fixed. A withdrawn city with the best scores
+    filled the window and was then dropped whole, so the page came back EMPTY with no next cursor,
+    while the facet counts (which do check) said stays existed.
+  */
+  it('still fills a nationwide page when the best-scored city is withdrawn', async () => {
+    await db.execute(sql`
+      UPDATE properties SET recommendation_score = '99.000'
+       WHERE slug IN (${cheapPropertySlug}, ${dearPropertySlug})
+    `);
+    await db.execute(sql`UPDATE cities SET is_active = false WHERE slug = ${citySlug}`);
+
+    const page = await search.search(query({ citySlug: undefined, limit: 1 }));
+
+    expect(page.items, 'a withdrawn city emptied the page').toHaveLength(1);
+    expect([cheapPropertySlug, dearPropertySlug]).not.toContain(page.items[0]?.slug);
+  });
+
   // ─── Paging ────────────────────────────────────────────────────────────────
 
   it('pages without repeating a property, and stops', async () => {

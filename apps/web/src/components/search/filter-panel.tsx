@@ -471,6 +471,8 @@ export function FilterPanel({
             onChange={(value) =>
               go({
                 nearLandmark: value || null,
+                /* One near criterion at a time: a landmark replaces a type of place. */
+                ...(value ? { nearKind: null } : {}),
                 sort: value
                   ? parsed.sort
                   : parsed.sort === 'distance_asc'
@@ -484,7 +486,19 @@ export function FilterPanel({
               label={ts('nearKind')}
               value={parsed.nearKind ?? ''}
               options={[{ code: '', label: ts('nearKindAny') }, ...options.landmarkKinds]}
-              onChange={(value) => go({ nearKind: value || null })}
+              onChange={(value) =>
+                /* And a type of place replaces a landmark, which a sort by distance needs. */
+                go({
+                  nearKind: value || null,
+                  ...(value
+                    ? {
+                        nearLandmark: null,
+                        sort:
+                          parsed.sort === 'distance_asc' ? 'recommended' : parsed.sort,
+                      }
+                    : {}),
+                })
+              }
             />
           ) : null}
           {parsed.nearLandmark || parsed.nearKind ? (

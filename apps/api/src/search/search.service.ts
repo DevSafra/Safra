@@ -280,13 +280,23 @@ export class SearchService {
      * `recommended` — whose third key is the price — the cut would decide an ordering that the price
      * is supposed to decide.
      */
+    /*
+      The window ranks by the SORT's own leading keys (audit 2026-10-04). It ranked by score then
+      rating for both sorts, so «الأعلى تقييماً» chose its page by recommendation score and only
+      ordered by rating inside it: a 5.0 with a low score was never shown and other stays repeated.
+    */
+    const windowOrder =
+      query.sort === 'rating_desc'
+        ? sql`pr.rating DESC NULLS LAST, pr.recommendation_score DESC`
+        : sql`pr.recommendation_score DESC, pr.rating DESC NULLS LAST`;
+
     const pageProperties = rankBeforePricing
       ? sql`
         AND u.property_id IN (
           SELECT ranked.property_id FROM (
             SELECT eligible.property_id,
                    RANK() OVER (
-                     ORDER BY pr.recommendation_score DESC, pr.rating DESC NULLS LAST
+                     ORDER BY ${windowOrder}
                    ) AS rk
             FROM (SELECT DISTINCT available.property_id FROM available) eligible
             JOIN properties pr ON pr.id = eligible.property_id

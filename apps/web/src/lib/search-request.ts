@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { getAmenities, type Amenity } from '@/lib/catalog';
-import { parseSearch, type ParsedSearch } from '@/lib/search-query';
+import { allowedAmenityCodes, parseSearch, type ParsedSearch } from '@/lib/search-query';
 
 /**
  * A search as the browser's own fetches send it, read the way the results page reads its URL.
@@ -25,10 +25,7 @@ export async function readSearchRequest(request: Request): Promise<{
   );
 
   const amenities = await getAmenities();
-  const parsed = parseSearch(
-    raw,
-    new Set(amenities.filter((one) => one.propertyCount > 0).map((one) => one.code)),
-  );
+  const parsed = parseSearch(raw, allowedAmenityCodes(amenities));
 
   const navigation =
     request.headers.get('sec-fetch-mode') === 'navigate' ||

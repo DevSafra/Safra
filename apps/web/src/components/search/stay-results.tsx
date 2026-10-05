@@ -30,6 +30,7 @@ import { formatMoney, localisedName, localisedText } from '@/lib/localise';
 import { readableDate } from '@/lib/readable-date';
 import { toCardModels } from '@/lib/search-cards';
 import {
+  allowedAmenityCodes,
   pageHref,
   parseSearch,
   toQueryString,
@@ -93,7 +94,7 @@ export async function StayResults({
     pool declared on the BUILDING never appeared as a filter at all, while the search itself would
     have found it.
   */
-  const allowed = new Set(amenities.map((one) => one.code));
+  const allowed = allowedAmenityCodes(amenities);
   const read = (raw: RawQuery) =>
     parseSearch(pinnedCitySlug ? { ...raw, citySlug: pinnedCitySlug } : raw, allowed);
 
