@@ -56,7 +56,7 @@ export function PartnerTypeManager({
     {
       key: 'code',
       header: c.colCode,
-      render: (row) => <span className="font-mono text-13 text-faint">{row.code}</span>,
+      render: (row) => <code className="font-mono text-13 text-faint">{row.code}</code>,
     },
     {
       key: 'ar',

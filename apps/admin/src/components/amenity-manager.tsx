@@ -56,7 +56,7 @@ export function AmenityManager({
     {
       key: 'code',
       header: c.colCode,
-      render: (row) => <span className="font-mono text-13 text-faint">{row.code}</span>,
+      render: (row) => <code className="font-mono text-13 text-faint">{row.code}</code>,
     },
     {
       key: 'ar',
@@ -82,8 +82,8 @@ export function AmenityManager({
       key: 'filter',
       header: c.colFilterable,
       render: (row) => (
-        <StatusPill tone={row.isFilterable ? 'sky' : 'faint'}>
-          {row.isFilterable ? c.active : c.inactive}
+        <StatusPill tone={row.isFilterable ? 'sky' : 'stone'}>
+          {row.isFilterable ? c.filterOn : c.filterOff}
         </StatusPill>
       ),
     },

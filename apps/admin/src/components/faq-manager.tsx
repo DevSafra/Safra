@@ -11,6 +11,7 @@ import { Actions, CheckboxField, Field, Panel, Prose, Row } from '@/components/g
 import type { FaqQuestionRow, GeneralFaqRow } from '@/lib/api';
 import { count } from '@/lib/format';
 import { apiErrorOf, t } from '@/lib/strings';
+import { wholeNumber } from '@/lib/numeric-input';
 
 /**
  * الأسئلة الشائعة — both FAQs, authored here (Bashar, 2026-09-28).
@@ -58,13 +59,19 @@ export function FaqQuestionManager({
     {
       key: 'en',
       header: c.faqQuestionEn,
-      render: (row) => <span className="text-text2">{row.questionEn ?? '—'}</span>,
+      render: (row) => (
+        <span className="text-text2">{row.questionEn ?? c.faqQuestionEnMissing}</span>
+      ),
     },
     {
       key: 'required',
       header: c.faqColRequired,
       render: (row) => (
-        <StatusPill tone={row.isRequired ? 'warn' : 'faint'}>
+        /*
+          Not a status, but on the same screen as «موقوف»'s faint grey, so «اختياري» takes a hue
+          nothing else on الكتالوج uses (audit 2026-10-04: the two read alike).
+        */
+        <StatusPill tone={row.isRequired ? 'warn' : 'indigo'}>
           {row.isRequired ? c.faqRequired : c.faqOptional}
         </StatusPill>
       ),
@@ -170,7 +177,7 @@ function QuestionForm({
         questionEn: questionEn || null,
         questionDe: questionDe || null,
         isRequired,
-        position: Number(position) || 0,
+        position: wholeNumber(position) ?? 0,
         ...(question ? { isActive } : {}),
       };
 
@@ -422,7 +429,7 @@ function GeneralForm({
         answerAr,
         answerEn: answerEn || null,
         answerDe: answerDe || null,
-        position: Number(position) || 0,
+        position: wholeNumber(position) ?? 0,
         ...(entry ? { isActive } : {}),
       };
 

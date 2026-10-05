@@ -49,6 +49,13 @@ const SECTIONS = [
   '/settings',
   '/audit',
   '/emergency',
+  /*
+    The catalogue screens added since, whose pills the sweep never read (audit 2026-10-04): the
+    FAQ manager drew «اختياري» and «متوقف» in the same faint grey on one screen.
+  */
+  '/catalogue',
+  '/groups',
+  '/landmarks',
 ] as const;
 
 /**
@@ -281,6 +288,12 @@ test.describe('console navigation', () => {
       const leaked = await page.evaluate(() =>
         Array.from(document.querySelectorAll('body *'))
           .filter((element) => element.children.length === 0)
+          /*
+            Except an IDENTIFIER the screen shows on purpose, marked as one in the markup: the
+            catalogue's «المعرّف» column prints a record's stable code for the operator who needs
+            it. A `<code>` element is the declaration; nothing else is exempt (2026-10-04).
+          */
+          .filter((element) => !element.closest('code'))
           .map((element) => (element.textContent ?? '').trim())
           .filter((text) => /^[a-z]+(?:_[a-z]+)+$/.test(text)),
       );

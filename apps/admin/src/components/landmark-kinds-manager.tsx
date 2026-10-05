@@ -85,7 +85,9 @@ export function LandmarkKindsManager({
                     </span>
                   )}
                 </td>
-                <td className="p-2 font-mono text-13 text-faint">{kind.code}</td>
+                <td className="p-2">
+                  <code className="font-mono text-13 text-faint">{kind.code}</code>
+                </td>
                 <td className="p-2">{kind.nameAr}</td>
                 <td className="p-2 tabular-nums">{kind.landmarks}</td>
                 <td className="p-2">

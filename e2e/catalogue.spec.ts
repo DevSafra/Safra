@@ -115,8 +115,8 @@ test('an amenity can be created, retired and deleted', async ({ page }) => {
     Retired, but still filterable: the two flags are separate, and the row shows both. Conflating
     them would let somebody tidying the search sidebar stop partners declaring a real facility.
   */
-  expect(rowText, 'it is retired').toContain('موقوف');
-  expect(rowText, 'and still marked filterable').toContain('مفعَّل');
+  expect(rowText, 'it is retired').toContain(t.sections.catalogue.inactive);
+  expect(rowText, 'and still marked filterable').toContain(t.sections.catalogue.filterOn);
 
   // ── Delete it ──
   await page.locator(`[data-amenity-edit="${PROBE}"]`).click();

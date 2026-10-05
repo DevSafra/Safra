@@ -632,7 +632,11 @@ export const ar = {
       colStatus: 'الحالة',
       colUsage: 'الاستخدام',
       active: 'مفعَّل',
-      inactive: 'موقوف',
+      /*
+        «معطَّل», not «موقوف» (audit 2026-10-04). «موقوف» is a SUSPENSION elsewhere (a coupon, drawn
+        in red), and one word in two colours across screens reads as two different states.
+      */
+      inactive: 'معطَّل',
       edit: 'تعديل',
       remove: 'حذف',
       removing: 'جارٍ الحذف…',
@@ -661,6 +665,8 @@ export const ar = {
       faqOptional: 'اختياري',
       faqQuestionAr: 'السؤال بالعربية',
       faqQuestionEn: 'السؤال بالإنجليزية',
+      /* A question with no English shows the Arabic to English readers; said in words, not «—». */
+      faqQuestionEnMissing: 'يُعرض بالعربية',
       faqQuestionDe: 'السؤال بالألمانية',
       faqRequiredLabel: 'الإجابة إلزامية قبل إرسال الإعلان للمراجعة',
       faqPosition: 'الترتيب',
@@ -690,6 +696,12 @@ export const ar = {
       amenitiesEmpty: 'لا خدمات بعد.',
       colGroup: 'المجموعة',
       colFilterable: 'التصفية',
+      /*
+        Its OWN words (audit 2026-10-04). It read «مفعَّل»/«موقوف», the status column's words, in a
+        second colour on the same screen, so one word meant two things in two colours.
+      */
+      filterOn: 'في التصفية',
+      filterOff: 'خارج التصفية',
       filterableLabel: 'تظهر في تصفية البحث',
       activeAmenityLabel: 'مفعَّلة: يستطيع الشريك اختيارها',
       group: 'المجموعة في مُصفّي البحث',
