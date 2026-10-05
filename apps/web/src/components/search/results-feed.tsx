@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import type { CardModel } from '@/lib/search-cards';
 
 import { ResultCard } from './result-card';
+import { FAVOURITE_EVENT, type FavouriteChange } from './save-heart';
 
 type Status = 'idle' | 'loading' | 'error' | 'done';
 
@@ -125,6 +126,24 @@ export function ResultsFeed({
       /* Storage refused or the entry is not ours: the first batch is the right fallback. */
     }
     // Once per search: a new query is a new list, mounted afresh under a new key.
+  }, []);
+
+  /*
+    A heart pressed anywhere on the page lands in the cards, so the snapshot `remember` writes, and
+    the list restored from it, carry what the reader actually saved (audit 2026-10-04).
+  */
+  useEffect(() => {
+    const follow = (event: Event) => {
+      const change = (event as CustomEvent<FavouriteChange>).detail;
+      setCards((current) =>
+        current.map((card) =>
+          card.slug === change.slug ? { ...card, saved: change.saved } : card,
+        ),
+      );
+    };
+
+    window.addEventListener(FAVOURITE_EVENT, follow);
+    return () => window.removeEventListener(FAVOURITE_EVENT, follow);
   }, []);
 
   const remember = useCallback(

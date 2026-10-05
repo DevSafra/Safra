@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
 /**
@@ -14,6 +14,18 @@ import { useParams, useRouter } from 'next/navigation';
  * Optimistic: the heart changes on the press and goes back if the server refuses, with the failure
  * said aloud for a screen reader.
  */
+/**
+ * A confirmed save or unsave, announced to the page (audit 2026-10-04).
+ *
+ * A heart held its state only in itself, so the results feed kept the state each card ARRIVED with:
+ * coming back from a stay restored a list whose hearts were stale, and a heart pressed in the full
+ * map's list did not reach the same stay's card behind it. Every heart for the slug and the feed's
+ * own cards listen, so all of them agree without a reload.
+ */
+export const FAVOURITE_EVENT = 'safra:favourite';
+
+export type FavouriteChange = { readonly slug: string; readonly saved: boolean };
+
 export function SaveHeart({
   slug,
   initiallySaved,
@@ -35,6 +47,16 @@ export function SaveHeart({
   const [saved, setSaved] = useState(initiallySaved);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    const follow = (event: Event) => {
+      const change = (event as CustomEvent<FavouriteChange>).detail;
+      if (change.slug === slug) setSaved(change.saved);
+    };
+
+    window.addEventListener(FAVOURITE_EVENT, follow);
+    return () => window.removeEventListener(FAVOURITE_EVENT, follow);
+  }, [slug]);
 
   async function toggle() {
     if (busy) return;
@@ -61,7 +83,14 @@ export function SaveHeart({
       if (!response.ok) {
         setSaved(!next);
         setFailed(true);
+        return;
       }
+
+      window.dispatchEvent(
+        new CustomEvent<FavouriteChange>(FAVOURITE_EVENT, {
+          detail: { slug, saved: next },
+        }),
+      );
     } catch {
       setSaved(!next);
       setFailed(true);

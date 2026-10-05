@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import ar from '../packages/i18n/src/messages/web/ar.json' assert { type: 'json' };
 
 import { stayFrom } from './free-nights.js';
 
@@ -475,6 +476,100 @@ test('coming back from a stay returns to it, with what was loaded', async ({ pag
     back,
     'brought into view, not left at the edge it was pressed at',
   ).toBeInViewport({ ratio: 0.8 });
+});
+
+/*
+  A heart pressed on a card from a LATER batch survives opening the stay and coming back
+  (audit 2026-10-04). The restored list was rebuilt from the cards as they first arrived, so the
+  heart came back empty and a second press sent a second save. Signed in, and put back afterwards,
+  because the suite shares one customer account.
+*/
+test.describe('a heart on the results list', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test('keeps what the reader saved when they come back from a stay', async ({
+    page,
+  }) => {
+    await page.goto('/ar/login?next=%2Far%2Faccount');
+    await page.getByLabel(ar.auth.email).fill('customer@safra.test');
+    await page
+      .locator('input[type=password]')
+      .first()
+      .fill(process.env['TESTBED_PASSWORD'] ?? 'a-testbed-password-1');
+    await page.getByRole('button', { name: ar.auth.signIn }).first().click();
+    await page.waitForURL(/\/ar\/account/, { timeout: 20_000 });
+
+    await page.goto(SEARCH);
+    const firstBatch = await page.locator('main article').count();
+    test.skip(
+      firstBatch < 20,
+      'the testbed has fewer than one batch of stays for these dates',
+    );
+
+    await scrollPast(page, firstBatch);
+
+    /* A card from the later batch that is not saved yet. */
+    const later = page.locator('main article').nth(firstBatch + 2);
+    const id = await later.getAttribute('id');
+    const slug =
+      ((await later.locator('h3 a').getAttribute('href')) ?? '')
+        .split('/property/')[1]
+        ?.split('?')[0] ?? '';
+    const heart = later.locator('button[aria-pressed]');
+    test.skip((await heart.getAttribute('aria-pressed')) === 'true', 'already saved');
+
+    const saved = page.waitForResponse(
+      (r) => r.url().includes('/api/favourites') && r.request().method() === 'POST',
+    );
+    await heart.click();
+    expect((await saved).ok()).toBe(true);
+
+    try {
+      await later.locator('h3 a').click();
+      await page.waitForURL(/\/property\//);
+      await page.goBack();
+      await page.waitForURL(/\/search/);
+
+      await expect(
+        page.locator(`[id="${id}"] button[aria-pressed]`),
+        'the restored heart shows what was saved',
+      ).toHaveAttribute('aria-pressed', 'true');
+    } finally {
+      await page.request.delete('/ar/api/favourites', {
+        data: { slug },
+      });
+    }
+  });
+});
+
+/*
+  A filter is honoured on EVERY batch, not only the first (audit 2026-10-04). The batch and map
+  routes kept only amenities with a non-zero catalogue count, which counts room-level links only,
+  so an amenity declared on the building was dropped from every scroll batch.
+*/
+test('the scroll batch applies an amenity filter exactly as the API does', async ({
+  request,
+}) => {
+  const amenities = (await (
+    await request.get('http://localhost:4000/api/v1/amenities')
+  ).json()) as
+    | { code: string; propertyCount: number }[]
+    | { items: { code: string; propertyCount: number }[] };
+  const list = Array.isArray(amenities) ? amenities : amenities.items;
+  const building = list.find((one) => one.propertyCount === 0);
+  test.skip(!building, 'every amenity is linked to a room in this database');
+
+  const filter = `${STAY}&citySlug=aleppo&amenityCodes=${building!.code}&cursor=MjA`;
+  const site = (await (
+    await request.get(`/ar/api/search?${filter}`, {
+      headers: { Accept: 'application/json' },
+    })
+  ).json()) as { cards: { slug: string }[] };
+  const api = (await (
+    await request.get(`http://localhost:4000/api/v1/search?${filter}`)
+  ).json()) as { items: { slug: string }[] };
+
+  expect(site.cards.map((card) => card.slug)).toEqual(api.items.map((item) => item.slug));
 });
 
 test('the batch route sends a browser to the page, and refuses a malformed cursor', async ({
