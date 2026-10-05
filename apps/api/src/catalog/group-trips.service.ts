@@ -82,7 +82,12 @@ export class PublicGroupTripsService {
         JOIN countries co ON co.id = c.country_id
         LEFT JOIN currencies cur ON cur.id = g.currency_id
        WHERE g.deleted_at IS NULL AND g.status = 'published'
-       ORDER BY (g.ends_on < current_date), g.starts_on, g.created_at
+       -- Upcoming soonest first, then past NEWEST first: the cap below keeps the recent evidence
+       -- (audit 2026-10-04; oldest first crowded last month's trips out behind years-old ones).
+       ORDER BY (g.ends_on < current_date),
+                CASE WHEN g.ends_on >= current_date THEN g.starts_on END ASC,
+                g.starts_on DESC,
+                g.created_at
        LIMIT ${PUBLIC_GROUP_TRIPS_LIMIT}
     `);
 

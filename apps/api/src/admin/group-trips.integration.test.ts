@@ -262,6 +262,30 @@ describeIfDb('group trips', () => {
     expect((await publicTrips.list()).items).toHaveLength(PUBLIC_GROUP_TRIPS_LIMIT);
   });
 
+  /*
+    Upcoming trips soonest first, then PAST trips newest first (audit 2026-10-04).
+
+    Past trips are kept as evidence that SAFRA runs them, so the recent ones matter most, and the
+    cap above is applied to this order: sorted oldest first, sixty trips from years ago crowded out
+    last month's.
+  */
+  it('lists upcoming trips soonest first and past trips newest first', async () => {
+    await db.execute(sql`
+      INSERT INTO group_trips (slug, city_id, title_ar, summary_ar, description_ar,
+                               starts_on, ends_on, status)
+      SELECT v.slug, c.id, 'رحلة', 'سطر.', 'وصف كافٍ.', v.starts::date, v.ends::date, 'published'
+        FROM (VALUES ('past-old', '2020-01-01', '2020-01-05'),
+                     ('past-recent', '2026-01-01', '2026-01-05'),
+                     ('coming', '2030-01-01', '2030-01-05')) AS v(slug, starts, ends),
+             cities c
+       WHERE c.slug = ${citySlug}
+    `);
+
+    const order = (await publicTrips.list()).items.map((trip) => trip.slug);
+
+    expect(order).toEqual(['coming', 'past-recent', 'past-old']);
+  });
+
   /* The control for the cap: a small set comes back whole, so «at most N» is not «almost none». */
   it('shows every trip when there are few', async () => {
     await console_.create(admin(), draft('a-few-1'));
