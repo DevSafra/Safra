@@ -107,7 +107,20 @@ describeIfDb('a booking that holds several identical rooms', () => {
             AND daterange(bu.check_in, bu.check_out, '[)')
                 && daterange(${STAY.checkIn}::date, ${STAY.checkOut}::date, '[)')
         )
-      GROUP BY u.property_id, u.room_type_code
+        /*
+          Counted the way allocateRooms counts, or the fixture promises rooms the allocator
+          will not give. It also skips a room the partner closed on the calendar, and treats only
+          rooms of the same price and capacity as interchangeable; leftover closures and price edits
+          from e2e runs made this pick a type with three "free" rooms of which one was bookable.
+        */
+        AND NOT EXISTS (
+          SELECT 1 FROM availability_days ad
+          WHERE ad.unit_id = u.id
+            AND ad.date >= ${STAY.checkIn}::date
+            AND ad.date <  ${STAY.checkOut}::date
+            AND ad.status <> 'available'
+        )
+      GROUP BY u.property_id, u.room_type_code, u.base_price, u.max_guests
       HAVING COUNT(*) >= 3
       ORDER BY COUNT(*) DESC
       LIMIT 1

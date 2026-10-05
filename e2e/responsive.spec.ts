@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { partnerApplicationsOpen } from '../packages/contracts/src/partner-applications.js';
+
 import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
 import { PARTNER_BASE } from './partner-session.js';
 
@@ -573,7 +575,10 @@ test.describe('the phone menu', () => {
     });
   }
 
-  test('the menu reaches every destination the bar gives up', async ({ page }) => {
+  test('the menu reaches every destination the bar gives up', async ({
+    page,
+    request,
+  }) => {
     await page.setViewportSize({ width: 390, height: 860 });
     await page.goto('/ar');
     await page.locator('header [data-menu="mobile"]').click();
@@ -587,11 +592,26 @@ test.describe('the phone menu', () => {
       'الرئيسية',
       'عن سفرة',
       'تواصل معنا',
-      'سجّل كشريك',
       'تسجيل الدخول',
       'إنشاء حساب',
     ]) {
       await expect(menu.getByRole('link', { name }), name).toBeVisible();
+    }
+
+    /*
+      The partner invitation exists only while the super admin keeps the form open (2026-10-04),
+      so this asserts whichever state the switch is in. It failed a full run with the form
+      deliberately closed on الإعدادات; `partner-applications-switch.spec.ts` drives both states.
+    */
+    const settings = (await (
+      await request.get('http://localhost:4000/api/v1/settings/public')
+    ).json()) as Record<string, unknown>;
+    const partner = menu.getByRole('link', { name: 'سجّل كشريك' });
+
+    if (partnerApplicationsOpen(settings)) {
+      await expect(partner).toBeVisible();
+    } else {
+      await expect(partner).toHaveCount(0);
     }
 
     /* Every row is a finger target, which the 42px the bar's own links use is not. */
