@@ -14,6 +14,8 @@ export const en = {
   'request.not_found': 'Not found.',
   'request.upstream_unreachable': 'Could not reach the server. Please try again.',
   'request.unknown': 'Something went wrong. Please try again.',
+  'request.cross_origin':
+    'This request was refused because it did not come from the SAFRA site. Reload the page and try again.',
   'request.too_many': 'Too many requests. Please wait a moment and try again.',
   'request.capacity': 'The service is busy right now. Please try again in a moment.',
   'auth.required': 'Authentication required.',
@@ -46,6 +48,8 @@ export const en = {
     'This account cannot use the partner dashboard. If you were sent a partnership invitation or an invitation to work for a partner, open its link from your email to activate the account first.',
   'auth.staff_account':
     'This is a staff account. Sign in to the SAFRA command centre instead.',
+  'auth.email_unverified':
+    'Your email address is not confirmed yet. Open the confirmation link we sent you, or ask for a new one.',
   'permission.denied': 'You do not have access to this resource.',
   'scope.outside': 'This record is outside your assigned scope.',
   'staff.not_found': 'Staff member not found.',
@@ -78,6 +82,14 @@ export const en = {
     "Today's bookings have closed for this city. The first available date is {date}.",
   'booking.arrival_in_past':
     'The arrival date is in the past. The first available date is {date}.',
+  'booking.basket_mixed_currency':
+    'Rooms priced in different currencies cannot share one booking. Book each type separately.',
+  'booking.basket_duplicate_type':
+    'You chose the same room type twice. Combine it into one line with the number of rooms you want.',
+  'booking.check_in_too_early':
+    'A guest cannot be checked in before their arrival date, which is {date}.',
+  'booking.emergency_stopped':
+    'New bookings in this area are paused because of an emergency. Your existing bookings are not affected.',
   'payment.unavailable': 'Payment is temporarily unavailable. Please retry.',
   'partner.not_found': 'Partner not found.',
 
@@ -358,6 +370,10 @@ export const en = {
   'staff.invitation_invalid': 'That invitation link is invalid or has already been used.',
   'staff.cannot_change_own_role':
     'You cannot change your own role. Ask another super admin.',
+  'staff.role_beyond_actor':
+    'You cannot grant permissions you do not hold, or change the role of someone who holds more than you. Ask a super admin.',
+  'staff.scope_beyond_actor':
+    'You cannot grant a city scope wider than your own, or change the scope of someone who reaches further than you. Ask a super admin.',
   'booking.departure_after_arrival':
     'Departure must be at least one night after arrival.',
   'booking.arrival_minimum_nights':
@@ -462,6 +478,8 @@ export const en = {
   'validation.decimal_string': 'Enter an amount such as 10.00.',
   'validation.currency_code': 'Must be a three-letter ISO 4217 currency code.',
   'validation.rate_positive': 'Rate must be greater than zero.',
+  'validation.rate_too_large':
+    'Rate is too large: at most ten digits before the decimal point.',
   'validation.rate_syp_fixed': 'The SYP to SYP rate is always 1 and cannot be set.',
   'validation.price_range': 'Minimum price cannot exceed maximum price.',
   'validation.one_field_required': 'Provide at least one field to update.',

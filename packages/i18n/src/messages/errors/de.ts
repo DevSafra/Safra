@@ -15,6 +15,8 @@ export const de = {
   'request.upstream_unreachable':
     'Der Server ist nicht erreichbar. Bitte erneut versuchen.',
   'request.unknown': 'Etwas ist schiefgelaufen. Bitte erneut versuchen.',
+  'request.cross_origin':
+    'Diese Anfrage wurde abgelehnt, weil sie nicht von der SAFRA-Website kam. Laden Sie die Seite neu und versuchen Sie es erneut.',
   'request.too_many':
     'Zu viele Anfragen. Bitte einen Moment warten und erneut versuchen.',
   'request.capacity':
@@ -55,6 +57,8 @@ export const de = {
     'Dieses Konto hat keinen Zugang zum Partner-Dashboard. Falls Sie eine Partner-Einladung oder eine Einladung zur Mitarbeit bei einem Partner erhalten haben, öffnen Sie zuerst deren Link in Ihrer E-Mail, um das Konto zu aktivieren.',
   'auth.staff_account':
     'Dies ist ein Mitarbeiterkonto. Bitte melden Sie sich stattdessen im SAFRA-Kommandozentrum an.',
+  'auth.email_unverified':
+    'Ihre E-Mail-Adresse ist noch nicht bestätigt. Öffnen Sie den Bestätigungslink, den wir Ihnen gesendet haben, oder fordern Sie einen neuen an.',
   'permission.denied': 'Sie haben keinen Zugriff auf diese Ressource.',
   'scope.outside': 'Dieser Datensatz liegt außerhalb Ihres zugewiesenen Bereichs.',
   'staff.not_found': 'Mitarbeiter nicht gefunden.',
@@ -89,6 +93,14 @@ export const de = {
     'Buchungen für heute sind in dieser Stadt geschlossen. Erstes verfügbares Datum: {date}.',
   'booking.arrival_in_past':
     'Das Anreisedatum liegt in der Vergangenheit. Erstes verfügbares Datum: {date}.',
+  'booking.basket_mixed_currency':
+    'Zimmer in unterschiedlichen Währungen können nicht in einer Buchung stehen. Bitte jeden Typ einzeln buchen.',
+  'booking.basket_duplicate_type':
+    'Sie haben denselben Zimmertyp zweimal gewählt. Bitte in einer Zeile mit der gewünschten Anzahl zusammenfassen.',
+  'booking.check_in_too_early':
+    'Ein Gast kann nicht vor dem Anreisedatum eingecheckt werden. Anreise: {date}.',
+  'booking.emergency_stopped':
+    'Neue Buchungen in dieser Region sind wegen eines Notfalls ausgesetzt. Ihre bestehenden Buchungen sind nicht betroffen.',
   'payment.unavailable':
     'Die Zahlung ist vorübergehend nicht verfügbar. Bitte erneut versuchen.',
   'partner.not_found': 'Partner nicht gefunden.',
@@ -405,6 +417,10 @@ export const de = {
     'Dieser Einladungslink ist ungültig oder wurde bereits verwendet.',
   'staff.cannot_change_own_role':
     'Sie können Ihre eigene Rolle nicht ändern. Bitte einen anderen Super-Admin fragen.',
+  'staff.role_beyond_actor':
+    'Sie können keine Berechtigungen vergeben, die Sie selbst nicht haben, und nicht die Rolle von jemandem ändern, der mehr Berechtigungen hat als Sie. Bitte einen Super-Admin fragen.',
+  'staff.scope_beyond_actor':
+    'Sie können keinen Städtebereich vergeben, der über Ihren eigenen hinausgeht, und nicht den Bereich von jemandem ändern, der weiter reicht als Sie. Bitte einen Super-Admin fragen.',
   'booking.departure_after_arrival':
     'Die Abreise muss mindestens eine Nacht nach der Anreise liegen.',
   'booking.arrival_minimum_nights':
@@ -515,6 +531,8 @@ export const de = {
   'validation.decimal_string': 'Bitte einen Betrag wie 10.00 eingeben.',
   'validation.currency_code': 'Muss ein dreibuchstabiger ISO-4217-Währungscode sein.',
   'validation.rate_positive': 'Der Kurs muss größer als null sein.',
+  'validation.rate_too_large':
+    'Der Kurs ist zu groß: höchstens zehn Stellen vor dem Komma.',
   'validation.rate_syp_fixed':
     'Der Kurs SYP zu SYP ist immer 1 und kann nicht gesetzt werden.',
   'validation.price_range': 'Der Mindestpreis darf den Höchstpreis nicht überschreiten.',

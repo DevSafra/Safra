@@ -34,6 +34,12 @@ export const ERROR = {
   REQUEST_UPSTREAM_UNREACHABLE: 'request.upstream_unreachable',
   REQUEST_UNKNOWN: 'request.unknown',
   /**
+   * A state-changing request whose `Origin` is another site — refused before it reaches the API.
+   * The customer site's route handlers act on the session cookie, which a browser attaches to a
+   * cross-site form post as readily as to our own.
+   */
+  REQUEST_CROSS_ORIGIN: 'request.cross_origin',
+  /**
    * The rate limiter's refusal.
    *
    * `@nestjs/throttler` answers a 429 with `{statusCode, message: 'ThrottlerException: Too
@@ -104,6 +110,14 @@ export const ERROR = {
   AUTH_NOT_PARTNER: 'auth.not_partner',
   /** The customer site: good credentials, but this IS a staff account — the console is elsewhere. */
   AUTH_STAFF_ACCOUNT: 'auth.staff_account',
+  /**
+   * The customer site: right password, but the address was never verified (Bashar, 2026-10-06).
+   *
+   * Only answered AFTER the password is proven, so it confirms nothing to somebody guessing — the
+   * same ordering `auth.locked` relies on. Specific because the person can act on it: the sign-in
+   * form offers to send the link again.
+   */
+  AUTH_EMAIL_UNVERIFIED: 'auth.email_unverified',
   PERMISSION_DENIED: 'permission.denied',
   SCOPE_OUTSIDE: 'scope.outside',
   STAFF_NOT_FOUND: 'staff.not_found',
@@ -155,6 +169,24 @@ export const ERROR = {
    * customer asked and somebody else committed first, so there is no single date to name.
    */
   BOOKING_DATES_JUST_TAKEN: 'booking.dates_just_taken',
+  /**
+   * A basket whose room types are priced in different currencies. One booking carries one
+   * currency, one FX snapshot and one commission cap, so a mixed basket has no single total.
+   */
+  BOOKING_BASKET_MIXED_CURRENCY: 'booking.basket_mixed_currency',
+  /**
+   * Two lines of one basket naming rooms of the same type. The allocator treats such rooms as
+   * interchangeable, so the second line would be charged for rooms the first already holds.
+   */
+  BOOKING_BASKET_DUPLICATE_TYPE: 'booking.basket_duplicate_type',
+  /** Staff recording an arrival before the stay starts, in the city's own calendar. `{date}`. */
+  BOOKING_CHECK_IN_TOO_EARLY: 'booking.check_in_too_early',
+  /**
+   * Emergency Mode has stopped new bookings in this property's city or country (EC-009). Specific
+   * rather than «not found»: the listing exists and will be bookable again, and the declaration is
+   * public in effect, so saying so discloses nothing about the partner.
+   */
+  BOOKING_EMERGENCY_STOPPED: 'booking.emergency_stopped',
   PAYMENT_UNAVAILABLE: 'payment.unavailable',
   PARTNER_NOT_FOUND: 'partner.not_found',
 
@@ -495,6 +527,18 @@ export const ERROR = {
   STAFF_ALREADY_ACTIVATED: 'staff.already_activated',
   STAFF_INVITATION_INVALID: 'staff.invitation_invalid',
   STAFF_CANNOT_CHANGE_OWN_ROLE: 'staff.cannot_change_own_role',
+  /**
+   * The role carries authority the actor does not hold — or is «مدير عام» and the actor is not one.
+   * One code for inviting INTO such a role, moving somebody ONTO it, and re-roling somebody who
+   * already holds more than the actor: each is handing out, or taking away, power the actor lacks.
+   */
+  STAFF_ROLE_BEYOND_ACTOR: 'staff.role_beyond_actor',
+  /**
+   * The same rule for SCOPE (audit 2026-10-06): a member limited to some cities cannot give a
+   * colleague cities, or reach, they do not hold themselves, nor change the scope of somebody who
+   * already reaches further than they do.
+   */
+  STAFF_SCOPE_BEYOND_ACTOR: 'staff.scope_beyond_actor',
   BOOKING_DEPARTURE_AFTER_ARRIVAL: 'booking.departure_after_arrival',
   BOOKING_ARRIVAL_MINIMUM_NIGHTS: 'booking.arrival_minimum_nights',
   /**
@@ -634,6 +678,8 @@ export const ERROR = {
   VALIDATION_CURRENCY_CODE: 'validation.currency_code',
   VALIDATION_RATE_POSITIVE: 'validation.rate_positive',
   VALIDATION_RATE_SYP_FIXED: 'validation.rate_syp_fixed',
+  /** More whole digits than `fx_rates.rate numeric(18,8)` holds. */
+  VALIDATION_RATE_TOO_LARGE: 'validation.rate_too_large',
   VALIDATION_PRICE_RANGE: 'validation.price_range',
   VALIDATION_ONE_FIELD_REQUIRED: 'validation.one_field_required',
   VALIDATION_PASSWORD_UNCHANGED: 'validation.password_unchanged',
