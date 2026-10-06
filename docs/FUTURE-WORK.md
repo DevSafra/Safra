@@ -96,6 +96,94 @@ deleting it; the reason something was blocked is often the reason it comes back.
 
 ## 1. Where the project stands
 
+> ### Go-live audit of the whole system, 2026-10-06: about a hundred findings, fixing in waves
+>
+> Bashar bought a domain and asked for the system to be made ready for go-live with «no bugs or
+> anything». Six read-only reviewers audited every module (not a diff); each finding was verified
+> against the code. **Wave 1 (security and money) is built and verified, not yet committed:**
+> `pnpm verify` green (346 files, 4,882 tests), the full suite green on a CI-shaped fresh database,
+> `pnpm e2e` 607 passed / 1 skipped after one spec fix, and email verification driven in a browser at
+> 390 and 1440 (refusal, resend, superseded link, confirmation, sign-in). The fresh-database runs also
+> exposed four test races, now fixed: a payout fixture that borrowed scarce rows, a 2FA code generated
+> at the end of its 30-second step, a badge count reading other suites' customers, and a dispute
+> fixture borrowing a booking another suite deleted. Waves 2 and 3 are below so none is lost. **Decisions taken 2026-10-06:** customers must verify their email before signing in; a
+> coupon is used only once its booking is paid; each email shows a link or code once; the three sites
+> forward the visitor's address to the API under a shared secret. **Pending from Bashar:** the domain
+> name, the hosting provider, the real contact details, and the no-show rule for pay-at-hotel.
+> **New product direction, after the fixes:** payment at the SAFRA office (booking held until staff
+> mark it paid) or directly at the hotel (the hotel owes SAFRA its commission, invoiced).
+>
+> **Wave 1, security and money (in progress):** open redirect in `safeRedirect`; a custom role with
+> `staff.manage` can create a super admin; sign-in before email verification merges guest bookings;
+> refresh-token and recovery-code races; partner logout does not revoke; customer route handlers
+> without an Origin check; the shared rate-limit bucket behind the three sites; refunds on couponed
+> bookings (500 or overpay); a refund against a fined payout; wallet double debit; settle without
+> write scope; a payout's fine posts no ledger leg; SAFRA payouts paid or opened twice; failed
+> provider refunds re-credit the wallet; refund status for wallet-only payments; the refund tier
+> clock in UTC; webhook refund matching; forged cursors 500; unbounded FX digits; the SLA sweep vs
+> partner accept race; `markPaid` without a row-count check; coupon redemptions never released;
+> `post/0020` re-accepting coupons on every deploy; mixed-currency baskets; basket rooms skipping
+> stay rules; duplicate basket lines; dispute close paying twice; duplicate disputes; a fine waived
+> twice; staff check-in with no date bound; mail failures crashing gift cards, resets and sign-up;
+> one link per email; full addresses published with Arabic commas; Emergency Mode enforcing
+> nothing; the PDF renderer locking up; phone redaction missing Arabic digits.
+>
+> **Wave 1 follow-ups, found while fixing it, each waiting for a decision:** a card captured after
+> its hold expired needs an automatic refund or a review queue; the enrolments `post/0020` wrote
+> before its fix need a one-off cleanup; a fine waived after part of it was collected over-credits
+> the partner, and a waived fine pays the customer no compensation; a gift card's share of a refund
+> and the service-fee revenue line are not split; one booking can hold two open gateway attempts;
+> the console's and the portal's route handlers have no Origin check (the customer site's now do);
+> seeded custom roles carry empty permission sets; every customer who never confirmed an address
+> (2,421 in the dev database) cannot sign in until they do, which needs a message before launch;
+> staff see «تسجيل الوصول» on a stay that has not started and are refused with the reason only
+> after pressing it; a 2FA code is accepted only in its own 30-second step, so a code typed as the
+> step turns over is refused (one step either side is the usual tolerance); and the site's outline
+> secondary buttons have no press feedback, unlike the gold primary.
+>
+> **Security pass over wave 1 (2026-10-06): no critical or high finding.** Fixed: two equal refund
+> confirmations arriving together completed one refund twice and left the other `processing` (medium,
+> money; `refund-confirmation-race.integration.test.ts` commits and races two connections), and a
+> member limited to some cities could make a colleague national or narrow a national one (medium,
+> `staff.scope_beyond_actor`). Open, low: the console's and portal's LOGIN routes accept a cross-site
+> post (login CSRF, closed on the customer site); customer sessions issued before the verification
+> rule keep refreshing; the resend answers measurably slower for an unverified address, as the
+> password reset already does; the three sites do not refuse to boot without
+> `INTERNAL_CALLER_SECRET`, they fall back to one shared rate-limit bucket; and two tabs refreshing
+> at once now sign the person out, which is the intended cost of closing the refresh race.
+>
+> **Wave 2, deploy safety and broken features:** `post/0001` rebuilding the bookings exclusion
+> constraint under a full lock on every deploy (and `post/0023`, `post/0010`); the seed overwriting
+> console edits on every deploy; `post/0008` and `post/0017` resurrecting what staff removed;
+> key rotation leaving four encrypted columns unreadable (runbooks also stale); no artefact can seed
+> a fresh production database; production boot accepting localhost `PARTNER_URL` and an `.example`
+> sender; missing indexes on `notifications.partner_id`/`customer_profile_id` and
+> `refunds.payment_id`; whole-table aggregates on support, messaging and the customer registry;
+> booking exports never deleted (the privacy page says seven days); notification and creative
+> re-drives that do nothing; re-drive sending wrong links; ad creative replace and failure states;
+> city-scoped staff seeing country-wide money and mixed currencies summed as USD; the customer record
+> ignoring scope; employee dispute evidence labelled as SAFRA's; landmark edits by slug across cities;
+> closed markets and suspended partners still bookable on the listing page and favourites; an
+> unpublished favourite that cannot be removed; transient storage failures failing a photo for good;
+> emails in log lines; the verify-email link consumed by a scanner; robots.txt, canonical and hreflang.
+>
+> **Wave 3, console, portal and low:** the rows-per-page bar dropping filters; CSV export ignoring
+> filters; Arabic digits disabling a dozen console and portal controls (gift card, coupon, ad price,
+> compensation, fines, verification codes, 2FA, numeric settings, payout account numbers); partner
+> payouts capped at 50 with a wrong total; two irreversible actions without confirmation; the
+> middleware skipping paths with a dot; allow-lists crashing on inherited names; missing
+> `ParseUUIDPipe` 500s; property page 500 on impossible dates; checkout not clamping the adult count;
+> a booking total without currency; audit payloads without currency; review, application and reply
+> races; partner employee role cross-assignment; scope leaks in coupon partner lists, the delivery
+> log and differing 404 codes; deleting a city leaving its trips listed; the EU sanctions parser's
+> person/entity label; coupon caps without currency; gift-card audit amounts without currency;
+> expired gift cards left on the books; the ledger trigger's rounding with a fractional FX rate; a
+> paid payout's destination changing with a later account edit.
+>
+> **Not touched, by Bashar's instruction («do not touch the image for now»):** both Dockerfiles look
+> unable to build (missing workspace manifests since August; `NEXT_PUBLIC_*` not passed as build
+> args) and neither image has the Chromium the PDFs need.
+
 > ### CI was red on every run from at least 2026-08-25; reproduced and fixed, 2026-10-05
 >
 > Bashar: «can you check the workflows/actions on github are failing and fix that?». None of the
