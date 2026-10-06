@@ -66,4 +66,43 @@ describe('safeRedirect', () => {
   it('drops a fragment rather than carrying it through', () => {
     expect(safeRedirect('/ar/account#token', 'ar')).toBe('/ar/account');
   });
+
+  /**
+   * The origin check alone let these through: each stays on the throwaway origin while it is
+   * being parsed, and the URL parser then collapses the dot segment so the PATHNAME it returns is
+   * `//evil.example` — which the browser reads as another host the moment it is used as a
+   * Location. The result is what gets checked, not only the input.
+   */
+  it('rejects dot segments that collapse into a protocol-relative path', () => {
+    for (const hostile of [
+      '/.//evil.example',
+      '/a/..//evil.example',
+      '/%2e//evil.example',
+      '/%2E//evil.example',
+      '/a/%2e%2e//evil.example',
+      '/./\\evil.example',
+    ]) {
+      expect(safeRedirect(hostile, 'ar'), hostile).toBe('/ar');
+    }
+  });
+
+  it('never returns anything that starts with two slashes or a slash and a backslash', () => {
+    for (const value of [
+      '/.//x',
+      '/a/..//x',
+      '/%2e//x',
+      '/ar/./account',
+      '/ar/../en/account',
+    ]) {
+      const result = safeRedirect(value, 'ar');
+      expect(result.startsWith('//'), value).toBe(false);
+      expect(result.startsWith('/\\'), value).toBe(false);
+      expect(result.startsWith('/'), value).toBe(true);
+    }
+  });
+
+  it('keeps an ordinary path that merely contains a dot segment', () => {
+    expect(safeRedirect('/ar/./account', 'ar')).toBe('/ar/account');
+    expect(safeRedirect('/ar/x/../account?tab=1', 'ar')).toBe('/ar/account?tab=1');
+  });
 });

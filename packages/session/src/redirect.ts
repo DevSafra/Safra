@@ -14,6 +14,7 @@
  *    straight through. This is the case such checks usually miss.
  *  - `https://evil.example` — absolute URL.
  *  - `/\evil.example` — backslashes, which some browsers normalise to slashes.
+ *  - `/.//evil.example`, `/%2e//evil.example` — dot segments the parser collapses into `//`.
  *  - anything not starting with a single `/`.
  */
 export function safeRedirect(
@@ -43,7 +44,18 @@ export function safeRedirect(
 
     if (resolved.origin !== base) return fallback;
 
-    return `${resolved.pathname}${resolved.search}`;
+    const path = `${resolved.pathname}${resolved.search}`;
+
+    /**
+     * The RESULT is checked again, not only the input. Dot segments are resolved by the parser,
+     * so `/.//evil.example`, `/a/..//evil.example` and `/%2e//evil.example` all stay on the
+     * throwaway origin above and still come out with a pathname of `//evil.example` — which a
+     * browser reads as another host once it is a Location. What is returned is what is used, so
+     * that is the string that has to be a single-slash path.
+     */
+    if (path.startsWith('//') || path.startsWith('/\\')) return fallback;
+
+    return path;
   } catch {
     return fallback;
   }
