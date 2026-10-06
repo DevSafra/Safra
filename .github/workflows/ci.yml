@@ -95,8 +95,20 @@ jobs:
       - name: Verify migrate + seed are idempotent
         run: pnpm run db:migrate && pnpm run db:seed
 
+      # The fixtures the integration suite reads: partners, a multi-room hotel, reviews, payout
+      # accrual and a USD rate. Every developer database has them, which is why the suite passed
+      # everywhere except here and CI failed on every run from at least 2026-08-25 to 2026-10-05.
+      # Called through the API package directly: the root script sources a .env that CI does not
+      # have. Without S3 settings it skips the fixture photographs, which no integration test reads.
+      - name: Seed the integration testbed
+        run: pnpm --filter @safra/api db:testbed
+
       - name: Test (including database integration tests)
         run: pnpm exec vitest run
+        env:
+          # This database was migrated minutes ago and has written nothing, so the two sweeps of
+          # what the platform HAS written (audit-catalogue, audit-subject) skip here, and only here.
+          SAFRA_FRESH_DATABASE: '1'
 
   audit:
     name: Dependency audit

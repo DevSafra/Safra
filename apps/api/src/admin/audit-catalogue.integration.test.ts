@@ -30,7 +30,15 @@ import { createDatabase, type Database } from '@safra/db';
  * Read-only: safe against any environment.
  */
 const DATABASE_URL = process.env['DATABASE_URL'];
-const describeIfDb = DATABASE_URL ? describe : describe.skip;
+/*
+  A sweep of what the platform has WRITTEN, so it needs a database that has lived: a developer's, a
+  staging copy, production. CI migrates a fresh one, which holds no audit rows at all, and there the
+  guard below would fail by construction rather than because anything is unnamed. CI says so with
+  SAFRA_FRESH_DATABASE=1 (set in .github/workflows/ci.yml and nowhere else), and only there is this
+  skipped. Bashar's decision, 2026-10-05: everywhere real data exists, it runs exactly as before.
+*/
+const FRESH_DATABASE = process.env['SAFRA_FRESH_DATABASE'] === '1';
+const describeIfDb = DATABASE_URL && !FRESH_DATABASE ? describe : describe.skip;
 
 /**
  * Codes a compile-time catalogue cannot translate, and why not.
