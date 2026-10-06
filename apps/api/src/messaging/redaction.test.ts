@@ -33,6 +33,19 @@ describe('redacting contact details', () => {
       ['a URL', 'see https://wa.me/963944123456 for details', 'wa.me/963944123456'],
       ['a bare domain', 'book direct at qasr-alsharq.com and save', 'qasr-alsharq.com'],
       ['a social handle', 'find us @qasralsharq on instagram', '@qasralsharq'],
+      /*
+        Typed on an Arabic or a Persian keyboard (2026-10-06). `\d` is ASCII only in JavaScript,
+        so every one of these was stored exactly as written.
+      */
+      ['a mobile in Arabic-Indic digits', 'اتصل بي على ٠٩٤٤ ١٢٣ ٤٥٦', '٠٩٤٤ ١٢٣ ٤٥٦'],
+      ['a bare Arabic-Indic run', 'رقمي ٠٩٤٤١٢٣٤٥٦ مساءً', '٠٩٤٤١٢٣٤٥٦'],
+      [
+        'an international number in Arabic-Indic',
+        'واتساب +٩٦٣ ٩٤٤ ١٢٣٤٥٦',
+        '+٩٦٣ ٩٤٤ ١٢٣٤٥٦',
+      ],
+      ['a mobile in Persian digits', 'شماره من ۰۹۴۴۱۲۳۴۵۶ است', '۰۹۴۴۱۲۳۴۵۶'],
+      ['a number mixing all three sets', 'call 09٤٤ ۱۲3 456 now', '09٤٤ ۱۲3 456'],
     ];
 
     for (const [what, body, secret] of blocked) {
@@ -80,6 +93,9 @@ describe('redacting contact details', () => {
       ['a larger price', 'the total is 3,118,050 SYP'],
       ['a date range', 'from 25 to 28 July 2026'],
       ['a room number', 'غرفة 204، الطابق الثاني'],
+      /* The Arabic-digit counterparts of the same false positives: prices and rooms, not phones. */
+      ['a price in Arabic-Indic digits', 'المبلغ ٢٧٢ دولاراً لثلاث ليالٍ'],
+      ['a room number in Arabic-Indic digits', 'غرفة ٢٠٤، الطابق الثاني'],
       ['a plain sentence', 'نتواصل مع الشريك وسنعود إليك خلال ساعة.'],
     ];
 

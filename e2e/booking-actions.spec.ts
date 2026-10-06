@@ -111,19 +111,59 @@ test('a second internal note does not erase the first', async ({ page }) => {
  * of them and `db:testbed` seeds more; the test SKIPS rather than fails if the pool ever empties,
  * because a suite that goes red for want of a fixture teaches everyone to ignore it.
  */
+/**
+ * A pending booking whose guest may already be at the desk, read off the registry's own dates.
+ *
+ * Staff cannot check a guest in before the arrival day (2026-10-06), so the lifecycle needs a stay
+ * that has started; the newest pending booking is usually weeks away. The row prints
+ * `{from} ← {to}` with the year, and the month, left off `from` when `to` already says them, and
+ * STRICTLY before today in UTC is on or after the arrival day in every city's calendar.
+ */
+async function arrivedReference(page: Page): Promise<string | null> {
+  const today = new Date().toISOString().slice(0, 10);
+  const hyphen = '\u2060?-\u2060?';
+  const range = new RegExp(
+    `(\\d{2})(?:${hyphen}(\\d{2}))?(?:${hyphen}(\\d{4}))?\\s*←\\s*\\d{2}${hyphen}(\\d{2})${hyphen}(\\d{4})`,
+  );
+
+  for (const row of await page
+    .locator('tr', { has: page.locator('a[href^="/bookings/BKG-"]') })
+    .all()) {
+    const found = range.exec(await row.innerText());
+
+    if (!found) continue;
+
+    const [, day, month, year, toMonth, toYear] = found;
+    const checkIn = `${year ?? toYear}-${month ?? toMonth}-${day}`;
+
+    if (checkIn < today) {
+      return (await row.locator('a[href^="/bookings/BKG-"]').first().innerText()).trim();
+    }
+  }
+
+  return null;
+}
+
 test('a booking walks its whole lifecycle, and each control appears only in its own state', async ({
   page,
 }) => {
-  await page.goto('/bookings?status=pending_confirmation&size=5');
+  let reference: string | null = null;
 
-  const row = page.locator('a[href^="/bookings/BKG-"]').first();
+  /* Newest first, and the newest are usually weeks away, so read back until one has arrived. */
+  for (let at = 1; at <= 20 && reference === null; at += 1) {
+    await page.goto(`/bookings?status=pending_confirmation&size=100&page=${at}`);
+
+    if ((await page.locator('a[href^="/bookings/BKG-"]').count()) === 0) break;
+
+    reference = await arrivedReference(page);
+  }
 
   test.skip(
-    (await row.count()) === 0,
-    'No booking awaits confirmation — reseed with `pnpm db:testbed`.',
+    reference === null,
+    'No booking awaits confirmation on or after its arrival day — reseed with `pnpm db:testbed`.',
   );
 
-  const reference = (await row.innerText()).trim();
+  if (reference === null) return;
   const pill = page.locator('[data-status-pill]').first();
   const button = (name: string) => page.getByRole('button', { name, exact: true });
 

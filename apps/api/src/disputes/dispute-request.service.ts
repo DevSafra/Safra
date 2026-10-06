@@ -208,29 +208,6 @@ export class DisputeRequestService {
       throw badRequest(ERROR.DISPUTE_BOOKING_NOT_DISPUTABLE);
     }
 
-    /*
-      One live dispute per booking per REASON.
-
-      The schema's own note says a booking can be disputed twice for different reasons, so this does
-      not refuse a second dispute — only a second of the same kind while the first is unanswered.
-      Without it, a form submitted twice freezes the payout on two rows and puts two identical cases
-      in a queue real people are working.
-    */
-    const existing = await this.db.execute<{ reference: string }>(sql`
-      SELECT reference FROM disputes
-      WHERE booking_id = ${booking.id}::uuid
-        AND kind = ${input.kind}::dispute_kind
-        /*
-          The live pair. resolved and rejected are terminal — the schema's CHECK requires a
-          resolution to close — so a dispute in either state has been answered and the reason is
-          free to raise again.
-        */
-        AND status IN ('open', 'investigating')
-      LIMIT 1
-    `);
-
-    if (existing.rows[0]) throw badRequest(ERROR.DISPUTE_ALREADY_OPEN);
-
     /* Both prose fields, masked the way every stored message is. The originals are not kept. */
     const title = redactIncomingMessage(input.title);
     const description = redactIncomingMessage(input.description);
@@ -241,6 +218,37 @@ export class DisputeRequestService {
       are cheap enough that atomicity costs nothing.
     */
     const created = await this.db.transaction(async (tx) => {
+      /*
+        One live dispute per booking per REASON, decided INSIDE the transaction and under a lock.
+
+        The schema's own note says a booking can be disputed twice for different reasons, so this
+        does not refuse a second dispute — only a second of the same kind while the first is
+        unanswered. Without it, a form submitted twice freezes the payout on two rows and puts two
+        identical cases in a queue real people are working.
+
+        The check used to run before the transaction, so a double tap passed it twice and inserted
+        twice. Locking the BOOKING row serialises every submission against this booking: the second
+        waits for the first to commit, then reads its dispute and refuses.
+      */
+      await tx.execute(
+        sql`SELECT id FROM bookings WHERE id = ${booking.id}::uuid FOR UPDATE`,
+      );
+
+      const existing = await tx.execute<{ reference: string }>(sql`
+        SELECT reference FROM disputes
+        WHERE booking_id = ${booking.id}::uuid
+          AND kind = ${input.kind}::dispute_kind
+          /*
+            The live pair. resolved and rejected are terminal — the schema's CHECK requires a
+            resolution to close — so a dispute in either state has been answered and the reason is
+            free to raise again.
+          */
+          AND status IN ('open', 'investigating')
+        LIMIT 1
+      `);
+
+      if (existing.rows[0]) throw badRequest(ERROR.DISPUTE_ALREADY_OPEN);
+
       const rows = await tx.execute<{ id: string; reference: string }>(sql`
         INSERT INTO disputes
           (booking_id, partner_id, customer_profile_id, kind, status, title, description,

@@ -19,6 +19,11 @@ export interface CouponContext {
   readonly partnerId: string;
   /** Absent for a guest who has not been resolved to a profile yet. */
   readonly customerProfileId?: string | undefined;
+  /**
+   * The address the booking is made under, so the per-customer limit can see past a second
+   * profile for the same person. Normalised here, whatever the caller passes.
+   */
+  readonly customerEmail?: string | undefined;
 }
 
 export interface CouponMatch {
@@ -188,18 +193,38 @@ export class CouponService {
     return coupon;
   }
 
-  /** How many times this customer has already redeemed this coupon. */
+  /**
+   * How many times this customer has already redeemed this coupon.
+   *
+   * ## By profile OR by address (2026-10-06)
+   *
+   * Guest checkout finds a profile by the EXACT address and makes a new one otherwise, so one
+   * person could hold two profiles for one address (a row written before addresses were normalised
+   * at the boundary, a casing difference from another path) and a once-per-customer code was
+   * once per PROFILE. Counting redemptions whose profile carries the same normalised address closes
+   * that. A different address is a different customer as far as this can tell; that gap is
+   * recorded rather than guessed at.
+   *
+   * Walked from this coupon's own redemptions (the `coupon_id` index) to their profiles by primary
+   * key, rather than searching every profile by a lowered address no index covers. The walk is
+   * bounded by how often this one coupon has been used.
+   */
   private async customerUses(
     tx: Database,
     couponId: string,
     context: CouponContext,
   ): Promise<number> {
-    if (!context.customerProfileId) return 0;
+    const email = context.customerEmail?.trim().toLowerCase() || null;
+
+    if (!context.customerProfileId && email === null) return 0;
 
     const rows = await tx.execute<{ n: string }>(sql`
-      SELECT count(*)::text AS n FROM coupon_redemptions
-      WHERE coupon_id = ${couponId}::uuid
-        AND customer_profile_id = ${context.customerProfileId}::uuid
+      SELECT count(*)::text AS n
+      FROM coupon_redemptions r
+      JOIN customer_profiles cp ON cp.id = r.customer_profile_id
+      WHERE r.coupon_id = ${couponId}::uuid
+        AND (r.customer_profile_id = ${context.customerProfileId ?? null}::uuid
+             OR lower(btrim(cp.email)) = ${email}::text)
     `);
 
     return Number(rows.rows.at(0)?.n ?? 0);

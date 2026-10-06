@@ -30,7 +30,8 @@ import { ERROR, WALLET_NOTE, normaliseBankAccount } from '@safra/contracts';
 import { FieldEncryptionService } from '../common/crypto/field-encryption.service.js';
 import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 import { notFound } from '../common/errors/app-error.js';
-import { conflict } from '../common/errors/app-error.js';
+import { badRequest, conflict } from '../common/errors/app-error.js';
+import { releaseCouponRedemptions } from '../coupons/coupon-release.js';
 
 /**
  * State transitions on an existing booking (§6.3 steps 5–8, §6.4).
@@ -116,7 +117,7 @@ export class BookingActionsService {
     );
 
     const result = await this.db.transaction(async (tx) => {
-      await tx.execute(sql`
+      const moved = await tx.execute<{ id: string }>(sql`
         UPDATE bookings
         SET status = 'pending_confirmation',
             paid_at = now(),
@@ -124,7 +125,19 @@ export class BookingActionsService {
             -- (EC-001), and from now it holds the partner's window (§6.4).
             confirmation_deadline_at = now() + (${windowMinutes}::int * INTERVAL '1 minute')
         WHERE id = ${booking.id} AND status = 'pending_payment'
+        RETURNING id
       `);
+
+      /*
+        The capture is conditional on THIS transition, and everything below is the capture.
+
+        The status was read before this transaction, so between the two the payment-expiry sweep may
+        have cancelled the booking, or a second capture event for the same payment may have moved it
+        already. Without this the UPDATE matched nothing and the rest ran anyway: a captured payment
+        and a revenue group on a cancelled booking, or the same money counted twice. Throwing rolls
+        the whole transaction back, so nothing is half-recorded.
+      */
+      if (!moved.rows[0]) throw conflict(ERROR.BOOKING_TRANSITION_INVALID);
 
       await tx.execute(sql`
         INSERT INTO timeline_events (subject_type, subject_id, event_type, actor_type)
@@ -449,7 +462,7 @@ export class BookingActionsService {
 
     const result = await this.db.transaction(async (tx) => {
       if (decision === 'confirm') {
-        await tx.execute(sql`
+        const moved = await tx.execute<{ id: string }>(sql`
           UPDATE bookings
           SET status = 'confirmed',
               partner_responded_at = now(),
@@ -457,7 +470,16 @@ export class BookingActionsService {
               confirmed_by_user_id = ${claims?.sub ?? null},
               confirmation_deadline_at = NULL
           WHERE id = ${booking.id} AND status = 'pending_confirmation'
+          RETURNING id
         `);
+
+        /*
+          The §6.4 sweep may have cancelled this booking after `load` read it. The partner is then
+          answering a request that no longer exists, and confirming anyway would mail the customer a
+          voucher for a stay they have just been told is cancelled and refunded. A conflict, so the
+          portal re-reads the booking rather than showing «تم القبول».
+        */
+        if (!moved.rows[0]) throw conflict(ERROR.BOOKING_TRANSITION_INVALID);
 
         /**
          * Answering promptly is rewarded, because §5.5 ranks on response speed.
@@ -474,14 +496,22 @@ export class BookingActionsService {
           WHERE partners.id = ${partnerId} AND b.id = ${booking.id} AND b.paid_at IS NOT NULL
         `);
       } else {
-        await tx.execute(sql`
+        const moved = await tx.execute<{ id: string }>(sql`
           UPDATE bookings
           SET status = 'cancelled',
               partner_responded_at = now(),
               cancelled_at = now(),
               cancellation_reason = ${reason ?? 'system.partner_rejected'}
           WHERE id = ${booking.id} AND status = 'pending_confirmation'
+          RETURNING id
         `);
+
+        /*
+          Same race, other branch: if the sweep cancelled first it has already recorded the
+          no-response violation, and a rejection landing on top would add a second one for the
+          same booking.
+        */
+        if (!moved.rows[0]) throw conflict(ERROR.BOOKING_TRANSITION_INVALID);
 
         /**
          * §6.4 treats a rejection AFTER payment as a violation too — the customer
@@ -786,6 +816,8 @@ export class BookingActionsService {
    * one business. That is the whole reason it cannot simply reuse the partner method.
    */
   async staffCheckIn(reference: string, claims: AccessTokenClaims | undefined) {
+    await this.assertArrivalDayReached(reference, claims);
+
     return this.move(
       reference,
       'checked_in',
@@ -793,6 +825,42 @@ export class BookingActionsService {
       'booking.checked_in',
       claims,
     );
+  }
+
+  /**
+   * A guest cannot have arrived before their stay starts.
+   *
+   * Judged by the CITY's calendar, the rule the partner's arrivals list already applies
+   * (`check_in <= (now() AT TIME ZONE c.timezone)::date`): a front desk in Damascus records its
+   * guest on the morning of arrival, local time, which can still be the day before in UTC. Before
+   * this, staff could mark a stay months away as checked in, which hands the partner a stay that
+   * completes, accrues and pays out early.
+   */
+  private async assertArrivalDayReached(
+    reference: string,
+    claims: AccessTokenClaims | undefined,
+  ): Promise<void> {
+    /*
+      Scoped and write-checked FIRST, through `load`. Asking the date of a booking outside this
+      member's cities and answering «too early, arrival {date}» would be the enumeration oracle the
+      scope predicate exists to close.
+    */
+    const booking = await this.load(reference, claims);
+
+    const rows = await this.db.execute<{ check_in: string; reached: boolean }>(sql`
+      SELECT b.check_in::text AS check_in,
+             b.check_in <= (now() AT TIME ZONE c.timezone)::date AS reached
+      FROM bookings b
+      JOIN cities c ON c.id = b.city_id
+      WHERE b.id = ${booking.id}
+      LIMIT 1
+    `);
+
+    const row = rows.rows[0];
+
+    if (row && !row.reached) {
+      throw badRequest(ERROR.BOOKING_CHECK_IN_TOO_EARLY, { date: row.check_in });
+    }
   }
 
   /** Undoes it, bounded the same way — `checked_in` is in the predicate, so this cannot reach into `completed`. */
@@ -839,14 +907,22 @@ export class BookingActionsService {
     this.assertTransition(booking.status, 'cancelled', actor);
 
     return this.db.transaction(async (tx) => {
-      await tx.execute(sql`
+      /*
+        Guarded on the status `load` read, like every other transition here. It matched on the id
+        alone, so a cancellation racing a capture cancelled a booking that had just been PAID, and
+        then returned its wallet hold and its coupon as though it never had been.
+      */
+      const moved = await tx.execute<{ id: string }>(sql`
         UPDATE bookings
         SET status = 'cancelled',
             cancelled_at = now(),
             cancelled_by_user_id = ${claims?.sub ?? null},
             cancellation_reason = ${reason}
-        WHERE id = ${booking.id}
+        WHERE id = ${booking.id} AND status = ${booking.status}::booking_status
+        RETURNING id
       `);
+
+      if (!moved.rows[0]) throw conflict(ERROR.BOOKING_TRANSITION_INVALID);
 
       /**
        * Stored value held against an UNPAID booking goes straight back (§7.3).
@@ -855,9 +931,14 @@ export class BookingActionsService {
        * settled payment, and returning it here would refund outside the
        * cancellation policy and without a `refunds` row — RefundService owns that
        * path and applies §7.4's tiers to it.
+       *
+       * The coupon too, for the same reason and on the same condition: it counts as used only
+       * once the booking is paid (Bashar, 2026-10-06), so a booking cancelled before payment gives
+       * it back, and one cancelled after payment keeps it spent.
        */
       if (booking.status === 'pending_payment') {
         await this.releaseWalletHold(tx as unknown as Database, booking.id);
+        await releaseCouponRedemptions(tx as unknown as Database, [booking.id]);
       }
 
       await tx.execute(sql`

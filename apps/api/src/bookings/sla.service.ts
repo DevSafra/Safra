@@ -17,6 +17,8 @@ import {
 import { ENV, type Env } from '../config/env.js';
 import { JobRunService } from '../common/jobs/job-run.service.js';
 import { describeError } from '../common/errors/safe-error.js';
+import { releaseCouponRedemptions } from '../coupons/coupon-release.js';
+import { emergencyCovers } from '../admin/emergency-scope.js';
 
 /** Distinct advisory-lock key per job; see RankingScheduler for the rationale. */
 /**
@@ -124,28 +126,43 @@ export class SlaService {
    * fault when a customer simply closes the tab.
    */
   private async expireUnpaidBookings(): Promise<number> {
-    const result = await this.db.execute<{
-      id: string;
-      reference: string;
-      customer_profile_id: string;
-      currency_id: string;
-      wallet_amount: string;
-    }>(sql`
-      WITH expired AS (
-        UPDATE bookings
-        SET status = 'cancelled',
-            cancelled_at = now(),
-            -- A CODE, not a sentence. See the note on cancellation reasons below.
-            cancellation_reason = 'system.payment_expired'
-        WHERE status = 'pending_payment'
-          AND confirmation_deadline_at IS NOT NULL
-          AND confirmation_deadline_at < now()
-          AND deleted_at IS NULL
-        RETURNING id, reference, customer_profile_id, currency_id,
-                  wallet_amount::text AS wallet_amount
-      )
-      SELECT id, reference, customer_profile_id, currency_id, wallet_amount FROM expired
-    `);
+    /*
+      The cancellation and the coupon's release are one transaction (Bashar, 2026-10-06: «Give it
+      back»). A coupon counts as used only once its booking is paid, and a booking EC-001 expires
+      was never paid. Committing the cancellation alone would leave the redemption standing, and
+      the customer would meet «you have already used this» on the next attempt at the same stay.
+    */
+    const result = await this.db.transaction(async (tx) => {
+      const expired = await tx.execute<{
+        id: string;
+        reference: string;
+        customer_profile_id: string;
+        currency_id: string;
+        wallet_amount: string;
+      }>(sql`
+        WITH expired AS (
+          UPDATE bookings
+          SET status = 'cancelled',
+              cancelled_at = now(),
+              -- A CODE, not a sentence. See the note on cancellation reasons below.
+              cancellation_reason = 'system.payment_expired'
+          WHERE status = 'pending_payment'
+            AND confirmation_deadline_at IS NOT NULL
+            AND confirmation_deadline_at < now()
+            AND deleted_at IS NULL
+          RETURNING id, reference, customer_profile_id, currency_id,
+                    wallet_amount::text AS wallet_amount
+        )
+        SELECT id, reference, customer_profile_id, currency_id, wallet_amount FROM expired
+      `);
+
+      await releaseCouponRedemptions(
+        tx as unknown as Database,
+        expired.rows.map((booking) => booking.id),
+      );
+
+      return expired;
+    });
 
     for (const booking of result.rows) {
       await this.db.execute(sql`
@@ -266,6 +283,8 @@ export class SlaService {
           SELECT 1 FROM notifications n
           WHERE n.booking_id = b.id AND n.template_key = 'partner.deadline_reminder'
         )
+        -- A suspended deadline is not about to close, so nobody is chased about it.
+        AND NOT ${emergencyCovers('suspendSla', sql`b.property_id`)}
       /*
         Most urgent first, and the ordering is not cosmetic.
 
@@ -335,16 +354,21 @@ export class SlaService {
       currency_id: string;
       currency_code: string;
       fx_rate_to_syp: string;
+      fines_waived: boolean;
     }>(sql`
       SELECT b.id, b.reference, b.partner_id, b.customer_profile_id, b.currency_id,
              cur.code AS currency_code,
-             b.fx_rate_to_syp::text AS fx_rate_to_syp
+             b.fx_rate_to_syp::text AS fx_rate_to_syp,
+             ${emergencyCovers('waiveFines', sql`b.property_id`)} AS fines_waived
       FROM bookings b
       JOIN currencies cur ON cur.id = b.currency_id
       WHERE b.status = 'pending_confirmation'
         AND b.confirmation_deadline_at IS NOT NULL
         AND b.confirmation_deadline_at < now()
         AND b.deleted_at IS NULL
+        -- Emergency Mode's «تعليق مهلة التأكيد» (EC-009): the window is not running, so it cannot
+        -- have lapsed. Filtered IN the query, so the LIMIT counts only bookings this sweep may act on.
+        AND NOT ${emergencyCovers('suspendSla', sql`b.property_id`)}
       -- Most overdue first, for the reason the reminder sweep above states and this one did not.
       --
       -- With no ORDER BY, which 100 the planner returns is undefined, so past a backlog of 100 a
@@ -382,14 +406,65 @@ export class SlaService {
       );
 
       try {
-        await this.db.transaction(async (tx) => {
-          await tx.execute(sql`
+        const cancelled = await this.db.transaction(async (tx) => {
+          const moved = await tx.execute<{ id: string }>(sql`
             UPDATE bookings
             SET status = 'cancelled',
                 cancelled_at = now(),
                 cancellation_reason = 'system.partner_no_response'
             WHERE id = ${booking.id} AND status = 'pending_confirmation'
+            RETURNING id
           `);
+
+          /*
+            Nothing moved, so somebody else decided this booking after the candidate list was read
+            and before this transaction opened — most often the partner pressing «قبول» in the last
+            seconds of their window. Everything below is a consequence of THIS sweep cancelling,
+            so none of it may happen: a fine, a compensation credit, a ledger group and «أُلغي
+            حجزك» on a booking that is going ahead are four wrong things at once.
+
+            Not a throw: the booking is fine, it is simply no longer this sweep's to cancel.
+          */
+          if (!moved.rows[0]) return false;
+
+          /*
+            Emergency Mode's «إعفاء الغرامات» (EC-009): the partner did not choose the incident.
+
+            The booking is still cancelled, because the customer still needs their money back and
+            the window really did close; the refund sweep returns it on the same reason code. What
+            does NOT happen is everything that makes this the partner's fault: no violation (it
+            would count towards the next one's escalation), no fine, and so no compensation —
+            `postPartnerFine` defines the compensation AS the fine's other leg, so crediting the
+            guest without fining the partner would be SAFRA paying out of a ledger account that says
+            the partner did. The cancellation count stays: it measures a cancellation that happened
+            (Bashar, 2026-08-24), it is not a penalty for one.
+          */
+          if (booking.fines_waived) {
+            await tx.execute(sql`
+              UPDATE partners
+              SET cancellation_count = cancellation_count + 1
+              WHERE id = ${booking.partner_id}
+            `);
+
+            const waived = {
+              finesWaivedByEmergency: true,
+              currency: booking.currency_code,
+            };
+
+            await tx.execute(sql`
+              INSERT INTO timeline_events (subject_type, subject_id, event_type, actor_type, payload)
+              VALUES ('booking', ${booking.id}, 'booking.sla_expired', 'system',
+                      ${JSON.stringify(waived)}::jsonb)
+            `);
+
+            await tx.execute(sql`
+              INSERT INTO audit_log (action, subject_type, subject_id, after)
+              VALUES ('booking.sla_expired', 'booking', ${booking.id},
+                      ${JSON.stringify({ reference: booking.reference, ...waived })}::jsonb)
+            `);
+
+            return true;
+          }
 
           /**
            * How many times this partner has done this. §6.4 escalates on repeat
@@ -516,9 +591,20 @@ export class SlaService {
             VALUES ('booking.sla_expired', 'booking', ${booking.id},
                     ${JSON.stringify({ reference: booking.reference, ...outcome })}::jsonb)
           `);
+
+          return true;
         });
 
+        if (!cancelled) continue;
+
         handled += 1;
+
+        /*
+          No «أُلغي حجزك» under a waiver: that mail says the partner failed to confirm and that
+          compensation was added, and neither is true here. The refund sweep still sends
+          «بدأ استرداد المبلغ» when the money starts back.
+        */
+        if (booking.fines_waived) continue;
 
         /*
           The customer is told, AFTER the transaction has committed.

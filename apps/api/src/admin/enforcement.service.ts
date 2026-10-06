@@ -422,6 +422,25 @@ export class EnforcementService {
     const fxRateToSyp = await this.fx.rateToSyp(found.code);
 
     await this.db.transaction(async (tx) => {
+      /*
+        Locked and re-read INSIDE the transaction, before the reversal is posted.
+
+        The check above read `waived_at` with no lock, so two operators pressing «إعفاء» together
+        both passed it and both posted a reversal: the fine credited back twice. The row lock makes
+        the second wait for the first to commit, and then it reads the first's `waived_at`. The
+        UPDATE below carries `waived_at IS NULL` as well, so a caller that ever reaches it without
+        this lock still cannot waive twice.
+      */
+      const current = await tx.execute<{ waived_at: string | null }>(sql`
+        SELECT waived_at::text AS waived_at FROM partner_violations
+        WHERE id = ${violationId}::uuid
+        FOR UPDATE
+      `);
+
+      if (current.rows[0]?.waived_at != null) {
+        throw badRequest(ERROR.VIOLATION_ALREADY_WAIVED);
+      }
+
       const { entryGroupId } = await this.ledger.postFineWaiver(
         tx as unknown as Database,
         {
@@ -434,14 +453,18 @@ export class EnforcementService {
         },
       );
 
-      await tx.execute(sql`
+      const waived = await tx.execute<{ id: string }>(sql`
         UPDATE partner_violations
         SET waived_at = now(), waived_by_user_id = ${actor?.sub}::uuid,
             waived_reason = ${input.reason},
             waiver_ledger_group_id = ${entryGroupId}::uuid,
             updated_at = now()
-        WHERE id = ${violationId}::uuid
+        WHERE id = ${violationId}::uuid AND waived_at IS NULL
+        RETURNING id
       `);
+
+      /* Rolls the reversal posted above back with it: one waiver, one reversal, or neither. */
+      if (!waived.rows[0]) throw badRequest(ERROR.VIOLATION_ALREADY_WAIVED);
 
       await this.audit.record(
         {

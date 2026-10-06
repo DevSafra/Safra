@@ -11,6 +11,7 @@ import { FxRateService } from '../fx/fx-rate.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { interleaved } from '../common/testing/interleaved.testing.js';
 
 /**
  * النزاعات from the asking side, against a real PostgreSQL.
@@ -195,6 +196,36 @@ describeIfDb('DisputeRequestService', () => {
       status: 400,
       response: { code: 'dispute.already_open' },
     });
+  });
+
+  /**
+   * The same form submitted twice at once (a double tap, a retried request).
+   *
+   * The «already open» check ran BEFORE the transaction, so both submissions passed it and both
+   * inserted: two open disputes, two cases in the queue, one complaint. The rollback harness has
+   * one connection, so the second submission is run at the exact moment the first opens its
+   * transaction, which is the window. Watched to fail against the old code: two rows.
+   */
+  it('opens one dispute when the same reason is submitted twice at once', async () => {
+    const racing = interleaved(db, () => open());
+
+    const second = new DisputeRequestService(racing, silentDisputeNotifier());
+
+    await expect(
+      second.open(customer(), {
+        bookingReference: paidBooking,
+        kind: 'property_unavailable',
+        title: 'الشقة كانت مغلقة',
+        description: ACCOUNT,
+      }),
+    ).rejects.toMatchObject({ status: 400, response: { code: 'dispute.already_open' } });
+
+    const live = await db.execute<{ n: string }>(sql`
+      SELECT count(*)::text AS n FROM disputes d JOIN bookings b ON b.id = d.booking_id
+      WHERE b.reference = ${paidBooking} AND d.status IN ('open', 'investigating')
+    `);
+
+    expect(live.rows[0]?.n, 'two live disputes for one complaint').toBe('1');
   });
 
   /** The schema's own note: a booking can be disputed twice for DIFFERENT reasons. */

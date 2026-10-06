@@ -39,6 +39,17 @@ import { REDACTION_TOKEN, stripRedactionMarkers } from '@safra/i18n';
  * appeared and the count rose, both of which were true. The test now asserts the original string
  * is wholly absent, which is the property that actually matters.
  */
+/**
+ * A digit in any of the three sets people type a phone number in.
+ *
+ * `\d` is ASCII 0-9 in JavaScript, with or without the `u` flag, and the people this platform
+ * serves type numbers with an Arabic keyboard: «٠٩٤٤١٢٣٤٥٦» (Arabic-Indic, U+0660-0669) or, on a
+ * Persian layout, «۰۹۴۴۱۲۳۴۵۶» (U+06F0-06F9). Both went through untouched until 2026-10-06, which
+ * made the rule a formality for exactly the readers it was written for. A number that MIXES the sets
+ * is caught too, because the class is per character.
+ */
+const DIGIT = '[0-9\\u0660-\\u0669\\u06F0-\\u06F9]';
+
 const PATTERNS: readonly { readonly name: string; readonly pattern: RegExp }[] = [
   {
     /* First, so the whole address goes — see the ordering note above. */
@@ -69,7 +80,11 @@ const PATTERNS: readonly { readonly name: string; readonly pattern: RegExp }[] =
      * preceded by a letter — otherwise every reference in every message would be redacted,
      * which broke this on the first test.
      */
-    pattern: /(?<![A-Za-z\d-])(?:\+?\d[\d\s().-]{5,}\d)(?![\d-])/g,
+    pattern: new RegExp(
+      `(?<![A-Za-z${DIGIT.slice(1, -1)}-])(?:\\+?${DIGIT}(?:${DIGIT}|[\\s().-]){5,}${DIGIT})` +
+        `(?!${DIGIT}|-)`,
+      'g',
+    ),
   },
 ] as const;
 

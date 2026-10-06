@@ -279,6 +279,136 @@ describeIfDb('the confirmation window lapsing', () => {
     });
   });
 
+  /**
+   * Emergency Mode's two levers on this sweep (EC-009).
+   *
+   * REGRESSION (2026-10-06): `emergency_modes.flags` was written by the console and read by
+   * nothing, so a declared emergency changed no deadline and waived no fine. Each lever is asserted
+   * on its own, against a declaration on the booking's CITY and on its COUNTRY, and each has a
+   * control: a lifted declaration, and one on somewhere else, must change nothing.
+   */
+  describe('under Emergency Mode', () => {
+    /** Declares an emergency over the fixture's city or its country, as the console would store it. */
+    async function declare(
+      scope: 'city' | 'country' | 'elsewhere',
+      flags: { suspendSla?: boolean; waiveFines?: boolean },
+      options: { lifted?: boolean } = {},
+    ) {
+      await db.execute(sql`
+        WITH actor AS (
+          INSERT INTO users (email, role, status)
+          VALUES ('sla-e-' || gen_random_uuid() || '@safra.test', 'super_admin', 'active')
+          RETURNING id
+        ), target AS (
+          SELECT CASE ${scope}
+                   WHEN 'city' THEN ci.id
+                   WHEN 'country' THEN ci.country_id
+                   ELSE (SELECT o.id FROM cities o WHERE o.id <> ci.id LIMIT 1)
+                 END AS id
+          FROM bookings b JOIN cities ci ON ci.id = b.city_id
+          WHERE b.id = ${bookingId}
+        )
+        INSERT INTO emergency_modes
+          (scope, scope_id, flags, activated_by_user_id, reason, deactivated_at)
+        SELECT ${scope === 'country' ? 'country' : 'city'}, target.id,
+               ${JSON.stringify({
+                 stopBookings: false,
+                 broadcast: false,
+                 suspendSla: flags.suspendSla ?? false,
+                 waiveFines: flags.waiveFines ?? false,
+               })}::jsonb,
+               actor.id, 'عاصفة تغلق المدينة', ${options.lifted ? sql`now()` : sql`NULL`}
+        FROM actor, target
+      `);
+    }
+
+    const statusOf = async () =>
+      (
+        await db.execute<{ status: string }>(sql`
+          SELECT status::text AS status FROM bookings WHERE id = ${bookingId}
+        `)
+      ).rows[0]?.status;
+
+    it.each(['city', 'country'] as const)(
+      'suspends the deadline for a booking in the declared %s',
+      async (scope) => {
+        await declare(scope, { suspendSla: true });
+        await sla.sweep();
+
+        expect(await statusOf()).toBe('pending_confirmation');
+        expect(sent.filter((notice) => notice.bookingId === bookingId)).toHaveLength(0);
+      },
+    );
+
+    it('does not chase a partner whose deadline is suspended', async () => {
+      await db.execute(sql`
+        UPDATE bookings SET confirmation_deadline_at = now() + INTERVAL '10 hours'
+        WHERE status = 'pending_confirmation' AND id <> ${bookingId}
+      `);
+      await db.execute(sql`
+        UPDATE bookings SET confirmation_deadline_at = now() + INTERVAL '10 minutes'
+        WHERE id = ${bookingId}
+      `);
+      await declare('city', { suspendSla: true });
+
+      await sla.sweep();
+
+      expect(sent.filter((notice) => notice.bookingId === bookingId)).toHaveLength(0);
+    });
+
+    it.each([
+      ['a lifted declaration', 'city', true],
+      ['a declaration on another city', 'elsewhere', false],
+    ] as const)('lets %s run the window as normal', async (_, scope, lifted) => {
+      await declare(scope, { suspendSla: true, waiveFines: true }, { lifted });
+      await sla.sweep();
+
+      expect(await statusOf()).toBe('cancelled');
+
+      const fined = await db.execute<{ n: number }>(sql`
+        SELECT count(*)::int AS n FROM partner_violations WHERE booking_id = ${bookingId}
+      `);
+
+      expect(fined.rows[0]?.n).toBe(1);
+    });
+
+    it.each(['city', 'country'] as const)(
+      'cancels without a fine for a booking in the declared %s',
+      async (scope) => {
+        await declare(scope, { waiveFines: true });
+        await sla.sweep();
+
+        /* Still cancelled, under the reason the refund sweep returns the money on. */
+        const after = await db.execute<{ status: string; reason: string | null }>(sql`
+          SELECT status::text AS status, cancellation_reason AS reason
+          FROM bookings WHERE id = ${bookingId}
+        `);
+
+        expect(after.rows[0]?.status).toBe('cancelled');
+        expect(after.rows[0]?.reason).toBe('system.partner_no_response');
+
+        const violations = await db.execute<{ n: number }>(sql`
+          SELECT count(*)::int AS n FROM partner_violations WHERE booking_id = ${bookingId}
+        `);
+        const fineLegs = await db.execute<{ n: number }>(sql`
+          SELECT count(*)::int AS n FROM ledger_entries
+          WHERE booking_id = ${bookingId} AND account = 'partner_fine'
+        `);
+        const credits = await db.execute<{ n: number }>(sql`
+          SELECT count(*)::int AS n FROM wallet_transactions
+          WHERE booking_id = ${bookingId} AND reason = 'sla_compensation'
+        `);
+
+        expect(violations.rows[0]?.n, 'no violation').toBe(0);
+        expect(fineLegs.rows[0]?.n, 'no fine in the ledger').toBe(0);
+        expect(credits.rows[0]?.n, 'no compensation the partner is not funding').toBe(0);
+
+        /* And not the mail that blames the partner and promises compensation. */
+        expect(sent.filter((notice) => notice.bookingId === bookingId)).toHaveLength(0);
+      },
+    );
+  });
+
   /** A paid booking whose partner never answered, with its window already past. */
   async function seed(): Promise<{ bookingId: string }> {
     const made = await db.execute<{ id: string }>(sql`

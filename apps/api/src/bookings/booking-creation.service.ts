@@ -19,6 +19,8 @@ import { CouponService } from '../coupons/coupon.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 import { BLOCKING_STATUS_SQL } from './booking-state.js';
+import { mergeBasketLines, type BasketLine } from './basket.js';
+import { emergencyStopsBookings } from '../admin/emergency-scope.js';
 
 /**
  * The most rooms one booking may hold, across every type in the basket.
@@ -74,7 +76,13 @@ export class BookingCreationService {
     /** A basket of room types. See `PricingService.quote`. */
     lines?: readonly { unitId: string; rooms: number }[] | undefined;
   }) {
-    const price = await this.pricing.quote(input);
+    const basket = mergeBasketLines(
+      input.lines && input.lines.length > 0
+        ? input.lines
+        : [{ unitId: input.unitId, rooms: input.rooms ?? 1 }],
+    );
+
+    const price = await this.pricing.quote({ ...input, lines: basket });
 
     /*
       The stay rules, which `create` has always applied and this did not.
@@ -91,7 +99,11 @@ export class BookingCreationService {
       Read here rather than threaded out of pricing: pricing's job is what a stay COSTS, and
       whether it is allowed is this service's.
     */
-    await this.assertStayIsAllowed(input.unitId, price.nights);
+    const facts = await this.basketFacts(basket, input.checkIn);
+
+    this.assertDistinctTypes(basket, facts);
+    this.assertStayLengths(basket, facts, price.nights);
+    this.assertArrivalMinimums(basket, facts, input.checkIn, price.nights);
 
     return {
       nights: price.nights,
@@ -116,33 +128,114 @@ export class BookingCreationService {
   }
 
   /**
-   * The minimum and maximum stay a unit accepts.
+   * What the stay rules need to know about every unit in a basket, in one round trip.
    *
-   * One rule, asked in two places — `quote` before the customer commits and `create` when they do.
-   * `create` keeps its own inline copy because it has the unit row in hand already and re-reading
-   * it inside the booking transaction would be a second query for a value it holds; what matters is
-   * that the two ANSWER the same, which `booking-min-nights.integration.test.ts` asserts directly.
+   * ## Every unit, not the lead (2026-10-06)
+   *
+   * `min_nights`, `max_nights` and the arrival-day minimum were read for the LEAD unit only, in
+   * both `quote` and `create`. A basket of a one-night double and a suite that takes three nights
+   * was therefore bookable for one night, because nobody asked the suite. The rules are a property
+   * of each room, so each room in the basket is asked.
+   *
+   * One query shared by `quote` and `create`, so the two answer the same question the same way,
+   * which `booking-stay-rules.integration.test.ts` asserts for the lead and
+   * `booking-basket-rules.integration.test.ts` for the rest.
    */
-  private async assertStayIsAllowed(unitId: string, nights: number): Promise<void> {
-    const rows = await this.db.execute<{ min_nights: number; max_nights: number | null }>(
-      sql`
-        SELECT min_nights, max_nights
-          FROM units
-         WHERE id = ${unitId} AND is_active AND deleted_at IS NULL
-         LIMIT 1
-      `,
-    );
+  private async basketFacts(
+    basket: readonly BasketLine[],
+    checkIn: string,
+  ): Promise<Map<string, BasketUnitFacts>> {
+    const rows = await this.db.execute<BasketUnitFacts & { id: string }>(sql`
+      SELECT u.id::text AS id, u.min_nights, u.max_nights, u.property_id::text AS property_id,
+             u.room_type_code, u.base_price::text AS base_price, u.max_guests,
+             (SELECT ad.min_nights FROM availability_days ad
+               WHERE ad.unit_id = u.id AND ad.date = ${checkIn}::date
+                 AND ad.min_nights IS NOT NULL
+               LIMIT 1) AS arrival_min_nights
+        FROM units u
+       WHERE u.id IN (${sql.join(
+         basket.map((line) => sql`${line.unitId}`),
+         sql`, `,
+       )})
+         AND u.is_active AND u.deleted_at IS NULL
+    `);
 
-    const unit = rows.rows[0];
+    return new Map(rows.rows.map((row) => [row.id, row]));
+  }
 
-    /* No unit is `pricing.quote`'s refusal to make, and it has already made it. */
-    if (!unit) return;
+  /* A unit missing from `facts` is pricing's or capacity's refusal to make, and both make it. */
 
-    if (nights < unit.min_nights) {
-      throw badRequest(ERROR.UNIT_MIN_NIGHTS, { min: unit.min_nights });
+  private assertStayLengths(
+    basket: readonly BasketLine[],
+    facts: ReadonlyMap<string, BasketUnitFacts>,
+    nights: number,
+  ): void {
+    for (const line of basket) {
+      const unit = facts.get(line.unitId);
+
+      if (!unit) continue;
+
+      if (nights < unit.min_nights) {
+        throw badRequest(ERROR.UNIT_MIN_NIGHTS, { min: unit.min_nights });
+      }
+      if (unit.max_nights !== null && nights > unit.max_nights) {
+        throw badRequest(ERROR.UNIT_MAX_NIGHTS, { max: unit.max_nights });
+      }
     }
-    if (unit.max_nights !== null && nights > unit.max_nights) {
-      throw badRequest(ERROR.UNIT_MAX_NIGHTS, { max: unit.max_nights });
+  }
+
+  /** A partner's per-day «الوصول في هذا اليوم يتطلب N ليالٍ», for every room in the basket. */
+  private assertArrivalMinimums(
+    basket: readonly BasketLine[],
+    facts: ReadonlyMap<string, BasketUnitFacts>,
+    checkIn: string,
+    nights: number,
+  ): void {
+    for (const line of basket) {
+      const minimum = facts.get(line.unitId)?.arrival_min_nights;
+
+      if (minimum !== null && minimum !== undefined && nights < minimum) {
+        throw badRequest(ERROR.BOOKING_ARRIVAL_MINIMUM_NIGHTS, {
+          date: checkIn,
+          nights: minimum,
+        });
+      }
+    }
+  }
+
+  /**
+   * Two lines of one interchangeable room type are refused.
+   *
+   * `allocateRooms` fills a line from every room of the same property, type code, price and
+   * capacity, and it does not count this booking's own rooms as taken (it must not, or the lead
+   * room the insert trigger already wrote would refuse its own booking). So a second line of the
+   * same type drew from the pool the first had already drawn from, and the guest was charged for
+   * rooms the booking did not hold. The same unit named twice is merged before this
+   * (`mergeBasketLines`); two DIFFERENT units of one type are two names for one choice, and the
+   * guest is asked to make it once.
+   */
+  private assertDistinctTypes(
+    basket: readonly BasketLine[],
+    facts: ReadonlyMap<string, BasketUnitFacts>,
+  ): void {
+    const seen = new Set<string>();
+
+    for (const line of basket) {
+      const unit = facts.get(line.unitId);
+
+      /* No type code is one of a kind: interchangeable with nothing but itself. */
+      if (!unit || unit.room_type_code === null) continue;
+
+      const key = [
+        unit.property_id,
+        unit.room_type_code,
+        unit.base_price,
+        unit.max_guests,
+      ].join('|');
+
+      if (seen.has(key)) throw badRequest(ERROR.BOOKING_BASKET_DUPLICATE_TYPE);
+
+      seen.add(key);
     }
   }
 
@@ -589,6 +682,15 @@ export class BookingCreationService {
       throw notFound(ERROR.UNIT_NOT_FOUND);
     }
 
+    /*
+      Emergency Mode's «إيقاف الحجوزات» (EC-009), checked HERE so every way of creating a booking
+      meets it: this is the one insert path, and a basket's lines all share this property. Before
+      2026-10-06 the flag was stored and shown and read by nothing.
+    */
+    if (await emergencyStopsBookings(this.db, unit.property_id)) {
+      throw conflict(ERROR.BOOKING_EMERGENCY_STOPPED);
+    }
+
     // ── §5.3 same-day cutoff, in the CITY's local time ──────────────────────
     const cutoffHour =
       unit.city_cutoff_hour ??
@@ -646,12 +748,11 @@ export class BookingCreationService {
       types sleep together, and reading only the lead type's capacity would refuse the mixed
       booking that exists precisely to fit a family the single type could not.
     */
-    const leadRooms = Math.max(1, Math.trunc(input.rooms ?? 1));
-    const extraLines = (input.additionalLines ?? []).map((line) => ({
-      unitId: line.unitId,
-      rooms: Math.max(1, Math.trunc(line.rooms)),
-    }));
-    const basket = [{ unitId: input.unitId, rooms: leadRooms }, ...extraLines];
+    /* Merged first, so the same unit named twice is one line and is held as many times as it is charged. */
+    const basket = mergeBasketLines([
+      { unitId: input.unitId, rooms: input.rooms ?? 1 },
+      ...(input.additionalLines ?? []),
+    ]);
     const rooms = basket.reduce((sum, line) => sum + line.rooms, 0);
 
     if (rooms > MAX_ROOMS_PER_BOOKING) {
@@ -680,12 +781,10 @@ export class BookingCreationService {
     if (nights < 1) {
       throw badRequest(ERROR.BOOKING_DEPARTURE_AFTER_ARRIVAL);
     }
-    if (nights < unit.min_nights) {
-      throw badRequest(ERROR.UNIT_MIN_NIGHTS, { min: unit.min_nights });
-    }
-    if (unit.max_nights !== null && nights > unit.max_nights) {
-      throw badRequest(ERROR.UNIT_MAX_NIGHTS, { max: unit.max_nights });
-    }
+    const facts = await this.basketFacts(basket, input.checkIn);
+
+    this.assertDistinctTypes(basket, facts);
+    this.assertStayLengths(basket, facts, nights);
 
     const maxNights = await this.settings.getNumber('search.max_nights', 90);
     if (nights > maxNights) {
@@ -711,21 +810,7 @@ export class BookingCreationService {
       throw conflict(ERROR.UNIT_UNAVAILABLE_ON, { date: blockedDay.date });
     }
 
-    const perDayMinimum = await this.db.execute<{ min_nights: number }>(sql`
-      SELECT min_nights FROM availability_days
-      WHERE unit_id = ${input.unitId}
-        AND date = ${input.checkIn}::date
-        AND min_nights IS NOT NULL
-      LIMIT 1
-    `);
-
-    const arrivalMinimum = perDayMinimum.rows[0]?.min_nights;
-    if (arrivalMinimum !== undefined && nights < arrivalMinimum) {
-      throw badRequest(ERROR.BOOKING_ARRIVAL_MINIMUM_NIGHTS, {
-        date: input.checkIn,
-        nights: arrivalMinimum,
-      });
-    }
+    this.assertArrivalMinimums(basket, facts, input.checkIn, nights);
 
     // ── Price, with every rate snapshotted ──────────────────────────────────
     const undiscounted = await this.pricing.quote({
@@ -919,6 +1004,8 @@ export class BookingCreationService {
               cityId: unit.city_id,
               partnerId: unit.partner_id,
               customerProfileId,
+              /* So a second profile under the same address cannot spend a once-per-customer code twice. */
+              customerEmail: input.guest.email,
             },
             booking.id,
           );
@@ -1117,4 +1204,15 @@ function isExclusionViolation(error: unknown): boolean {
       candidate !== null &&
       (candidate as { code?: unknown }).code === EXCLUSION_VIOLATION,
   );
+}
+
+/** What the stay rules read about one unit of a basket. See `basketFacts`. */
+interface BasketUnitFacts extends Record<string, unknown> {
+  min_nights: number;
+  max_nights: number | null;
+  property_id: string;
+  room_type_code: string | null;
+  base_price: string;
+  max_guests: number;
+  arrival_min_nights: number | null;
 }

@@ -543,13 +543,35 @@ export class DisputeService {
 
     if (dispute.status === 'investigating') return { acknowledged: false };
 
-    await this.db.transaction(async (tx) => {
-      await tx.execute(sql`
+    const acknowledged = await this.db.transaction(async (tx) => {
+      /*
+        `open` is in the predicate, and the read above is only the courteous answer.
+
+        Between that read and this write another operator may have CLOSED the dispute. An UPDATE on
+        the id alone then put it back to `investigating`, which is UNRESOLVED, which froze again the
+        payout the closure had just released. Or another operator may have taken it first, and this
+        would overwrite who has it. The row count says which writer won.
+      */
+      const taken = await tx.execute<{ id: string }>(sql`
         UPDATE disputes
         SET status = 'investigating'::dispute_status,
             assigned_to_user_id = ${actor?.sub}::uuid
-        WHERE id = ${dispute.id}::uuid
+        WHERE id = ${dispute.id}::uuid AND status = 'open'::dispute_status
+        RETURNING id
       `);
+
+      if (!taken.rows[0]) {
+        const now = await tx.execute<{ status: string }>(sql`
+          SELECT status::text AS status FROM disputes WHERE id = ${dispute.id}::uuid
+        `);
+        const status = now.rows[0]?.status;
+
+        if (status === 'resolved' || status === 'rejected') {
+          throw conflict(ERROR.DISPUTE_ALREADY_CLOSED);
+        }
+
+        return false;
+      }
 
       await this.audit.record(
         {
@@ -563,7 +585,12 @@ export class DisputeService {
         },
         tx as unknown as Database,
       );
+
+      return true;
     });
+
+    /* Somebody else took it first: the same quiet answer as finding it already taken. */
+    if (!acknowledged) return { acknowledged: false };
 
     /*
       «Somebody is looking at it now» — after the commit, failure swallowed.
@@ -631,17 +658,44 @@ export class DisputeService {
     /* What actually landed, for the audit row — see where it is recorded. */
     let credited: WalletMovementResult | null = null;
 
+    /* The status this closure actually moved from, for the audit row. See the UPDATE below. */
+    let closedFrom = dispute.status;
+
     await this.db.transaction(async (tx) => {
-      await tx.execute(sql`
-        UPDATE disputes
+      /*
+        The closure is conditional on the dispute still being unresolved, and everything after it
+        in this transaction is conditional on the closure.
+
+        The check above ran outside the transaction with no lock, and this UPDATE matched on the id
+        alone, so two operators pressing «حلّ» together both passed the check and both paid the
+        compensation: two wallet credits, two ledger groups, one complaint. Now the second UPDATE
+        waits on the first's row lock, re-reads the row, matches nothing, and the conflict rolls its
+        whole transaction back before any money moves.
+
+        `prior` reads the row under the same lock so the audit records the state that was really
+        closed (`open` or `investigating`), not the one read before the race.
+      */
+      const closed = await tx.execute<{ from_status: string }>(sql`
+        WITH prior AS (
+          SELECT id, status FROM disputes WHERE id = ${dispute.id}::uuid FOR UPDATE
+        )
+        UPDATE disputes d
         SET status = ${input.outcome}::dispute_status,
             resolution = ${input.resolution},
             closed_at = now(),
             closed_by_user_id = ${actor?.sub}::uuid,
             compensation_amount = ${input.compensationAmount ?? null},
             compensation_currency_id = ${currencyId}::uuid
-        WHERE id = ${dispute.id}::uuid
+        FROM prior
+        WHERE d.id = prior.id AND prior.status IN ('open', 'investigating')
+        RETURNING prior.status::text AS from_status
       `);
+
+      const from = closed.rows[0]?.from_status;
+
+      if (!from) throw conflict(ERROR.DISPUTE_ALREADY_CLOSED);
+
+      closedFrom = from;
 
       if (input.compensationAmount && currencyId) {
         /*
@@ -718,7 +772,7 @@ export class DisputeService {
           action: `dispute.${input.outcome}`,
           subjectType: 'dispute',
           subjectId: dispute.id,
-          before: { status: dispute.status },
+          before: { status: closedFrom },
           after: {
             status: input.outcome,
             compensationAmount: input.compensationAmount ?? null,
@@ -853,22 +907,31 @@ export class DisputeService {
       throw badRequest(ERROR.DISPUTE_BOOKING_NOT_DISPUTABLE);
     }
 
-    /* One live dispute per booking per KIND — the same rule the customer's route enforces. */
-    const existing = await this.db.execute<{ reference: string }>(sql`
-      SELECT reference FROM disputes
-      WHERE booking_id = ${booking.id}::uuid
-        AND kind = ${input.kind}::dispute_kind
-        AND status IN ${UNRESOLVED}
-      LIMIT 1
-    `);
-
-    if (existing.rows[0]) throw conflict(ERROR.DISPUTE_ALREADY_OPEN);
-
     /* Both prose fields masked, as every stored message is. The originals are not kept. */
     const title = redactIncomingMessage(input.title);
     const description = redactIncomingMessage(input.description);
 
     const created = await this.db.transaction(async (tx) => {
+      /*
+        One live dispute per booking per KIND — the same rule the customer's route enforces, and
+        enforced the same way: inside the transaction, under the BOOKING's row lock. Checked before
+        the transaction it let two submissions (two operators, or an operator and the customer's own
+        form, which takes the same lock) both pass and both insert.
+      */
+      await tx.execute(
+        sql`SELECT id FROM bookings WHERE id = ${booking.id}::uuid FOR UPDATE`,
+      );
+
+      const existing = await tx.execute<{ reference: string }>(sql`
+        SELECT reference FROM disputes
+        WHERE booking_id = ${booking.id}::uuid
+          AND kind = ${input.kind}::dispute_kind
+          AND status IN ${UNRESOLVED}
+        LIMIT 1
+      `);
+
+      if (existing.rows[0]) throw conflict(ERROR.DISPUTE_ALREADY_OPEN);
+
       const created = await tx.execute<{ id: string; reference: string }>(sql`
         INSERT INTO disputes
           (booking_id, partner_id, customer_profile_id, kind, status, title, description,

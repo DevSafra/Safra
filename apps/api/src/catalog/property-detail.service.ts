@@ -618,12 +618,38 @@ export class PropertyDetailService {
 }
 
 /**
- * Keeps only the first comma-separated component of an address.
+ * Where one component of an address ends, in every way a partner actually types one.
+ *
+ * The Latin comma was the only separator until 2026-10-06, and the addresses on this platform are
+ * Arabic: «المالكي، دمشق» uses U+060C, which `split(',')` does not see, so the WHOLE stored address
+ * was published as the "approximate" one, and from there reached the page and its structured data.
+ *
+ * So: the Latin, Arabic (also the Persian and Urdu comma), full-width and small commas; the Latin
+ * and Arabic semicolons; a line break; and a dash used as a separator. A hyphen INSIDE a word
+ * («Al-Malki») is not a separator, so a hyphen counts only with space on either side; an en or em
+ * dash always does.
+ */
+const ADDRESS_SEPARATOR = /[,\u060C\uFF0C\uFE50;\u061B\n\r]|\s-\s|\s*[\u2013\u2014]\s*/u;
+
+/** A run containing a digit in ANY script: a house number, a building or a floor. */
+const HAS_DIGIT = /\p{Nd}/u;
+
+/**
+ * Keeps only the first component of an address, and no number from it.
  *
  * "Bab Touma, Old City, Damascus" becomes "Bab Touma" — enough context to judge the
  * area, not enough to find the building before a booking exists.
+ *
+ * The NUMBERS are dropped too, because the first component is not always an area: an address
+ * typed with no separator at all («شارع بغداد ١٢ بناء ٣») is one component, and keeping it would
+ * publish the building. Dropping a numbered run can only ever make the answer vaguer, which is the
+ * safe direction for a field whose whole job is to say less. «المزة 86» becomes «المزة».
  */
-function firstAddressLine(address: string): string {
-  const [first] = address.split(',');
-  return (first ?? '').trim();
+export function firstAddressLine(address: string): string {
+  const [first] = address.split(ADDRESS_SEPARATOR);
+
+  return (first ?? '')
+    .split(/\s+/u)
+    .filter((word) => word !== '' && !HAS_DIGIT.test(word))
+    .join(' ');
 }

@@ -14,6 +14,7 @@ import {
   toMinor,
 } from '../common/money.js';
 import { customerFeeMinor, customerFeeRule } from './customer-fee.js';
+import { mergeBasketLines } from './basket.js';
 import { DEFAULT_MONEY_CURRENCY, ERROR } from '@safra/contracts';
 import { notFound, badRequest } from '../common/errors/app-error.js';
 
@@ -168,18 +169,11 @@ export class PricingService {
       The basket, normalised. A caller giving `unitId` + `rooms` is asking for a basket of one, and
       collapsing the two shapes here means everything below has exactly one case to handle.
     */
-    const basket =
+    const basket = mergeBasketLines(
       input.lines && input.lines.length > 0
-        ? input.lines.map((line) => ({
-            unitId: line.unitId,
-            rooms: Math.max(1, Math.trunc(line.rooms)),
-          }))
-        : [
-            {
-              unitId: input.unitId,
-              rooms: Math.max(1, Math.trunc(input.rooms ?? 1)),
-            },
-          ];
+        ? input.lines
+        : [{ unitId: input.unitId, rooms: input.rooms ?? 1 }],
+    );
 
     const rows = await this.db.execute<{
       unit_id: string;
@@ -229,6 +223,19 @@ export class PricingService {
 
     const first = nights[0];
     if (!first) throw notFound(ERROR.UNIT_NOT_FOUND);
+
+    /*
+      One currency per basket, refused rather than summed.
+
+      Everything below is read from the FIRST row: the scale, the FX snapshot, the commission cap's
+      conversion and the currency stamped on the booking. A suite in EUR beside a room in USD would
+      add euros to dollars and record the sum in whichever came first. A coded 400 rather than a
+      conversion: a booking carries one currency and one rate, and two rates on one total is a
+      number nobody can reconcile.
+    */
+    if (nights.some((night) => night.currency_id !== first.currency_id)) {
+      throw badRequest(ERROR.BOOKING_BASKET_MIXED_CURRENCY);
+    }
 
     const scale = first.decimals;
 
