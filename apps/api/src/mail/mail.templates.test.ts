@@ -46,6 +46,12 @@ const RENDERERS: {
   readonly entry: string;
   readonly render: (locale: string) => { subject: string; text: string };
   readonly shows: string;
+  /**
+   * The CODE this mail carries, for the templates that carry one. A URL is found by its scheme;
+   * a code has no shape to find it by, so the row names it and «shows each link and code once»
+   * refuses a catalogue entry with `{code}` whose row does not.
+   */
+  readonly code?: string;
 }[] = [
   {
     name: 'bookingConfirmedMail',
@@ -162,6 +168,7 @@ const RENDERERS: {
       }),
     /* The CODE, which is the one thing the message exists to carry. */
     shows: '481902',
+    code: '481902',
   },
   {
     name: 'passwordResetMail',
@@ -247,6 +254,7 @@ const RENDERERS: {
         expiresInMinutes: 10,
       }),
     shows: '123456',
+    code: '123456',
   },
   {
     name: 'partnerEmployeeInvitationMail',
@@ -349,6 +357,7 @@ const RENDERERS: {
         amount: '50 USD',
       }),
     shows: 'AAAAA-BBBBB-CCCCC-DDDDD',
+    code: 'AAAAA-BBBBB-CCCCC-DDDDD',
   },
   {
     name: 'giftCardReceivedMail',
@@ -362,6 +371,7 @@ const RENDERERS: {
         amount: '50 USD',
       }),
     shows: 'AAAAA-BBBBB-CCCCC-DDDDD',
+    code: 'AAAAA-BBBBB-CCCCC-DDDDD',
   },
   {
     name: 'reviewRepliedMail',
@@ -615,8 +625,22 @@ function marker(subject: string): string {
   return literals.sort((a, b) => b.length - a.length)[0] ?? '';
 }
 
+/** A link or code placeholder — the same names `compose` lifts out of the language blocks. */
+const SHARED_PLACEHOLDER = /\{(url|code|\w+Url)\}/;
+
+const DIVIDER = '─────────────';
+
+/** Whether this catalogue entry carries a link or a code, so the mail has a shared section. */
+function hasShared(entry: string): boolean {
+  return SHARED_PLACEHOLDER.test(emailMessages('ar')[entry as 'passwordReset'].body);
+}
+
+function occurrences(text: string, value: string): number {
+  return text.split(value).length - 1;
+}
+
 describe('every transactional email is Arabic first, English underneath', () => {
-  for (const { name, entry, render, shows } of RENDERERS) {
+  for (const { name, entry, render, shows, code } of RENDERERS) {
     for (const locale of LOCALES) {
       describe(`${name} [${locale}]`, () => {
         /**
@@ -646,9 +670,10 @@ describe('every transactional email is Arabic first, English underneath', () => 
          */
         it('renders one block per required language', () => {
           const mail = render(locale);
-          const expected = localesFor(locale).length;
+          /* Plus the one shared section that carries the links and codes, when there are any. */
+          const expected = localesFor(locale).length + (hasShared(entry) ? 1 : 0);
 
-          expect(mail.text.split('─────────────')).toHaveLength(expected);
+          expect(mail.text.split(DIVIDER)).toHaveLength(expected);
         });
 
         /**
@@ -659,12 +684,60 @@ describe('every transactional email is Arabic first, English underneath', () => 
          * because it looks complete.
          */
         it('repeats the interpolated value in every block', () => {
-          if (!shows) return;
+          /* A link or a code is the opposite case, and has its own assertion below. */
+          if (!shows || shows === code || /^https?:\/\//.test(shows)) return;
 
           const mail = render(locale);
-          const blocks = mail.text.split('─────────────');
+          const blocks = mail.text.split(DIVIDER).slice(0, localesFor(locale).length);
 
           for (const block of blocks) expect(block).toContain(shows);
+        });
+
+        /**
+         * Every link and code appears EXACTLY ONCE (Bashar, 2026-10-06: «One link, shared»).
+         *
+         * Printed once per language block, a reset link or a gift card code reads as two different
+         * tokens in one message. They follow the language blocks in one shared section, each
+         * introduced in every language, Arabic first.
+         */
+        it('shows each link and code exactly once, after the language blocks', () => {
+          const mail = render(locale);
+          const body = emailMessages('ar')[entry as 'passwordReset'].body;
+          const parts = mail.text.split(DIVIDER);
+          const languageBlocks = parts.slice(0, localesFor(locale).length).join(DIVIDER);
+          const sharedSection = parts.slice(localesFor(locale).length).join(DIVIDER);
+
+          const links = [...new Set(mail.text.match(/https?:\/\/\S+/g) ?? [])];
+          const linkKeys = new Set(
+            [...body.matchAll(/\{(url|\w+Url)\}/g)].map((match) => match[1]),
+          );
+
+          expect(links, 'a link placeholder rendered no link').toHaveLength(
+            linkKeys.size,
+          );
+
+          for (const link of links) {
+            expect(occurrences(mail.text, link), `${link} repeated`).toBe(1);
+            expect(sharedSection).toContain(link);
+          }
+
+          if (body.includes('{code}')) {
+            expect(code, 'this row must name the code its template carries').toBeTruthy();
+          }
+
+          if (code) {
+            expect(occurrences(mail.text, code), 'the code is repeated').toBe(1);
+            expect(sharedSection).toContain(code);
+            expect(languageBlocks).not.toContain(code);
+          }
+
+          /* Within the shared section, every introduced value is introduced in Arabic first. */
+          for (const item of sharedSection.split('\n\n')) {
+            const lines = item.trim().split('\n');
+
+            if (lines.length > 1)
+              expect(lines[0], 'English caption first').toMatch(/[\u0600-\u06FF]/);
+          }
         });
 
         /** The whole point of a plain-text email: the paragraphs are the formatting. */
@@ -771,7 +844,7 @@ describe('mails that carry a secret', () => {
     expect(mail.sensitive).toBe(true);
   });
 
-  /** And the code itself still reaches the reader, in both languages. */
+  /** And the code itself still reaches the reader, once, introduced in both languages. */
   it('still sends the code to the partner', () => {
     const mail = templates.partnerLoginCodeMail({
       to: SAMPLE.to,
@@ -780,8 +853,41 @@ describe('mails that carry a secret', () => {
       expiresInMinutes: 10,
     });
 
-    for (const block of mail.text.split('─────────────')) {
-      expect(block).toContain('123456');
+    expect(occurrences(mail.text, '123456')).toBe(1);
+
+    const shared = mail.text.split(DIVIDER).at(-1) ?? '';
+
+    expect(shared).toContain(emailMessages('ar').partnerLoginCode.body.split('\n')[0]);
+    expect(shared).toContain(emailMessages('en').partnerLoginCode.body.split('\n')[0]);
+  });
+});
+
+/**
+ * The catalogue holds to the two layouts `compose` knows how to lift a link or code out of.
+ *
+ * A value on a line of its own, or a label and the value on one line. A placeholder in the middle
+ * of a sentence would be lifted with half a sentence around it, so a third layout fails here rather
+ * than in somebody's inbox.
+ */
+describe('catalogue shape for links and codes', () => {
+  it('puts every link and code on its own line, or after a label', () => {
+    for (const locale of LOCALES) {
+      for (const [entry, copy] of Object.entries(emailMessages(locale))) {
+        if (!copy || typeof copy !== 'object' || !('body' in copy)) continue;
+
+        for (const line of String(copy.body).split('\n')) {
+          const shared = [...line.matchAll(/\{(\w+)\}/g)].filter((match) =>
+            SHARED_PLACEHOLDER.test(match[0]),
+          );
+
+          if (shared.length === 0) continue;
+
+          expect(shared, `${locale}.${entry}: two links on one line`).toHaveLength(1);
+          expect(line.trim(), `${locale}.${entry}: «${line}»`).toMatch(
+            /^([^{}]*[:：]\s*)?\{(url|code|\w+Url)\}$/,
+          );
+        }
+      }
     }
   });
 });

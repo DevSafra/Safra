@@ -45,15 +45,15 @@ export interface OutgoingMail {
  * in the worst possible way there: everything reports success and no customer ever
  * receives anything.
  *
- * ## Sending never blocks the caller
+ * ## `send()` THROWS when delivery fails
  *
- * `send()` resolves even when delivery fails, and logs the failure. A password reset
- * whose email bounced must not roll back the token that was just issued — the
- * customer can request another, whereas a 500 tells them the whole feature is broken.
- * The same reasoning as the SLA sweep: never throw out of a side effect.
+ * It used to resolve and log, and this note said so after the code stopped doing it: since
+ * 2026-09-06 it rethrows (see the catch below), because the queue's worker needs the throw to
+ * retry and to record the row truthfully. Six request-path callers kept relying on the old note
+ * and turned an SMTP refusal into a 500 after their own work had committed.
  *
- * Delivery moves onto BullMQ with the rest of §14's background work; the interface
- * is deliberately fire-and-forget so that change is internal.
+ * So: a worker calls `send()` and lets it throw. A request whose work has already committed
+ * calls `sendBestEffort()` from `./best-effort.js`, which cannot.
  */
 @Injectable()
 export class MailService {
@@ -108,7 +108,8 @@ export class MailService {
        * email itself never goes.
        */
       this.logger.error(
-        `Failed to send "${mail.subject}" to ${mail.to}: ` + `${describeError(error)}`,
+        /* The subject only, never the recipient's address (audit 2026-10-06). */
+        `Failed to send "${mail.subject}": ` + `${describeError(error)}`,
       );
 
       /*

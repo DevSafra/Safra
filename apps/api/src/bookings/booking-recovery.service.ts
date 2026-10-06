@@ -16,6 +16,7 @@ import { bookingRecoveryMail, bookingVerificationMail } from '../mail/mail.templ
 import { badRequest, notFound } from '../common/errors/app-error.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { assertCanWrite, scopeFilter, writeFilter } from '../rbac/scope.sql.js';
+import { sendBestEffort } from '../mail/best-effort.js';
 
 /** SHA-256, for the same reason `BookingAccessService` uses it — see `bookingVerifications`. */
 const digest = (value: string): string =>
@@ -177,7 +178,8 @@ export class BookingRecoveryService {
       after: { channel: 'email' },
     });
 
-    await this.mail.send(
+    await sendBestEffort(
+      this.mail,
       bookingVerificationMail({
         to: booking.email,
         reference,

@@ -29,6 +29,7 @@ import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 import { actorName } from '../common/actor-name.sql.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { badRequest, conflict, forbidden, notFound } from '../common/errors/app-error.js';
+import { sendBestEffort } from '../mail/best-effort.js';
 
 /** `PRQ-000031`. Bounded before it reaches a query; the lookup is parameterised regardless. */
 const REFERENCE_PATTERN = /^PRQ-\d{1,12}$/;
@@ -276,7 +277,8 @@ export class PartnerApplicationService {
     });
 
     /* After the row exists. An acknowledgement for a request we failed to store would be a lie. */
-    await this.mail.send(
+    await sendBestEffort(
+      this.mail,
       partnerApplicationReceivedMail({
         to: account.email,
         reference: row.reference,
@@ -631,7 +633,8 @@ export class PartnerApplicationService {
       A request filed while the form was open can still be decided after it closed. The refusal
       then carries no invitation to apply again: the link would lead to a page that is not there.
     */
-    await this.mail.send(
+    await sendBestEffort(
+      this.mail,
       (await this.applicationsOpen())
         ? partnerApplicationRejectedMail({
             to: row.email,

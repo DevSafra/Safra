@@ -4,6 +4,7 @@ import { AuthTokenService } from '../auth/auth-token.service.js';
 import { ENV, type Env } from '../config/env.js';
 import { MailService } from '../mail/mail.service.js';
 import { partnerInvitationMail } from '../mail/mail.templates.js';
+import { sendBestEffort } from '../mail/best-effort.js';
 
 /**
  * How long an invitation link lives.
@@ -66,7 +67,8 @@ export class PartnerInvitationService {
       PARTNER_INVITATION_TTL_MS,
     );
 
-    await this.mail.send(
+    await sendBestEffort(
+      this.mail,
       partnerInvitationMail({
         to: input.to,
         reference: input.partnerReference,

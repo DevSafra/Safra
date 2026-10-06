@@ -26,6 +26,7 @@ import { renderContractHtml } from './contract-template.js';
 import { renderContractPdf } from './contract-pdf.js';
 import { actorName } from '../common/actor-name.sql.js';
 import { describeError } from '../common/errors/safe-error.js';
+import { sendBestEffort } from '../mail/best-effort.js';
 
 /** The handoff's ceiling: PDF ≤ 10MB. Also a database CHECK, for every other writer. */
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -392,7 +393,8 @@ export class PartnerContractService {
       After the transaction. A partner told about a contract that then rolled back would open a
       dashboard with nothing in it, and the mail cannot be un-sent.
     */
-    await this.mail.send(
+    await sendBestEffort(
+      this.mail,
       partnerContractReadyMail({
         to: partnerRow.email,
         partner: partnerRow.display_name,
@@ -726,7 +728,8 @@ export class PartnerContractService {
 
     if (!partner) return;
 
-    await this.mail.send(
+    await sendBestEffort(
+      this.mail,
       partnerContractAwaitingSignatureMail({
         to: partner.email,
         reference: partnerReference,
@@ -764,7 +767,8 @@ export class PartnerContractService {
 
     if (!partner) return;
 
-    await this.mail.send(
+    await sendBestEffort(
+      this.mail,
       partnerContractCountersignedMail({
         to: partner.email,
         reference: partnerReference,
@@ -810,7 +814,8 @@ export class PartnerContractService {
 
     await Promise.all(
       staff.rows.map((recipient) =>
-        this.mail.send(
+        sendBestEffort(
+          this.mail,
           partnerContractReturnedMail({
             to: recipient.email,
             reference: partnerReference,

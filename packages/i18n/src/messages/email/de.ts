@@ -102,7 +102,7 @@ export const de = {
   },
   staffReinstated: {
     subject: 'Ihr SAFRA-Konsolenkonto wurde wieder aktiviert',
-    body: 'Ihr SAFRA-Konsolenkonto wurde wieder aktiviert und Sie können sich erneut anmelden:\n{url}\n\nSie müssen sich auf jedem Gerät neu anmelden, da Ihre früheren Sitzungen bei der Deaktivierung beendet wurden.\n\nIhre Rolle und Ihre Berechtigungen sind unverändert.\n\nIhr SAFRA-Team',
+    body: 'Ihr SAFRA-Konsolenkonto wurde wieder aktiviert.\n\nHier können Sie sich erneut anmelden:\n{url}\n\nSie müssen sich auf jedem Gerät neu anmelden, da Ihre früheren Sitzungen bei der Deaktivierung beendet wurden.\n\nIhre Rolle und Ihre Berechtigungen sind unverändert.\n\nIhr SAFRA-Team',
   },
 
   /* ── Partner werden (Bashar, 2026-08-19) ── */

@@ -19,7 +19,7 @@ import { WalletService } from './../wallet/wallet.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import type { Env } from '../config/env.js';
 import type { FxRateService } from '../fx/fx-rate.service.js';
-import type { MailService, OutgoingMail } from '../mail/mail.service.js';
+import { MailService, type OutgoingMail } from '../mail/mail.service.js';
 
 /**
  * Issuing a gift card SAFRA is giving away — §9.3's «+ إنشاء بطاقة هدية».
@@ -120,6 +120,42 @@ describeIfDb('a gift card issued by staff', () => {
       reason: 'تعويض عن تأخّر في معالجة طلب دعم.',
       ...over,
     });
+
+  /**
+   * A refused mail must not replace the response that puts the code on the staff member's screen.
+   *
+   * REGRESSION (2026-10-06): the send after the committed transaction was a bare `await` on a
+   * `MailService.send` that rethrows, so an SMTP refusal answered 500 for a card that existed, and
+   * the only plaintext copy of its code went with the response.
+   */
+  it('returns the issued code when the mail server refuses', async () => {
+    const refusing = new GiftCardService(
+      db,
+      { APP_URL: 'https://safra.test' } as unknown as Env,
+      new WalletService(db, {
+        rateToSyp: () => Promise.resolve('13000.00000000'),
+        decimalsOf: () => Promise.resolve(2),
+      } as unknown as FxRateService),
+      new AuditService(db),
+      new MailService({
+        MAIL_FROM: 'safra@example.test',
+        SMTP_URL: 'smtp://127.0.0.1:1',
+      } as unknown as Env),
+      new LedgerService(db),
+      fxForLedger,
+      new SettingsService(db),
+    );
+
+    const result = await refusing.issue(STAFF(staffId), {
+      amount: '75.00',
+      currency: 'USD',
+      recipientEmail: 'guest@example.test',
+      reason: 'تعويض عن تأخّر في معالجة طلب دعم.',
+    });
+
+    expect(result.code).toMatch(/^[0-9A-HJKMNP-TV-Z]{5}(-[0-9A-HJKMNP-TV-Z]{5}){3}$/);
+    expect(result.card.status).toBe('active');
+  });
 
   /**
    * The card exists, it is SAFRA's, and it names who made it.

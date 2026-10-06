@@ -12,7 +12,7 @@ import { AuditService } from '../common/audit/audit.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import type { Env } from '../config/env.js';
-import type { MailService, OutgoingMail } from '../mail/mail.service.js';
+import { MailService, type OutgoingMail } from '../mail/mail.service.js';
 import type { FxRateService } from '../fx/fx-rate.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
 import { GiftCardService } from './gift-card.service.js';
@@ -445,6 +445,50 @@ describeIfDb('GiftCardService', () => {
     expect(redeemed.walletBalance).toBe('50.000');
   });
 
+  /**
+   * A mail server that REFUSES must not cost the buyer their code.
+   *
+   * REGRESSION (2026-10-06): `MailService.send` rethrows since 2026-09-06, and the purchase sent
+   * its mail with a bare `await` after the transaction had committed. A refused SMTP connection
+   * answered 500 for a card that was bought and paid for, and the 500 replaced the only response
+   * that carries the plaintext code: only its hash is stored, so the card existed and nobody could
+   * ever spend it.
+   *
+   * A REAL `MailService` pointed at a port nothing listens on, so the failure is the transport's
+   * own rather than a stub's idea of one.
+   */
+  it('returns the code, and the card redeems, when the mail server refuses', async () => {
+    await fund('60.000');
+
+    const refusing = new GiftCardService(
+      db,
+      { APP_URL: 'https://safra.test' } as unknown as Env,
+      wallet,
+      new AuditService(db),
+      new MailService({
+        MAIL_FROM: 'safra@example.test',
+        SMTP_URL: 'smtp://127.0.0.1:1',
+      } as unknown as Env),
+      new LedgerService(db),
+      fxForLedger,
+      new SettingsService(db),
+    );
+
+    const bought = await refusing.purchase(customer(), {
+      amount: '50.00',
+      recipientEmail: 'someone-else@example.test',
+    });
+
+    expect(bought.code).toMatch(/^[0-9A-HJKMNP-TV-Z]{5}(-[0-9A-HJKMNP-TV-Z]{5}){3}$/);
+
+    const redeemed = await giftCards.redeem(
+      customer(OTHER_PROFILE_ID, OTHER_USER_ID),
+      bought.code,
+    );
+
+    expect(redeemed.creditedAmount).toBe('50.000');
+  });
+
   it('refuses a purchase the wallet cannot cover, and creates no card', async () => {
     await fund('10.00');
 
@@ -576,11 +620,11 @@ describeIfDb('GiftCardService', () => {
   });
 
   /**
-   * A mail server that refuses must not un-buy a paid-for card.
+   * A mail server that refuses must not un-buy a paid-for card, nor answer an error for it.
    *
-   * The real `MailService.send` swallows delivery errors, so this asserts the ORDER rather than the
-   * swallowing: the send happens after the transaction commits, so a throw from it cannot roll back
-   * a card the customer has already paid for.
+   * This used to assert `rejects.toThrow()`, on the premise that `MailService.send` swallowed and
+   * only the ORDER needed proving. `send` has rethrown since 2026-09-06, so that assertion was
+   * describing the defect: a committed card, a 500, and the code gone with the response.
    */
   it('keeps the card when the mail cannot be sent', async () => {
     await fund('50.000');
@@ -598,7 +642,9 @@ describeIfDb('GiftCardService', () => {
       new SettingsService(db),
     );
 
-    await expect(failing.purchase(customer(), { amount: '25.00' })).rejects.toThrow();
+    const bought = await failing.purchase(customer(), { amount: '25.00' });
+
+    expect(bought.code).toMatch(/^[0-9A-HJKMNP-TV-Z]{5}(-[0-9A-HJKMNP-TV-Z]{5}){3}$/);
 
     /* The card is committed regardless — this is the point. */
     const cards = await db.execute<{ count: string }>(sql`

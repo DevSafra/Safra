@@ -36,6 +36,7 @@ import { WalletService, withdrawableOf } from '../wallet/wallet.service.js';
 import { badRequest, notFound, unauthorized } from '../common/errors/app-error.js';
 import { ENV, type Env } from '../config/env.js';
 import { MailService } from '../mail/mail.service.js';
+import { sendBestEffort } from '../mail/best-effort.js';
 import { giftCardPurchasedMail, giftCardReceivedMail } from '../mail/mail.templates.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -563,8 +564,11 @@ export class GiftCardService {
       SMTP call on a purchase — the same trade `docs/FUTURE-WORK.md` §7b deviation 1 accepted for
       low-volume notices, and a card purchase is one.
 
-      `MailService.send` swallows delivery errors, so a mail server that refuses cannot fail a
-      purchase that already succeeded.
+      `deliver` sends best-effort, so a mail server that refuses cannot fail a purchase that already
+      succeeded. That matters more here than anywhere: a 500 at this point would replace the one
+      response that carries the plaintext code, after the wallet was debited, and nothing could ever
+      produce the code again. The response returning is the recovery; the buyer's screen shows the
+      code once with a copy control, exactly as it does when the mail arrives.
     */
     await this.deliver(result, claims);
 
@@ -737,12 +741,13 @@ export class GiftCardService {
     });
 
     /*
-      Outside the transaction: a mail server refusing must not undo an issued card.
-      `MailService` swallows delivery failures and records both outcomes, and the code is on the
-      issuing staff member's screen once — so a refused send costs a resend, not the card.
+      Outside the transaction: a mail server refusing must not undo an issued card, and must not
+      replace the response that puts the code on the issuing staff member's screen. That screen is
+      the only other copy, so a refused send costs passing the code on by hand, not the card.
     */
     {
-      await this.mail.send(
+      await sendBestEffort(
+        this.mail,
         giftCardReceivedMail({
           to: input.recipientEmail,
           /* The platform's own default: an issued card has no account to read a preference from. */
@@ -968,20 +973,23 @@ export class GiftCardService {
       ).toString(),
     };
 
-    await this.mail.send(giftCardPurchasedMail({ to: buyer.email, ...shared }));
+    await sendBestEffort(
+      this.mail,
+      giftCardPurchasedMail({ to: buyer.email, ...shared }),
+    );
 
     const recipient = result.card.recipientEmail;
 
     /* Not to themselves twice: a buyer may name their own address. */
     if (recipient && recipient.toLowerCase() !== buyer.email.toLowerCase()) {
-      await this.mail.send(giftCardReceivedMail({ to: recipient, ...shared }));
+      await sendBestEffort(this.mail, giftCardReceivedMail({ to: recipient, ...shared }));
     }
 
     /*
       Nothing logged here on purpose.
 
-      `MailService` already records both outcomes with the subject and the recipient, and it SWALLOWS
-      delivery errors — so a line here saying the code was emailed would be written just as happily
+      `MailService` already records both outcomes, and `sendBestEffort` swallows delivery errors so
+      that they cannot cost the buyer the response that carries the code — so a line here saying the code was emailed would be written just as happily
       when the mail server refused. Observed doing exactly that against a dev box with no SMTP on
       1025. A log that asserts what it cannot know is worse than no log, and it would be the line an
       investigation trusted while a customer sat holding an unusable card.

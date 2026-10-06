@@ -102,7 +102,7 @@ export const en = {
   },
   staffReinstated: {
     subject: 'Your SAFRA console account has been reinstated',
-    body: 'Your SAFRA console account has been reinstated and you can sign in again:\n{url}\n\nYou will need to sign in again on every device, because your earlier sessions were ended when the account was disabled.\n\nYour role and permissions are exactly as they were before; neither was changed.\n\nThe SAFRA team',
+    body: 'Your SAFRA console account has been reinstated.\n\nYou can sign in again here:\n{url}\n\nYou will need to sign in again on every device, because your earlier sessions were ended when the account was disabled.\n\nYour role and permissions are exactly as they were before; neither was changed.\n\nThe SAFRA team',
   },
 
   /* ── Joining as a partner (Bashar, 2026-08-19) ── */

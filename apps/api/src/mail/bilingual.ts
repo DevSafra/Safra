@@ -70,25 +70,140 @@ export function localesFor(preferred: string): ('ar' | 'en' | 'de')[] {
 }
 
 /**
+ * The values that are a LINK or a CODE, by name: `url`, `code`, and any `…Url`.
+ *
+ * Decided by the placeholder's name rather than by a list each template passes, because every
+ * template already names its link `url` and its secret `code`, and a list would be twenty-two more
+ * chances to forget one. `catalogue shape` in `mail.templates.test.ts` holds the copy to the layout
+ * `extractShared` relies on.
+ */
+const SHARED_KEY = /^(url|code|\w+Url)$/;
+
+/** One link or code, and the sentence that introduces it in each language, in block order. */
+type SharedValue = {
+  readonly key: string;
+  readonly value: string;
+  readonly captions: string[];
+};
+
+/**
+ * Takes the link and code lines OUT of one block's copy, and the sentence that leads into each.
+ *
+ * Two layouts exist in the catalogue, and only two — the sweep in `mail.templates.test.ts` fails on
+ * a third:
+ *
+ *  - the value on a line of its own, introduced by the nearest line above it that ends in a colon
+ *    («افتح الرابط التالي لاختيار كلمة مرور جديدة:» then `{url}`). That lead-in travels with the
+ *    value, because left behind it is a sentence ending in a colon with nothing after it.
+ *  - a label and the value on one line, «رمز التحقق: {code}». The label is the caption.
+ *
+ * A value introduced by a whole paragraph (no colon) keeps the paragraph where it is and travels
+ * alone; that paragraph already says what the link is for.
+ */
+function extractShared(body: string): {
+  body: string;
+  found: { key: string; caption: string }[];
+} {
+  const lines = body.split('\n');
+  const removed = new Set<number>();
+  const found: { key: string; caption: string }[] = [];
+
+  lines.forEach((line, index) => {
+    const key = [...line.matchAll(/\{(\w+)\}/g)]
+      .map((match) => match[1] ?? '')
+      .find((name) => SHARED_KEY.test(name));
+
+    if (!key) return;
+
+    removed.add(index);
+
+    const label = line.replace(`{${key}}`, '').trim();
+
+    if (label !== '') {
+      found.push({ key, caption: label });
+      return;
+    }
+
+    let above = index - 1;
+
+    while (above >= 0 && (lines[above] ?? '').trim() === '') above -= 1;
+
+    const leadIn = (lines[above] ?? '').trim();
+
+    if (above >= 0 && !removed.has(above) && /[:：]$/.test(leadIn)) {
+      removed.add(above);
+      found.push({ key, caption: leadIn });
+    } else {
+      found.push({ key, caption: '' });
+    }
+  });
+
+  return {
+    body: lines
+      .filter((_, index) => !removed.has(index))
+      .join('\n')
+      /* A lifted line leaves its paragraph breaks behind; two blank lines read as a missing paragraph. */
+      .replace(/\n{3,}/g, '\n\n')
+      .trim(),
+    found,
+  };
+}
+
+/**
  * Renders one catalogue entry into every required language.
  *
  * `select` picks the entry rather than the caller passing a key, so the return type is checked:
  * a template naming a section that does not exist fails to compile instead of sending an email
  * with `undefined` in it.
  *
- * `values` are filled into EVERY block — a link or a code appears once per language because it is
- * one message rendered twice, and printing a token in only one block would leave the other reader
- * with a sentence about a link that is not there.
+ * ## Every link and code appears ONCE (Bashar, 2026-10-06: «One link, shared»)
+ *
+ * They used to be filled into every block, on the reasoning that a sentence about a link should
+ * not sit in a block without it. The cost was a reset link or a gift card code printed two or
+ * three times in one message, which reads as two different tokens — and a reader who forwards
+ * «the second link» has no way to know it was the same one.
+ *
+ * So the language blocks carry the prose, and the links and codes follow them in one shared
+ * section, each introduced by its own lead-in in every language, Arabic first. The lead-in moves
+ * with the value because it is the sentence that says what the value is FOR; left in the block it
+ * would end in a colon pointing at nothing.
+ *
+ * Everything else — a reference, a property, an amount — is still filled into every block. Those
+ * are part of sentences, and a block without them would not say what it is about.
  */
 export function compose(
   select: (messages: EmailMessages) => Copy,
   preferred: string,
   values: Values = {},
 ): { subject: string; text: string } {
+  const shared: SharedValue[] = [];
+
   const rendered = localesFor(preferred).map((locale) => {
     const messages = emailMessages(locale);
     const copy = select(messages);
     const filled = typeof values === 'function' ? values(messages) : values;
+    const { body, found } = extractShared(copy.body);
+
+    for (const { key, caption } of found) {
+      const value = filled[key];
+
+      let entry = shared.find((candidate) => candidate.key === key);
+
+      if (!entry) {
+        /*
+          A value the template forgot stays visible as its placeholder, exactly as `fill` leaves
+          one, so «leaves no unfilled placeholder» still catches it rather than the line vanishing.
+        */
+        entry = {
+          key,
+          value: value === undefined ? `{${key}}` : String(value),
+          captions: [],
+        };
+        shared.push(entry);
+      }
+
+      if (caption !== '') entry.captions.push(fill(caption, filled));
+    }
 
     return {
       /*
@@ -99,12 +214,20 @@ export function compose(
         somebody has to keep.
       */
       subject: fill(copy.subject, filled),
-      body: fill(copy.body, filled),
+      body: fill(body, filled),
     };
   });
 
+  const blocks = rendered.map((copy) => copy.body);
+
+  if (shared.length > 0) {
+    blocks.push(
+      shared.map((entry) => [...entry.captions, entry.value].join('\n')).join('\n\n'),
+    );
+  }
+
   return {
     subject: rendered.map((copy) => copy.subject).join(SUBJECT_SEPARATOR),
-    text: rendered.map((copy) => copy.body).join(DIVIDER),
+    text: blocks.join(DIVIDER),
   };
 }
