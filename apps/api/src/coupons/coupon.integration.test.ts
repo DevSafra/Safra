@@ -2,7 +2,11 @@ import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ERROR, normaliseCouponCode } from '@safra/contracts';
-import { createRollbackDatabase, type Database } from '@safra/db';
+import {
+  createRollbackDatabase,
+  ensureRetiredCurrencies,
+  type Database,
+} from '@safra/db';
 
 import { CouponService, type CouponContext } from './coupon.service.js';
 
@@ -38,6 +42,8 @@ describeIfDb('a coupon judged against a stay', () => {
 
   beforeEach(async () => {
     await harness.begin();
+    /* The retired EUR, JOD, LBP and TRY a migrated database holds; a fresh one (CI's) does not. */
+    await ensureRetiredCurrencies(harness.db);
 
     const seeded = await db.execute<{
       city: string;

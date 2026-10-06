@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Client, type QueryArrayConfig, type QueryConfig } from 'pg';
 
@@ -282,4 +283,31 @@ export function createRollbackDatabase(
       if (connected) await client.end();
     },
   };
+}
+
+/**
+ * The currencies a database that has lived through the migrations still holds, retired.
+ *
+ * The platform settles in SYP and prices in USD, and the reference seed carries only those two. A
+ * database that existed before `post/0017` also holds EUR, JOD, LBP and TRY, soft-deleted and (but
+ * for TRY) inactive, and integration tests lean on them: JOD for its three decimals, EUR for a
+ * second priced currency, LBP for "a retired code can be added again". A FRESH database (CI's) has
+ * none of them, so those tests failed there while passing on every developer machine
+ * (2026-10-05).
+ *
+ * Call inside a rollback transaction. A row that already exists is left exactly as it is, so a
+ * developer database is unchanged and a fresh one gains the same retired rows production has.
+ */
+export async function ensureRetiredCurrencies(db: Database): Promise<void> {
+  await db.execute(sql`
+    INSERT INTO currencies (code, name_ar, name_en, name_de, symbol, decimals, is_active, deleted_at)
+    SELECT v.code, v.name_ar, v.name_en, v.name_de, v.symbol, v.decimals, v.active, now()
+      FROM (VALUES
+              ('EUR', 'يورو', 'Euro', 'Euro', '€', 2, false),
+              ('JOD', 'دينار أردني', 'Jordanian Dinar', 'Jordanischer Dinar', 'د.أ', 3, false),
+              ('LBP', 'ليرة لبنانية', 'Lebanese Pound', 'Libanesisches Pfund', 'ل.ل', 2, false),
+              ('TRY', 'ليرة تركية', 'Turkish Lira', 'Türkische Lira', '₺', 2, true)
+           ) AS v(code, name_ar, name_en, name_de, symbol, decimals, active)
+     WHERE NOT EXISTS (SELECT 1 FROM currencies c WHERE c.code = v.code)
+  `);
 }

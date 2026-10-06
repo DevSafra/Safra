@@ -1253,6 +1253,28 @@ async function build(db: Seeder): Promise<void> {
   if (!usd) throw new Error('USD is missing — run `pnpm db:seed` first.');
   if (!policy) throw new Error('No cancellation policy — run `pnpm db:seed` first.');
 
+  /*
+    A USD → SYP rate, if the database has none (2026-10-05).
+
+    Pricing refuses to quote without one, and the reference seed deliberately ships no rate (a
+    hardcoded rate goes stale, and a wrong one looks plausible). The TESTBED is test data, so it
+    records the same rate it already snapshots onto every booking it writes. Only when there is no
+    rate at all: one an operator set in the console is theirs and is left alone. Without this, a
+    fresh database (CI's) priced nothing and two dozen integration tests failed on «Pricing is
+    temporarily unavailable» for a reason that had nothing to do with what they test.
+  */
+  const syp = currencies.find((c) => c.code === 'SYP');
+
+  if (syp) {
+    await db.execute(sql`
+      INSERT INTO fx_rates (base_currency_id, quote_currency_id, rate, effective_from, source)
+      SELECT ${usd.id}, ${syp.id}, ${FX_RATE_TO_SYP.toFixed(8)}, now() - interval '1 day', 'testbed'
+       WHERE NOT EXISTS (
+         SELECT 1 FROM fx_rates WHERE base_currency_id = ${usd.id} AND quote_currency_id = ${syp.id}
+       )
+    `);
+  }
+
   const emails = [...PARTNERS.map((p) => p.email), CUSTOMER.email];
   /*
     A parameterised IN list. `${array}` in a drizzle template expands to `($1, $2, …)`, which is an

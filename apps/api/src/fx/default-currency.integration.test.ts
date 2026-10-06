@@ -2,7 +2,11 @@ import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { DEFAULT_MONEY_CURRENCY, ERROR } from '@safra/contracts';
-import { createRollbackDatabase, type Database } from '@safra/db';
+import {
+  createRollbackDatabase,
+  ensureRetiredCurrencies,
+  type Database,
+} from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { FxRateService } from './fx-rate.service.js';
@@ -56,6 +60,8 @@ describeIfDb('the default currency model', () => {
 
   beforeEach(async () => {
     await harness.begin();
+    /* The retired EUR, JOD, LBP and TRY a migrated database holds; a fresh one (CI's) does not. */
+    await ensureRetiredCurrencies(harness.db);
 
     fx = new FxRateService(db, new AuditService(db));
     wallet = new WalletService(db, fx);

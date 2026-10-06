@@ -1,7 +1,11 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createRollbackDatabase, type Database } from '@safra/db';
+import {
+  createRollbackDatabase,
+  ensureRetiredCurrencies,
+  type Database,
+} from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { FxRateService } from './fx-rate.service.js';
@@ -41,6 +45,8 @@ describeIfDb('FxRateService', () => {
 
   beforeEach(async () => {
     await harness.begin();
+    /* The retired EUR, JOD, LBP and TRY a migrated database holds; a fresh one (CI's) does not. */
+    await ensureRetiredCurrencies(harness.db);
     db = harness.db;
 
     /**

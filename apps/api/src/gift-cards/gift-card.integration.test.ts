@@ -1,7 +1,11 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { sql } from 'drizzle-orm';
 
-import { createRollbackDatabase, type Database } from '@safra/db';
+import {
+  createRollbackDatabase,
+  ensureRetiredCurrencies,
+  type Database,
+} from '@safra/db';
 import { normaliseGiftCode } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
@@ -102,6 +106,8 @@ describeIfDb('GiftCardService', () => {
 
   beforeEach(async () => {
     await harness.begin();
+    /* The retired EUR, JOD, LBP and TRY a migrated database holds; a fresh one (CI's) does not. */
+    await ensureRetiredCurrencies(harness.db);
     db = harness.db;
     wallet = new WalletService(db, fxStub);
     sent = [];

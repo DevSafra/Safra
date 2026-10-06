@@ -1,7 +1,11 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createRollbackDatabase, type Database } from '@safra/db';
+import {
+  createRollbackDatabase,
+  ensureRetiredCurrencies,
+  type Database,
+} from '@safra/db';
 
 import type { FxRateService } from '../fx/fx-rate.service.js';
 import { WalletService } from './wallet.service.js';
@@ -58,6 +62,8 @@ describeIfDb('a three-decimal currency', () => {
 
   beforeEach(async () => {
     await harness.begin();
+    /* The retired EUR, JOD, LBP and TRY a migrated database holds; a fresh one (CI's) does not. */
+    await ensureRetiredCurrencies(harness.db);
 
     const made = await db.execute<{ id: string }>(sql`
       INSERT INTO customer_profiles (full_name, email, phone, is_guest)

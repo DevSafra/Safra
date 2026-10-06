@@ -1,7 +1,11 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createRollbackDatabase, type Database } from '@safra/db';
+import {
+  createRollbackDatabase,
+  ensureRetiredCurrencies,
+  type Database,
+} from '@safra/db';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
 import { AuditService } from '../common/audit/audit.service.js';
@@ -65,6 +69,8 @@ describeIfDb('compensation paid on a resolved dispute', () => {
 
   beforeEach(async () => {
     await harness.begin();
+    /* The retired EUR, JOD, LBP and TRY a migrated database holds; a fresh one (CI's) does not. */
+    await ensureRetiredCurrencies(harness.db);
     await seed();
   });
 
@@ -366,6 +372,17 @@ describeIfDb('compensation paid on a resolved dispute', () => {
         SELECT ref.eur_id, (SELECT id FROM currencies WHERE code = 'SYP'),
                '14000.00000000', now() - interval '1 hour', 'test'
         FROM ref
+        RETURNING id
+      ), fx_usd AS (
+        /*
+          And the USD rate the conversion starts from, pinned here too (2026-10-05). It was read from
+          whatever the database held: 13,000 on a developer's, 12,500 from the testbed on CI's, and
+          the figures asserted below are only true at 13,000.
+        */
+        INSERT INTO fx_rates (base_currency_id, quote_currency_id, rate, effective_from, source)
+        SELECT (SELECT id FROM currencies WHERE code = 'USD'),
+               (SELECT id FROM currencies WHERE code = 'SYP'),
+               '13000.00000000', now() - interval '1 hour', 'test'
         RETURNING id
       ), wa AS (
         /* EUR, deliberately — 512 real wallets are, and the console pays in USD. */
