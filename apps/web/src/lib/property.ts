@@ -8,6 +8,8 @@ import {
   propertyTag,
 } from '@safra/contracts';
 
+import { visitorHeaders } from './visitor';
+
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
 
 const translated = z.object({
@@ -218,11 +220,17 @@ export async function getProperty(
   */
   const query = stay ? `?checkIn=${stay.checkIn}&checkOut=${stay.checkOut}` : '';
 
+  /*
+    Only the live branch is the visitor's: see `visitorHeaders` for why a cached fetch must not
+    carry their address. Read outside the `try`, so a render-phase error is not a «no such listing».
+  */
+  const visitor = stay ? await visitorHeaders() : {};
+
   try {
     const response = await fetch(
       `${API_URL}/api/v1/properties/${encodeURIComponent(slug)}${query}`,
       {
-        headers: { Accept: 'application/json' },
+        headers: { Accept: 'application/json', ...visitor },
         /*
           Availability is never cached; the description is.
 
@@ -341,9 +349,12 @@ export async function quote(input: {
     );
   }
 
+  /* The visitor's quote, on the visitor's rate limit — outside the `try` for the reason above. */
+  const visitor = await visitorHeaders();
+
   try {
     const response = await fetch(url, {
-      headers: { Accept: 'application/json' },
+      headers: { Accept: 'application/json', ...visitor },
       cache: 'no-store',
     });
 

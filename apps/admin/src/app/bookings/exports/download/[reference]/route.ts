@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { seeOther } from '@safra/session';
+import { seeOther, internalCallerHeaders } from '@safra/session';
 
 import { getStaffSession } from '@/lib/session-server';
 
@@ -38,7 +38,7 @@ const UNAVAILABLE = '/bookings/exports?unavailable=1';
 export const dynamic = 'force-dynamic';
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ reference: string }> },
 ): Promise<Response> {
   const session = await getStaffSession();
@@ -58,7 +58,11 @@ export async function GET(
   if (!REFERENCE_PATTERN.test(reference)) return seeOther(UNAVAILABLE);
 
   const response = await fetch(`${API_URL}/api/v1/admin/exports/${reference}/download`, {
-    headers: { Accept: 'text/csv', Authorization: `Bearer ${session.accessToken}` },
+    headers: {
+      Accept: 'text/csv',
+      Authorization: `Bearer ${session.accessToken}`,
+      ...internalCallerHeaders(request.headers),
+    },
     cache: 'no-store',
   });
 

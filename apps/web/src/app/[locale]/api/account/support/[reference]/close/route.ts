@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 
 import { ERROR } from '@safra/contracts';
+import { internalCallerHeaders } from '@safra/session';
 
 import { getSession } from '@/lib/session-server';
+import { refuseCrossOrigin } from '@/lib/cross-origin';
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
 
@@ -17,9 +19,12 @@ const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
  * through it.
  */
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ reference: string }> },
 ): Promise<NextResponse> {
+  const refused = refuseCrossOrigin(request);
+  if (refused) return refused;
+
   const session = await getSession();
 
   if (!session) {
@@ -34,6 +39,7 @@ export async function POST(
         headers: {
           Accept: 'application/json',
           Authorization: `Bearer ${session.accessToken}`,
+          ...internalCallerHeaders(request.headers),
         },
         cache: 'no-store',
       },

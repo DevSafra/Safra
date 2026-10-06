@@ -4,6 +4,7 @@ import { cache } from 'react';
 import { z } from 'zod';
 
 import { getPartnerSession } from './session-server';
+import { visitorHeaders } from './visitor';
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
 
@@ -28,6 +29,9 @@ export async function partnerFetch<T>(
   const session = await getPartnerSession();
   if (!session) return 'unauthenticated';
 
+  /* On the visitor's rate limit, not this server's — see `visitorHeaders`. */
+  const visitor = await visitorHeaders();
+
   let response: Response;
 
   try {
@@ -37,6 +41,7 @@ export async function partnerFetch<T>(
         Accept: 'application/json',
         Authorization: `Bearer ${session.accessToken}`,
         ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        ...visitor,
       },
       ...(init.body ? { body: JSON.stringify(init.body) } : {}),
       cache: 'no-store',

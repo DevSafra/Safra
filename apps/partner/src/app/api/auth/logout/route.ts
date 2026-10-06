@@ -1,6 +1,13 @@
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
-import { PARTNER_SESSION_COOKIE, sessionCookieOptions } from '@safra/session';
+import {
+  PARTNER_SESSION_COOKIE,
+  callLogout,
+  decodeSession,
+  internalCallerHeaders,
+  sessionCookieOptions,
+} from '@safra/session';
 
 /**
  * Signs the partner out by clearing the cookie, then sends them to the sign-in page.
@@ -12,10 +19,21 @@ import { PARTNER_SESSION_COOKIE, sessionCookieOptions } from '@safra/session';
  * means the browser NAVIGATES to whatever this returns — a JSON body leaves the partner staring at
  * `{"ok":true}`. 303 specifically, so the follow-up is a GET rather than a repeated POST.
  *
- * The refresh token is not revoked upstream, so this ends the SESSION rather than every session —
- * the same limitation the console's logout carries.
+ * The refresh token is revoked at the API first, as the console and the customer site do. Clearing
+ * only the cookie left that token exchangeable for fresh access for the rest of its thirty days, so
+ * a partner signing out of a shared reception computer was not signed out of anything a copied
+ * token could reach. It ends THIS session's family, not every session the partner holds.
+ *
+ * The cookie is cleared even when the API call fails: somebody who pressed sign out must end up
+ * signed out of the browser in front of them whatever the network did. `callLogout` swallows its
+ * own failure for that reason.
  */
-export function POST(): NextResponse {
+export async function POST(request: Request): Promise<NextResponse> {
+  const jar = await cookies();
+  const session = decodeSession(jar.get(PARTNER_SESSION_COOKIE)?.value);
+
+  await callLogout(session?.refreshToken, internalCallerHeaders(request.headers));
+
   /*
     A RELATIVE `Location`, and a NextResponse because this clears the session cookie.
 

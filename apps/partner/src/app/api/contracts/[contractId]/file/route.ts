@@ -1,4 +1,4 @@
-import { seeOther } from '@safra/session';
+import { seeOther, internalCallerHeaders } from '@safra/session';
 
 import { getPartnerSession } from '@/lib/session-server';
 
@@ -35,7 +35,7 @@ const UNAVAILABLE = '/contracts?file=unavailable';
  * a contract id that exists and one that does not are indistinguishable from outside.
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ contractId: string }> },
 ): Promise<Response> {
   const { contractId } = await params;
@@ -48,7 +48,10 @@ export async function GET(
     const response = await fetch(
       `${API_URL}/api/v1/partner/contracts/${encodeURIComponent(contractId)}/file`,
       {
-        headers: { Authorization: `Bearer ${session.accessToken}` },
+        headers: {
+          Authorization: `Bearer ${session.accessToken}`,
+          ...internalCallerHeaders(request.headers),
+        },
         cache: 'no-store',
       },
     );

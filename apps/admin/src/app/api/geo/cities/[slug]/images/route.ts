@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { internalCallerHeaders } from '@safra/session';
 
 import { getStaffSession } from '@/lib/session-server';
 
@@ -35,6 +36,7 @@ export async function POST(
           ...(request.headers.get('content-type')
             ? { 'Content-Type': request.headers.get('content-type') as string }
             : {}),
+          ...internalCallerHeaders(request.headers),
         },
         body: request.body,
         duplex: 'half',

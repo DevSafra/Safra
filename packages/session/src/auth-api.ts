@@ -5,6 +5,7 @@ import {
   type ErrorCode,
 } from '@safra/contracts';
 
+import { internalCallerHeaders } from './internal-caller.js';
 import { sessionFrom, type Session } from './session.js';
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
@@ -110,6 +111,10 @@ export async function callAuth(
  * and without this every customer arrives as the Next server's address — one shared
  * budget of five attempts a minute for the entire site, and an audit trail (§15)
  * that records the proxy instead of the visitor.
+ *
+ * The vouched address (`internalCallerHeaders`) is what the API believes once the
+ * secret is configured. The raw `x-forwarded-for` still travels for a deployment
+ * without it, where the API's `trust proxy` reads it exactly as it always has.
  */
 export function forwardedHeaders(request: Request): Record<string, string> {
   const forwardedFor = request.headers.get('x-forwarded-for');
@@ -118,17 +123,26 @@ export function forwardedHeaders(request: Request): Record<string, string> {
   return {
     ...(forwardedFor ? { 'x-forwarded-for': forwardedFor } : {}),
     ...(userAgent ? { 'user-agent': userAgent } : {}),
+    ...internalCallerHeaders(request.headers),
   };
 }
 
-/** Ends the session at the API, so the refresh family is revoked server-side. */
-export async function callLogout(refreshToken: string | undefined): Promise<void> {
+/**
+ * Ends the session at the API, so the refresh family is revoked server-side.
+ *
+ * `headers` carries `internalCallerHeaders`, so a sign-out is on the visitor's rate limit rather
+ * than one shared by every visitor of this server.
+ */
+export async function callLogout(
+  refreshToken: string | undefined,
+  headers: Record<string, string> = {},
+): Promise<void> {
   if (!refreshToken) return;
 
   try {
     await fetch(`${API_URL}/api/v1/auth/logout`, {
       method: 'POST',
-      headers: { cookie: `${API_REFRESH_COOKIE}=${refreshToken}` },
+      headers: { cookie: `${API_REFRESH_COOKIE}=${refreshToken}`, ...headers },
       cache: 'no-store',
     });
   } catch {

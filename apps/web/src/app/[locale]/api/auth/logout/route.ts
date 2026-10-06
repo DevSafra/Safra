@@ -4,9 +4,11 @@ import { NextResponse } from 'next/server';
 import {
   CUSTOMER_SESSION_COOKIE,
   callLogout,
+  internalCallerHeaders,
   decodeSession,
   sessionCookieOptions,
 } from '@safra/session';
+import { refuseCrossOrigin } from '@/lib/cross-origin';
 
 /**
  * Ends the session (SRS §4).
@@ -20,11 +22,14 @@ import {
  * who clicked "sign out" must end up signed out of the browser in front of them,
  * whatever the network did.
  */
-export async function POST(): Promise<NextResponse> {
+export async function POST(request: Request): Promise<NextResponse> {
+  const refused = refuseCrossOrigin(request);
+  if (refused) return refused;
+
   const jar = await cookies();
   const session = decodeSession(jar.get(CUSTOMER_SESSION_COOKIE)?.value);
 
-  await callLogout(session?.refreshToken);
+  await callLogout(session?.refreshToken, internalCallerHeaders(request.headers));
 
   const response = new NextResponse(null, { status: 204 });
 

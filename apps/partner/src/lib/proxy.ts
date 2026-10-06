@@ -3,6 +3,7 @@ import 'server-only';
 import { NextResponse } from 'next/server';
 
 import { getPartnerSession } from './session-server';
+import { visitorHeaders } from './visitor';
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
 
@@ -28,6 +29,9 @@ export async function proxy(
     return NextResponse.json({ message: 'Not signed in.' }, { status: 401 });
   }
 
+  /* On the visitor's rate limit, not this server's — see `visitorHeaders`. */
+  const visitor = await visitorHeaders();
+
   try {
     const response = await fetch(`${API_URL}/api/v1${path}`, {
       method: init.method,
@@ -35,6 +39,7 @@ export async function proxy(
         Accept: 'application/json',
         Authorization: `Bearer ${session.accessToken}`,
         ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        ...visitor,
       },
       ...(init.body ? { body: JSON.stringify(init.body) } : {}),
       cache: 'no-store',

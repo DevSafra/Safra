@@ -8,6 +8,7 @@ import helmet from 'helmet';
 
 import { AppModule } from './app.module.js';
 import { configureBodyParsers } from './common/http/body-parsers.js';
+import { internalCallerMiddleware } from './common/http/internal-caller.js';
 import { API_PREFIX } from './config/constants.js';
 import { JsonLogger } from './common/logging/json.logger.js';
 import { requestIdMiddleware } from './common/logging/request-id.middleware.js';
@@ -46,6 +47,14 @@ async function bootstrap(): Promise<void> {
    * and walk straight through the rate limiter.
    */
   app.set('trust proxy', 1);
+
+  /**
+   * Before the request id, because that copies `req.ip` into the request context the audit log
+   * reads. A request from one of SAFRA's own front ends carries the visitor's address and a secret
+   * only those front ends hold; without both, `req.ip` stays what `trust proxy` makes it. See
+   * `internal-caller.ts` for why a secret rather than a second trusted hop.
+   */
+  app.use(internalCallerMiddleware(env.INTERNAL_CALLER_SECRET));
 
   /**
    * FIRST, before anything that might log. Everything downstream runs inside the

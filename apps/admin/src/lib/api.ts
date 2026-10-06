@@ -11,6 +11,7 @@ import {
 
 import { DEFAULT_PAGE_SIZE } from './search-params';
 import { getStaffSession } from './session-server';
+import { visitorHeaders } from './visitor';
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
 
@@ -31,6 +32,9 @@ export async function staffFetch<T>(
   const session = await getStaffSession();
   if (!session) return 'unauthenticated';
 
+  /* On the visitor's rate limit, not this server's — see `visitorHeaders`. */
+  const visitor = await visitorHeaders();
+
   let response: Response;
 
   try {
@@ -40,6 +44,7 @@ export async function staffFetch<T>(
         Accept: 'application/json',
         Authorization: `Bearer ${session.accessToken}`,
         ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        ...visitor,
       },
       ...(init.body ? { body: JSON.stringify(init.body) } : {}),
       cache: 'no-store',

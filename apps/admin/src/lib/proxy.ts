@@ -6,6 +6,7 @@ import { ERROR } from '@safra/contracts';
 
 import { MALFORMED_BODY } from './json-body';
 import { getStaffSession } from './session-server';
+import { visitorHeaders } from './visitor';
 
 export { jsonBody } from './json-body';
 
@@ -34,6 +35,9 @@ export async function proxy(
     return NextResponse.json({ code: ERROR.REQUEST_MALFORMED_BODY }, { status: 400 });
   }
 
+  /* On the visitor's rate limit, not this server's — see `visitorHeaders`. */
+  const visitor = await visitorHeaders();
+
   try {
     const response = await fetch(`${API_URL}/api/v1${path}`, {
       method: init.method,
@@ -41,6 +45,7 @@ export async function proxy(
         Accept: 'application/json',
         Authorization: `Bearer ${session.accessToken}`,
         ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        ...visitor,
       },
       ...(init.body ? { body: JSON.stringify(init.body) } : {}),
       cache: 'no-store',

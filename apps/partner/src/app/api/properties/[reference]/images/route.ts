@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { ERROR, propertyImageOrderSchema } from '@safra/contracts';
+import { internalCallerHeaders } from '@safra/session';
 
 import { proxy } from '@/lib/proxy';
 import { getPartnerSession } from '@/lib/session-server';
@@ -41,6 +42,7 @@ export async function POST(
           Accept: 'application/json',
           Authorization: `Bearer ${session.accessToken}`,
           'content-type': contentType,
+          ...internalCallerHeaders(request.headers),
         },
         body: await request.arrayBuffer(),
         cache: 'no-store',

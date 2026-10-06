@@ -8,6 +8,8 @@ import {
   sessionCookieOptions,
 } from '@safra/session';
 
+import { visitorHeaders } from '@/lib/visitor';
+
 /**
  * Ends the staff session locally and revokes the refresh family at the API.
  *
@@ -19,7 +21,7 @@ export async function POST(): Promise<NextResponse> {
   const jar = await cookies();
   const session = decodeSession(jar.get(STAFF_SESSION_COOKIE)?.value);
 
-  await callLogout(session?.refreshToken);
+  await callLogout(session?.refreshToken, await visitorHeaders());
 
   const response = new NextResponse(null, { status: 204 });
 

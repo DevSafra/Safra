@@ -10,6 +10,7 @@ import {
   forwardedHeaders,
   sessionCookieOptions,
 } from '@safra/session';
+import { refuseCrossOrigin } from '@/lib/cross-origin';
 
 /**
  * Signs a customer in (SRS §4).
@@ -32,6 +33,9 @@ import {
  * account, which is the separation that should exist anyway.
  */
 export async function POST(request: Request): Promise<NextResponse> {
+  const refused = refuseCrossOrigin(request);
+  if (refused) return refused;
+
   let body: unknown;
 
   try {

@@ -1,4 +1,5 @@
 import { DEFAULT_LOCALE } from '@safra/i18n';
+import { internalCallerHeaders } from '@safra/session';
 
 import { isLocale } from '@/i18n/routing';
 
@@ -46,7 +47,7 @@ const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
   The advertiser's URL is necessarily absolute — it is another site — and it is validated below.
 */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ locale: string; reference: string }> },
 ): Promise<Response> {
   const { locale, reference } = await params;
@@ -66,7 +67,12 @@ export async function GET(
     try {
       const response = await fetch(
         `${API_URL}/api/v1/ads/${encodeURIComponent(reference)}/click`,
-        { redirect: 'manual', cache: 'no-store' },
+        {
+          redirect: 'manual',
+          cache: 'no-store',
+          /* The click is the visitor's, counted on their rate limit rather than this server's. */
+          headers: internalCallerHeaders(request.headers),
+        },
       );
 
       return response.status === 302 ? response.headers.get('location') : null;

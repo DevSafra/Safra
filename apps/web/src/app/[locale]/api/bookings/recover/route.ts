@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ERROR } from '@safra/contracts';
+import { internalCallerHeaders } from '@safra/session';
+import { refuseCrossOrigin } from '@/lib/cross-origin';
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
 
@@ -17,6 +19,9 @@ const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
  * without it, one visitor's rate limit would be shared by everybody.
  */
 export async function POST(request: Request): Promise<NextResponse> {
+  const refused = refuseCrossOrigin(request);
+  if (refused) return refused;
+
   let body: unknown;
 
   try {
@@ -34,6 +39,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         'Content-Type': 'application/json',
         Accept: 'application/json',
         ...(forwardedFor ? { 'x-forwarded-for': forwardedFor } : {}),
+        ...internalCallerHeaders(request.headers),
       },
       body: JSON.stringify(body),
       cache: 'no-store',

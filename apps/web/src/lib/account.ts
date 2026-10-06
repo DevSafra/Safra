@@ -3,6 +3,7 @@ import 'server-only';
 import { z } from 'zod';
 
 import { getSession } from './session-server';
+import { visitorHeaders } from './visitor';
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
 
@@ -56,6 +57,9 @@ async function authedFetch<T>(
   const session = await getSession();
   if (!session) return 'unauthenticated';
 
+  /* On the visitor's rate limit, not this server's — see `visitorHeaders`. */
+  const visitor = await visitorHeaders();
+
   let response: Response;
 
   try {
@@ -63,6 +67,7 @@ async function authedFetch<T>(
       headers: {
         Accept: 'application/json',
         Authorization: `Bearer ${session.accessToken}`,
+        ...visitor,
       },
       cache: 'no-store',
     });

@@ -65,6 +65,16 @@ export const envSchema = z.object({
   */
   REVALIDATE_SECRET: z.string().min(32).optional(),
 
+  /*
+    The secret the three front ends present when they tell this API which visitor a server-side
+    call is for — see `common/http/internal-caller.ts`. All four processes read the same value.
+
+    Optional so local development runs without it (every visitor is then the web server, as it
+    always was); REQUIRED in production by `loadEnv`, because without it every visitor on one web
+    instance shares one rate-limit bucket and one busy minute locks the site out.
+  */
+  INTERNAL_CALLER_SECRET: secretSchema.optional(),
+
   MEDIA_REQUIRE_PUBLIC: z
     .enum(['true', 'false'])
     .default('false')
@@ -269,6 +279,14 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     throw new Error(
       'SMTP_URL is required in production. Without it the mailer only logs, so ' +
         'password resets and verification emails would never be delivered.',
+    );
+  }
+
+  /* See `INTERNAL_CALLER_SECRET` above: without it the sites share one rate limit per instance. */
+  if (env.NODE_ENV === 'production' && !env.INTERNAL_CALLER_SECRET) {
+    throw new Error(
+      'INTERNAL_CALLER_SECRET is required in production. Without it every visitor ' +
+        'of a web instance shares one rate-limit bucket. Generate with: openssl rand -base64 48',
     );
   }
 

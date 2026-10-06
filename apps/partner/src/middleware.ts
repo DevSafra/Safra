@@ -15,6 +15,7 @@ import {
   needsRefresh,
   sessionCookieOptions,
   type Session,
+  internalCallerHeaders,
 } from '@safra/session';
 
 /** The only path reachable without a partner session. */
@@ -229,7 +230,14 @@ async function rotateIfStale(request: NextRequest): Promise<string | null | unde
 
   if (!needsRefresh(session)) return undefined;
 
-  const outcome = await callAuth('/auth/refresh', { refreshToken: session.refreshToken });
+  /*
+    On the VISITOR's refresh budget, not this server's: thirty a minute shared by every session on
+    the instance was the 2026-10-06 lockout, and a 429 here keeps an expired session.
+  */
+  const outcome = await callAuth('/auth/refresh', {
+    refreshToken: session.refreshToken,
+    headers: internalCallerHeaders(request.headers),
+  });
 
   if (!outcome.ok || !outcome.session) {
     return outcome.status === 401 || outcome.status === 403 ? null : undefined;

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { internalCallerHeaders } from '@safra/session';
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
 
@@ -15,7 +16,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const response = await fetch(`${API_URL}/api/v1/auth/staff-invitation/accept`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...internalCallerHeaders(request.headers),
+      },
       body: JSON.stringify(body),
       cache: 'no-store',
     });

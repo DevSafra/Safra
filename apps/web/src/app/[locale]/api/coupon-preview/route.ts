@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { ERROR } from '@safra/contracts';
+import { internalCallerHeaders } from '@safra/session';
+import { refuseCrossOrigin } from '@/lib/cross-origin';
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
 
@@ -17,6 +19,9 @@ const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
  * under the coupon's row lock.
  */
 export async function POST(request: NextRequest) {
+  const refused = refuseCrossOrigin(request);
+  if (refused) return refused;
+
   /*
     Read first, apart from the upstream call (audit 2026-10-04): a malformed body is the caller's
     fault, a coded 400, not the 502 «could not reach the server» the catch below means.
@@ -38,6 +43,7 @@ export async function POST(request: NextRequest) {
         ...(request.headers.get('x-forwarded-for')
           ? { 'x-forwarded-for': request.headers.get('x-forwarded-for') as string }
           : {}),
+        ...internalCallerHeaders(request.headers),
       },
       body: JSON.stringify(payload),
     });

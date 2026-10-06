@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { seeOther } from '@safra/session';
+import { seeOther, internalCallerHeaders } from '@safra/session';
 
 import { getStaffSession } from '@/lib/session-server';
 
@@ -27,7 +27,7 @@ const UNAVAILABLE = '/partners?file=unavailable';
  * around it. It redirects to سجل الشركاء now, where the message reads in Arabic (2026-08-25).
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string; party: string }> },
 ): Promise<Response> {
   const session = await getStaffSession();
@@ -39,7 +39,13 @@ export async function GET(
 
   const response = await fetch(
     `${API_URL}/api/v1/admin/partner-contracts/${encodeURIComponent(id)}/file/${encodeURIComponent(party)}`,
-    { headers: { Authorization: `Bearer ${session.accessToken}` }, cache: 'no-store' },
+    {
+      headers: {
+        Authorization: `Bearer ${session.accessToken}`,
+        ...internalCallerHeaders(request.headers),
+      },
+      cache: 'no-store',
+    },
   );
 
   /*

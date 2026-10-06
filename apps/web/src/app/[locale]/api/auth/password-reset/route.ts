@@ -8,6 +8,7 @@ import {
 } from '@safra/contracts';
 
 import { forwardedHeaders } from '@safra/session';
+import { refuseCrossOrigin } from '@/lib/cross-origin';
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
 
@@ -23,6 +24,9 @@ const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
  * server's single budget of three per minute.
  */
 export async function POST(request: Request): Promise<NextResponse> {
+  const refused = refuseCrossOrigin(request);
+  if (refused) return refused;
+
   let body: unknown;
 
   try {

@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 
 import { ERROR } from '@safra/contracts';
+import { internalCallerHeaders } from '@safra/session';
 
 import { getSession } from '@/lib/session-server';
+import { refuseCrossOrigin } from '@/lib/cross-origin';
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
 
@@ -20,6 +22,9 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ reference: string }> },
 ): Promise<NextResponse> {
+  const refused = refuseCrossOrigin(request);
+  if (refused) return refused;
+
   const session = await getSession();
 
   if (!session) {
@@ -43,6 +48,7 @@ export async function POST(
           'Content-Type': 'application/json',
           Accept: 'application/json',
           Authorization: `Bearer ${session.accessToken}`,
+          ...internalCallerHeaders(request.headers),
         },
         body: JSON.stringify(body),
         cache: 'no-store',

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { ERROR, errorParamsOf, registerSchema } from '@safra/contracts';
 
 import { forwardedHeaders } from '@safra/session';
+import { refuseCrossOrigin } from '@/lib/cross-origin';
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
 /**
@@ -30,6 +31,9 @@ const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
  * always non-committal (ADR 0003); registration now matches it.
  */
 export async function POST(request: Request): Promise<NextResponse> {
+  const refused = refuseCrossOrigin(request);
+  if (refused) return refused;
+
   let body: unknown;
 
   try {

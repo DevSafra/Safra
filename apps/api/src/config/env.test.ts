@@ -24,6 +24,7 @@ const BASE = {
   S3_ACCESS_KEY_ID: 'AKIAEXAMPLE',
   S3_SECRET_ACCESS_KEY: 'e'.repeat(40),
   S3_BUCKET: 'safra-documents',
+  INTERNAL_CALLER_SECRET: 'c'.repeat(48),
 } satisfies NodeJS.ProcessEnv;
 
 /** A production environment with one thing removed or changed. */
@@ -71,6 +72,23 @@ describe('loadEnv', () => {
     });
   });
 
+  /**
+   * Without the secret the sites cannot say which visitor a call is for, so every visitor on one
+   * web instance shares one rate-limit bucket — the 2026-10-06 lockout. Optional locally, where
+   * that is how it has always behaved.
+   */
+  it('rejects a production environment without INTERNAL_CALLER_SECRET', () => {
+    expect(() => loadEnv(env({ INTERNAL_CALLER_SECRET: undefined }))).toThrow(
+      /INTERNAL_CALLER_SECRET/,
+    );
+  });
+
+  it('rejects an INTERNAL_CALLER_SECRET short enough to guess', () => {
+    expect(() => loadEnv(env({ INTERNAL_CALLER_SECRET: 'too-short' }))).toThrow(
+      /INTERNAL_CALLER_SECRET/,
+    );
+  });
+
   describe('development stays convenient', () => {
     /**
      * The production-only checks must not fire in development, or every contributor
@@ -84,6 +102,7 @@ describe('loadEnv', () => {
             SMTP_URL: undefined,
             S3_ACCESS_KEY_ID: undefined,
             S3_BUCKET: undefined,
+            INTERNAL_CALLER_SECRET: undefined,
           }),
         ),
       ).not.toThrow();

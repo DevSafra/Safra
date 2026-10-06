@@ -5,6 +5,13 @@ import { FAVOURITE_STATUS_BATCH } from '@safra/contracts';
 import { savedSlugs } from './api';
 
 /*
+  savedSlugs now forwards the visitor's address (lib/visitor.ts), which reads the incoming request's
+  headers. Outside a Next request there are none, so a test supplies an empty set, as the app always
+  calls this inside one.
+*/
+vi.mock('next/headers', () => ({ headers: () => Promise.resolve(new Headers()) }));
+
+/*
   The full map asks which of up to 250 stays the reader saved, and the API refuses more than
   FAVOURITE_STATUS_BATCH in one request. One request naming all 250 would be refused whole, and every
   heart on the map would be drawn empty.

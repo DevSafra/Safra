@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { internalCallerHeaders } from '@safra/session';
 
 import { getStaffSession } from '@/lib/session-server';
 
@@ -19,7 +20,7 @@ const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
  * opinion in this file would be a second thing to keep in step.
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ evidenceId: string }> },
 ): Promise<NextResponse> {
   const { evidenceId } = await params;
@@ -33,7 +34,10 @@ export async function GET(
     const response = await fetch(
       `${API_URL}/api/v1/admin/disputes/evidence/${encodeURIComponent(evidenceId)}/file`,
       {
-        headers: { Authorization: `Bearer ${session.accessToken}` },
+        headers: {
+          Authorization: `Bearer ${session.accessToken}`,
+          ...internalCallerHeaders(request.headers),
+        },
         cache: 'no-store',
       },
     );

@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 import { FAVOURITE_STATUS_BATCH } from '@safra/contracts';
 
+import { visitorHeaders } from './visitor';
+
 /**
  * Server-side API client.
  *
@@ -64,8 +66,15 @@ async function apiFetch<T>(
     }
   }
 
+  /*
+    A live call is the VISITOR's, so it goes on their rate limit rather than this server's. A cached
+    one does not: it is made once per window for everybody, and a visitor's address in its headers
+    would give each visitor a private cache entry — see `visitorHeaders`.
+  */
+  const visitor = options.revalidate === false ? await visitorHeaders() : {};
+
   const response = await fetch(url, {
-    headers: { Accept: 'application/json' },
+    headers: { Accept: 'application/json', ...visitor },
     next:
       options.revalidate === false
         ? { revalidate: 0 }
@@ -464,12 +473,19 @@ export async function savedSlugs(
     return new Set(answers.flatMap((answer) => [...answer]));
   }
 
+  /* Outside the `try`: a render-phase error from reading the request must not read as «none saved». */
+  const visitor = await visitorHeaders();
+
   try {
     const url = new URL(`${API_URL}/api/v1/favourites/statuses`);
     for (const slug of slugs) url.searchParams.append('slugs', slug);
 
     const response = await fetch(url, {
-      headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}` },
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+        ...visitor,
+      },
       cache: 'no-store',
     });
 

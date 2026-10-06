@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { internalCallerHeaders } from '@safra/session';
 import { getSession } from '@/lib/session-server';
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
@@ -58,6 +59,7 @@ export async function GET(
         headers: {
           Accept: 'application/pdf',
           Authorization: `Bearer ${session.accessToken}`,
+          ...internalCallerHeaders(request.headers),
         },
         cache: 'no-store',
       },

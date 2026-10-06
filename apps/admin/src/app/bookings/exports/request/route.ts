@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { seeOther } from '@safra/session';
+import { seeOther, internalCallerHeaders } from '@safra/session';
 
 import { getStaffSession } from '@/lib/session-server';
 
@@ -50,6 +50,7 @@ export async function POST(request: Request): Promise<Response> {
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${session.accessToken}`,
+      ...internalCallerHeaders(request.headers),
     },
     body: JSON.stringify(body),
     cache: 'no-store',
