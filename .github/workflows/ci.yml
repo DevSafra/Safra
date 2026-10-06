@@ -103,6 +103,13 @@ jobs:
       - name: Seed the integration testbed
         run: pnpm --filter @safra/api db:testbed
 
+      # The API renders partnership contracts and booking vouchers to PDF with a headless Chromium
+      # (playwright-core), and voucher.integration.test.ts renders a real one. The runner has no
+      # browser, so the last failure after the testbed fix was «Executable doesn't exist». Installed
+      # through the repository's own Playwright so the build matches what the code asks for.
+      - name: Install the browser the PDF renderer uses
+        run: pnpm exec playwright install --with-deps chromium
+
       - name: Test (including database integration tests)
         run: pnpm exec vitest run
         env:
