@@ -1,14 +1,15 @@
 import { sql } from 'drizzle-orm';
-import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createDatabase, createRollbackDatabase, type Database } from '@safra/db';
-import { PERMISSIONS as P } from '@safra/contracts';
+import { ERROR, PERMISSIONS as P } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { PayoutService } from './payout.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { codeOf } from '../common/errors/app-error.js';
 
 /**
  * The partner payout ledger against a REAL PostgreSQL.
@@ -297,6 +298,7 @@ describeIfDb('PayoutService', () => {
   }
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await harness.rollback();
   });
 
@@ -1798,6 +1800,140 @@ describeIfDb('PayoutService', () => {
       `);
 
       expect(Number(applied.rows[0]!.n)).toBe(0);
+    });
+
+    /*
+      A refund on a stay whose transfer is carrying a fine (audit 2026-10-06).
+
+      The reversal retotalled the transfer with its own copy that kept the fine already applied.
+      Taking the refunded stay off left the gross below the fine, the net went negative, and
+      `partner_payouts_non_negative` refused the statement — after the refund's money had moved, so
+      the refund answered 500 and the partner stayed on the transfer for the stay. The retotal is
+      now the accrual's own: the fine takes what the smaller transfer can carry, the rest waits.
+    */
+    it('takes a refunded stay off a transfer carrying a fine, and carries the fine forward', async () => {
+      if (bookingIds.length === 0) return;
+
+      const fine = await imposeFine('500.000');
+      const payout = await openTransfer();
+
+      expect(Number(payout!.fine)).toBeCloseTo(500, 2);
+
+      await db.execute(sql`
+        INSERT INTO payments (booking_id, method, provider, amount, currency_id, status,
+                              captured_at)
+        SELECT b.id, 'bank_transfer', 'manual', b.total_amount, b.currency_id, 'captured', now()
+          FROM bookings b WHERE b.id = ${bookingIds[0]!}::uuid
+           AND NOT EXISTS (SELECT 1 FROM payments p WHERE p.booking_id = b.id
+                            AND p.status IN ('captured','partially_refunded','refunded'))
+      `);
+      await db.execute(sql`
+        INSERT INTO refunds (payment_id, booking_id, amount, currency_id,
+                             applied_refund_percent, reason, status, wallet_amount, completed_at)
+        SELECT p.id, b.id, b.base_amount, b.currency_id, 100, 'refund under a fine',
+               'completed', 0, now()
+          FROM bookings b JOIN payments p ON p.booking_id = b.id
+           AND p.status IN ('captured','partially_refunded','refunded')
+         WHERE b.id = ${bookingIds[0]!}::uuid LIMIT 1
+      `);
+
+      await ledger.reverseForRefund(db, bookingIds[0]!);
+
+      const after = await db.execute<{
+        gross: string;
+        fine: string;
+        net: string;
+        items: number;
+      }>(sql`
+        SELECT gross_amount::text AS gross, fine_amount::text AS fine, net_amount::text AS net,
+               (SELECT count(*)::int FROM partner_payout_items i
+                 WHERE i.payout_id = p.id AND i.booking_id = ${bookingIds[0]!}::uuid) AS items
+          FROM partner_payouts p WHERE p.id = ${payout!.id}
+      `);
+
+      expect(after.rows[0]!.items, 'the refunded stay is not paid for').toBe(0);
+      expect(Number(after.rows[0]!.gross), 'two stays left').toBeCloseTo(372, 2);
+      expect(Number(after.rows[0]!.fine), 'only what the transfer can carry').toBeCloseTo(
+        372,
+        2,
+      );
+      expect(Number(after.rows[0]!.net), 'never negative').toBeCloseTo(0, 2);
+
+      const state = await fineState(fine);
+      expect(Number(state!.collected)).toBeCloseTo(372, 2);
+      expect(state!.settled, 'the rest waits for the next period').toBeNull();
+    });
+
+    /*
+      The fine a transfer withheld is settled in the ledger by the transfer (audit 2026-10-06).
+
+      Only the net was debited from `partner_payable`, and nothing credited `partner_fine`: the
+      withheld fine stayed owed to the partner AND owed by them, and the books disagreed with the
+      transfer by exactly the fine.
+    */
+    it('posts the withheld fine when the transfer is paid, so the books balance', async () => {
+      if (bookingIds.length === 0) return;
+
+      await imposeFine('50.000');
+      const payout = await openTransfer();
+
+      await service.close(payout!.id, finance);
+      await service.release(payout!.id, { scheduledFor: '2026-08-20' }, finance);
+      await service.markPaid(payout!.id, { paidReference: 'BANK-REF-FINE-LEG' }, finance);
+
+      const legs = await db.execute<{
+        account: string;
+        direction: string;
+        amount: string;
+      }>(sql`
+        SELECT e.account::text AS account, e.direction::text AS direction,
+               e.amount::numeric(18,3)::text AS amount
+          FROM ledger_entries e
+          JOIN partner_payouts p ON p.entry_group_id = e.entry_group_id
+         WHERE p.id = ${payout!.id}
+         ORDER BY e.account::text
+      `);
+
+      expect(legs.rows).toEqual([
+        { account: 'partner_fine', direction: 'credit', amount: '50.000' },
+        { account: 'partner_payable', direction: 'debit', amount: '558.000' },
+        { account: 'partner_payout', direction: 'credit', amount: '508.000' },
+      ]);
+    });
+
+    /*
+      «Mark paid» pressed twice: the second read the payout while it was still `scheduled`. It is
+      now refused with a code under the row lock, before anything is written.
+    */
+    it('refuses to mark the same transfer paid twice', async () => {
+      if (bookingIds.length === 0) return;
+
+      const payout = await openTransfer();
+
+      await service.close(payout!.id, finance);
+      await service.release(payout!.id, { scheduledFor: '2026-08-20' }, finance);
+
+      const read = await (
+        service as unknown as { require: (id: string, c: unknown) => Promise<unknown> }
+      ).require(payout!.id, finance);
+
+      await service.markPaid(payout!.id, { paidReference: 'BANK-REF-ONCE' }, finance);
+
+      /* The second press, holding the row it read before the first committed. */
+      vi.spyOn(
+        service as unknown as { require: () => Promise<unknown> },
+        'require',
+      ).mockResolvedValueOnce(read);
+
+      await expect(
+        service.markPaid(payout!.id, { paidReference: 'BANK-REF-TWICE' }, finance),
+      ).rejects.toSatisfy((error) => codeOf(error) === ERROR.PAYOUT_NOT_SCHEDULED);
+
+      const groups = await db.execute<{ n: number }>(sql`
+        SELECT count(DISTINCT entry_group_id)::int AS n FROM ledger_entries
+         WHERE account = 'partner_payout' AND partner_id = ${partnerId}::uuid
+      `);
+      expect(groups.rows[0]!.n, 'one movement for one transfer').toBe(1);
     });
 
     /* `retotal` runs on every accrual, so the same fine must not be taken twice. */

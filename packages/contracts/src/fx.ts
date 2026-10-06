@@ -24,10 +24,15 @@ export const setFxRateSchema = z
      * SYP rates are five significant digits and climbing; a JSON number arrives as
      * an IEEE-754 double, and the whole point of this fix is that SYP figures stop
      * being quietly wrong. Up to 8 decimal places, matching the column.
+     *
+     * And at most TEN whole digits, which is what `numeric(18,8)` leaves. Unbounded, an
+     * eleven-digit rate passed here and the INSERT failed with a numeric overflow: a 500
+     * for a typo the person could have been told about (audit 2026-10-06).
      */
     rate: z
       .string()
       .regex(/^\d+(\.\d{1,8})?$/, ERROR.VALIDATION_DECIMAL_STRING)
+      .refine((v) => /^0*\d{1,10}(\.|$)/.test(v), ERROR.VALIDATION_RATE_TOO_LARGE)
       .refine((v) => Number(v) > 0, ERROR.VALIDATION_RATE_POSITIVE),
 
     /**

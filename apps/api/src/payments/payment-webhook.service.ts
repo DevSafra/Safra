@@ -278,19 +278,73 @@ export class PaymentWebhookService {
     return 'accepted';
   }
 
-  /** A refund SAFRA initiated has settled at the provider. */
+  /**
+   * A refund SAFRA initiated has settled at the provider.
+   *
+   * ## Matched on the PROVIDER's share, and only ever one refund (audit 2026-10-06)
+   *
+   * The gateway was asked for `amount - wallet_amount`; the wallet share never went near it. This
+   * compared the event with the gross `amount`, so a split refund's confirmation matched nothing
+   * and stayed `processing` for ever. And an event carrying no amount completed EVERY open refund
+   * on the payment, so one confirmation could mark money returned that the provider never sent.
+   *
+   * Now: the oldest open refund whose provider share is the reported figure, or — with no figure —
+   * the only open refund, if there is exactly one. Anything else is ambiguous and is refused, so
+   * the event stays recorded and unprocessed for a person rather than guessed at.
+   */
   private async applyRefundConfirmation(
     payment: PaymentRow,
     event: NormalisedEvent,
   ): Promise<WebhookVerdict> {
-    await this.db.execute(sql`
+    const reported = event.amount?.value ?? null;
+
+    /*
+      `SKIP LOCKED`, and the status checked again on the row itself (audit 2026-10-06). Two
+      confirmations of two equal refunds arriving together both chose the oldest; the second waited
+      on the first's lock, re-checked only `id = …`, completed the same row again and left the other
+      `processing` for ever. Skipping a row another confirmation holds sends the second to the next
+      one, and the outer status test means no row is ever completed twice.
+    */
+    const completed = await this.db.execute(sql`
       UPDATE refunds
       SET status = 'completed'::refund_status, completed_at = now(), updated_at = now()
-      WHERE payment_id = ${payment.id}
+      WHERE id = (
+        SELECT r.id FROM refunds r
+         WHERE r.payment_id = ${payment.id}
+           AND r.status IN ('pending','processing')
+           AND r.deleted_at IS NULL
+           AND (
+             (${reported}::numeric IS NOT NULL
+               AND r.amount - r.wallet_amount = ${reported}::numeric)
+             OR (${reported}::numeric IS NULL
+               AND (SELECT count(*) FROM refunds o
+                     WHERE o.payment_id = ${payment.id}
+                       AND o.status IN ('pending','processing')
+                       AND o.deleted_at IS NULL) = 1)
+           )
+         ORDER BY r.created_at, r.id
+         LIMIT 1
+         FOR UPDATE SKIP LOCKED
+      )
         AND status IN ('pending','processing')
-        AND (${event.amount?.value ?? null}::numeric IS NULL
-             OR amount = ${event.amount?.value ?? null}::numeric)
     `);
+
+    if (completed.rowCount === 0) {
+      const open = await this.db.execute<{ n: number }>(sql`
+        SELECT count(*)::int AS n FROM refunds
+         WHERE payment_id = ${payment.id} AND status IN ('pending','processing')
+           AND deleted_at IS NULL
+      `);
+
+      /* Nothing open is a redelivery after the reply already completed it. */
+      if ((open.rows[0]?.n ?? 0) === 0) return 'accepted';
+
+      this.logger.error(
+        `Webhook ${event.providerEventId} confirms a refund on payment ${payment.reference} ` +
+          `that matches no open refund (reported ${reported ?? 'no amount'}); left for review.`,
+      );
+      return 'rejected';
+    }
 
     /*
       The third of three paths on which a refund becomes final, and the one that is easiest to

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { COUNT_CAP, MAX_PAGE_NUMBER, offsetPage, pageQuerySchema } from './pagination.js';
+import {
+  COUNT_CAP,
+  MAX_PAGE_NUMBER,
+  decodeCursor,
+  encodeCursor,
+  offsetPage,
+  pageQuerySchema,
+} from './pagination.js';
 
 /**
  * The page arithmetic, which is the whole of what `offsetPage` is for.
@@ -139,5 +146,65 @@ describe('pageQuerySchema', () => {
   /** `.strict()`, so a stray `cursor=` from an old bookmark is a 400 rather than silence. */
   it('rejects unknown fields', () => {
     expect(pageQuerySchema.safeParse({ page: 1, cursor: 'abc' }).success).toBe(false);
+  });
+});
+
+/**
+ * A cursor is attacker-controlled input, and a bad one is a 400, never a 500 (audit 2026-10-06).
+ *
+ * `decodeCursor` used to accept anything `new Date()` would parse. JavaScript is far more
+ * forgiving than PostgreSQL: `"1"` is the year 2001 and `"2026-02-30"` is the second of March, so
+ * those passed here, reached `(created_at, id) < (${sortKey}, ...)` and PostgreSQL refused them —
+ * a 500 on the invoices, gift cards, wallet statement and every other cursor list.
+ */
+describe('decodeCursor', () => {
+  const ID = '019a0000-0000-7000-8000-000000000001';
+  const forge = (key: string, id = ID) =>
+    Buffer.from(`${key}|${id}`, 'utf8').toString('base64url');
+
+  it('round-trips every sort key shape the services encode', () => {
+    for (const key of [
+      '2026-10-06T09:15:00.123Z',
+      '2026-10-06 09:15:00.123456+00',
+      '2026-10-06 12:15:00.123456+03',
+      '2026-10-06 12:15:00+05:30',
+      '2026-10-06T09:15:00.123456Z',
+      '2026-10-06',
+    ]) {
+      expect(decodeCursor(encodeCursor(key, ID)), key).toMatchObject({
+        sortKey: key,
+        id: ID,
+      });
+    }
+
+    const at = new Date('2026-10-06T09:15:00.123Z');
+    expect(decodeCursor(encodeCursor(at, ID))?.createdAt.getTime()).toBe(at.getTime());
+  });
+
+  it('refuses a key JavaScript parses and PostgreSQL does not', () => {
+    for (const key of [
+      '1',
+      '2026',
+      'Tue Oct 06 2026',
+      '2026-02-30',
+      '2026-13-01',
+      '2026-10-06T25:00:00Z',
+      '2026-10-06T09:61:00Z',
+      ' 2026-10-06',
+      '2026-10-06x',
+    ]) {
+      expect(decodeCursor(forge(key)), key).toBeNull();
+    }
+  });
+
+  it('refuses an id that is not a uuid', () => {
+    expect(decodeCursor(forge('2026-10-06', '1'))).toBeNull();
+    expect(decodeCursor(forge('2026-10-06', "x' OR 1=1"))).toBeNull();
+  });
+
+  it('refuses something that is not a cursor at all', () => {
+    expect(decodeCursor('!!!')).toBeNull();
+    expect(decodeCursor('')).toBeNull();
+    expect(decodeCursor(Buffer.from('no-separator').toString('base64url'))).toBeNull();
   });
 });

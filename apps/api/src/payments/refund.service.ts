@@ -203,14 +203,10 @@ export class RefundService {
       */
       await tx.execute(sql`SELECT id FROM bookings WHERE id = ${booking.id} FOR UPDATE`);
 
-      const current = await tx.execute<{ total: string }>(sql`
-        SELECT COALESCE(SUM(amount), 0)::text AS total
-        FROM refunds
-        WHERE booking_id = ${booking.id} AND status IN ('pending','processing','completed')
-      `);
+      const current = await this.returnedSoFar(tx as unknown as Database, booking.id);
 
       if (
-        toMinor(current.rows[0]?.total ?? '0', MONEY_SCALE) !==
+        toMinor(current.total, MONEY_SCALE) !==
         toMinor(quote.alreadyRefunded, MONEY_SCALE)
       ) {
         throw conflict(ERROR.REFUND_QUOTE_CHANGED);
@@ -361,7 +357,7 @@ export class RefundService {
         WHERE id = ${refundId}
       `);
 
-      await this.markPaymentRefundState(payment.id);
+      await this.markPaymentRefundState(this.db, payment.id);
       await this.ledger.reverseForRefund(this.db, booking.id);
       await this.tellTheCustomer(booking, quote);
 
@@ -384,22 +380,65 @@ export class RefundService {
 
     const status = outcome.kind === 'failed' ? 'failed' : outcome.kind;
 
-    await this.db.execute(sql`
-      UPDATE refunds
-      SET status = ${status}::refund_status,
-          provider_ref = ${outcome.kind === 'failed' ? null : outcome.providerRef},
-          completed_at = CASE WHEN ${status} = 'completed' THEN now() ELSE NULL END,
-          updated_at = now()
-      WHERE id = ${refundId}
-    `);
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        UPDATE refunds
+        SET status = ${status}::refund_status,
+            provider_ref = ${outcome.kind === 'failed' ? null : outcome.providerRef},
+            completed_at = CASE WHEN ${status} = 'completed' THEN now() ELSE NULL END,
+            updated_at = now()
+        WHERE id = ${refundId}
+      `);
+
+      /*
+        A refusal returns NOTHING through the gateway, so its leg comes back out of the books.
+
+        The group above credited `customer_payment` for the gateway share on the assumption it
+        would leave. It did not, and the retry the system sweep makes posts that leg again — so
+        without this the books would say the share was returned twice while the customer had it
+        once. The wallet share is NOT reversed: it was credited in the transaction above and is
+        the customer's balance now, which is why `returnedSoFar` counts it and a retry does not
+        credit it again (audit 2026-10-06).
+      */
+      if (outcome.kind === 'failed') {
+        await this.ledger.post(
+          tx as unknown as Database,
+          [
+            {
+              account: 'customer_payment',
+              direction: 'debit',
+              amount: quote.providerAmount,
+              description: `Refund on ${reference} refused by the provider`,
+            },
+            {
+              account: 'refund',
+              direction: 'credit',
+              amount: quote.providerAmount,
+              description: `Refund on ${reference} refused by the provider`,
+            },
+          ],
+          {
+            currencyId: booking.currency_id,
+            fxRateToSyp: booking.fx_rate_to_syp,
+            bookingId: booking.id,
+            paymentId: payment.id,
+            refundId,
+            partnerId: booking.partner_id,
+            customerProfileId: booking.customer_profile_id,
+            createdByUserId: claims?.sub,
+          },
+        );
+      }
+    });
 
     /**
      * The payment reflects whether the refund was total or partial, which is what
      * makes a second refund attempt on the same booking arithmetically correct.
+     * A failed one too: its wallet share has gone back regardless.
      */
-    if (status !== 'failed') {
-      await this.markPaymentRefundState(payment.id);
+    await this.markPaymentRefundState(this.db, payment.id);
 
+    if (status !== 'failed') {
       /*
         Only once the money is actually back. A refund still `processing` at the provider has not
         returned anything, so reversing here would give up the commission AND reduce what the
@@ -492,9 +531,13 @@ export class RefundService {
   private async computeQuote(booking: BookingRow): Promise<RefundQuote> {
     const snapshot = (booking.cancellation_policy_snapshot ?? {}) as PolicySnapshot;
 
-    const hoursBeforeCheckIn = Math.floor(
-      (new Date(`${booking.check_in}T00:00:00Z`).getTime() - Date.now()) / 3_600_000,
-    );
+    /*
+      Measured to midnight in the CITY's timezone, by the database, as stay completion and the
+      arrivals board measure their dates. It was measured to midnight UTC, so a Damascus stay's
+      tiers closed three hours late and a cancellation just past a threshold was still paid the
+      more generous tier.
+    */
+    const hoursBeforeCheckIn = booking.hours_before_check_in;
 
     const tiers = [...(snapshot.tiers ?? [])].sort(
       (a, b) => b.hoursBeforeCheckIn - a.hoursBeforeCheckIn,
@@ -511,12 +554,18 @@ export class RefundService {
     const percent = Math.max(matched?.refundPercent ?? 0, floor);
 
     /**
-     * Refundable base is the BASE amount, not the total. SAFRA's service fee is
-     * earned when the booking is made and is not the partner's money to return;
-     * refunding it would mean the platform pays for the customer's change of mind.
+     * Refundable base is what the customer PAID toward the stay, not the total. SAFRA's
+     * service fee is earned when the booking is made and is not the partner's money to
+     * return; refunding it would mean the platform pays for the customer's change of mind.
+     *
+     * Less any coupon, and never more than was captured (audit 2026-10-06). A tier is a
+     * share of what the customer paid; applied to the undiscounted base, a 100% tier on a
+     * couponed stay asked for more than the payment took — post/0026 refused it and the
+     * refund answered 500 — and every partial tier paid the coupon back in cash.
      */
-    const refundableBase = booking.base_amount;
-    const alreadyRefunded = await this.sumRefunded(booking.id);
+    const refundableBase = this.capturedCap(booking, stayPaid(booking));
+    const returned = await this.returnedSoFar(this.db, booking.id);
+    const alreadyRefunded = returned.total;
 
     /*
       Quantised to the BOOKING's currency.
@@ -526,10 +575,7 @@ export class RefundService {
       customer is quoted and the figure that is stored are the same number.
     */
     const gross = quantise(
-      fromMinor(
-        applyRate(toMinor(refundableBase, MONEY_SCALE), percent / 100),
-        MONEY_SCALE,
-      ),
+      fromMinor(applyRate(refundableBase, percent / 100), MONEY_SCALE),
       Number(booking.currency_decimals),
     );
 
@@ -548,10 +594,7 @@ export class RefundService {
      * second partial refund would hand back the same balance twice.
      */
     const walletFunded = toMinor(booking.wallet_amount, MONEY_SCALE);
-    const walletAlreadyBack = toMinor(
-      await this.sumRefundedToWallet(booking.id),
-      MONEY_SCALE,
-    );
+    const walletAlreadyBack = toMinor(returned.wallet, MONEY_SCALE);
 
     const walletHeadroom = walletFunded - walletAlreadyBack;
     const cappedHeadroom = walletHeadroom > 0n ? walletHeadroom : 0n;
@@ -581,15 +624,19 @@ export class RefundService {
    * does not share is the tier lookup, because there is no tier to apply — see `refundInFull`.
    */
   private async fullQuote(booking: BookingRow): Promise<RefundQuote> {
-    const gross = booking.total_amount;
-    const alreadyRefunded = await this.sumRefunded(booking.id);
+    /* Capped at what was captured, for the reason `computeQuote` gives. */
+    const gross = fromMinor(
+      this.capturedCap(booking, toMinor(booking.total_amount, MONEY_SCALE)),
+      MONEY_SCALE,
+    );
+    const returned = await this.returnedSoFar(this.db, booking.id);
+    const alreadyRefunded = returned.total;
 
     const remaining = toMinor(gross, MONEY_SCALE) - toMinor(alreadyRefunded, MONEY_SCALE);
     const refundAmountMinor = remaining > 0n ? remaining : 0n;
 
     const walletHeadroom =
-      toMinor(booking.wallet_amount, MONEY_SCALE) -
-      toMinor(await this.sumRefundedToWallet(booking.id), MONEY_SCALE);
+      toMinor(booking.wallet_amount, MONEY_SCALE) - toMinor(returned.wallet, MONEY_SCALE);
     const cappedHeadroom = walletHeadroom > 0n ? walletHeadroom : 0n;
 
     const toWalletMinor =
@@ -609,25 +656,40 @@ export class RefundService {
     };
   }
 
-  /** How much of this booking's refunds has already gone back to stored value. */
-  private async sumRefundedToWallet(bookingId: string): Promise<string> {
-    const rows = await this.db.execute<{ total: string }>(sql`
-      SELECT COALESCE(SUM(wallet_amount), 0)::text AS total
-      FROM refunds
-      WHERE booking_id = ${bookingId} AND status IN ('pending','processing','completed')
-    `);
+  /** `value`, never more than the booking's capture: the payment's own share plus the wallet's. */
+  private capturedCap(booking: BookingRow, value: bigint): bigint {
+    const captured = toMinor(booking.captured_amount, MONEY_SCALE);
+    const capped = value < captured ? value : captured;
 
-    return rows.rows[0]?.total ?? '0';
+    return capped > 0n ? capped : 0n;
   }
 
-  private async sumRefunded(bookingId: string): Promise<string> {
-    const rows = await this.db.execute<{ total: string }>(sql`
-      SELECT COALESCE(SUM(amount), 0)::text AS total
+  /**
+   * What this booking's refunds have already returned, in total and to stored value.
+   *
+   * A live refund counts in full. A FAILED one counts its wallet share only (audit 2026-10-06):
+   * that share was credited in the transaction that wrote the row, and a provider refusing the
+   * gateway share later takes none of it back. Counting a failed refund as nothing made the
+   * system sweep's retry credit the wallet share a second time.
+   *
+   * One query for every reader — both quotes and the re-check under the booking lock in `post` —
+   * because a quote and its re-check that disagree about a failed refund refuse every retry.
+   */
+  private async returnedSoFar(
+    executor: Database,
+    bookingId: string,
+  ): Promise<{ total: string; wallet: string }> {
+    const rows = await executor.execute<{ total: string; wallet: string }>(sql`
+      SELECT COALESCE(SUM(CASE WHEN status = 'failed' THEN wallet_amount ELSE amount END), 0)::text
+               AS total,
+             COALESCE(SUM(wallet_amount), 0)::text AS wallet
       FROM refunds
-      WHERE booking_id = ${bookingId} AND status IN ('pending','processing','completed')
+      WHERE booking_id = ${bookingId}
+        AND status IN ('pending','processing','completed','failed')
+        AND deleted_at IS NULL
     `);
 
-    return rows.rows[0]?.total ?? '0';
+    return { total: rows.rows[0]?.total ?? '0', wallet: rows.rows[0]?.wallet ?? '0' };
   }
 
   /**
@@ -681,6 +743,7 @@ export class RefundService {
   ) {
     const found = await this.db.execute<{
       booking_id: string;
+      city_id: string | null;
       payment_id: string;
       provider: string;
       status: string;
@@ -689,7 +752,8 @@ export class RefundService {
       reference: string;
       payer_account_encrypted: string | null;
     }>(sql`
-      SELECT r.booking_id::text, r.payment_id::text, p.provider::text AS provider,
+      SELECT r.booking_id::text, b.city_id::text AS city_id, r.payment_id::text,
+             p.provider::text AS provider,
              r.status::text AS status, r.amount::text AS amount, cur.code AS currency_code,
              b.reference, p.payer_account_encrypted
         FROM refunds r
@@ -705,6 +769,14 @@ export class RefundService {
     const refund = found.rows[0];
 
     if (!refund) throw notFound(ERROR.REFUND_NOT_FOUND);
+
+    /*
+      `read_only` passes the predicate above, which governs READS, and is refused here, as `load`
+      refuses it for issuing a refund. Settling moves the ledger and confirms money left SAFRA's
+      account, so a finance officer who may only look at a city must not be able to do it there.
+    */
+    assertCanWrite(claims, refund.city_id);
+
     if (refund.status !== 'processing') throw conflict(ERROR.REFUND_NOT_PENDING);
 
     /*
@@ -793,21 +865,7 @@ export class RefundService {
       /* Somebody else settled it between the read above and here. One settlement, one conflict. */
       if (settled.rowCount === 0) throw conflict(ERROR.REFUND_NOT_PENDING);
 
-      await tx.execute(sql`
-        UPDATE payments p
-           SET status = CASE
-                 WHEN r.refunded >= p.amount THEN 'refunded'::payment_status
-                 ELSE 'partially_refunded'::payment_status
-               END,
-               updated_at = now()
-          FROM (
-            SELECT COALESCE(SUM(amount - wallet_amount), 0) AS refunded
-              FROM refunds
-             WHERE payment_id = ${refund.payment_id}::uuid
-               AND status IN ('pending','processing','completed')
-          ) r
-         WHERE p.id = ${refund.payment_id}::uuid
-      `);
+      await this.markPaymentRefundState(tx as unknown as Database, refund.payment_id);
 
       /*
         The accounting, inside the same transaction as the status it depends on.
@@ -849,26 +907,42 @@ export class RefundService {
     return { refundId, status: 'completed' as const, amount: refund.amount };
   }
 
-  private async markPaymentRefundState(paymentId: string): Promise<void> {
-    await this.db.execute(sql`
+  /**
+   * `refunded` once BOTH sources are back, `partially_refunded` until then.
+   *
+   * A booking is funded from two places: the payment's own rail and the wallet. The gateway
+   * share is compared with the payment's own amount, and the wallet share with what the wallet
+   * funded on the booking, so neither can mark the other's money returned (audit 2026-10-04).
+   *
+   * A WALLET payment has no gateway share at all — its `amount` IS the wallet's share — so its
+   * gateway side is zero by definition. Comparing the gateway share (always nothing) with its
+   * amount left every fully refunded wallet-only payment `partially_refunded` for good
+   * (audit 2026-10-06). A failed refund's wallet share counts, for the reason `returnedSoFar` gives.
+   */
+  private async markPaymentRefundState(
+    executor: Database,
+    paymentId: string,
+  ): Promise<void> {
+    await executor.execute(sql`
       UPDATE payments p
       SET status = CASE
-            WHEN r.refunded >= p.amount THEN 'refunded'::payment_status
+            WHEN r.gateway >= CASE WHEN p.method = 'wallet' THEN 0 ELSE p.amount END
+             AND r.wallet >= b.wallet_amount
+            THEN 'refunded'::payment_status
             ELSE 'partially_refunded'::payment_status
           END,
           updated_at = now()
-      FROM (
-        /*
-          The share that came back THROUGH this payment. A refund's wallet share returns to stored
-          value, not to the payment, and \`payments.amount\` is only the gateway or transfer share of a
-          split booking, so counting the wallet share marked a payment refunded while its own money
-          was still out (audit 2026-10-04).
-        */
-        SELECT COALESCE(SUM(amount - wallet_amount), 0) AS refunded
+      FROM bookings b,
+      (
+        SELECT COALESCE(SUM(amount - wallet_amount)
+                 FILTER (WHERE status IN ('pending','processing','completed')), 0) AS gateway,
+               COALESCE(SUM(wallet_amount), 0) AS wallet
         FROM refunds
-        WHERE payment_id = ${paymentId} AND status IN ('pending','processing','completed')
+        WHERE payment_id = ${paymentId}
+          AND status IN ('pending','processing','completed','failed')
+          AND deleted_at IS NULL
       ) r
-      WHERE p.id = ${paymentId}
+      WHERE p.id = ${paymentId} AND b.id = p.booking_id
     `);
   }
 
@@ -918,9 +992,26 @@ export class RefundService {
              b.currency_id, b.fx_rate_to_syp::text AS fx_rate_to_syp,
              b.partner_id, b.customer_profile_id, b.city_id::text AS city_id,
              b.cancellation_policy_snapshot, cur.code AS currency_code,
-             cur.decimals AS currency_decimals
+             cur.decimals AS currency_decimals,
+             b.discount_amount::text AS discount_amount,
+             -- What the booking actually took: its payment's own share (a wallet payment's amount
+             -- IS the wallet share, so it is not counted twice) plus the wallet's.
+             (COALESCE((
+                SELECT p.amount FROM payments p
+                 WHERE p.booking_id = b.id
+                   AND p.status IN ('captured','partially_refunded','refunded')
+                   AND p.method <> 'wallet'
+                   AND p.deleted_at IS NULL
+                 ORDER BY p.captured_at DESC NULLS LAST
+                 LIMIT 1
+              ), 0) + b.wallet_amount)::text AS captured_amount,
+             -- Midnight of check-in in the CITY's timezone, as stay completion reads its dates.
+             floor(extract(epoch FROM (
+               (b.check_in::timestamp AT TIME ZONE COALESCE(ci.timezone, 'UTC')) - now()
+             )) / 3600)::int AS hours_before_check_in
       FROM bookings b
       JOIN currencies cur ON cur.id = b.currency_id
+      LEFT JOIN cities ci ON ci.id = b.city_id
       WHERE b.reference = ${reference} AND b.deleted_at IS NULL
         AND ${scopeFilter(claims, 'b.city_id')}
       LIMIT 1
@@ -958,4 +1049,18 @@ type BookingRow = {
   partner_id: string;
   customer_profile_id: string;
   cancellation_policy_snapshot: unknown;
+  discount_amount: string;
+  /** The payment's own share plus the wallet's — the ceiling on anything refunded. */
+  captured_amount: string;
+  /** To midnight of check-in in the city's timezone, computed by the database. */
+  hours_before_check_in: number;
 };
+
+/** What the customer paid toward the stay: the base less any coupon, never below zero. */
+function stayPaid(booking: BookingRow): bigint {
+  const paid =
+    toMinor(booking.base_amount, MONEY_SCALE) -
+    toMinor(booking.discount_amount, MONEY_SCALE);
+
+  return paid > 0n ? paid : 0n;
+}

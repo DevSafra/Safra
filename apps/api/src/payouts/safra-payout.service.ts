@@ -10,6 +10,7 @@ import {
   type SafraPayoutAccountUpdateInput,
   type SafraPayoutOpenInput,
   type SafraPayoutPaidInput,
+  type ErrorCode,
   type SafraPayoutReasonInput,
 } from '@safra/contracts';
 
@@ -20,6 +21,15 @@ import { LedgerService } from '../ledger/ledger.service.js';
 import { actorName } from '../common/actor-name.sql.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+
+/**
+ * Every `open` takes this transaction-scoped advisory lock, so two cannot both find a period free.
+ * Its own number: the `8_421_0xx` keys belong to the scheduled jobs' session locks.
+ */
+const SAFRA_PAYOUT_OPEN_LOCK_KEY = 8_421_101;
+
+/** A transfer still in motion — anything but paid or cancelled. */
+const OPEN_STATUSES = ['accruing', 'pending_release', 'scheduled', 'on_hold'] as const;
 
 /**
  * Revenue SAFRA actually EARNED, as opposed to revenue it merely booked.
@@ -593,25 +603,37 @@ export class SafraPayoutService {
    * would open a transfer of zero, which is a row that looks like a payment and is not one.
    */
   async open(claims: AccessTokenClaims | undefined, input: SafraPayoutOpenInput) {
-    const clash = await this.db.execute<{ reference: string }>(sql`
-      SELECT reference FROM safra_payouts
-      WHERE deleted_at IS NULL AND status <> 'cancelled'
-        AND period_start <= ${input.periodEnd}::date
-        AND period_end   >= ${input.periodStart}::date
-      LIMIT 1
-    `);
-
-    if (clash.rows[0]) {
-      throw conflict(ERROR.SAFRA_PAYOUT_PERIOD_OVERLAP, {
-        reference: clash.rows[0].reference,
-      });
-    }
-
     const accrued = await this.accruedIn(input.periodStart, input.periodEnd);
 
     if (Number(accrued.net) <= 0) throw badRequest(ERROR.SAFRA_PAYOUT_NOTHING_ACCRUED);
 
     const id = await this.db.transaction(async (tx) => {
+      /*
+        The overlap is decided INSIDE the transaction that inserts, behind one lock (audit
+        2026-10-06).
+
+        It was checked before the transaction began, so two officers opening the same month at
+        once both found no clash and both inserted: two transfers settling the same revenue, the
+        books balanced, and the money able to leave twice. A row lock cannot help — the clash is
+        with a row that does not exist yet — so every open takes the same transaction-scoped
+        advisory lock, and the second waits for the first to commit and then sees its period.
+      */
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${SAFRA_PAYOUT_OPEN_LOCK_KEY})`);
+
+      const clash = await tx.execute<{ reference: string }>(sql`
+        SELECT reference FROM safra_payouts
+        WHERE deleted_at IS NULL AND status <> 'cancelled'
+          AND period_start <= ${input.periodEnd}::date
+          AND period_end   >= ${input.periodStart}::date
+        LIMIT 1
+      `);
+
+      if (clash.rows[0]) {
+        throw conflict(ERROR.SAFRA_PAYOUT_PERIOD_OVERLAP, {
+          reference: clash.rows[0].reference,
+        });
+      }
+
       const created = await tx.execute<{ id: string; reference: string }>(sql`
         INSERT INTO safra_payouts
           (period_start, period_end, commission_partner_amount, commission_customer_amount,
@@ -653,6 +675,14 @@ export class SafraPayoutService {
     }
 
     await this.db.transaction(async (tx) => {
+      /* Guarded by the status it was read in — see `lockedStatus`. */
+      await this.lockedStatus(
+        tx,
+        id,
+        ['pending_release', 'on_hold'],
+        ERROR.SAFRA_PAYOUT_NOT_RELEASABLE,
+      );
+
       await tx.execute(sql`
         UPDATE safra_payouts
         SET status = 'scheduled', released_at = now(),
@@ -745,6 +775,13 @@ export class SafraPayoutService {
     const syp = await this.sypCurrencyId();
 
     await this.db.transaction(async (tx) => {
+      /*
+        Asked again under the row lock, BEFORE the ledger is written (audit 2026-10-06). Two
+        presses of «تم الدفع» both passed the check above and both posted the group, so SAFRA's
+        revenue was recorded as withdrawn twice for one transfer.
+      */
+      await this.lockedStatus(tx, id, ['scheduled'], ERROR.SAFRA_PAYOUT_NOT_PAYABLE);
+
       const { entryGroupId } = await this.ledger.post(
         tx as unknown as Database,
         [
@@ -803,6 +840,9 @@ export class SafraPayoutService {
     }
 
     await this.db.transaction(async (tx) => {
+      /* A transfer paid a moment ago must not be put back on hold over its own ledger entry. */
+      await this.lockedStatus(tx, id, OPEN_STATUSES, ERROR.SAFRA_PAYOUT_ALREADY_FINAL);
+
       await tx.execute(sql`
         UPDATE safra_payouts
         SET status = 'on_hold', hold_reason = ${input.reason}, updated_at = now()
@@ -833,6 +873,9 @@ export class SafraPayoutService {
     }
 
     await this.db.transaction(async (tx) => {
+      /* Nor cancelled: a paid transfer cancelled afterwards would free its period to open again. */
+      await this.lockedStatus(tx, id, OPEN_STATUSES, ERROR.SAFRA_PAYOUT_ALREADY_FINAL);
+
       await tx.execute(sql`
         UPDATE safra_payouts
         SET status = 'cancelled', hold_reason = ${input.reason}, updated_at = now()
@@ -882,6 +925,32 @@ export class SafraPayoutService {
         Number(adRevenue)
       ).toFixed(2),
     };
+  }
+
+  /**
+   * The payout's status, read under a row lock inside the caller's transaction, refused unless
+   * it is one of `allowed`.
+   *
+   * Every transition reads the row first, outside its transaction, to answer quickly; that read
+   * cannot be what decides, because a second request made in the same second read the same
+   * status. Taking the lock here makes the second wait for the first to commit and then see what
+   * the first wrote — one transition, one conflict, never the same step twice.
+   */
+  private async lockedStatus(
+    tx: unknown,
+    id: string,
+    allowed: readonly string[],
+    refusal: ErrorCode,
+  ): Promise<void> {
+    const rows = await (tx as Database).execute<{ status: string }>(sql`
+      SELECT status::text AS status FROM safra_payouts
+       WHERE id = ${id}::uuid AND deleted_at IS NULL
+       FOR UPDATE
+    `);
+
+    const status = rows.rows[0]?.status;
+
+    if (!status || !allowed.includes(status)) throw conflict(refusal);
   }
 
   private async requireAccount(id: string) {

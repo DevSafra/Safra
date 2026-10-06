@@ -6,6 +6,7 @@ import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
 
 import { DATABASE } from '../database/database.module.js';
+import { retotalPayout } from '../payouts/payout-totals.js';
 import {
   MONEY_SCALE,
   fromMinor,
@@ -503,21 +504,41 @@ export class LedgerService {
       payable_credited: string;
       payable_reversed: string;
       base_amount: string;
+      discount_column: string;
       commission_column: string;
       payable_column: string;
+      coupon_debited: string;
+      coupon_reversed: string;
     }>(sql`
       SELECT b.currency_id::text,
              b.fx_rate_to_syp::text,
              b.partner_id::text,
              b.base_amount::text AS base_amount,
+             b.discount_amount::text AS discount_column,
              b.partner_commission_amount::text AS commission_column,
              b.partner_payable_amount::text AS payable_column,
+             -- What actually went back: every completed refund, and the wallet share of a FAILED
+             -- one. A failed refund's wallet share was credited the moment it was written and is
+             -- never taken back (RefundService), so it is money returned all the same.
              coalesce((
-               SELECT sum(r.amount) FROM refunds r
+               SELECT sum(CASE WHEN r.status = 'completed' THEN r.amount ELSE r.wallet_amount END)
+                 FROM refunds r
                 WHERE r.booking_id = b.id
-                  AND r.status = 'completed'
+                  AND r.status IN ('completed', 'failed')
                   AND r.deleted_at IS NULL
              ), 0)::text AS refunded,
+             coalesce((
+               SELECT sum(e.amount) FROM ledger_entries e
+                WHERE e.booking_id = b.id
+                  AND e.account = 'coupon_discount'
+                  AND e.direction = 'debit'
+             ), 0)::text AS coupon_debited,
+             coalesce((
+               SELECT sum(e.amount) FROM ledger_entries e
+                WHERE e.booking_id = b.id
+                  AND e.account = 'coupon_discount'
+                  AND e.direction = 'credit'
+             ), 0)::text AS coupon_reversed,
              coalesce((
                SELECT sum(e.amount) FROM ledger_entries e
                 WHERE e.booking_id = b.id
@@ -590,13 +611,35 @@ export class LedgerService {
     }
 
     /*
-      A refund can never exceed the accommodation: the SAFRA fee is not refundable, and a figure
-      above the accommodation would otherwise reverse more than was ever credited.
-    */
-    const refunded = toMinor(row.refunded, MONEY_SCALE);
-    const returned = refunded > accommodation ? accommodation : refunded;
+      What the customer paid toward the stay, which is what a refund is a share OF.
 
-    if (returned <= 0n) return null;
+      A coupon makes the customer pay less for the same accommodation: the capture balances with a
+      `coupon_discount` debit beside the money that arrived, and `RefundService` refunds a tier of
+      what was PAID (base less discount). So a 100% refund of a couponed stay returns the paid
+      figure, and reading it against the whole accommodation would reverse only part of the payable
+      — the partner would then be paid for a stay that was refunded in full. The proportion is
+      taken against the paid figure instead, and SAFRA's discount is given back in the same
+      proportion: a stay that did not happen cost SAFRA no discount.
+
+      A refund can never exceed it: the SAFRA fee is not refundable, and a figure above it would
+      otherwise reverse more than was ever credited. Read from the LEDGER like every other figure
+      here, so a booking captured before the discount leg existed behaves exactly as it did.
+    */
+    const coupon = toMinor(row.coupon_debited, MONEY_SCALE);
+    const paidForStay = accommodation > coupon ? accommodation - coupon : 0n;
+    const refunded = toMinor(row.refunded, MONEY_SCALE);
+    const refundedForStay = refunded > paidForStay ? paidForStay : refunded;
+
+    if (refunded <= 0n) return null;
+
+    /* On the accommodation's scale, so commission and payable come back in the refund's proportion. */
+    const returned =
+      refundedForStay >= paidForStay
+        ? accommodation
+        : (refundedForStay * accommodation) / paidForStay;
+
+    const couponDelta =
+      returned - refundedForStay - toMinor(row.coupon_reversed, MONEY_SCALE);
 
     /*
       The commission share, rounded half-up, and the payable share taking the REMAINDER.
@@ -643,16 +686,29 @@ export class LedgerService {
       });
     }
 
-    legs.push({
-      account: 'refund',
-      direction: 'credit',
-      amount: fromMinor(
-        (commissionDelta > 0n ? commissionDelta : 0n) +
-          (payableDelta > 0n ? payableDelta : 0n),
-        MONEY_SCALE,
-      ),
-      description: note,
-    });
+    const reversed =
+      (commissionDelta > 0n ? commissionDelta : 0n) +
+      (payableDelta > 0n ? payableDelta : 0n);
+    const couponBack = couponDelta > 0n ? couponDelta : 0n;
+
+    if (couponBack > 0n) {
+      legs.push({
+        account: 'coupon_discount',
+        direction: 'credit',
+        amount: fromMinor(couponBack, MONEY_SCALE),
+        description: note,
+      });
+    }
+
+    /* The rest is the refund itself, which is what lets the `refund` clearing account net to zero. */
+    if (reversed - couponBack > 0n) {
+      legs.push({
+        account: 'refund',
+        direction: 'credit',
+        amount: fromMinor(reversed - couponBack, MONEY_SCALE),
+        description: note,
+      });
+    }
 
     /*
       Its OWN transaction, because all callers reach here AFTER theirs has closed.
@@ -723,21 +779,17 @@ export class LedgerService {
           `);
         }
 
+        /*
+          The SAME retotal accrual runs, fines and recoveries re-decided against the new gross.
+
+          This was a one-statement copy that kept the fine and recovery already applied. A refund
+          that took the gross below them made the net negative, `partner_payouts_non_negative`
+          refused it — after the refund's money had moved — and the stay stayed on the transfer at
+          its old figure. Re-deciding takes only what the smaller transfer can carry and leaves the
+          rest outstanding for the next period, which is how fines and recoveries already work.
+        */
         for (const row of affected.rows) {
-          await inner.execute(sql`
-            UPDATE partner_payouts p
-               SET gross_amount = coalesce(i.total, 0),
-                   -- Every subtraction, or the identity CHECK refuses the row. recovery_amount
-                   -- joined fine_amount on 2026-09-07, and a retotal that forgot it would fail on
-                   -- exactly the payouts carrying an overpayment: the ones that matter.
-                   net_amount = coalesce(i.total, 0) - p.fine_amount - p.recovery_amount,
-                   updated_at = now()
-              FROM (
-                SELECT coalesce(sum(amount), 0) AS total
-                  FROM partner_payout_items WHERE payout_id = ${row.payout_id}
-              ) i
-             WHERE p.id = ${row.payout_id}
-          `);
+          await retotalPayout(inner as unknown as Database, row.payout_id);
         }
       }
 
@@ -851,16 +903,26 @@ export class LedgerService {
   private async reducePayableWithoutLedger(
     tx: Database,
     bookingId: string,
-    row: { refunded: string; base_amount: string; commission_column: string },
+    row: {
+      refunded: string;
+      base_amount: string;
+      discount_column: string;
+      commission_column: string;
+    },
   ): Promise<bigint | null> {
     const base = toMinor(row.base_amount, MONEY_SCALE);
 
     if (base <= 0n) return null;
 
-    const refunded = toMinor(row.refunded, MONEY_SCALE);
-    const returned = refunded > base ? base : refunded;
+    /* What was PAID toward the stay, for the reason `reverseForRefund` gives for the ledger case. */
+    const discount = toMinor(row.discount_column, MONEY_SCALE);
+    const paid = base > discount ? base - discount : 0n;
 
-    if (returned <= 0n) return null;
+    const refunded = toMinor(row.refunded, MONEY_SCALE);
+
+    if (refunded <= 0n) return null;
+
+    const returned = refunded > paid ? paid : refunded;
 
     const quoted = toMinor(row.commission_column, MONEY_SCALE);
     const original = base - quoted;
@@ -868,7 +930,7 @@ export class LedgerService {
     if (original <= 0n) return null;
 
     /* Kept, not multiplied out: the remaining share of an obligation that was never captured. */
-    const target = (original * (base - returned)) / base;
+    const target = paid > 0n ? (original * (paid - returned)) / paid : 0n;
 
     await tx.execute(sql`
       UPDATE bookings

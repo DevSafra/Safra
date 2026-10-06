@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
-import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createRollbackDatabase, type Database } from '@safra/db';
+import { createDatabase, createRollbackDatabase, type Database } from '@safra/db';
 import { ERROR } from '@safra/contracts';
 
 import { AdInvoiceService } from '../admin/ad-invoice.service.js';
@@ -96,6 +96,7 @@ describeIfDb('SafraPayoutService', () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await harness.rollback();
   });
 
@@ -884,21 +885,7 @@ describeIfDb('SafraPayoutService', () => {
       testbed resets during this work removed the single real example ($613.80 on BKG-2026-425971).
     */
     it('reduces the obligation on a booking whose capture never reached the ledger', async () => {
-      const clean = await db.execute<{ id: string; base: string; payable: string }>(sql`
-        SELECT b.id::text, b.base_amount::text AS base,
-               b.partner_payable_amount::text AS payable
-          FROM bookings b
-         WHERE b.base_amount > 0
-           AND b.partner_payable_amount > 0
-           AND abs(b.base_amount - b.partner_commission_amount - b.partner_payable_amount) <= 0.001
-           AND NOT EXISTS (SELECT 1 FROM refunds r
-                            WHERE r.booking_id = b.id AND r.deleted_at IS NULL)
-           AND NOT EXISTS (SELECT 1 FROM ledger_entries e WHERE e.booking_id = b.id)
-           AND EXISTS (SELECT 1 FROM payments p WHERE p.booking_id = b.id)
-         LIMIT 1
-      `);
-
-      const row = clean.rows[0];
+      const row = await ledgerlessCopy();
 
       expect(row, 'a booking with a payable and no ledger at all').toBeDefined();
 
@@ -931,20 +918,7 @@ describeIfDb('SafraPayoutService', () => {
 
     /* Reducing the same obligation twice would take it to a quarter. It must converge. */
     it('reduces it to the same figure however many times it is asked', async () => {
-      const clean = await db.execute<{ id: string; payable: string }>(sql`
-        SELECT b.id::text, b.partner_payable_amount::text AS payable
-          FROM bookings b
-         WHERE b.base_amount > 0
-           AND b.partner_payable_amount > 0
-           AND abs(b.base_amount - b.partner_commission_amount - b.partner_payable_amount) <= 0.001
-           AND NOT EXISTS (SELECT 1 FROM refunds r
-                            WHERE r.booking_id = b.id AND r.deleted_at IS NULL)
-           AND NOT EXISTS (SELECT 1 FROM ledger_entries e WHERE e.booking_id = b.id)
-           AND EXISTS (SELECT 1 FROM payments p WHERE p.booking_id = b.id)
-         LIMIT 1
-      `);
-
-      const row = clean.rows[0];
+      const row = await ledgerlessCopy();
 
       expect(row).toBeDefined();
       await captureWithoutLedger(row!.id);
@@ -980,19 +954,7 @@ describeIfDb('SafraPayoutService', () => {
       `base - commission`, and the only acceptable answer is that a refund does not raise it.
     */
     it('never raises the obligation, even where base does not equal commission plus payable', async () => {
-      const clean = await db.execute<{ id: string; base: string }>(sql`
-        SELECT b.id::text, b.base_amount::text AS base
-          FROM bookings b
-         WHERE b.base_amount > 100
-           AND b.partner_payable_amount > 0
-           AND NOT EXISTS (SELECT 1 FROM refunds r
-                            WHERE r.booking_id = b.id AND r.deleted_at IS NULL)
-           AND NOT EXISTS (SELECT 1 FROM ledger_entries e WHERE e.booking_id = b.id)
-           AND EXISTS (SELECT 1 FROM payments p WHERE p.booking_id = b.id)
-         LIMIT 1
-      `);
-
-      const row = clean.rows[0];
+      const row = await ledgerlessCopy(100);
 
       expect(row, 'a booking with no ledger to build the broken case on').toBeDefined();
 
@@ -1025,6 +987,58 @@ describeIfDb('SafraPayoutService', () => {
         'a refund never raises what SAFRA owes',
       ).toBeLessThanOrEqual(Number(before.rows[0]!.payable) + 0.001);
     });
+
+    /**
+     * A booking with a payment and no ledger at all, BUILT rather than found (2026-10-06).
+     *
+     * The three cases above searched for one, and on a fresh database (CI's) the testbed holds only
+     * a handful; whether any was there depended on what other suites had committed by the moment
+     * this one took its snapshot, so they failed one full run in three. A copy of a consistent
+     * booking is made instead: new id and reference, cancelled so it holds no room nights beside the
+     * original, and a payment with no ledger behind it. Every column a row can be given is read from
+     * the schema, so the copy survives a new column.
+     */
+    async function ledgerlessCopy(
+      minimumBase = 0,
+    ): Promise<{ id: string; base: string; payable: string } | undefined> {
+      const columns = await db.execute<{ name: string }>(sql`
+        SELECT column_name AS name FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = 'bookings' AND is_generated = 'NEVER'
+           AND column_name NOT IN ('id', 'reference', 'status')
+         ORDER BY ordinal_position
+      `);
+      /* Identifiers from the catalogue, quoted; nothing here came from a caller. */
+      const list = sql.raw(columns.rows.map((c) => `"${c.name}"`).join(', '));
+
+      const made = await db.execute<{ id: string; base: string; payable: string }>(sql`
+        WITH src AS (
+          SELECT b.id FROM bookings b
+           WHERE b.base_amount > ${minimumBase}
+             AND b.partner_payable_amount > 0
+             AND abs(b.base_amount - b.partner_commission_amount - b.partner_payable_amount) <= 0.001
+             AND EXISTS (SELECT 1 FROM payments p WHERE p.booking_id = b.id)
+           LIMIT 1
+        ), copy AS (
+          INSERT INTO bookings (id, reference, status, ${list})
+          SELECT uuidv7(),
+                 'BKG-' || to_char(now(), 'YYYY') || '-' || reference_number(nextval('booking_reference_seq')),
+                 'cancelled'::booking_status,
+                 ${list}
+            FROM bookings WHERE id = (SELECT id FROM src)
+          RETURNING id, currency_id, base_amount, partner_payable_amount
+        ), paid AS (
+          INSERT INTO payments (booking_id, method, provider, amount, currency_id, status)
+          SELECT id, 'bank_transfer', 'manual_transfer', base_amount, currency_id, 'requires_action'
+            FROM copy
+          RETURNING id
+        )
+        SELECT copy.id::text, copy.base_amount::text AS base,
+               copy.partner_payable_amount::text AS payable
+          FROM copy, paid
+      `);
+
+      return made.rows[0];
+    }
 
     /* Advertising revenue has no booking, so a join written carelessly deletes the ad business. */
     it('keeps advertising revenue, which has no booking to refund', async () => {
@@ -1244,6 +1258,73 @@ describeIfDb('SafraPayoutService', () => {
       ).toBe(ERROR.SAFRA_PAYOUT_ALREADY_FINAL);
     });
 
+    /*
+      The second of two presses, holding the row it read before the first committed (audit
+      2026-10-06). Every transition checked the status outside its transaction and updated without
+      asking again, so «تم الدفع» pressed twice posted SAFRA's withdrawal twice, and a cancel landing
+      just after a payment cancelled a paid transfer and freed its period to be settled again.
+    */
+    const pressedTwice = async () => {
+      const acc = await account();
+
+      await service.verifyAccount(actor, acc.id);
+      await service.updateAccount(actor, acc.id, { isDefault: true });
+
+      const period = await periodWithRevenue();
+      const { id } = await service.open(actor, {
+        periodStart: period.from,
+        periodEnd: period.to,
+      });
+
+      await service.release(actor, id);
+
+      const stale = await (
+        service as unknown as { requirePayout: (id: string) => Promise<unknown> }
+      ).requirePayout(id);
+
+      await service.markPaid(actor, id, { paidReference: 'TRX-ONCE' });
+
+      vi.spyOn(
+        service as unknown as { requirePayout: () => Promise<unknown> },
+        'requirePayout',
+      ).mockResolvedValueOnce(stale);
+
+      return id;
+    };
+
+    it('refuses to mark one transfer paid twice', async () => {
+      const id = await pressedTwice();
+
+      expect(
+        codeOf(
+          await service
+            .markPaid(actor, id, { paidReference: 'TRX-TWICE' })
+            .catch((error: unknown) => error),
+        ),
+      ).toBe(ERROR.SAFRA_PAYOUT_NOT_PAYABLE);
+
+      const groups = await db.execute<{ n: number }>(sql`
+        SELECT count(DISTINCT e.entry_group_id)::int AS n
+          FROM ledger_entries e, safra_payouts p
+         WHERE p.id = ${id}::uuid AND e.account = 'safra_payout'
+           AND e.description = 'SAFRA payout ' || p.reference
+      `);
+      expect(groups.rows[0]!.n, 'one withdrawal for one transfer').toBe(1);
+    });
+
+    it('refuses to cancel a transfer that was paid a moment ago', async () => {
+      const id = await pressedTwice();
+
+      expect(
+        codeOf(
+          await service
+            .cancel(actor, id, { reason: 'ضغطة متأخرة.' })
+            .catch((error: unknown) => error),
+        ),
+      ).toBe(ERROR.SAFRA_PAYOUT_ALREADY_FINAL);
+      expect((await service.payouts()).find((one) => one.id === id)?.status).toBe('paid');
+    });
+
     /* A destination a transfer points at cannot be removed — the record would lose its «where». */
     it('refuses to delete a destination a transfer used', async () => {
       const acc = await account();
@@ -1324,5 +1405,68 @@ describeIfDb('SafraPayoutService', () => {
 
     expect(paid?.payload).toContain('1234');
     expect(paid?.payload).toContain('TRX-5');
+  });
+});
+
+/**
+ * Two officers opening the same month at the same moment (audit 2026-10-06).
+ *
+ * The overlap was checked before the inserting transaction began, so both found the period free
+ * and both inserted: two transfers settling the same revenue. This needs two real connections and
+ * real commits — the rollback harness serialises everything onto one, which removes the race —
+ * so it opens on its own pool and deletes what it opened. No audit row is written (the stub) and
+ * no ledger entry (nothing is paid), so nothing outlives it.
+ */
+describeIfDb('SafraPayoutService.open under concurrency', () => {
+  const db = createDatabase(DATABASE_URL ?? '', 4);
+  const service = new SafraPayoutService(
+    db,
+    { record: () => Promise.resolve() } as unknown as AuditService,
+    new FieldEncryptionService(TEST_ENV),
+    new LedgerService(db),
+  );
+  const opened: string[] = [];
+
+  afterAll(async () => {
+    if (opened.length > 0) {
+      await db.execute(sql`
+        DELETE FROM safra_payouts WHERE id IN (${sql.join(
+          opened.map((id) => sql`${id}::uuid`),
+          sql`, `,
+        )})
+      `);
+    }
+    await (db as unknown as { $client: { end: () => Promise<void> } }).$client.end();
+  });
+
+  it('opens one transfer when two ask for the same period at once', async () => {
+    const free = await db.execute<{ n: number }>(sql`
+      SELECT count(*)::int AS n FROM safra_payouts
+       WHERE deleted_at IS NULL AND status <> 'cancelled'
+    `);
+    /* A transfer already on file would refuse both, and the test would prove nothing. */
+    if ((free.rows[0]?.n ?? 0) > 0) return;
+
+    const period = await db.execute<{ from: string; to: string }>(sql`
+      SELECT min(created_at)::date::text AS from, max(created_at)::date::text AS to
+      FROM ledger_entries
+      WHERE account::text IN ('safra_commission_partner', 'safra_commission_customer', 'ad_revenue')
+        AND direction = 'credit'
+    `);
+    const input = { periodStart: period.rows[0]!.from, periodEnd: period.rows[0]!.to };
+
+    const results = await Promise.allSettled([
+      service.open(undefined, input),
+      service.open(undefined, input),
+    ]);
+
+    for (const result of results) {
+      if (result.status === 'fulfilled') opened.push(result.value.id);
+    }
+
+    expect(opened, 'one transfer for one period').toHaveLength(1);
+    expect(codeOf(results.find((result) => result.status === 'rejected')?.reason)).toBe(
+      ERROR.SAFRA_PAYOUT_PERIOD_OVERLAP,
+    );
   });
 });

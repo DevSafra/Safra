@@ -441,6 +441,31 @@ describeIfDb('customer wallet', () => {
         }),
       ).rejects.toThrow(/malformed/i);
     });
+
+    /*
+      A cursor that DECODES but that PostgreSQL cannot read (audit 2026-10-06). `"1"` passed the
+      old `new Date()` test, reached the keyset comparison and failed there: a 500, not a 400.
+    */
+    it('answers a forged cursor PostgreSQL cannot compare with a coded 400', async () => {
+      await wallet.credit(db, {
+        customerProfileId: profileId,
+        amount: '1.00',
+        currencyId: await currencyId(db, 'USD'),
+        reason: 'sla_compensation',
+      });
+      const walletId = (await wallet.findByCustomer(profileId))?.walletId ?? '';
+
+      for (const key of ['1', '2026-02-30']) {
+        const forged = Buffer.from(`${key}|${randomUUID()}`, 'utf8').toString(
+          'base64url',
+        );
+
+        await expect(
+          wallet.listTransactions(walletId, { limit: 20, cursor: forged }),
+          key,
+        ).rejects.toSatisfy((error) => codeOf(error) === ERROR.REQUEST_CURSOR_INVALID);
+      }
+    });
   });
 
   // ── Immutability ────────────────────────────────────────────────────────────

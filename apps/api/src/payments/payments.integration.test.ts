@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 
 import { sql } from 'drizzle-orm';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createDatabase, type Database } from '@safra/db';
 
@@ -745,6 +745,62 @@ describeIfDb('payment collection, webhooks and refunds', () => {
         WHERE id = ${booking.id}::uuid`);
 
       expect(held.rows[0]?.wallet_amount).toBe('0.000');
+    });
+
+    /*
+      Two "pay with wallet" presses in the same second (audit 2026-10-06).
+
+      Both read nothing held, both priced the whole total from the balance, and both debited it:
+      a balance big enough for two stays paid this one twice. The hold is now decided under the
+      booking's row lock, so the second sees the first's hold and is refused. Committed for real
+      on two connections — the race only exists where two transactions genuinely overlap.
+    */
+    it('debits the wallet once when two wallet payments start at the same moment', async () => {
+      await credit(db, wallet, '1000.000');
+
+      const token = await access.mint(db, booking.id, minutesFromNow(60));
+      const start = () =>
+        intents.start({
+          reference: booking.reference,
+          accessToken: token,
+          applyWallet: true,
+          claims: owner,
+          locale: 'en',
+        });
+
+      /*
+        Both requests held at the wallet lookup until both have priced the attempt, which is the
+        window two real requests share. Without it the second usually arrives after the first has
+        opened its payment row and simply reuses it — a pass that says nothing about the lock.
+      */
+      const lookup = wallet.findByCustomer.bind(wallet);
+      let arrived = 0;
+      let release: () => void = () => undefined;
+      const bothArrived = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const held = vi.spyOn(wallet, 'findByCustomer').mockImplementation(async (id) => {
+        arrived += 1;
+        if (arrived === 2) release();
+        await bothArrived;
+        return lookup(id);
+      });
+
+      await Promise.allSettled([start(), start()]);
+      held.mockRestore();
+
+      const debited = await db.execute<{ total: string }>(sql`
+        SELECT COALESCE(SUM(amount), 0)::text AS total FROM wallet_transactions
+         WHERE booking_id = ${booking.id}::uuid AND direction = 'debit'
+      `);
+      const hold = await db.execute<{ wallet_amount: string }>(sql`
+        SELECT wallet_amount::text AS wallet_amount FROM bookings WHERE id = ${booking.id}::uuid
+      `);
+
+      expect(arrived, 'both requests priced the attempt before either held').toBe(2);
+      expect(debited.rows[0]?.total, 'one stay, paid once').toBe('201.990');
+      expect(hold.rows[0]?.wallet_amount).toBe('201.990');
+      expect(await balanceOf(wallet)).toBe('798.010');
     });
 
     it('captures with no provider at all when the balance covers the total', async () => {

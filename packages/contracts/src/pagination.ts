@@ -59,6 +59,46 @@ export function encodeCursor(createdAt: Date | string, id: string): string {
   return Buffer.from(`${key}|${id}`, 'utf8').toString('base64url');
 }
 
+/** Every table this pages has a uuid key; anything else is not a cursor we issued. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The shapes `encodeCursor` is handed: an ISO instant from a Date, PostgreSQL's own
+ * `timestamptz::text`, a `to_char` instant with microseconds, or a bare date.
+ */
+const SORT_KEY =
+  /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}):(\d{2})(?:\.\d{1,6})?(?:Z|[+-]\d{2}(?::?\d{2})?)?)?$/;
+
+/**
+ * Whether PostgreSQL will accept this as a date or timestamp (audit 2026-10-06).
+ *
+ * `new Date()` was the test, and JavaScript is far more forgiving than PostgreSQL: `"1"` is the
+ * year 2001 and `"2026-02-30"` rolls over to March. A forged cursor carrying either passed here,
+ * reached the keyset comparison, and PostgreSQL refused it — a 500 on every cursor list. So the
+ * SHAPE is matched and each field checked against the calendar, which is what PostgreSQL does.
+ */
+function isSortKey(key: string): boolean {
+  const match = SORT_KEY.exec(key);
+
+  if (!match) return false;
+
+  const [, year, month, day, hour = '0', minute = '0', second = '0'] = match;
+  const m = Number(month);
+  const d = Number(day);
+  const daysInMonth = new Date(Date.UTC(Number(year), m, 0)).getUTCDate();
+
+  return (
+    m >= 1 &&
+    m <= 12 &&
+    d >= 1 &&
+    d <= daysInMonth &&
+    Number(hour) < 24 &&
+    Number(minute) < 60 &&
+    Number(second) < 60 &&
+    !Number.isNaN(new Date(key).getTime())
+  );
+}
+
 /**
  * Returns null for anything unparseable. Callers MUST treat null as a client
  * error (400) rather than falling back to the first page — see the note in
@@ -80,14 +120,13 @@ export function decodeCursor(
     }
 
     const sortKey = raw.slice(0, separator);
-    const createdAt = new Date(sortKey);
     const id = raw.slice(separator + 1);
 
-    if (Number.isNaN(createdAt.getTime()) || id.length === 0) {
+    if (!isSortKey(sortKey) || !UUID.test(id)) {
       return null;
     }
 
-    return { createdAt, sortKey, id };
+    return { createdAt: new Date(sortKey), sortKey, id };
   } catch {
     // A malformed cursor is treated as "start from the beginning" by the caller,
     // never as a 500.

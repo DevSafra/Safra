@@ -287,6 +287,27 @@ export class PaymentIntentService {
 
     try {
       await this.db.transaction(async (tx) => {
+        /*
+          One hold per booking, decided under the booking's row lock (audit 2026-10-06).
+
+          The amount was priced from `context.walletMinor`, read before this attempt reached the
+          gateway. Two "pay with wallet" requests in the same second both read nothing held, both
+          priced the same hold, and both debited it: the customer paid the booking twice from
+          stored value and the booking recorded twice what it cost. Locking the booking makes the
+          second wait for the first to commit, and re-reading what is held tells it the figure it
+          was priced on is gone — so it fails the attempt instead of debiting again.
+        */
+        const held = await tx.execute<{ wallet_amount: string }>(sql`
+          SELECT wallet_amount::text AS wallet_amount FROM bookings
+           WHERE id = ${booking.id} FOR UPDATE
+        `);
+
+        if (
+          toMinor(held.rows[0]?.wallet_amount ?? '0', MONEY_SCALE) !== context.walletMinor
+        ) {
+          throw conflict(ERROR.WALLET_BALANCE_CHANGED);
+        }
+
         await this.wallet.debit(tx as unknown as Database, {
           customerProfileId: booking.customerProfileId,
           amount,
