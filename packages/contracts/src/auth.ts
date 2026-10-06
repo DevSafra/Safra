@@ -304,6 +304,15 @@ export const passwordResetConfirmSchema = z
   .strict();
 export type PasswordResetConfirmInput = z.infer<typeof passwordResetConfirmSchema>;
 
+/**
+ * Asking for another verification link from the sign-in form, by address.
+ *
+ * An unverified customer cannot sign in, so the signed-in resend is out of their reach. Only the
+ * address, and the answer is the same whether it matched or not — the password reset's rule.
+ */
+export const emailVerificationResendSchema = z.object({ email: emailSchema }).strict();
+export type EmailVerificationResendInput = z.infer<typeof emailVerificationResendSchema>;
+
 export const emailVerificationConfirmSchema = z
   .object({ token: authTokenSchema })
   .strict();

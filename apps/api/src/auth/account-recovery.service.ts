@@ -7,6 +7,7 @@ import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
 import { ENV, type Env } from '../config/env.js';
 import { MailService } from '../mail/mail.service.js';
+import { sendBestEffort } from '../mail/best-effort.js';
 import {
   accountExistsMail,
   emailVerificationMail,
@@ -68,7 +69,10 @@ export class AccountRecoveryService {
    *
    * Returns void on every path on purpose — see the class note. The work is awaited
    * rather than detached so a mail-server stall shows up as a slow response instead
-   * of a silently dropped email, and `MailService.send` never throws.
+   * of a silently dropped email.
+   *
+   * Sent best-effort: a refused mail must not turn this into a 500, which would be a response the
+   * unknown-address branch never gives. The token stands and the person asks again.
    */
   async requestPasswordReset(
     email: string,
@@ -109,7 +113,8 @@ export class AccountRecoveryService {
       context,
     );
 
-    await this.mail.send(
+    await sendBestEffort(
+      this.mail,
       passwordResetMail({
         to: user.email,
         url: this.link('reset-password', issued.token, user.preferredLocale),
@@ -182,6 +187,29 @@ export class AccountRecoveryService {
     this.logger.log(`Password reset completed for user ${redeemed.userId}.`);
   }
 
+  /**
+   * Sends a verification link to an address, from the sign-in form — or quietly does nothing.
+   *
+   * An unverified customer cannot sign in (Bashar, 2026-10-06), so `requestEmailVerification`,
+   * which needs a session, is out of their reach. This is the same send, found by address, and it
+   * answers void on every path exactly as `requestPasswordReset` does: an unknown address, a
+   * verified one and a throttled one are indistinguishable to the caller, so the route is no way to
+   * learn who has an account. The per-account window inside the send still bounds one inbox.
+   */
+  async requestEmailVerificationByEmail(
+    email: string,
+    context: { ipAddress?: string | undefined; userAgent?: string | undefined },
+  ): Promise<void> {
+    const user = await this.findActiveUser(email);
+
+    if (!user) {
+      this.logger.log(`Email verification requested for an unknown address.`);
+      return;
+    }
+
+    await this.requestEmailVerification(user.id, context);
+  }
+
   /** Sends a verification link. Safe to call repeatedly; issuing supersedes. */
   async requestEmailVerification(
     userId: string,
@@ -217,7 +245,13 @@ export class AccountRecoveryService {
       context,
     );
 
-    await this.mail.send(
+    /*
+      Best-effort, and the reason is registration: this runs on the NEW-address branch of
+      `POST /auth/register` and `notifyAccountExists` on the taken one. A mail failure that threw
+      here and not there would answer 500 for one and 202 for the other.
+    */
+    await sendBestEffort(
+      this.mail,
       emailVerificationMail({
         to: user.email,
         url: this.link('verify-email', issued.token, user.preferred_locale),
@@ -504,7 +538,9 @@ export class AccountRecoveryService {
    * close.
    */
   async notifyAccountExists(email: string, locale: string): Promise<void> {
-    await this.mail.send(
+    /* Best-effort for the same reason as `requestEmailVerification`, its twin on the other branch. */
+    await sendBestEffort(
+      this.mail,
       accountExistsMail({
         to: email,
         signInUrl: new URL(`/${locale}/login`, this.env.APP_URL).toString(),

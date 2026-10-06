@@ -17,6 +17,7 @@ import type { Request, Response } from 'express';
 import {
   ERROR,
   type EmailVerificationConfirmInput,
+  type EmailVerificationResendInput,
   type LoginCodeResendInput,
   type LoginInput,
   type LoginResponse,
@@ -26,6 +27,7 @@ import {
   type ProfileUpdateInput,
   type RegisterInput,
   emailVerificationConfirmSchema,
+  emailVerificationResendSchema,
   loginCodeResendSchema,
   loginSchema,
   passwordChangeSchema,
@@ -378,6 +380,29 @@ export class AuthController {
     if (!user) throw unauthorized(ERROR.AUTH_REQUIRED);
 
     await this.recovery.requestEmailVerification(user.sub, contextOf(request));
+  }
+
+  /**
+   * Re-sends the verification email by ADDRESS, for somebody who cannot sign in yet.
+   *
+   * An unverified customer is refused at sign-in, so the route above — which needs a session — is
+   * out of their reach. Public, always 204, and throttled like the password reset beside it,
+   * because it is the same shape: an address in, possibly a mail out, nothing said either way.
+   */
+  @Public()
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @Post('email/verify/resend')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @AuditExempt(
+    'Requesting a verification email is not itself a state change worth auditing; auditing ' +
+      'the route would log every probe as an action.',
+  )
+  async resendEmailVerification(
+    @Body(new ZodValidationPipe(emailVerificationResendSchema))
+    body: EmailVerificationResendInput,
+    @Req() request: Request,
+  ): Promise<void> {
+    await this.recovery.requestEmailVerificationByEmail(body.email, contextOf(request));
   }
 
   /**

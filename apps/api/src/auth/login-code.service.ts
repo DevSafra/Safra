@@ -8,6 +8,7 @@ import { ERROR } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { MailService } from '../mail/mail.service.js';
+import { sendBestEffort } from '../mail/best-effort.js';
 import { PasswordService } from '../common/crypto/password.service.js';
 import { partnerLoginCodeMail } from '../mail/mail.templates.js';
 import { tooManyRequests, unauthorized } from '../common/errors/app-error.js';
@@ -133,8 +134,13 @@ export class LoginCodeService {
     /*
       Sent AFTER the row is committed. A mail that arrives before the code it names exists is a
       partner typing a valid code at a server that has never heard of it.
+
+      Best-effort: the code row is committed, and a refused mail answering 500 would tell the partner
+      nothing they can act on. The sign-in still pauses at «enter the code», and asking again issues
+      a fresh one, which is the recovery the resend limit already budgets for.
     */
-    await this.mail.send(
+    await sendBestEffort(
+      this.mail,
       partnerLoginCodeMail({
         to: email,
         code,

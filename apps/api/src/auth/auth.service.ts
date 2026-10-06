@@ -26,7 +26,7 @@ import { PasswordService } from '../common/crypto/password.service.js';
 import { LoginCodeService } from './login-code.service.js';
 import { TokenService, type IssuedTokens } from './token.service.js';
 import { TwoFactorService } from './two-factor.service.js';
-import { unauthorized, unavailable } from '../common/errors/app-error.js';
+import { forbidden, unauthorized, unavailable } from '../common/errors/app-error.js';
 import { describeError } from '../common/errors/safe-error.js';
 
 /**
@@ -268,6 +268,24 @@ export class AuthService {
     if (user.status !== 'active') {
       // Deliberately generic: a suspended account should not be confirmable.
       throw genericFailure;
+    }
+
+    /*
+      A customer signs in only once the address is proven (Bashar, 2026-10-06).
+
+      Registration accepts any address, so without this somebody could register a stranger's email
+      and act as it — the verification that later merges that stranger's guest bookings would be the
+      first thing ever to ask whether the mailbox was theirs.
+
+      Below the password and the lock, for the reason `auth.locked` sits there: the specific answer
+      goes only to somebody who proved the password, so it is no oracle for "registered, never
+      verified". Not a failed attempt — the password was right — and no session is issued.
+
+      Customers only. Staff and partner accounts are verified by the invitation that created them,
+      and a legacy row missing the timestamp must not be locked out of a console by a customer rule.
+    */
+    if (user.role === 'customer' && !user.emailVerifiedAt) {
+      throw forbidden(ERROR.AUTH_EMAIL_UNVERIFIED);
     }
 
     /*

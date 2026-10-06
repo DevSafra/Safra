@@ -13,6 +13,21 @@ import { TwoFactorService } from './two-factor.service.js';
 import type { AccessTokenClaims } from './token.service.js';
 import type { Env } from '../config/env.js';
 
+/*
+  A code for the CURRENT step, never one about to expire. enable() accepts only the present step, so a
+  code generated in the last moment of one is checked in the next and refused; the e2e helper in
+  e2e/staff.ts waits the same way. Seen as a fresh-database CI failure, 2026-10-06.
+*/
+async function freshCode(secret: string): Promise<string> {
+  if (authenticator.timeRemaining() < 5) {
+    await new Promise((resolve) =>
+      setTimeout(resolve, authenticator.timeRemaining() * 1000 + 500),
+    );
+  }
+
+  return authenticator.generate(secret);
+}
+
 /**
  * Partner two-factor authentication, end to end, against a REAL PostgreSQL.
  *
@@ -155,7 +170,7 @@ describeIfDb('partner two-factor authentication', () => {
   /** Enrol the partner and return the secret, for tests that need an already-enrolled account. */
   async function enrol(): Promise<string> {
     const { secret } = await twoFactor.beginSetup(partnerClaims());
-    await twoFactor.enable(partnerClaims(), authenticator.generate(secret));
+    await twoFactor.enable(partnerClaims(), await freshCode(secret));
     return secret;
   }
 
@@ -190,10 +205,7 @@ describeIfDb('partner two-factor authentication', () => {
 
     it('enforces 2FA and issues recovery codes once the code is confirmed', async () => {
       const { secret } = await twoFactor.beginSetup(partnerClaims());
-      const result = await twoFactor.enable(
-        partnerClaims(),
-        authenticator.generate(secret),
-      );
+      const result = await twoFactor.enable(partnerClaims(), await freshCode(secret));
 
       expect(result.enabled).toBe(true);
       expect(result.recoveryCodes).toHaveLength(8);
@@ -218,7 +230,7 @@ describeIfDb('partner two-factor authentication', () => {
       const { secret } = await twoFactor.beginSetup(partnerClaims());
       const { recoveryCodes } = await twoFactor.enable(
         partnerClaims(),
-        authenticator.generate(secret),
+        await freshCode(secret),
       );
 
       const stored = await db.execute<{ hashes: string[] }>(
@@ -233,7 +245,7 @@ describeIfDb('partner two-factor authentication', () => {
       const { secret } = await twoFactor.beginSetup(partnerClaims());
       const { recoveryCodes } = await twoFactor.enable(
         partnerClaims(),
-        authenticator.generate(secret),
+        await freshCode(secret),
       );
       const code = recoveryCodes[0] ?? '';
 
@@ -260,10 +272,7 @@ describeIfDb('partner two-factor authentication', () => {
      */
     it('issues a replacement session for the account that enrolled', async () => {
       const { secret } = await twoFactor.beginSetup(partnerClaims());
-      const result = await twoFactor.enable(
-        partnerClaims(),
-        authenticator.generate(secret),
-      );
+      const result = await twoFactor.enable(partnerClaims(), await freshCode(secret));
 
       expect(result.session.accessToken).toBeTruthy();
       expect(result.session.refreshToken).toBeTruthy();
@@ -307,7 +316,7 @@ describeIfDb('partner two-factor authentication', () => {
 
       const enabled = await twoFactor.enable(
         partnerClaims(),
-        authenticator.generate(second.secret),
+        await freshCode(second.secret),
       );
       expect(enabled.enabled).toBe(true);
     });

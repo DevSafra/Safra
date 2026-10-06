@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 
 import { Inject, Injectable } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { authenticator } from 'otplib';
 
 import type { Database } from '@safra/db';
@@ -231,6 +231,12 @@ export class TwoFactorService {
    * cannot look one up. A match is REMOVED from the array before the login completes,
    * which is what makes the code single-use even if two requests race: the update is
    * conditional on the array still containing that hash.
+   *
+   * That sentence described the intent and not the code until 2026-10-06: the write was an
+   * unconditional overwrite with the array as it was READ, so two sign-ins presenting one code
+   * both got in, and two different codes used at once each wrote back the other's code. The
+   * removal is now `array_remove` guarded by `= ANY(...)` in one statement, so the database
+   * decides which request spent the code and nothing read earlier is written back.
    */
   async consumeRecoveryCode(userId: string, code: string): Promise<boolean> {
     const user = await this.db.query.users.findFirst({
@@ -243,19 +249,23 @@ export class TwoFactorService {
 
     for (const hash of hashes) {
       if (await this.passwords.verify(hash, code)) {
-        const remaining = hashes.filter((h) => h !== hash);
+        const spent = await this.db.execute<{ remaining: number }>(sql`
+          UPDATE users
+          SET totp_recovery_code_hashes = array_remove(totp_recovery_code_hashes, ${hash})
+          WHERE id = ${userId}::uuid AND ${hash} = ANY(totp_recovery_code_hashes)
+          RETURNING cardinality(totp_recovery_code_hashes) AS remaining
+        `);
 
-        await this.db
-          .update(schema.users)
-          .set({ totpRecoveryCodeHashes: remaining })
-          .where(eq(schema.users.id, userId));
+        /* Somebody else's request removed it first: this one presented a spent code. */
+        const row = spent.rows[0];
+        if (!row) return false;
 
         this.audit.recordDetached({
           actorUserId: userId,
           action: 'auth.recovery_code_used',
           subjectType: 'user',
           subjectId: userId,
-          after: { remainingCodes: remaining.length },
+          after: { remainingCodes: Number(row.remaining) },
         });
 
         return true;

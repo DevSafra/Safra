@@ -327,6 +327,46 @@ describeIfDb('account recovery', () => {
 
   // ── Email verification and claiming ─────────────────────────────────────────
 
+  /**
+   * Asking for another verification link by ADDRESS, from the sign-in form.
+   *
+   * Once an unverified customer cannot sign in (Bashar, 2026-10-06), the signed-in resend is out of
+   * their reach, so the sign-in form asks by address instead. It answers nothing either way, like
+   * the password reset beside it, so it is not a way to learn who has an account.
+   */
+  describe('requesting a verification link by address', () => {
+    it('emails an unverified customer a link that verifies them', async () => {
+      await recovery.requestEmailVerificationByEmail(user.email.toUpperCase(), {});
+
+      expect(outbox).toHaveLength(1);
+
+      await recovery.confirmEmailVerification(tokenFrom(outbox.at(-1)));
+
+      const rows = await db.execute<{ verified: boolean }>(sql`
+        SELECT email_verified_at IS NOT NULL AS verified FROM users WHERE id = ${user.id}`);
+
+      expect(rows.rows[0]?.verified).toBe(true);
+    });
+
+    it('sends nothing to an address with no account, and does not say so', async () => {
+      await expect(
+        recovery.requestEmailVerificationByEmail(`nobody-${randomUUID()}@safra.test`, {}),
+      ).resolves.toBeUndefined();
+
+      expect(outbox).toHaveLength(0);
+    });
+
+    it('sends nothing to an account that is already verified', async () => {
+      await db.execute(
+        sql`UPDATE users SET email_verified_at = now() WHERE id = ${user.id}`,
+      );
+
+      await recovery.requestEmailVerificationByEmail(user.email, {});
+
+      expect(outbox).toHaveLength(0);
+    });
+  });
+
   describe('email verification', () => {
     it('marks the address verified', async () => {
       await recovery.requestEmailVerification(user.id, {});

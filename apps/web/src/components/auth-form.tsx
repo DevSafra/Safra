@@ -11,7 +11,7 @@ import { PhoneField } from '@/components/phone-field';
 import type { DialOption } from '@/lib/dial-options';
 import { reloadInto } from '@safra/ui';
 import { errorMessage } from '@safra/i18n';
-import { isErrorCode, phoneSchema } from '@safra/contracts';
+import { ERROR, isErrorCode, phoneSchema } from '@safra/contracts';
 
 interface FieldErrors {
   [field: string]: string | undefined;
@@ -66,6 +66,43 @@ export function AuthForm({
   const [sent, setSent] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  /*
+    The address a sign-in was refused for because it is not confirmed yet (2026-10-06), so the form
+    can offer the link again. Held as the address that was REFUSED, not read back from the field, so
+    editing the field afterwards cannot send the link somewhere the refusal never named.
+  */
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+  const [resend, setResend] = useState<'idle' | 'sending' | 'sent'>('idle');
+
+  async function resendVerification() {
+    if (!unverifiedEmail || resend === 'sending') return;
+
+    setResend('sending');
+
+    try {
+      const response = await fetch(`/${locale}/api/auth/verify-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: unverifiedEmail }),
+      });
+
+      if (!response.ok) {
+        applyError(await response.json().catch(() => null), response.status, {
+          setFormError,
+          setFieldErrors,
+          t,
+          locale,
+        });
+        setResend('idle');
+        return;
+      }
+
+      setResend('sent');
+    } catch {
+      setFormError(t('networkError'));
+      setResend('idle');
+    }
+  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -74,6 +111,8 @@ export function AuthForm({
     setSubmitting(true);
     setFormError(null);
     setFieldErrors({});
+    setUnverifiedEmail(null);
+    setResend('idle');
 
     const form = new FormData(event.currentTarget);
 
@@ -152,12 +191,24 @@ export function AuthForm({
       });
 
       if (!response.ok) {
-        applyError(await response.json().catch(() => null), response.status, {
+        const failure: unknown = await response.json().catch(() => null);
+
+        applyError(failure, response.status, {
           setFormError,
           setFieldErrors,
           t,
           locale,
         });
+
+        if (
+          mode === 'login' &&
+          typeof failure === 'object' &&
+          failure !== null &&
+          (failure as { code?: unknown }).code === ERROR.AUTH_EMAIL_UNVERIFIED
+        ) {
+          setUnverifiedEmail(body.email);
+        }
+
         setSubmitting(false);
         return;
       }
@@ -237,6 +288,30 @@ export function AuthForm({
         >
           {formError}
         </p>
+      ) : null}
+
+      {/*
+        Offered only for the refusal that it answers. The confirmation replaces the button rather
+        than sitting beside it: a second press would only supersede the link just sent.
+      */}
+      {unverifiedEmail ? (
+        resend === 'sent' ? (
+          <p
+            role="status"
+            className="rounded-lg border border-ok/40 bg-ok/10 p-3 text-sm text-ok"
+          >
+            {t('verificationResent')}
+          </p>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void resendVerification()}
+            disabled={resend === 'sending'}
+            className="inline-flex min-h-10 cursor-pointer items-center self-start rounded-lg border border-line px-4 py-2 text-sm text-gold-read disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
+          >
+            {resend === 'sending' ? t('submitting') : t('resendVerification')}
+          </button>
+        )
       ) : null}
 
       {mode === 'register' ? (

@@ -62,9 +62,15 @@ describeIfDb('the account lockout', () => {
     email = `lockout-${crypto.randomUUID()}@safra.test`;
     const hash = await passwords.hash(PASSWORD);
 
+    /*
+      Verified, because a customer must be to sign in at all (2026-10-06). Left unverified, the
+      success below would stop at `auth.email_unverified` before the counter is cleared, and this
+      suite would be testing the verification gate instead of the lockout.
+    */
     await db.execute(sql`
-      INSERT INTO users (email, phone, role, status, preferred_locale, password_hash)
-      VALUES (${email}, '+963900000000', 'customer', 'active', 'ar', ${hash})
+      INSERT INTO users (email, phone, role, status, preferred_locale, password_hash,
+                         email_verified_at)
+      VALUES (${email}, '+963900000000', 'customer', 'active', 'ar', ${hash}, now())
     `);
   });
 

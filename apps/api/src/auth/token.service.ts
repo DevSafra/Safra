@@ -328,61 +328,7 @@ export class TokenService {
    */
   async staffPermissions(user: typeof schema.users.$inferSelect): Promise<Permission[]> {
     if (user.staffRoleId) {
-      const rows = await this.db
-        .select({
-          permissions: schema.staffRoles.permissions,
-          isSystem: schema.staffRoles.isSystem,
-          admitsAs: schema.staffRoles.admitsAs,
-        })
-        .from(schema.staffRoles)
-        .where(
-          and(
-            eq(schema.staffRoles.id, user.staffRoleId),
-            isNull(schema.staffRoles.deletedAt),
-          ),
-        )
-        .limit(1);
-
-      /*
-        A SYSTEM role with an empty set resolves from `ROLE_PERMISSIONS[admits_as]` (2026-08-24).
-
-        ## The landmine this defuses
-
-        `post/0008` seeds the four system roles with `ARRAY[]::text[]`, deliberately: *"what each of
-        these four roles can do still comes from ROLE_PERMISSIONS in code while users.staff_role_id
-        is null. Copying the sets into rows here would create a second source of truth."* That
-        reasoning is right and the seed missed one thing — those roles are ASSIGNABLE. «مدير عام» is
-        offered in the console's role picker, and `changeRole` writes `staff_role_id`.
-
-        So the first person assigned the seeded «مدير عام» became a super admin with ZERO
-        permissions: the branch above returns the stored set, which is empty. They would sign in,
-        see nothing, and the account that is supposed to be able to fix it would be the one that
-        could not.
-
-        It was latent until 2026-08-24 because the console showed every link regardless and the API
-        refused them one at a time. Gating the navigation turned it into "many pages are missing",
-        which is how it would have been discovered — by somebody it had already happened to.
-
-        The fallback is gated on `is_system`, and that is the whole safety of it: a CUSTOM role with
-        no capabilities means the super admin who created it ticked nothing, and it must grant
-        nothing. Only the four seeded rows, which stand for the enum values, defer to the code.
-      */
-      const role = rows[0];
-
-      if (role?.isSystem && (role.permissions?.length ?? 0) === 0) {
-        return resolvePermissions(
-          role.admitsAs,
-          user.permissionOverrides ?? [],
-          await this.enabledGrants(),
-        );
-      }
-
-      /*
-        A withdrawn role grants NOTHING rather than falling back to the enum. Fails closed: the
-        alternative is that retiring a role silently restores whatever its holders' enum value
-        implied, which is the opposite of what withdrawing it meant.
-      */
-      return staffRolePermissions(rows[0]?.permissions ?? []);
+      return this.grantsOfRole(user.staffRoleId, user.permissionOverrides ?? []);
     }
 
     return resolvePermissions(
@@ -390,6 +336,73 @@ export class TokenService {
       user.permissionOverrides ?? [],
       await this.enabledGrants(),
     );
+  }
+
+  /**
+   * What HOLDING a named role grants, before anybody holds it.
+   *
+   * `StaffService` asks this before it invites somebody into a role or moves somebody onto one: an
+   * actor may only hand out authority they hold themselves. It is the same resolution
+   * `staffPermissions` mints the token from, not a second reading of the row, so the comparison is
+   * against exactly what the new holder's token will carry. No per-user overrides, because the
+   * question is about the role and the person receiving it has none yet.
+   */
+  async staffRoleGrants(staffRoleId: string): Promise<Permission[]> {
+    return this.grantsOfRole(staffRoleId, []);
+  }
+
+  private async grantsOfRole(
+    staffRoleId: string,
+    overrides: string[],
+  ): Promise<Permission[]> {
+    const rows = await this.db
+      .select({
+        permissions: schema.staffRoles.permissions,
+        isSystem: schema.staffRoles.isSystem,
+        admitsAs: schema.staffRoles.admitsAs,
+      })
+      .from(schema.staffRoles)
+      .where(
+        and(eq(schema.staffRoles.id, staffRoleId), isNull(schema.staffRoles.deletedAt)),
+      )
+      .limit(1);
+
+    /*
+      A SYSTEM role with an empty set resolves from `ROLE_PERMISSIONS[admits_as]` (2026-08-24).
+
+      ## The landmine this defuses
+
+      `post/0008` seeds the four system roles with `ARRAY[]::text[]`, deliberately: *"what each of
+      these four roles can do still comes from ROLE_PERMISSIONS in code while users.staff_role_id
+      is null. Copying the sets into rows here would create a second source of truth."* That
+      reasoning is right and the seed missed one thing — those roles are ASSIGNABLE. «مدير عام» is
+      offered in the console's role picker, and `changeRole` writes `staff_role_id`.
+
+      So the first person assigned the seeded «مدير عام» became a super admin with ZERO
+      permissions: the branch above returns the stored set, which is empty. They would sign in,
+      see nothing, and the account that is supposed to be able to fix it would be the one that
+      could not.
+
+      It was latent until 2026-08-24 because the console showed every link regardless and the API
+      refused them one at a time. Gating the navigation turned it into "many pages are missing",
+      which is how it would have been discovered — by somebody it had already happened to.
+
+      The fallback is gated on `is_system`, and that is the whole safety of it: a CUSTOM role with
+      no capabilities means the super admin who created it ticked nothing, and it must grant
+      nothing. Only the four seeded rows, which stand for the enum values, defer to the code.
+    */
+    const role = rows[0];
+
+    if (role?.isSystem && (role.permissions?.length ?? 0) === 0) {
+      return resolvePermissions(role.admitsAs, overrides, await this.enabledGrants());
+    }
+
+    /*
+      A withdrawn role grants NOTHING rather than falling back to the enum. Fails closed: the
+      alternative is that retiring a role silently restores whatever its holders' enum value
+      implied, which is the opposite of what withdrawing it meant.
+    */
+    return staffRolePermissions(rows[0]?.permissions ?? []);
   }
 
   /**
@@ -605,13 +618,45 @@ export class TokenService {
       familyId: existing.familyId,
     });
 
-    await this.db
+    /*
+      The old token is revoked CONDITIONALLY, and losing that race is treated as the replay it is.
+
+      The check above reads `revoked_at` in JavaScript, and two refreshes presenting the same token
+      both pass it before either writes. The revoke used to be unconditional, so both callers got a
+      fresh session: a stolen token replayed beside its owner's became a second lineage the reuse
+      detection never saw. `revoked_at IS NULL` in the WHERE makes the database the arbiter, so
+      exactly one caller's UPDATE matches.
+
+      ## Why the new pair is issued BEFORE the claim, not after
+
+      The loser burns the family, and that has to reach the winner's new token too — otherwise the
+      winner walks away with a live session off a token that was demonstrably presented twice. With
+      the insert first, the winner's row exists before the winner's claim, which is before the
+      loser's failed claim, which is before the loser's `revokeFamily`: the burn always finds it. The
+      loser's own row is inserted, revoked with the family, and never returned. Claiming first
+      leaves a window in which the winner's insert lands after the burn.
+
+      A legitimate double refresh (two tabs at once) is signed out by this too. That is the answer
+      the replay branch above has always given, and the price of reuse detection meaning anything.
+    */
+    const claimed = await this.db
       .update(schema.refreshTokens)
       .set({
         revokedAt: new Date(),
         replacedByTokenHash: this.digest(tokens.refreshToken),
       })
-      .where(eq(schema.refreshTokens.id, existing.id));
+      .where(
+        and(
+          eq(schema.refreshTokens.id, existing.id),
+          isNull(schema.refreshTokens.revokedAt),
+        ),
+      )
+      .returning({ id: schema.refreshTokens.id });
+
+    if (claimed.length === 0) {
+      await this.revokeFamily(existing.familyId);
+      return null;
+    }
 
     return { tokens, claims };
   }

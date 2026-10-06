@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 
 import { isLocale } from '@/i18n/routing';
+import { visitorHeaders } from '@/lib/visitor';
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
 
@@ -49,11 +50,15 @@ export default async function VerifyEmailPage({
     return (
       <Shell title={t('verifyFailedTitle')} tone="bad">
         <p className="mt-2 text-sm text-muted">{t('verifyFailed')}</p>
+        {/*
+          To sign-in, not to the account. An unverified customer cannot sign in (2026-10-06), so the
+          account page would bounce them; the sign-in form is where a new link is offered.
+        */}
         <Link
-          href={`/${locale}/account`}
+          href={`/${locale}/login`}
           className="mt-6 inline-block rounded-lg border border-line px-5 py-2.5 text-sm text-muted"
         >
-          {t('account')}
+          {t('backToSignIn')}
         </Link>
       </Shell>
     );
@@ -85,10 +90,17 @@ export default async function VerifyEmailPage({
 }
 
 async function confirm(token: string): Promise<{ claimedBookings: number } | 'invalid'> {
+  /* The visitor's attempt, on the visitor's limit — outside the `try` so it cannot read as «invalid». */
+  const visitor = await visitorHeaders();
+
   try {
     const response = await fetch(`${API_URL}/api/v1/auth/email/verify/confirm`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...visitor,
+      },
       body: JSON.stringify({ token }),
       cache: 'no-store',
     });
