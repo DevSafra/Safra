@@ -123,6 +123,15 @@ deleting it; the reason something was blocked is often the reason it comes back.
 > majors that target the deprecated Node 20 (GitHub forces Node 24 and warns). The current majors
 > are v7, v7 and v6, all on Node 24; moving is a deliberate upgrade, not done here. The 8
 > `media-policy` tests skip in CI because CI runs no object store, as they did before.
+>
+> **The first CI run after this still failed one test**, `voucher.integration.test.ts`, which renders
+> a real PDF with a headless Chromium the runner did not have. CI now runs
+> `pnpm exec playwright install --with-deps chromium` before the tests. **The same gap exists in
+> production and is NOT fixed (needs a decision):** `apps/api/Dockerfile` is Alpine with only `tini`
+> added and `contract-pdf.ts` names no system browser, so partnership contracts and booking
+> vouchers will fail to render in the deployed API exactly as they did in CI. Fixing it means
+> installing Chromium in the image (Playwright's build or Alpine's package with `executablePath`)
+> and sizing the image for it, which belongs with the hosting decision (M-1).
 
 > ### Bug audit of the week's changes, 2026-10-04: thirteen fixed
 >
