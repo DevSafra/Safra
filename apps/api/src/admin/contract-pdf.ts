@@ -33,74 +33,130 @@ import { chromium, type Browser } from 'playwright-core';
 const MAX_CONCURRENT = 2;
 const RENDER_TIMEOUT_MS = 20_000;
 
-let browserPromise: Promise<Browser> | null = null;
-let active = 0;
-const waiting: (() => void)[] = [];
+/** How the browser is started. A parameter so a test can hand in one that fails. */
+export type LaunchBrowser = () => Promise<Browser>;
 
-async function sharedBrowser(): Promise<Browser> {
-  const existing = browserPromise;
-
-  if (existing) {
-    const browser = await existing;
-
-    if (browser.isConnected()) return browser;
-  }
-
-  browserPromise = chromium.launch({ args: ['--no-sandbox'] });
-
-  return browserPromise;
-}
-
-async function acquire(): Promise<void> {
-  if (active < MAX_CONCURRENT) {
-    active += 1;
-
-    return;
-  }
-
-  await new Promise<void>((resolve) => waiting.push(resolve));
-  active += 1;
-}
-
-function release(): void {
-  active -= 1;
-  waiting.shift()?.();
-}
+const launchChromium: LaunchBrowser = () => chromium.launch({ args: ['--no-sandbox'] });
 
 /**
- * @param html A complete, self-contained document. Built by `renderContractHtml`, never by a
- *   caller — nothing here escapes anything, because everything that needed escaping was escaped
- *   where the values were known.
+ * One reused browser and a bounded number of renders at a time.
+ *
+ * ## Every path out of a render gives its slot back (2026-10-06)
+ *
+ * `acquire()` used to run before the `try`, and so did starting the browser and opening the
+ * context. A launch that failed, or a context that could not be created, left the slot taken for
+ * the life of the process; two such failures and every later render waited for ever behind slots
+ * nobody would release. Now the slot is released in a `finally` that wraps EVERYTHING after it is
+ * taken, and closing the context cannot throw past it.
+ *
+ * ## A failed launch is not remembered
+ *
+ * The launch promise was cached whether it resolved or rejected, so one bad start (a missing
+ * Chromium, a full `/tmp`, a container OOM-killed mid-launch) answered every later call with the
+ * same rejection without trying again. A rejected launch now clears the cache, so the next render
+ * starts a fresh one.
  */
-export async function renderContractPdf(html: string): Promise<Buffer> {
-  await acquire();
+export function createContractRenderer(
+  launch: LaunchBrowser = launchChromium,
+  maxConcurrent = MAX_CONCURRENT,
+) {
+  let browserPromise: Promise<Browser> | null = null;
+  let active = 0;
+  const waiting: (() => void)[] = [];
 
-  const browser = await sharedBrowser();
-  /*
-    A context with NO permissions, no storage and no network state. This document is inert HTML we
-    wrote; the context is minimal so that stays true even if a future template gains a script.
-  */
-  const context = await browser.newContext({ locale: 'ar', javaScriptEnabled: false });
+  async function sharedBrowser(): Promise<Browser> {
+    const existing = browserPromise;
 
-  try {
-    const page = await context.newPage();
+    if (existing) {
+      const browser = await existing;
 
-    await page.setContent(html, { waitUntil: 'load', timeout: RENDER_TIMEOUT_MS });
-    /* The template's `@page` rules are print rules, so print media is what they apply to. */
-    await page.emulateMedia({ media: 'print' });
+      if (browser.isConnected()) return browser;
+    }
 
-    return await page.pdf({ format: 'A4', printBackground: true });
-  } finally {
-    await context.close();
-    release();
+    const launching = launch();
+
+    browserPromise = launching;
+
+    /* Cleared only if it is still OURS: a later launch must not be forgotten by an earlier failure. */
+    launching.catch(() => {
+      if (browserPromise === launching) browserPromise = null;
+    });
+
+    return launching;
   }
+
+  async function acquire(): Promise<void> {
+    if (active < maxConcurrent) {
+      active += 1;
+
+      return;
+    }
+
+    await new Promise<void>((resolve) => waiting.push(resolve));
+    active += 1;
+  }
+
+  function release(): void {
+    active -= 1;
+    waiting.shift()?.();
+  }
+
+  return {
+    /**
+     * @param html A complete, self-contained document. Built by `renderContractHtml`, never by a
+     *   caller — nothing here escapes anything, because everything that needed escaping was
+     *   escaped where the values were known.
+     */
+    async render(html: string): Promise<Buffer> {
+      await acquire();
+
+      try {
+        const browser = await sharedBrowser();
+        /*
+          A context with NO permissions, no storage and no network state. This document is inert
+          HTML we wrote; the context is minimal so that stays true even if a future template gains
+          a script.
+        */
+        const context = await browser.newContext({
+          locale: 'ar',
+          javaScriptEnabled: false,
+        });
+
+        try {
+          const page = await context.newPage();
+
+          await page.setContent(html, { waitUntil: 'load', timeout: RENDER_TIMEOUT_MS });
+          /* The template's `@page` rules are print rules, so print media is what they apply to. */
+          await page.emulateMedia({ media: 'print' });
+
+          return await page.pdf({ format: 'A4', printBackground: true });
+        } finally {
+          await context.close().catch(() => undefined);
+        }
+      } finally {
+        release();
+      }
+    },
+
+    /** Closes the shared browser. For tests, which must not leave a Chromium process behind. */
+    async close(): Promise<void> {
+      const existing = browserPromise;
+
+      browserPromise = null;
+
+      if (existing)
+        await existing.then((browser) => browser.close()).catch(() => undefined);
+    },
+  };
+}
+
+const shared = createContractRenderer();
+
+export function renderContractPdf(html: string): Promise<Buffer> {
+  return shared.render(html);
 }
 
 /** Closes the shared browser. For tests, which must not leave a Chromium process behind. */
-export async function closeContractBrowser(): Promise<void> {
-  const existing = browserPromise;
-
-  browserPromise = null;
-
-  if (existing) await (await existing).close().catch(() => undefined);
+export function closeContractBrowser(): Promise<void> {
+  return shared.close();
 }
