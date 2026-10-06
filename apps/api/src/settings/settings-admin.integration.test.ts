@@ -310,6 +310,13 @@ describeIfDb('SettingsAdminService', () => {
     });
 
     it('cannot be deleted', async () => {
+      /*
+        A row of its OWN to refuse deleting, like the test above. It leaned on rows earlier runs left
+        behind, so on a fresh database (CI's) the DELETE touched nothing, the trigger never fired, and
+        the statement succeeded: a test of the guard that could not reach it (2026-10-05).
+      */
+      await admin.update(KEY, 94, 'to be deleted', {});
+
       await expect(
         db.execute(sql`DELETE FROM settings_history WHERE key = ${KEY}`),
       ).rejects.toSatisfy(isAppendOnlyRefusal);

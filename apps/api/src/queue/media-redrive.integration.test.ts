@@ -176,8 +176,24 @@ describeIfDb('re-driving a lost image render', () => {
    * every campaign that ever had an upload, immediately and for ever.
    */
   it('re-drives a creative, keyed on the FILE as its upload is', async () => {
+    /*
+      The campaign is planted rather than borrowed. A fresh database has no advertising at all, so
+      reaching for an existing row made this pass only where somebody had once created a campaign.
+    */
     const rows = await db.execute<{ id: string }>(sql`
-      SELECT id::text FROM ad_campaigns WHERE deleted_at IS NULL ORDER BY id LIMIT 1
+      WITH ref AS (
+        SELECT (SELECT id FROM cities WHERE deleted_at IS NULL ORDER BY id LIMIT 1) AS city_id
+      ), adv AS (
+        INSERT INTO advertisers (name, kind, city_id)
+        SELECT 'معلن الصورة', 'restaurant', ref.city_id FROM ref
+        RETURNING id
+      )
+      INSERT INTO ad_campaigns (advertiser_id, city_id, status, starts_at, ends_at,
+                                headline_ar, headline_en, headline_de, target_url)
+      SELECT adv.id, ref.city_id, 'active', now() - interval '1 day', now() + interval '30 days',
+             'عنوان', 'Headline', 'Titel', 'https://example.test/x'
+      FROM adv, ref
+      RETURNING id::text
     `);
 
     const id = rows.rows[0]?.id;

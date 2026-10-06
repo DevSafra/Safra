@@ -4,8 +4,10 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createRollbackDatabase, type Database } from '@safra/db';
 import { ERROR } from '@safra/contracts';
 
+import { AdInvoiceService } from '../admin/ad-invoice.service.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { FieldEncryptionService } from '../common/crypto/field-encryption.service.js';
+import { FxRateService } from '../fx/fx-rate.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { accruedInStatement, SafraPayoutService } from './safra-payout.service.js';
 import { codeOf } from '../common/errors/app-error.js';
@@ -121,6 +123,63 @@ describeIfDb('SafraPayoutService', () => {
     `);
 
     return rows.rows[0]!;
+  };
+
+  /**
+   * Advertising revenue, booked the way the platform books it: an advertiser, a campaign, a due
+   * invoice, and `AdInvoiceService.markPaid`, which posts the `ad_payment` / `ad_revenue` pair.
+   *
+   * A fresh database has no advertising at all, and the developer database only had it because
+   * somebody had used the feature, so the tests about `ad_revenue` were asserting on history rather
+   * than on anything they set up. Going through the real service rather than inserting a ledger
+   * row keeps the fixture honest: if paying an invoice stopped reaching the ledger, these would
+   * fail rather than keep passing on a hand-written credit. 50,000 SYP, so no FX rate is involved.
+   */
+  const paidAdInvoice = async (): Promise<void> => {
+    /*
+      Its own super admin, rather than \`actor\`: a fresh database has no super admin for the
+      \`beforeEach\` lookup to find, and \`markPaid\` refuses an actor without an id because the
+      ledger and the audit trail both name who recorded the payment.
+    */
+    const made = await db.execute<{ reference: string; staff: string }>(sql`
+      WITH ref AS (
+        SELECT (SELECT id FROM cities WHERE deleted_at IS NULL ORDER BY id LIMIT 1) AS city_id,
+               (SELECT id FROM currencies WHERE code = 'SYP') AS syp_id
+      ), st AS (
+        INSERT INTO users (email, phone, role, status)
+        VALUES ('adrev-' || gen_random_uuid() || '@safra.test', '+963900000131',
+                'super_admin', 'active')
+        RETURNING id
+      ), adv AS (
+        INSERT INTO advertisers (name, kind, city_id)
+        SELECT 'معلن الإيراد', 'restaurant', ref.city_id FROM ref
+        RETURNING id
+      ), camp AS (
+        INSERT INTO ad_campaigns (advertiser_id, city_id, status, starts_at, ends_at,
+                                  headline_ar, headline_en, headline_de, target_url)
+        SELECT adv.id, ref.city_id, 'active', now() - interval '1 day',
+               now() + interval '30 days', 'عنوان', 'Headline', 'Titel', 'https://example.test/x'
+        FROM adv, ref
+        RETURNING id
+      )
+      INSERT INTO ad_invoices (campaign_id, period_start, period_end, amount, currency_id)
+      SELECT camp.id, now() - interval '1 day', now() + interval '30 days', 50000, ref.syp_id
+      FROM camp, ref
+      RETURNING reference, (SELECT id::text FROM st) AS staff
+    `);
+
+    const row = made.rows[0];
+
+    if (!row) throw new Error('fixture ad invoice was not created');
+
+    const audit = new AuditService(db);
+    const payer = { sub: row.staff, role: 'super_admin' } as unknown as AccessTokenClaims;
+
+    await new AdInvoiceService(db, audit, ledger, new FxRateService(db, audit)).markPaid(
+      payer,
+      row.reference,
+      'دفعة اختبار',
+    );
   };
 
   // ── Destinations ──────────────────────────────────────────────────────────
@@ -368,6 +427,8 @@ describeIfDb('SafraPayoutService', () => {
 
     /* Every stream is named, so a total is explicable rather than merely correct. */
     it('breaks the total down by revenue account', async () => {
+      await paidAdInvoice();
+
       const summary = await service.revenueSummary();
 
       expect(summary.byAccount.map((one) => one.account).sort()).toStrictEqual([
@@ -967,6 +1028,8 @@ describeIfDb('SafraPayoutService', () => {
 
     /* Advertising revenue has no booking, so a join written carelessly deletes the ad business. */
     it('keeps advertising revenue, which has no booking to refund', async () => {
+      await paidAdInvoice();
+
       const summary = await service.revenueSummary();
       const ads = summary.byAccount.find((one) => one.account === 'ad_revenue');
 

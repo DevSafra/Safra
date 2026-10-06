@@ -111,6 +111,19 @@ describeIfDb('verification queues', () => {
    * screen admitted it.
    */
   it('pages the partner queue and reports a total beyond the page', async () => {
+    /*
+      More than one page of pending partners, made here rather than assumed. A fresh database holds
+      the testbed's one and the one `beforeEach` adds, so two pages of five do not exist unless this
+      case builds them.
+
+      Each is given its OWN age. Every row written in this transaction would otherwise share one
+      `now()`, and the queue orders by `created_at` alone: rows that tie have no defined order
+      between two queries, so page 2 could repeat page 1 for a reason unrelated to the pager.
+    */
+    for (let age = 1; age <= 6; age += 1) {
+      await createPendingPartner(db, age);
+    }
+
     const first = await review.pendingPartners({ page: 1, limit: 5 });
 
     expect(first.items).toHaveLength(5);
@@ -206,7 +219,8 @@ async function dispute(
   `);
 }
 
-async function createPendingPartner(db: Database): Promise<string> {
+/** `ageSeconds` backdates `created_at`, so partners made in one transaction sort apart. */
+async function createPendingPartner(db: Database, ageSeconds = 0): Promise<string> {
   const id = randomUUID();
   const userId = randomUUID();
   const email = `queue-test-${id.slice(0, 8)}@safra.test`;
@@ -216,9 +230,9 @@ async function createPendingPartner(db: Database): Promise<string> {
 
   await db.execute(sql`
     INSERT INTO partners (id, user_id, partner_type_id, legal_name, display_name,
-                          city_id, address, phone, email)
+                          city_id, address, phone, email, created_at)
     SELECT ${id}::uuid, ${userId}::uuid, pt.id, 'Queue Test LLC', 'Queue Test', c.id,
-           'Addr', '+963900000030', ${email}
+           'Addr', '+963900000030', ${email}, now() - make_interval(secs => ${ageSeconds})
     FROM partner_types pt, cities c
     WHERE pt.code = 'accommodation' AND c.slug = 'damascus' LIMIT 1`);
 

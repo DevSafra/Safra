@@ -41,8 +41,100 @@ describeIfDb('the listing registry, filtered by what is missing', () => {
   const db: Database = harness.db;
   const registry = new RegistryService(db);
 
+  /**
+   * The listings this file needs, PLANTED inside the rolled-back transaction.
+   *
+   * Every guard below once read whatever the long-lived developer database happened to hold, and
+   * CI starts from migrations, the reference seed and the testbed — which hold no listing missing a
+   * unit, none missing a place, none with exactly one image, and none missing more than one thing.
+   * So the guards failed on a fresh database for a reason that had nothing to do with the registry.
+   *
+   * One row per role, each missing exactly what its name says and nothing else, so each check has
+   * a listing that carries it alone:
+   *
+   *   - `unitless`, `unplaced`, `unpictured`, `unwritten` — one gap apiece, so every check has a row.
+   *   - `bare` — all four gaps on ONE listing, which is what makes the union smaller than the sum.
+   *     Without a listing carrying several gaps, `any < sum` is false and proves nothing.
+   *   - `singleImage` — complete, with exactly one ready image, for the processing case.
+   *   - `draft` — unplaced and unwritten, for the case where a draft must stay silent.
+   */
+  const ROLES = [
+    'unitless',
+    'unplaced',
+    'unpictured',
+    'unwritten',
+    'bare',
+    'singleImage',
+    'draft',
+  ] as const;
+  type Role = (typeof ROLES)[number];
+  let planted: Record<Role, string>;
+
+  async function plant(): Promise<Record<Role, string>> {
+    const made = await db.execute<{ role: Role; reference: string }>(sql`
+      WITH ref AS (
+        SELECT (SELECT id FROM cities WHERE deleted_at IS NULL ORDER BY id LIMIT 1) AS city_id,
+               (SELECT id FROM currencies WHERE code = 'USD')                   AS currency_id,
+               (SELECT id FROM property_types ORDER BY id LIMIT 1)              AS type_id,
+               (SELECT id FROM partner_types ORDER BY id LIMIT 1)               AS partner_type_id,
+               (SELECT id FROM cancellation_policies ORDER BY id LIMIT 1)       AS policy_id
+      ), v (role, status, latitude, longitude, description_ar, has_unit, has_image) AS (
+        VALUES
+          ('unitless',    'published'::property_status, '33.5', '36.3', 'وصف', false, true),
+          ('unplaced',    'published'::property_status, NULL,   NULL,   'وصف', true,  true),
+          ('unpictured',  'published'::property_status, '33.5', '36.3', 'وصف', true,  false),
+          ('unwritten',   'published'::property_status, '33.5', '36.3', NULL,  true,  true),
+          ('bare',        'published'::property_status, NULL,   NULL,   NULL,  false, false),
+          ('singleImage', 'published'::property_status, '33.5', '36.3', 'وصف', true,  true),
+          ('draft',       'draft'::property_status,     NULL,   NULL,   NULL,  false, false)
+      ), pu AS (
+        INSERT INTO users (email, phone, role, status)
+        VALUES ('lr-p-' || gen_random_uuid() || '@safra.test', '+963900000081', 'partner', 'active')
+        RETURNING id
+      ), pa AS (
+        INSERT INTO partners (user_id, partner_type_id, legal_name, display_name, city_id,
+                              address, phone, email, verification)
+        SELECT pu.id, ref.partner_type_id, 'Listing Readiness', 'شريك', ref.city_id, 'x',
+               '+963900000081', 'lr-p-' || gen_random_uuid() || '@safra.test', 'approved'
+        FROM pu, ref RETURNING id
+      ), pr AS (
+        INSERT INTO properties (partner_id, city_id, property_type_id, cancellation_policy_id,
+                                slug, name_ar, name_en, name_de, address, status,
+                                latitude, longitude, description_ar)
+        SELECT pa.id, ref.city_id, ref.type_id, ref.policy_id,
+               'readiness-' || v.role || '-' || gen_random_uuid(), 'عقار', 'Stay', 'Stay', 'x',
+               v.status, v.latitude, v.longitude, v.description_ar
+        FROM pa, ref, v RETURNING id, reference, slug
+      ), tagged AS (
+        SELECT pr.id, pr.reference, v.role, v.has_unit, v.has_image
+        FROM pr JOIN v ON pr.slug LIKE 'readiness-' || v.role || '-%'
+      ), un AS (
+        INSERT INTO units (property_id, name_ar, name_en, name_de, max_guests, base_price,
+                           currency_id)
+        SELECT tagged.id, 'وحدة', 'Unit', 'Einheit', 2, '100.00', ref.currency_id
+        FROM tagged, ref WHERE tagged.has_unit RETURNING id
+      ), im AS (
+        INSERT INTO property_images (property_id, file_key, width, height, variant_widths,
+                                     is_cover, sort_order, status)
+        SELECT tagged.id, 'readiness/' || tagged.id || '.jpg', 1600, 1200,
+               ARRAY[400, 800, 1600], true, 0, 'ready'
+        FROM tagged WHERE tagged.has_image RETURNING id
+      )
+      SELECT role, reference FROM tagged
+    `);
+
+    const byRole = Object.fromEntries(made.rows.map((row) => [row.role, row.reference]));
+
+    for (const role of ROLES) {
+      expect(byRole[role], `the planted ${role} listing`).toBeDefined();
+    }
+
+    return byRole as Record<Role, string>;
+  }
+
   beforeEach(async () => {
     await harness.begin();
+    planted = await plant();
   });
 
   afterEach(async () => {
@@ -208,12 +300,13 @@ describeIfDb('the listing registry, filtered by what is missing', () => {
    * now one.
    */
   it('reports no gaps for a listing no guest can reach', async () => {
+    /* The planted draft, so the case does not depend on a draft the seed happens to carry. */
     const [draft] = await db
       .execute<{ reference: string }>(
         sql`SELECT reference FROM properties
             WHERE deleted_at IS NULL AND status = 'draft'
               AND (latitude IS NULL OR longitude IS NULL)
-            ORDER BY id LIMIT 1`,
+              AND reference = ${planted.draft}`,
       )
       .then((r) => r.rows);
 
@@ -445,7 +538,8 @@ describeIfDb('the listing registry, filtered by what is missing', () => {
               AND p.status IN ('published', 'pending_review')
               AND (SELECT count(*) FROM property_images i
                    WHERE i.property_id = p.id AND i.deleted_at IS NULL) = 1
-            ORDER BY p.id LIMIT 1`,
+              /* The planted one: no seed carries a live listing with exactly one image. */
+              AND p.reference = ${planted.singleImage}`,
       )
       .then((r) => r.rows);
 

@@ -248,17 +248,25 @@ describeIfDb('the O-sec-13 sweep, in behaviour', () => {
 
   /* ── Fixtures ─────────────────────────────────────────────────────────────────────────────── */
 
-  /** An open dispute on a booking in `cityId`, so the badge has something to be scoped away from. */
+  /**
+   * An open dispute on a booking in `cityId`, so the badge has something to be scoped away from.
+   *
+   * The booking is BUILT, not borrowed. This used to pick the newest existing booking in the city,
+   * and on a fresh database the second city by id has none: the INSERT … SELECT matched nothing,
+   * inserted nothing and reported no error, so the case read the testbed's one dispute and failed
+   * as «saw 1, not 2». The throw below is what makes a fixture that silently creates nothing loud.
+   */
   async function disputeIn(cityId: string | null): Promise<void> {
-    await db.execute(sql`
+    const made = await stay(cityId);
+    const row = await db.execute<{ id: string }>(sql`
       INSERT INTO disputes (booking_id, partner_id, customer_profile_id, kind, status, title)
       SELECT b.id, b.partner_id, b.customer_profile_id, 'complaint', 'open', 'نزاع نطاق'
       FROM bookings b
-      WHERE b.city_id = ${cityId}::uuid AND b.deleted_at IS NULL
-        AND b.customer_profile_id IS NOT NULL
-      ORDER BY b.created_at DESC, b.id DESC
-      LIMIT 1
+      WHERE b.reference = ${made.reference}
+      RETURNING id::text
     `);
+
+    if (!row.rows[0]) throw new Error('fixture dispute was not created');
   }
 
   async function partnerIn(cityId: string | null): Promise<{ id: string }> {

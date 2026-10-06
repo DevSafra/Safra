@@ -313,6 +313,32 @@ describeIfDb('CatalogService', () => {
    * language.
    */
   it('hands each city a cover image whose variant widths are NUMBERS', async () => {
+    /*
+      A photograph made here, on a city the list serves. The reference seed carries no city images
+      and a fresh database has none, so a case that only read existing rows had nothing to inspect
+      there. Hero and first in order, so it is the cover the query picks even where the city has
+      photographs of its own.
+    */
+    const [listed] = (
+      await db.execute<{ id: string; slug: string }>(sql`
+        SELECT c.id, c.slug
+        FROM cities c
+        JOIN countries co ON co.id = c.country_id
+        WHERE c.is_active AND co.is_active AND c.deleted_at IS NULL
+        ORDER BY c.sort_order, c.slug
+        LIMIT 1
+      `)
+    ).rows;
+
+    expect(listed, 'a listed city to photograph').toBeDefined();
+
+    await db.execute(sql`
+      INSERT INTO city_images (city_id, file_key, variant_widths, width, height,
+                               alt_ar, alt_en, alt_de, is_hero, sort_order)
+      VALUES (${listed!.id}::uuid, 'cities/catalog-test/cover', '{480,960,1600}'::int[],
+              1600, 1067, 'صورة اختبار', 'Test photograph', 'Testfoto', true, -1)
+    `);
+
     const cities = await catalog.cities();
 
     const withCover = cities.filter((city) => city.cover !== null);
@@ -320,6 +346,10 @@ describeIfDb('CatalogService', () => {
       withCover.length,
       'at least one seeded city must have an image',
     ).toBeGreaterThan(0);
+    expect(
+      withCover.map((city) => city.slug),
+      'the city photographed above is among them',
+    ).toContain(listed!.slug);
 
     for (const city of withCover) {
       const cover = city.cover!;
