@@ -134,7 +134,7 @@ const LAST_CONTACT_AT = sql`(
   SELECT ac.created_at::text
   FROM partner_application_contacts ac
   WHERE ac.application_id = a.id
-  ORDER BY ac.created_at DESC
+  ORDER BY ac.created_at DESC, ac.id DESC
   LIMIT 1
 ) AS contacted_at`;
 
@@ -143,7 +143,7 @@ const LAST_CONTACT_BY = sql`(
   FROM partner_application_contacts ac
   LEFT JOIN users u ON u.id = ac.contacted_by_user_id
   WHERE ac.application_id = a.id
-  ORDER BY ac.created_at DESC
+  ORDER BY ac.created_at DESC, ac.id DESC
   LIMIT 1
 ) AS contacted_by_email`;
 
@@ -394,14 +394,16 @@ export class PartnerApplicationService {
       notes: string;
     }>(sql`
       SELECT at::text AS at, by_email, notes FROM (
-        SELECT ac.created_at AS at, u.email AS by_email, ac.notes
+        SELECT ac.created_at AS at, ac.id, u.email AS by_email, ac.notes
         FROM partner_application_contacts ac
         LEFT JOIN users u ON u.id = ac.contacted_by_user_id
         WHERE ac.application_id = ${applicationId}
-        ORDER BY ac.created_at DESC
+        -- id breaks a tie on created_at (two calls in one transaction share now()), so the
+        -- history reads in the order the calls were logged, every time (2026-10-05).
+        ORDER BY ac.created_at DESC, ac.id DESC
         LIMIT ${MAX_CONTACTS_SHOWN}
       ) recent
-      ORDER BY at ASC
+      ORDER BY at ASC, id ASC
     `);
 
     if (rows.rows.length === MAX_CONTACTS_SHOWN) {
