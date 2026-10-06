@@ -26,6 +26,7 @@ import { PasswordService } from '../common/crypto/password.service.js';
 import { TokenService } from '../auth/token.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { badRequest, forbidden, notFound } from '../common/errors/app-error.js';
+import { sendBestEffort } from '../mail/best-effort.js';
 
 /**
  * An invitation is valid for 48 hours.
@@ -137,7 +138,7 @@ export interface StaffMember {
  *
  * ## What this service refuses to do
  *
- * Three refusals, each closing a way an administrator could lock the platform out of
+ * Four refusals, each closing a way an administrator could lock the platform out of
  * itself or quietly widen their own access. They are enforced here rather than in the
  * console because the console is not the security boundary.
  */
@@ -369,6 +370,8 @@ export class StaffService {
       throw badRequest(ERROR.STAFF_ROLE_INVALID_CONSOLE);
     }
 
+    await this.assertActorMayGrant(actor, input.staffRoleId, role);
+
     const existing = await this.db.execute<{ id: string }>(
       sql`SELECT id FROM users WHERE email = ${email} AND deleted_at IS NULL`,
     );
@@ -406,7 +409,8 @@ export class StaffService {
 
     await this.sendInvitation(user.id, email, role, input.locale ?? 'en');
 
-    this.logger.log(`Staff ${email} invited as ${role} by ${actor?.sub}.`);
+    /* The new account's id, never its address: a log line is not where personal data goes. */
+    this.logger.log(`Staff ${user.id} invited as ${role} by ${actor?.sub}.`);
 
     return { id: user.id, email, role };
   }
@@ -671,6 +675,13 @@ export class StaffService {
       throw forbidden(ERROR.STAFF_CANNOT_CHANGE_OWN_ROLE);
     }
 
+    /*
+      Both ends of the move are held to the actor's authority: the role they hand out, and the role
+      they take away. Re-roling somebody who outranks you is the same escalation pointed downwards.
+    */
+    await this.assertActorMayGrant(actor, staffRoleId, role.admits_as);
+    await this.assertActorOutranks(actor, target.role, await this.permissionsOf(userId));
+
     await this.assertNotLastSuperAdmin(target, role.is_system);
 
     await this.db.execute(sql`
@@ -718,6 +729,12 @@ export class StaffService {
     if (actor?.sub === userId) {
       throw forbidden(ERROR.STAFF_CANNOT_SUSPEND_SELF);
     }
+
+    /*
+      Refusal 4 again, for status (2026-10-06): suspending somebody who outranks you takes their
+      access as surely as re-roling them, and reinstating them undoes a decision made above you.
+    */
+    await this.assertActorOutranks(actor, target.role, await this.permissionsOf(userId));
 
     if (status === 'suspended') {
       await this.assertNotLastSuperAdmin(target, false);
@@ -843,7 +860,8 @@ export class StaffService {
       INVITATION_TTL_MS,
     );
 
-    await this.mail.send(
+    await sendBestEffort(
+      this.mail,
       staffInvitationMail({
         to: email,
         url: `${this.env.ADMIN_URL}/invitation/${token}`,
@@ -852,6 +870,81 @@ export class StaffService {
         expiresInHours: INVITATION_TTL_MS / 3_600_000,
       }),
     );
+  }
+
+  /**
+   * Refusal 4: nobody hands out authority they do not hold.
+   *
+   * `STAFF_ROLE_FORBIDDEN` keeps `staff_role.manage` off every custom role, so a role cannot
+   * redefine itself. That said nothing about ASSIGNING one: a custom role holding `staff.manage`
+   * could invite a fresh address straight into «مدير عام», or move a second account onto it, and
+   * the holder was a super admin one email later. So the role being granted must be within what
+   * the actor holds, and «مدير عام» may only be granted by a super admin.
+   *
+   * The actor is read from the DATABASE, not from the token's claims. The token can be fifteen
+   * minutes stale (ADR 0003) and is exactly what somebody who has just been demoted is still
+   * carrying; the comparison is against what they may do now.
+   */
+  private async assertActorMayGrant(
+    actor: AccessTokenClaims | undefined,
+    staffRoleId: string,
+    admitsAs: Role,
+  ): Promise<void> {
+    const authority = await this.actorAuthority(actor);
+
+    if (authority.isSuperAdmin) return;
+
+    if (admitsAs === 'super_admin') throw forbidden(ERROR.STAFF_ROLE_BEYOND_ACTOR);
+
+    const granted = await this.tokens.staffRoleGrants(staffRoleId);
+
+    if (!granted.every((permission) => authority.permissions.has(permission))) {
+      throw forbidden(ERROR.STAFF_ROLE_BEYOND_ACTOR);
+    }
+  }
+
+  /** The other half of refusal 4: the person being re-roled holds nothing the actor lacks. */
+  private async assertActorOutranks(
+    actor: AccessTokenClaims | undefined,
+    targetRole: Role,
+    targetPermissions: readonly string[],
+  ): Promise<void> {
+    const authority = await this.actorAuthority(actor);
+
+    if (authority.isSuperAdmin) return;
+
+    if (
+      targetRole === 'super_admin' ||
+      !targetPermissions.every((permission) => authority.permissions.has(permission))
+    ) {
+      throw forbidden(ERROR.STAFF_ROLE_BEYOND_ACTOR);
+    }
+  }
+
+  /**
+   * What the actor may do NOW, resolved the way their next token would be.
+   *
+   * A super admin is the top of the order by definition and is not held to a subset: their set is
+   * every permission, and refusing one because a runtime toggle had not been switched on for their
+   * enum would lock the one account that is supposed to be able to fix it. No actor at all is
+   * refused — deny by default; every route that reaches here is authenticated.
+   */
+  private async actorAuthority(
+    actor: AccessTokenClaims | undefined,
+  ): Promise<{ isSuperAdmin: boolean; permissions: ReadonlySet<string> }> {
+    if (!actor) throw forbidden(ERROR.STAFF_ROLE_BEYOND_ACTOR);
+
+    const user = await this.db.query.users.findFirst({
+      where: (table, { and, eq, isNull }) =>
+        and(eq(table.id, actor.sub), isNull(table.deletedAt)),
+    });
+
+    if (!user || !isStaffRole(user.role)) throw forbidden(ERROR.STAFF_ROLE_BEYOND_ACTOR);
+
+    return {
+      isSuperAdmin: user.role === 'super_admin',
+      permissions: new Set(await this.tokens.staffPermissions(user)),
+    };
   }
 
   private async staffById(userId: string) {

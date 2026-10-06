@@ -218,4 +218,104 @@ describeIfDb('scoping a staff member to cities', () => {
       slugs: [],
     });
   });
+
+  /**
+   * Nobody hands out, or takes away, reach they do not hold (audit 2026-10-06).
+   *
+   * A manager limited to one city, holding `staff.manage`. Each refusal is paired with the control
+   * below it: the same manager may still arrange scope INSIDE their own city, so a guard that refused
+   * everybody but a super admin would fail the control rather than pass the refusals.
+   */
+  describe('a member limited to some cities', () => {
+    let managerId = '';
+    const manager = (): AccessTokenClaims =>
+      ({
+        sub: managerId,
+        role: 'operations_manager',
+        permissions: [],
+        locale: 'ar',
+      }) as never;
+
+    async function limitTo(userId: string, cities: readonly string[]): Promise<void> {
+      await db.execute(sql`
+        UPDATE users SET scope_kind = 'cities', outside_scope_access = 'none'
+        WHERE id = ${userId}::uuid
+      `);
+      for (const slug of cities) {
+        await db.execute(sql`
+          INSERT INTO staff_scope_cities (user_id, city_id)
+          SELECT ${userId}::uuid, id FROM cities WHERE slug = ${slug}
+        `);
+      }
+    }
+
+    beforeEach(async () => {
+      managerId = await makeStaff('operations_manager');
+      await limitTo(managerId, [slugs[0] ?? '']);
+      await limitTo(memberId, []);
+    });
+
+    it('cannot make a colleague national', async () => {
+      await expect(
+        service.set(manager(), memberId, {
+          kind: 'all_cities',
+          citySlugs: [],
+          outside: 'none',
+        }),
+      ).rejects.toMatchObject({
+        status: 403,
+        response: { code: 'staff.scope_beyond_actor' },
+      });
+      expect((await storedScope(memberId)).kind).toBe('cities');
+    });
+
+    it('cannot give a colleague a city they do not hold', async () => {
+      await expect(
+        service.set(manager(), memberId, {
+          kind: 'cities',
+          citySlugs: [slugs[1] ?? ''],
+          outside: 'none',
+        }),
+      ).rejects.toMatchObject({
+        status: 403,
+        response: { code: 'staff.scope_beyond_actor' },
+      });
+      expect((await storedScope(memberId)).slugs).toEqual([]);
+    });
+
+    it('cannot narrow a colleague who reaches further than they do', async () => {
+      await db.execute(sql`
+        DELETE FROM staff_scope_cities WHERE user_id = ${memberId}::uuid
+      `);
+      await db.execute(sql`
+        UPDATE users SET scope_kind = 'all_cities' WHERE id = ${memberId}::uuid
+      `);
+
+      await expect(
+        service.set(manager(), memberId, {
+          kind: 'cities',
+          citySlugs: [slugs[0] ?? ''],
+          outside: 'none',
+        }),
+      ).rejects.toMatchObject({
+        status: 403,
+        response: { code: 'staff.scope_beyond_actor' },
+      });
+      expect((await storedScope(memberId)).kind).toBe('all_cities');
+    });
+
+    it('still arranges scope inside their own city', async () => {
+      await service.set(manager(), memberId, {
+        kind: 'cities',
+        citySlugs: [slugs[0] ?? ''],
+        outside: 'none',
+      });
+
+      await expect(storedScope(memberId)).resolves.toEqual({
+        kind: 'cities',
+        outside: 'none',
+        slugs: [slugs[0]],
+      });
+    });
+  });
 });

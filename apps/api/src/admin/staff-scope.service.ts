@@ -140,6 +140,52 @@ export class StaffScopeService {
     return offsetPage(items, total, query);
   }
 
+  /**
+   * Nobody hands out, or takes away, reach they do not hold (audit 2026-10-06).
+   *
+   * The role rule in `StaffService` stopped a custom role with `staff.manage` from granting
+   * «مدير عام»; scope had no such rule, so a manager limited to حلب could make a colleague national,
+   * or narrow a national colleague to one city. Both the scope being GIVEN and the scope being
+   * REPLACED must sit inside the actor's own, read from the database rather than the token, which
+   * can be minutes stale. A super admin and an all-cities member are not held to a subset.
+   */
+  private async assertWithinActorScope(
+    actor: AccessTokenClaims | undefined,
+    target: { kind: string; outside: string; cityIds: readonly string[] },
+    granted: { kind: string; outside: string; cityIds: readonly string[] },
+  ): Promise<void> {
+    if (!actor) throw forbidden(ERROR.STAFF_SCOPE_BEYOND_ACTOR);
+
+    const rows = await this.db.execute<{
+      role: string;
+      kind: string;
+      outside: string;
+    }>(sql`
+      SELECT role::text AS role, scope_kind::text AS kind, outside_scope_access::text AS outside
+      FROM users WHERE id = ${actor.sub}::uuid AND deleted_at IS NULL
+      LIMIT 1
+    `);
+
+    const self = rows.rows[0];
+
+    if (!self) throw forbidden(ERROR.STAFF_SCOPE_BEYOND_ACTOR);
+    if (self.role === 'super_admin' || self.kind === 'all_cities') return;
+
+    const held = new Set(await this.cityIdsOf(actor.sub));
+    const within = (scope: {
+      kind: string;
+      outside: string;
+      cityIds: readonly string[];
+    }) =>
+      scope.kind === 'cities' &&
+      scope.cityIds.every((id) => held.has(id)) &&
+      (scope.outside === 'none' || self.outside === 'read_only');
+
+    if (!within(granted) || !within(target)) {
+      throw forbidden(ERROR.STAFF_SCOPE_BEYOND_ACTOR);
+    }
+  }
+
   async set(
     actor: AccessTokenClaims | undefined,
     userId: string,
@@ -208,6 +254,12 @@ export class StaffScopeService {
     }
 
     const before = await this.cityIdsOf(userId);
+
+    await this.assertWithinActorScope(
+      actor,
+      { ...user, cityIds: before },
+      { ...input, cityIds },
+    );
 
     await this.db.transaction(async (tx) => {
       await tx.execute(sql`

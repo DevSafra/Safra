@@ -10,7 +10,8 @@ import { PasswordService } from '../common/crypto/password.service.js';
 import { StaffService } from './staff.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import type { MailService, OutgoingMail } from '../mail/mail.service.js';
-import type { TokenService } from '../auth/token.service.js';
+import { TokenService } from '../auth/token.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 
 /**
  * Staff provisioning against a REAL PostgreSQL (M-5).
@@ -41,12 +42,32 @@ describeIfDb('StaffService', () => {
   } as unknown as MailService;
 
   const revoked: string[] = [];
-  const tokens = {
-    revokeAllForUser: (id: string) => {
-      revoked.push(id);
-      return Promise.resolve();
+  /*
+    The REAL token service, with only revocation recorded rather than performed.
+
+    `invite` and `changeRole` compare a role against what the actor holds, and both sides of that
+    comparison are `TokenService`'s own resolution — the one the guard's token is minted from. A
+    stub here would be testing an escalation check against a permission model of the test's own
+    invention.
+  */
+  const tokens = Object.assign(
+    new TokenService(
+      {
+        JWT_ACCESS_SECRET: 'a'.repeat(48),
+        JWT_REFRESH_SECRET: 'b'.repeat(48),
+        ACCESS_TOKEN_TTL: '15m',
+        REFRESH_TOKEN_TTL: '30d',
+      } as never,
+      db,
+      new SettingsService(db),
+    ),
+    {
+      revokeAllForUser: (id: string) => {
+        revoked.push(id);
+        return Promise.resolve();
+      },
     },
-  } as unknown as TokenService;
+  );
 
   const service = new StaffService(
     db,
@@ -550,6 +571,203 @@ describeIfDb('StaffService', () => {
       } finally {
         await restore();
       }
+    });
+  });
+
+  /**
+   * A holder of `staff.manage` who is NOT a super admin may hand out only what they hold.
+   *
+   * `STAFF_ROLE_FORBIDDEN` keeps `staff_role.manage` off every custom role, which stops a role
+   * from REDEFINING itself. It did nothing about ASSIGNING: «مشرف موظفين» with `staff.manage`
+   * could invite a fresh address straight into «مدير عام», or move a colleague (or a second
+   * account of their own) onto it, and be a super admin one email later. Each refusal here is
+   * paired with the same actor succeeding inside their own authority, so a check that refuses
+   * everybody cannot pass for one that refuses the right thing.
+   */
+  describe('nobody grants more than they hold', () => {
+    /** A custom role, and an active account holding it, that may manage staff and read bookings. */
+    async function staffManager(): Promise<string> {
+      const role = await customRole(`مشرف موظفين ${run}`, [
+        'staff.manage',
+        'booking.read_all',
+      ]);
+      const row = await db.execute<{ id: string }>(sql`
+        INSERT INTO users (email, password_hash, role, staff_role_id, status, preferred_locale,
+                           email_verified_at)
+        VALUES (${address('manager')}, 'x', 'support_agent', ${role}::uuid, 'active', 'en', now())
+        RETURNING id
+      `);
+
+      return row.rows[0]?.id ?? '';
+    }
+
+    async function customRole(name: string, permissions: string[]): Promise<string> {
+      const literal = sql.join(
+        permissions.map((permission) => sql`${permission}`),
+        sql`, `,
+      );
+      const row = await db.execute<{ id: string }>(sql`
+        INSERT INTO staff_roles (name, permissions, admits_as)
+        VALUES (${name}, ARRAY[${literal}]::text[], 'support_agent')
+        RETURNING id
+      `);
+
+      return row.rows[0]?.id ?? '';
+    }
+
+    const manager = (id: string): AccessTokenClaims =>
+      ({
+        sub: id,
+        role: 'support_agent',
+        permissions: ['staff.manage'],
+        locale: 'ar',
+      }) as never;
+
+    it('refuses to invite into the super admin role', async () => {
+      await seedSuperAdmin();
+      const actor = await staffManager();
+
+      await expect(
+        service.invite(manager(actor), {
+          fullName: 'موظف اختبار',
+          email: address('to-root'),
+          staffRoleId: await roleAdmitting('super_admin'),
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('refuses to invite into a role carrying a permission the actor lacks', async () => {
+      await seedSuperAdmin();
+      const actor = await staffManager();
+      const wider = await customRole(`أوسع ${run}`, [
+        'booking.read_all',
+        'audit_log.read',
+      ]);
+
+      await expect(
+        service.invite(manager(actor), {
+          fullName: 'موظف اختبار',
+          email: address('wider'),
+          staffRoleId: wider,
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('still invites into a role within what the actor holds', async () => {
+      await seedSuperAdmin();
+      const actor = await staffManager();
+      const narrower = await customRole(`أضيق ${run}`, ['booking.read_all']);
+
+      const invited = await service.invite(manager(actor), {
+        fullName: 'موظف اختبار',
+        email: address('narrower'),
+        staffRoleId: narrower,
+      });
+
+      expect(invited.id).toBeTruthy();
+    });
+
+    it('refuses to move anybody onto the super admin role', async () => {
+      await seedSuperAdmin();
+      const actor = await staffManager();
+      const target = await invite('promote-me');
+
+      await expect(
+        service.changeRole(manager(actor), target.id, await roleAdmitting('super_admin')),
+      ).rejects.toThrow(ForbiddenException);
+
+      const row = await db.execute<{ role: string }>(
+        sql`SELECT role::text AS role FROM users WHERE id = ${target.id}`,
+      );
+      expect(row.rows[0]?.role).toBe('support_agent');
+    });
+
+    it('refuses to move anybody onto a role carrying a permission the actor lacks', async () => {
+      await seedSuperAdmin();
+      const actor = await staffManager();
+      const target = await invite('widen-me');
+      const wider = await customRole(`أوسع ${run}`, ['audit_log.read']);
+
+      await expect(service.changeRole(manager(actor), target.id, wider)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    /** Demoting somebody who outranks you is the same escalation pointed the other way. */
+    it('refuses to re-role a super admin', async () => {
+      const root = await seedSuperAdmin();
+      const actor = await staffManager();
+      const narrower = await customRole(`أضيق ${run}`, ['booking.read_all']);
+
+      await expect(service.changeRole(manager(actor), root, narrower)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('still moves a colleague onto a role within what the actor holds', async () => {
+      await seedSuperAdmin();
+      const actor = await staffManager();
+      const target = await invite('move-me');
+      const narrower = await customRole(`أضيق ${run}`, ['booking.read_all']);
+
+      await service.changeRole(manager(actor), target.id, narrower);
+
+      expect(revoked).toContain(target.id);
+    });
+
+    /** The super admin is the top of the order and is not held to anybody's subset. */
+    it('lets a super admin promote somebody to super admin', async () => {
+      await seedSuperAdmin();
+      const target = await invite('crown-me');
+
+      await service.changeRole(
+        admin(SUPER_ADMIN_ID),
+        target.id,
+        await roleAdmitting('super_admin'),
+      );
+
+      expect(revoked).toContain(target.id);
+    });
+
+    /*
+      Suspending is the same reach as re-roling (2026-10-06): a custom role with staff.manage could
+      not promote anyone above itself any more, but it could still SUSPEND a super admin as long as
+      another existed. The target is made a super admin by the real one first, so the last-super-
+      admin guard is not what refuses this.
+    */
+    it('refuses to suspend or reinstate somebody who outranks the actor', async () => {
+      await seedSuperAdmin();
+      const boss = await invite('suspend-the-boss');
+      await service.changeRole(
+        admin(SUPER_ADMIN_ID),
+        boss.id,
+        await roleAdmitting('super_admin'),
+      );
+      const actor = await staffManager();
+
+      await expect(
+        service.setStatus(manager(actor), boss.id, 'suspended'),
+      ).rejects.toThrow(ForbiddenException);
+      await expect(service.setStatus(manager(actor), boss.id, 'active')).rejects.toThrow(
+        ForbiddenException,
+      );
+
+      const row = await db.execute<{ status: string }>(
+        sql`SELECT status::text AS status FROM users WHERE id = ${boss.id}`,
+      );
+      expect(row.rows[0]?.status).toBe('active');
+    });
+
+    it('still suspends a colleague within what the actor holds', async () => {
+      await seedSuperAdmin();
+      const actor = await staffManager();
+      const colleague = await invite('suspend-a-peer');
+      const narrower = await customRole(`أضيق ${run}`, ['booking.read_all']);
+      await service.changeRole(admin(SUPER_ADMIN_ID), colleague.id, narrower);
+
+      await service.setStatus(manager(actor), colleague.id, 'suspended');
+
+      expect(revoked).toContain(colleague.id);
     });
   });
 
