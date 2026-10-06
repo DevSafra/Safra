@@ -96,6 +96,34 @@ deleting it; the reason something was blocked is often the reason it comes back.
 
 ## 1. Where the project stands
 
+> ### CI was red on every run from at least 2026-08-25; reproduced and fixed, 2026-10-05
+>
+> Bashar: «can you check the workflows/actions on github are failing and fix that?». None of the
+> last 300 runs had passed. Only the TEST step failed (format, build, lint and typecheck were green):
+> the integration suite read the long-lived developer database, and CI migrates a fresh one.
+> Reproduced locally against a fresh `safra_ci` database with CI's environment only: **152 failures
+> in 36 files**, now **0** (4,525 passed, 19 skipped).
+>
+> - **No fixtures:** CI never seeded the testbed. `.github/workflows/ci.yml` now runs
+>   `pnpm --filter @safra/api db:testbed` after the seed (the root script sources a `.env` CI lacks).
+> - **No exchange rate:** the testbed now records a USD → SYP rate when none exists.
+> - **Retired currencies** (EUR, JOD, LBP, TRY) exist only on a migrated database:
+>   `ensureRetiredCurrencies` in `@safra/db` recreates them inside each test that needs them.
+> - **Rows that happened to exist** (listings with each gap, pending partners, a dispute, a city
+>   photograph, ad revenue, an ad campaign, settings history): each test now builds its own.
+> - **A real ordering bug:** a partnership request's call history had no tiebreak, so two calls in
+>   one transaction read back in arbitrary order. It now orders by `created_at, id`.
+> - **The two audit sweeps** (`audit-catalogue`, `audit-subject`) check what the platform has
+>   WRITTEN, which a fresh database has not. By Bashar's decision they skip only where CI sets
+>   `SAFRA_FRESH_DATABASE=1`, and run as before everywhere else.
+> - **Two advisories published 2026-10-05** failed the audit: `proxy-addr` (critical, ships in the
+>   API's Express) and `source-map-js` (high, dev tooling), both pinned to their patched versions.
+>
+> **Still open, low:** `actions/checkout`, `actions/setup-node` and `pnpm/action-setup` are pinned at
+> majors that target the deprecated Node 20 (GitHub forces Node 24 and warns). The current majors
+> are v7, v7 and v6, all on Node 24; moving is a deliberate upgrade, not done here. The 8
+> `media-policy` tests skip in CI because CI runs no object store, as they did before.
+
 > ### Bug audit of the week's changes, 2026-10-04: thirteen fixed
 >
 > Bashar: «Can you check for any bugs on backend or frontend?», then «fix all of them». Everything
