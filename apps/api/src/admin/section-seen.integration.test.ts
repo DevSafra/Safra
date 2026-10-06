@@ -39,7 +39,12 @@ const DATABASE_URL = process.env['DATABASE_URL'];
 const describeIfDb = DATABASE_URL ? describe : describe.skip;
 
 describeIfDb('what is new since I last looked', () => {
-  const harness = createRollbackDatabase(DATABASE_URL ?? '');
+  /*
+    A snapshot, because the badge counts a GLOBAL set: a re-opened batch is a live window a few seconds
+    wide, and another suite committing a customer into it made «nothing unread» read 1 in a full
+    fresh-database run (2026-10-06). See `Isolation` in @safra/db.
+  */
+  const harness = createRollbackDatabase(DATABASE_URL ?? '', 'repeatable read');
   const db: Database = harness.db;
   const me = new MeService(db);
 
@@ -315,7 +320,17 @@ describeIfDb('what is new since I last looked', () => {
       readTo: await ageIso(8.5),
     });
 
-    expect(await customersBadge(), 'nothing unread').toBe(0);
+    /*
+      Nothing of THIS reader's unread. Customers other suites committed above the top of the page
+      before this test's snapshot are unread too, and the snapshot holds their number still, so the
+      badge must equal it exactly rather than merely be small.
+    */
+    const elsewhere = await db.execute<{ n: number }>(sql`
+      SELECT COUNT(*)::int AS n FROM customer_profiles
+       WHERE deleted_at IS NULL AND created_at > ${topOfPage}::timestamptz
+    `);
+
+    expect(await customersBadge(), 'nothing unread').toBe(elsewhere.rows[0]?.n ?? -1);
 
     /* Two arrive, above everything that was seen, and both reportable. */
     const older = await arrivesRecently(4);

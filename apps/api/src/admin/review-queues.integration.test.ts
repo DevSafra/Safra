@@ -201,6 +201,11 @@ describeIfDb('verification queues', () => {
  *
  * A booking is borrowed rather than built: this file's subject is the counters, and a dispute needs
  * a booking, a partner and a customer that already agree with each other.
+ *
+ * The OLDEST, and locked. The newest was borrowed until 2026-10-06, and the newest bookings are the
+ * ones other suites commit and delete: one vanished between this SELECT and the foreign-key check in
+ * a full fresh-database run. Seeded rows are not churned, and `FOR KEY SHARE` holds the one taken
+ * until this test rolls back.
  */
 async function dispute(
   db: Database,
@@ -214,8 +219,9 @@ async function dispute(
            ${status === 'resolved' ? sql`, 'closed for the counter test', now()` : sql``}
     FROM bookings b
     WHERE b.deleted_at IS NULL AND b.customer_profile_id IS NOT NULL
-    ORDER BY b.created_at DESC, b.id DESC
+    ORDER BY b.created_at, b.id
     LIMIT 1
+    FOR KEY SHARE OF b
   `);
 }
 
