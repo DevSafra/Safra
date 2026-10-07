@@ -203,6 +203,12 @@ deleting it; the reason something was blocked is often the reason it comes back.
 > is not yet shown in the reports' revenue figures or settled by a SAFRA payout, which read the
 > commission, fee and advertising accounts only.
 >
+> **Ad labels removed (Bashar, 2026-10-07):** the «إعلان شريك» badge on each partner ad card and
+> the footnote «إعلانات مدفوعة من شركاء في نفس المدينة؛ لا تؤثر على ترتيب نتائج البحث.» are gone
+> from the booking page. This departs from SRS §9.3 («موسومة دائماً «إعلان شريك»»); what remains is
+> the separate section under its own heading and `rel="sponsored"` on every ad link. Worth a legal
+> check before launch in any market that requires paid placements to be identifiable as ads.
+>
 > **Found beside the work, not changed:** SAFRA's own payout accounts are still edited in place;
 > two staff starting one conversation at once can make two; the key-rotation setting
 > `safra.field_key_rotation` can be set by any database session (fix: honour it only for a

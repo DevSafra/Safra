@@ -205,7 +205,7 @@ test.describe('حجوزاتي', () => {
     /* And neither leaks a figure from the booking that does exist. */
     expect(answers[0]!.body).not.toMatch(/\d+\.\d{2}/);
 
-    // ─── §9.3 — «إعلان شريك», on the booking's own page ───────────────────────
+    // ─── §9.3 — partner advertising, on the booking's own page ────────────────
     /*
       Driven from THIS session for the same reason as the voucher: a sign-in is budgeted here and
       this screen is already open in front of one.
@@ -236,12 +236,6 @@ test.describe('حجوزاتي', () => {
 
       if ((await slot.count()) > 0) {
         withAds.push(href);
-
-        /* Labelled — every card, not the block. A reader who stops at the headline was told. */
-        const cards = slot.locator('li');
-        const labels = slot.getByText(ar.ads.label);
-
-        await expect(labels).toHaveCount(await cards.count());
 
         /*
           And every link is OURS. The href is this app's own click route: the API's `clickPath` is

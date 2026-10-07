@@ -782,9 +782,9 @@
   },
   "ads": {
     "title": "Nearby, from our partners",
-    "label": "Partner ad",
-    "note": "Paid placements from partners in the same city; they never affect search ranking.",
-    "visit": "Visit site"
+    "visit": "Visit site",
+    "previous": "Previous places",
+    "next": "Next places"
   },
   "reviews": {
     "title": "Review your stay",

@@ -782,9 +782,9 @@
   },
   "ads": {
     "title": "In der Nähe, von unseren Partnern",
-    "label": "Partneranzeige",
-    "note": "Bezahlte Platzierungen von Partnern in derselben Stadt; sie beeinflussen das Suchranking nicht.",
-    "visit": "Website besuchen"
+    "visit": "Website besuchen",
+    "previous": "Vorherige Orte",
+    "next": "Nächste Orte"
   },
   "reviews": {
     "title": "Bewerten Sie Ihren Aufenthalt",

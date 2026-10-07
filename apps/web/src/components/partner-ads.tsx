@@ -1,21 +1,25 @@
 import { getTranslations } from 'next-intl/server';
 
+import { CardSlider } from '@/components/card-slider';
 import { getCityAds } from '@/lib/api';
 
 /**
- * «إعلان شريك» — paid placements from businesses in the city the customer booked in (§9.3).
+ * Paid placements from businesses in the city the customer booked in (§9.3).
  *
- * ## Labelled, separate, and never in a ranking
+ * ## Separate, and never in a ranking
  *
- * The SRS promise is that advertising is «موسومة دائماً «إعلان شريك» ولا تُخلط بترتيب البحث
- * الطبيعي», and this component is where a reader meets that promise. It is a block of its own with
- * its own heading, every card carries the label, and it renders only on screens that are ALREADY
- * about one booking or one city — never inside a result list, where the separation would be a
- * matter of styling rather than of structure.
+ * The block is its own section under its own heading, «أماكن قريبة من إقامتك», and it renders only
+ * on screens that are ALREADY about one booking or one city, never inside a result list, where the
+ * separation would be a matter of styling rather than of structure.
+ *
+ * Each card carried a «إعلان شريك» badge and the block a footnote saying it does not affect search
+ * ranking, as the SRS promised («موسومة دائماً «إعلان شريك»»). Bashar had both removed on
+ * 2026-10-07; the separate section and the `sponsored` link relation below are what remain of that
+ * promise, and the register records the change.
  *
  * There is no ordering here, no score and no boost: the API returns at most three, oldest campaign
  * first, and this renders them in the order it was given. A component that sorted them would be the
- * mechanism the promise exists to rule out.
+ * mechanism that rule exists to rule out.
  *
  * ## Every link goes through SAFRA — and through THIS app
  *
@@ -62,71 +66,66 @@ export async function PartnerAds({
 
   return (
     <section className="mt-10" aria-label={t('title')}>
-      <h2 className="font-display text-lg font-bold text-gold-read">{t('title')}</h2>
+      {/* In the page's ink, like every title in the customer dashboard (2026-10-07). */}
+      <h2 className="font-display text-lg font-bold text-text">{t('title')}</h2>
 
-      <ul className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {ads.map((ad) => (
-          <li
-            key={ad.reference}
-            className="flex min-w-0 flex-col gap-2 rounded-card border border-line bg-card p-4"
-          >
-            {/*
-              The label FIRST, above the headline.
+      {/*
+        A slider rather than a grid (Bashar, 2026-10-07), the same `CardSlider` and the same
+        arrangement as the home page's «موصى به من سفرة» row, which he named: arrows floating on
+        the two edges of the rail, off on a phone where a thumb scrolls it.
 
-              Below it, a reader who stops after the first line has read an advertisement without
-              being told it was one — and that first line is the half designed to be read.
-            */}
-            <span className="w-fit rounded-full border border-gold/40 px-2 py-0.5 text-13 font-semibold text-gold-read">
-              {t('label')}
-            </span>
-
-            {ad.imageUrl ? (
-              /*
+        Two departures, both his (2026-10-07). The rail keeps its column: running
+        to the page edge made it wider than the voucher card above it. And the cards are sized as a
+        share of that column, three on a desktop and two on a tablet, rather than at the home row's
+        fixed widths, which cut the third card off. The API returns at most three, so a desktop
+        shows them all and the arrows, which hide when nothing is left to reach, stay away.
+      */}
+      <div className="mt-3">
+        <CardSlider labels={{ previous: t('previous'), next: t('next') }}>
+          {ads.map((ad) => (
+            <li
+              key={ad.reference}
+              className="flex w-[16rem] shrink-0 snap-start flex-col gap-2 rounded-card border border-line bg-card p-4 sm:w-[calc((100%-0.75rem)/2)] lg:w-[calc((100%-1.5rem)/3)]"
+            >
+              {ad.imageUrl ? (
+                /*
                 `alt=""` — the headline directly beneath says the same thing, and a screen reader
                 announcing it twice is worse than not announcing the picture at all. `loading="lazy"`
                 because an advertisement must never delay the booking the reader came for.
               */
-              <img
-                src={ad.imageUrl}
-                alt=""
-                loading="lazy"
-                className="aspect-[3/2] w-full rounded-lg border border-line object-cover"
-              />
-            ) : null}
+                <img
+                  src={ad.imageUrl}
+                  alt=""
+                  loading="lazy"
+                  className="aspect-[3/2] w-full rounded-lg border border-line object-cover"
+                />
+              ) : null}
 
-            <p className="text-sm font-semibold text-text">{ad.headline}</p>
+              <p className="text-sm font-semibold text-text">{ad.headline}</p>
 
-            {/*
+              {/*
               The description, when the campaign has one (Bashar, 2026-08-31). Between the headline
               and the advertiser, which is where a reader looks for what the ad is actually about —
               and absent entirely when there is none, rather than an empty line holding space.
             */}
-            {ad.description ? (
-              <p className="text-xs leading-relaxed text-text2">{ad.description}</p>
-            ) : null}
+              {ad.description ? (
+                <p className="text-xs leading-relaxed text-text2">{ad.description}</p>
+              ) : null}
 
-            <p className="text-xs text-muted">{ad.advertiser}</p>
+              <p className="text-xs text-muted">{ad.advertiser}</p>
 
-            <a
-              href={`/${locale}/api/ads/${encodeURIComponent(ad.reference)}/click`}
-              rel="nofollow sponsored noopener noreferrer"
-              target="_blank"
-              className="mt-auto inline-flex min-h-10 w-fit items-center text-xs font-semibold text-gold-read hover:underline lg:min-h-0"
-            >
-              {t('visit')}
-            </a>
-          </li>
-        ))}
-      </ul>
-
-      {/*
-        Said out loud rather than left to the label.
-
-        «لا تؤثر على ترتيب نتائج البحث» is the part a customer cannot verify by looking, and it is
-        the whole reason the platform can carry advertising without the search results becoming
-        untrustworthy. It costs one line.
-      */}
-      <p className="mt-3 text-xs text-faint">{t('note')}</p>
+              <a
+                href={`/${locale}/api/ads/${encodeURIComponent(ad.reference)}/click`}
+                rel="nofollow sponsored noopener noreferrer"
+                target="_blank"
+                className="mt-auto inline-flex min-h-10 w-fit items-center text-xs font-semibold text-gold-read hover:underline lg:min-h-0"
+              >
+                {t('visit')}
+              </a>
+            </li>
+          ))}
+        </CardSlider>
+      </div>
     </section>
   );
 }
