@@ -102,7 +102,10 @@ export class CouponAdminService {
           ${input.maxDiscountAmount ?? null}::numeric,
           ${input.minBookingAmount ?? null}::numeric,
           ${input.startsOn}::date, ${input.endsOn}::date,
-          ${input.maxRedemptions ?? null}, ${input.maxRedemptionsPerCustomer ?? null},
+          -- Absent per-customer limit means ONE, as the contract says. It was bound as NULL, which
+          -- overrides the column's own DEFAULT 1 and broke its NOT NULL: every coupon created from
+          -- the console with that box left empty answered 500 (found 2026-10-07).
+          ${input.maxRedemptions ?? null}, ${input.maxRedemptionsPerCustomer ?? 1},
           ${cityId}::uuid, ${partnerId}::uuid, true, ${claims.sub}::uuid
         )
         ON CONFLICT DO NOTHING
