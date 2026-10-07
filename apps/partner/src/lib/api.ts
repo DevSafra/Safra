@@ -3,6 +3,8 @@ import 'server-only';
 import { cache } from 'react';
 import { z } from 'zod';
 
+import { SHOW_MORE_STEP } from '@safra/contracts';
+
 import { getPartnerSession } from './session-server';
 import { visitorHeaders } from './visitor';
 
@@ -426,8 +428,8 @@ const payoutTotalsSchema = z.object({
 export type PartnerPayoutTotals = z.infer<typeof payoutTotalsSchema>;
 
 /** One page of the partner's payouts, newest first, with the totals over all of them. */
-export async function getMyPayouts(cursor?: string) {
-  const query = new URLSearchParams({ limit: '20' });
+export async function getMyPayouts(cursor?: string, limit = SHOW_MORE_STEP) {
+  const query = new URLSearchParams({ limit: String(limit) });
 
   if (cursor) query.set('cursor', cursor);
 
@@ -1178,8 +1180,8 @@ export type PartnerEmployeePage = z.infer<typeof employeePageSchema>;
  * guess about a stranger's organisation. A hotel group with three hundred staff is an ordinary
  * customer. See `pagination.ts` for why customer-facing lists keep the cursor.
  */
-export async function getMyEmployees(cursor?: string) {
-  const query = new URLSearchParams({ limit: '20' });
+export async function getMyEmployees(cursor?: string, limit = SHOW_MORE_STEP) {
+  const query = new URLSearchParams({ limit: String(limit) });
 
   if (cursor) query.set('cursor', cursor);
 
@@ -1297,8 +1299,8 @@ const arrivalSchema = z.object({
 
 export type PartnerArrival = z.infer<typeof arrivalSchema>;
 
-export async function getMyArrivals(cursor?: string) {
-  const query = new URLSearchParams({ limit: '20' });
+export async function getMyArrivals(cursor?: string, limit = SHOW_MORE_STEP) {
+  const query = new URLSearchParams({ limit: String(limit) });
 
   if (cursor) query.set('cursor', cursor);
 
@@ -1402,8 +1404,8 @@ const violationSchema = z.object({
 
 export type PartnerViolation = z.infer<typeof violationSchema>;
 
-export async function getMyViolations(cursor?: string) {
-  const query = new URLSearchParams({ limit: '20' });
+export async function getMyViolations(cursor?: string, limit = SHOW_MORE_STEP) {
+  const query = new URLSearchParams({ limit: String(limit) });
 
   if (cursor) query.set('cursor', cursor);
 

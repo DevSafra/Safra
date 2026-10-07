@@ -7,7 +7,10 @@ import {
   type PartnerArrival,
 } from '@/lib/api';
 import { requireVerifiedPartner, sectionAccess } from '@/lib/gate';
+import { readShown, shownCount } from '@safra/contracts';
+
 import { Shell } from '@/components/shell';
+import { ListMore } from '@/components/list-more';
 import { SectionRefusal } from '@/components/section-refusal';
 import { ArrivalActions } from '@/components/arrival-actions';
 import { Ltr } from '@/components/ltr';
@@ -57,6 +60,8 @@ export default async function ArrivalsPage({
   const params = await searchParams;
   const raw = params['cursor'];
   const cursor = Array.isArray(raw) ? raw[0] : raw;
+  /* How much of the list to show: «عرض المزيد» adds fifteen (see @safra/contracts/show-more). */
+  const shown = shownCount(params['shown']);
 
   /*
     Trimmed but not otherwise reshaped — no upper-casing, no stripping.
@@ -125,7 +130,11 @@ export default async function ArrivalsPage({
     );
   }
 
-  const page = await getMyArrivals(cursor);
+  const page = await readShown(
+    (limit, after) => getMyArrivals(after, limit),
+    shown,
+    cursor,
+  );
 
   if (page === 'unauthenticated') {
     return shell(<p className="text-sm text-muted">{t.dashboard.sessionExpired}</p>);
@@ -153,14 +162,17 @@ export default async function ArrivalsPage({
         </ul>
       )}
 
-      {page.nextCursor ? (
-        <Link
-          href={`/arrivals?cursor=${encodeURIComponent(page.nextCursor)}`}
-          className="inline-flex min-h-10 w-fit items-center rounded-lg border border-line px-4 text-sm text-muted lg:min-h-0 lg:py-2"
-        >
-          {t.arrivals.loadMore}
-        </Link>
-      ) : null}
+      <ListMore
+        path="/arrivals"
+        cursor={cursor}
+        shown={shown}
+        nextCursor={page.nextCursor}
+        labels={{
+          more: t.arrivals.loadMore,
+          loading: t.list.loading,
+          first: t.list.first,
+        }}
+      />
     </>,
   );
 }

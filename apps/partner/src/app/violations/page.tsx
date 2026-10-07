@@ -2,7 +2,10 @@ import Link from 'next/link';
 
 import { getMyViolations, sidebarBadges, type PartnerViolation } from '@/lib/api';
 import { requireVerifiedPartner, sectionAccess } from '@/lib/gate';
+import { readShown, shownCount } from '@safra/contracts';
+
 import { Shell } from '@/components/shell';
+import { ListMore } from '@/components/list-more';
 import { SectionRefusal } from '@/components/section-refusal';
 import { Ltr } from '@/components/ltr';
 import { count } from '@/lib/format';
@@ -45,6 +48,8 @@ export default async function ViolationsPage({
   const params = await searchParams;
   const raw = params['cursor'];
   const cursor = Array.isArray(raw) ? raw[0] : raw;
+  /* How much of the list to show: «عرض المزيد» adds fifteen (see @safra/contracts/show-more). */
+  const shown = shownCount(params['shown']);
 
   const [access, profile] = await Promise.all([
     sectionAccess('violations'),
@@ -67,7 +72,11 @@ export default async function ViolationsPage({
 
   if (access !== 'open') return shell(<SectionRefusal access={access} />);
 
-  const page = await getMyViolations(cursor);
+  const page = await readShown(
+    (limit, after) => getMyViolations(after, limit),
+    shown,
+    cursor,
+  );
 
   if (page === 'unauthenticated') {
     return shell(<p className="text-sm text-muted">{t.dashboard.sessionExpired}</p>);
@@ -116,14 +125,17 @@ export default async function ViolationsPage({
         </ul>
       )}
 
-      {page.nextCursor ? (
-        <Link
-          href={`/violations?cursor=${encodeURIComponent(page.nextCursor)}`}
-          className="inline-flex min-h-10 w-fit items-center rounded-lg border border-line px-4 text-sm text-muted lg:min-h-0 lg:py-2"
-        >
-          {t.violations.loadMore}
-        </Link>
-      ) : null}
+      <ListMore
+        path="/violations"
+        cursor={cursor}
+        shown={shown}
+        nextCursor={page.nextCursor}
+        labels={{
+          more: t.violations.loadMore,
+          loading: t.list.loading,
+          first: t.list.first,
+        }}
+      />
     </>,
   );
 }

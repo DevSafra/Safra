@@ -1156,6 +1156,12 @@ export const ar = {
     close: 'حسناً',
   },
 
+  /* Every cursor list's foot, section-neutral like `slider`: «عرض المزيد» grows the list in place. */
+  list: {
+    more: 'عرض المزيد',
+    loading: 'جارٍ التحميل…',
+    first: 'العودة إلى البداية',
+  },
   slider: {
     title: 'معاينة الصور',
     open: 'معاينة الصورة',

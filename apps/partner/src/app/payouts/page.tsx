@@ -15,6 +15,7 @@ import {
 } from '@/lib/api';
 import { requireVerifiedPartner, sectionAccess } from '@/lib/gate';
 import { Shell } from '@/components/shell';
+import { ListMore } from '@/components/list-more';
 import { SectionRefusal } from '@/components/section-refusal';
 import { Ltr } from '@/components/ltr';
 import { amount, count } from '@/lib/format';
@@ -28,7 +29,7 @@ import {
   violationKind,
 } from '@/lib/strings';
 import { TONES } from '@/lib/tones';
-import { payoutIsSettled } from '@safra/contracts';
+import { payoutIsSettled, readShown, shownCount } from '@safra/contracts';
 import { statusTone } from '@safra/ui';
 
 /**
@@ -81,6 +82,8 @@ export default async function PayoutsPage({
 }) {
   const raw = (await searchParams)['cursor'];
   const cursor = Array.isArray(raw) ? raw[0] : raw;
+  /* How much of the list to show: «عرض المزيد» adds fifteen (see @safra/contracts/show-more). */
+  const shown = shownCount((await searchParams)['shown']);
 
   /*
     An EMPLOYEE is told this belongs to the owner, before the fetch that would refuse them.
@@ -118,7 +121,7 @@ export default async function PayoutsPage({
     none. Both reads are the partner's own and neither blocks the other, so they go together.
   */
   const [payouts, accounts, withheld, recoveries, fines] = await Promise.all([
-    getMyPayouts(cursor),
+    readShown((limit, after) => getMyPayouts(after, limit), shown, cursor),
     getMyPayoutAccounts(),
     getMyWithheldPayouts(),
     getMyRecoveries(),
@@ -233,14 +236,17 @@ export default async function PayoutsPage({
             The next page, the way the portal's other lists page (violations, arrivals). This list
             stopped at fifty with no way past it, so a partner's oldest transfers were unreachable.
           */}
-          {payouts.nextCursor ? (
-            <Link
-              href={`/payouts?cursor=${encodeURIComponent(payouts.nextCursor)}`}
-              className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-line px-4 text-sm text-muted transition-colors hover:border-gold hover:text-gold-read lg:min-h-0 lg:py-2"
-            >
-              {t.payouts.loadMore}
-            </Link>
-          ) : null}
+          <ListMore
+            path="/payouts"
+            cursor={cursor}
+            shown={shown}
+            nextCursor={payouts.nextCursor}
+            labels={{
+              more: t.payouts.loadMore,
+              loading: t.list.loading,
+              first: t.list.first,
+            }}
+          />
 
           <p className="text-13 leading-relaxed text-faint">{t.payouts.note}</p>
           <p className="text-13 leading-relaxed text-faint">{t.payouts.readOnly}</p>

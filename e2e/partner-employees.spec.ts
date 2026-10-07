@@ -453,32 +453,34 @@ test.describe('الموظفون', () => {
     });
 
     /**
-     * «عرض المزيد» pages, and the second page is not the first one again.
+     * «عرض المزيد» GROWS the list in place (Bashar, 2026-10-07), and what it adds is new.
      *
-     * The control is a plain link carrying a cursor, so this needs no JavaScript to work — but a
-     * cursor that does not ADVANCE looks identical to one that does until you compare the rows.
-     * That is exactly how `O-e2e-2` hid for a week, so the assertion is that the two pages share
-     * no row rather than that a second page rendered.
+     * It used to replace the page with the next one; now the rows on screen stay and the next ones
+     * join them. So the assertion is the shape of that: every row that was there is still there,
+     * in order, more follow, and no row appears twice. A cursor that did not advance (`O-e2e-2`)
+     * would show up here as the first rows repeated after themselves.
      */
-    test('pages to a second page that is not the first one again', async ({ page }) => {
+    test('grows the list with rows it did not already show', async ({ page }) => {
       await page.goto('/employees');
 
       const more = page.getByRole('link', { name: t.employees.loadMore });
 
       test.skip(
         (await more.count()) === 0,
-        'Fewer than one page of employees; nothing to page through.',
+        'Fifteen employees or fewer; nothing more to show.',
       );
 
-      const firstPage = await page.locator('#employees-list li').allTextContents();
+      const before = await page.locator('#employees-list li').allTextContents();
 
       await more.click();
-      await page.waitForURL(/cursor=/);
+      await page.waitForURL(/shown=30/);
+      await expect(page.locator('#employees-list li')).not.toHaveCount(before.length);
 
-      const secondPage = await page.locator('#employees-list li').allTextContents();
+      const after = await page.locator('#employees-list li').allTextContents();
 
-      expect(secondPage.length).toBeGreaterThan(0);
-      expect(secondPage).not.toStrictEqual(firstPage);
+      expect(after.slice(0, before.length)).toStrictEqual(before);
+      expect(after.length).toBeGreaterThan(before.length);
+      expect(new Set(after).size).toBe(after.length);
     });
   });
 

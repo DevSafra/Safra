@@ -1,5 +1,3 @@
-import Link from 'next/link';
-
 import { statusTone } from '@safra/ui';
 
 import {
@@ -10,7 +8,10 @@ import {
   type PartnerEmployeeRole,
 } from '@/lib/api';
 import { isEmployeeReader, requireVerifiedPartner } from '@/lib/gate';
+import { readShown, shownCount } from '@safra/contracts';
+
 import { Shell } from '@/components/shell';
+import { ListMore } from '@/components/list-more';
 import { Ltr } from '@/components/ltr';
 import { EmployeeActions, EmployeeInvite } from '@/components/employee-manager';
 import { TONES } from '@/lib/tones';
@@ -54,6 +55,8 @@ export default async function EmployeesPage({
   const params = await searchParams;
   const raw = params['cursor'];
   const cursor = Array.isArray(raw) ? raw[0] : raw;
+  /* How much of the list to show: «عرض المزيد» adds fifteen (see @safra/contracts/show-more). */
+  const shown = shownCount(params['shown']);
 
   /*
     An EMPLOYEE is told this belongs to the owner before either fetch is made.
@@ -92,7 +95,7 @@ export default async function EmployeesPage({
   }
 
   const [page, rolesResult] = await Promise.all([
-    getMyEmployees(cursor),
+    readShown((limit, after) => getMyEmployees(after, limit), shown, cursor),
     getEmployeeRoles(),
   ]);
 
@@ -131,14 +134,17 @@ export default async function EmployeesPage({
         when the API says there IS another page — a control that leads nowhere teaches nobody
         anything, which is the same reason the geography screens have no pager at all.
       */}
-      {page.nextCursor ? (
-        <Link
-          href={`/employees?cursor=${encodeURIComponent(page.nextCursor)}`}
-          className="inline-flex min-h-10 w-fit items-center rounded-lg border border-line px-4 text-sm text-muted lg:min-h-0 lg:py-2"
-        >
-          {t.employees.loadMore}
-        </Link>
-      ) : null}
+      <ListMore
+        path="/employees"
+        cursor={cursor}
+        shown={shown}
+        nextCursor={page.nextCursor}
+        labels={{
+          more: t.employees.loadMore,
+          loading: t.list.loading,
+          first: t.list.first,
+        }}
+      />
     </>,
   );
 }
