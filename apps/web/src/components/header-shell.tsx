@@ -72,9 +72,18 @@ export function HeaderShell({ children }: { children: React.ReactNode }) {
         className="pointer-events-none -mb-px h-px w-full"
       />
 
+      {/*
+        Solid while the phone menu is open (Bashar, 2026-10-07: «fix the background issue of the
+        navbar on mobile»). The header stays ABOVE the menu's scrim so its close button can be
+        reached, and at the top of a page it is transparent, so the scrim showed straight through it
+        as a grey bar with the logo floating on it; scrolled, the translucent bar did the same more
+        faintly. The page's own card colour, opaque, is what the sheet beneath it is drawn in, so
+        the two read as one surface. Keyed on the MENU button only: a desktop dropdown has no scrim
+        and leaves the header as it was.
+      */}
       <header
         data-stuck={stuck ? '' : undefined}
-        className={`sticky top-0 z-40 border-b transition-[background-color,border-color,box-shadow] duration-200 ease-out-strong print:hidden ${
+        className={`sticky top-0 z-40 border-b transition-[background-color,border-color,box-shadow] duration-200 ease-out-strong print:hidden has-[[data-menu=mobile][aria-expanded=true]]:border-[rgba(168,122,31,0.14)] has-[[data-menu=mobile][aria-expanded=true]]:bg-card has-[[data-menu=mobile][aria-expanded=true]]:backdrop-blur-none ${
           stuck
             ? 'border-[rgba(168,122,31,0.14)] bg-[var(--header-bg)] shadow-[var(--shadow-lift)] backdrop-blur-[18px]'
             : 'border-transparent bg-transparent'
