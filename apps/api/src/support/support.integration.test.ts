@@ -5,6 +5,8 @@ import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { SupportService } from './support.service.js';
 import { CustomerAccountService } from '../auth/customer-account.service.js';
+import { PropertiesService } from '../partner/properties.service.js';
+import { PERMISSIONS, ROLE_PERMISSIONS } from '@safra/contracts';
 import { interleaved } from '../common/testing/interleaved.testing.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
@@ -370,6 +372,109 @@ describeIfDb('SupportService', () => {
       expect((await rowOf(thread.reference, partner))?.unread).toBe(false);
       /* A partner's thread is not a customer's: nothing on it reaches this customer's badge. */
       expect(await unreadOf()).toBe(0);
+    });
+  });
+
+  // ─── What a partner-side reader has not read (Bashar, 2026-10-07) ─────────────
+
+  /**
+   * The partner portal's الدعم badge: per PERSON, because a business is several readers. The
+   * profile's count and the list row's flag are both read; they are two queries over two shapes of
+   * the same scope (a UNION in the profile, an OR here) and must agree.
+   */
+  describe('unread for a partner-side reader', () => {
+    const owner: AccessTokenClaims = {
+      ...partner,
+      permissions: [...ROLE_PERMISSIONS.partner],
+    };
+    /* The profile is read with `property.manage_own`; an employee holding it can read their badge. */
+    const staffer = (sub = EMPLOYEE_USER_ID): AccessTokenClaims => ({
+      ...employee(sub),
+      permissions: [PERMISSIONS.PROPERTY_MANAGE_OWN],
+    });
+
+    const badgeOf = async (claims: AccessTokenClaims) =>
+      (await new PropertiesService(db, null as never).profile(claims)).notices.support;
+
+    const unreadRows = async (claims: AccessTokenClaims) =>
+      (await support.list(claims, { limit: 50 })).items.filter((ticket) => ticket.unread)
+        .length;
+
+    const reply = async (reference: string, senderKind: string, internal = false) => {
+      await db.execute(sql`
+        INSERT INTO messages (conversation_id, sender_kind, body, redacted_count, internal, created_at)
+        SELECT c.id, ${senderKind}::message_sender, 'SAFRA has looked into this.', 0,
+               ${internal}, now() + INTERVAL '1 second'
+        FROM conversations c WHERE c.reference = ${reference}`);
+    };
+
+    it('counts a SAFRA reply until the owner opens the thread', async () => {
+      const thread = await support.open(owner, LONG);
+
+      expect(await badgeOf(owner)).toBe(0);
+
+      await reply(thread.reference, 'staff');
+
+      expect(await badgeOf(owner)).toBe(1);
+      expect(await unreadRows(owner)).toBe(1);
+
+      await support.thread(owner, thread.reference);
+
+      expect(await badgeOf(owner)).toBe(0);
+      expect(await unreadRows(owner)).toBe(0);
+    });
+
+    it('is per person: the receptionist reading it does not clear the owner', async () => {
+      const thread = await support.open(employee(), LONG);
+
+      await reply(thread.reference, 'staff');
+
+      expect(await badgeOf(staffer())).toBe(1);
+      expect(await badgeOf(owner)).toBe(1);
+
+      await support.thread(employee(), thread.reference);
+
+      expect(await badgeOf(staffer())).toBe(0);
+      expect(await badgeOf(owner), 'the owner has still not read it').toBe(1);
+    });
+
+    it('never tells an employee about a thread they cannot open', async () => {
+      const theirs = await support.open(employee(OTHER_EMPLOYEE_USER_ID), LONG);
+
+      await reply(theirs.reference, 'staff');
+
+      expect(await badgeOf(staffer())).toBe(0);
+      expect(await badgeOf(staffer(OTHER_EMPLOYEE_USER_ID))).toBe(1);
+    });
+
+    it('does not count a colleague writing as the business, or an internal note', async () => {
+      const thread = await support.open(owner, LONG);
+
+      await reply(thread.reference, 'partner');
+      await reply(thread.reference, 'staff', true);
+
+      expect(await badgeOf(owner)).toBe(0);
+    });
+
+    it('is not cleared by the customer reading, nor the customer by the partner', async () => {
+      const mine = await support.open(customer(), LONG);
+      const theirs = await support.open(owner, LONG);
+
+      await reply(mine.reference, 'staff');
+      await reply(theirs.reference, 'staff');
+      await support.thread(owner, theirs.reference);
+
+      expect(await badgeOf(owner)).toBe(0);
+      expect(
+        (
+          await new CustomerAccountService(
+            db,
+            null as never,
+            null as never,
+            null as never,
+          ).summary(customer())
+        ).counters.unreadSupport,
+      ).toBe(1);
     });
   });
 

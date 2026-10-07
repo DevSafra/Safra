@@ -11,6 +11,7 @@ import { LedgerService } from '../ledger/ledger.service.js';
 import { PayoutService } from '../payouts/payout.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { PartnerDisputesService } from './partner-disputes.service.js';
+import { PropertiesService } from './properties.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
 /**
@@ -528,6 +529,48 @@ describeIfDb('a dispute, from the partner’s side', () => {
     await expect(service.list(without)).rejects.toBeDefined();
     await expect(service.detail(reference, without)).rejects.toBeDefined();
     await expect(service.respond(reference, ACCOUNT, without)).rejects.toBeDefined();
+  });
+
+  /**
+   * The النزاعات badge (Bashar, 2026-10-07): live disputes nobody at the business has answered.
+   * A shared queue, so it falls the moment the account is given, by whoever gives it.
+   */
+  describe('the awaiting-response badge', () => {
+    /* The profile is read with `property.manage_own`, which the owner holds. */
+    const badgeOf = async (claims: AccessTokenClaims) =>
+      (
+        await new PropertiesService(db, new AuditService(db)).profile({
+          ...claims,
+          permissions: [...claims.permissions, P.PROPERTY_MANAGE_OWN],
+        })
+      ).notices.disputes;
+
+    it('counts an unanswered dispute until the business answers it', async () => {
+      expect(await badgeOf(owner())).toBe(1);
+
+      await service.respond(reference, ACCOUNT, employee());
+
+      expect(await badgeOf(owner()), 'answered by a colleague is answered').toBe(0);
+    });
+
+    it('does not count a decided dispute, which takes no answer', async () => {
+      await db.execute(sql`
+        UPDATE disputes SET status = 'rejected', resolution = 'لا أساس.', closed_at = now()
+        WHERE id = ${disputeId}::uuid
+      `);
+
+      expect(await badgeOf(owner())).toBe(0);
+    });
+
+    it('is withheld from a reader who cannot open النزاعات', async () => {
+      const without = { ...owner(), permissions: [] } as unknown as AccessTokenClaims;
+
+      expect(await badgeOf(without)).toBeNull();
+    });
+
+    it('counts only this business', async () => {
+      expect(await badgeOf(owner(otherPartnerId))).toBe(0);
+    });
   });
 
   /** A customer's own token carries no partner, so none of this is reachable with one. */

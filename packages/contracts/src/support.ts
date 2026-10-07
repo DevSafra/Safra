@@ -78,8 +78,8 @@ export interface SupportTicket {
   /** The most recent message a non-staff reader is allowed to see, for the list row. */
   readonly lastMessage: string | null;
   /**
-   * Something from SAFRA, the host or the system the CUSTOMER has not opened yet — the row-level half
-   * of the الدعم badge. Always false for a partner-side reader, whose reading is not tracked.
+   * Something from somebody else that THIS reader has not opened yet, the row-level half of the
+   * الدعم badge. A customer's reading is tracked on the thread, a partner-side reader's per person.
    */
   readonly unread: boolean;
 }

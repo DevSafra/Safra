@@ -57,6 +57,8 @@ export const CASCADE_HANDLES = new Set<string>([
   'booking_internal_notes',
   'booking_verifications',
   'coupon_redemptions',
+  /* Per-person read marks on a thread (partner portal الدعم badge) — a pure child of `conversations`. */
+  'conversation_reads',
   'coupon_partners',
   'dispute_evidence',
   /* The partner's account of a dispute — a pure child of `disputes`, deleted with it. */

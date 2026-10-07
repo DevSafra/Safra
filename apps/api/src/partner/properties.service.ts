@@ -13,6 +13,7 @@ import {
   usesStarRating,
   type PropertyCreateInput,
   type PropertyFaqAnswersInput,
+  type Permission,
   type PropertyUpdateInput,
   type UnitCreateInput,
   type UnitUpdateInput,
@@ -52,6 +53,10 @@ export class PropertiesService {
    */
   async profile(claims: AccessTokenClaims | undefined) {
     const partnerId = requirePartnerId(claims, P.PROPERTY_MANAGE_OWN);
+    const can = (permission: Permission) =>
+      (claims?.permissions ?? []).includes(permission);
+    const employee = claims?.role === 'partner_employee';
+    const reader = claims?.sub ?? null;
 
     const rows = await this.db.execute<{
       reference: string;
@@ -65,6 +70,9 @@ export class PropertiesService {
       review_average: string | null;
       suspended_since: string | null;
       suspended_reason: string | null;
+      unread_support: number;
+      awaiting_disputes: number | null;
+      pending_coupons: number | null;
     }>(sql`
       SELECT pa.reference, pa.display_name, pa.legal_name,
              pa.verification::text AS verification, pa.score, pa.tier::text AS tier,
@@ -95,7 +103,55 @@ export class PropertiesService {
              -- different audience -- staff-only, by the same rule that keeps score and tier from
              -- employees -- and this profile reaches whoever is signed in.
              to_char(pa.suspended_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS suspended_since,
-             pa.suspended_reason
+             pa.suspended_reason,
+             -- ── The notice badges (Bashar, 2026-10-07) ─────────────────────────────────────
+             --
+             -- الدعم: threads THIS PERSON can read holding a message from SAFRA, a guest or the
+             -- system newer than their own read mark (conversation_reads). Per person, because a
+             -- business is several readers. The scope is SupportService.scopeOf written as a
+             -- UNION so each half reaches an index; the support suite holds the two equal.
+             (SELECT count(*)::int FROM conversations c
+              WHERE c.deleted_at IS NULL
+                AND c.id IN (
+                  SELECT id FROM conversations
+                  WHERE partner_id = pa.id AND booking_id IS NULL AND dispute_id IS NULL
+                    AND (NOT ${employee} OR opened_by_user_id = ${reader}::uuid)
+                  UNION
+                  SELECT c2.id FROM conversations c2
+                  JOIN bookings b ON b.id = c2.booking_id
+                  WHERE b.partner_id = pa.id AND NOT ${employee}
+                )
+                AND EXISTS (
+                  SELECT 1 FROM messages m
+                  WHERE m.conversation_id = c.id
+                    AND m.internal = false
+                    AND m.sender_kind <> 'partner'
+                    AND m.created_at > coalesce(
+                      (SELECT cr.seen_at FROM conversation_reads cr
+                       WHERE cr.conversation_id = c.id AND cr.user_id = ${reader}::uuid),
+                      '-infinity'::timestamptz)
+                )) AS unread_support,
+             -- النزاعات: live disputes nobody at the business has answered yet. A QUEUE, so it is
+             -- shared: it falls the moment anyone submits the business's account. Null for a
+             -- reader who cannot open النزاعات, so its size is not told to them either.
+             CASE WHEN ${can(P.DISPUTE_RESPOND_OWN)} THEN
+               (SELECT count(*)::int FROM disputes d
+                WHERE d.partner_id = pa.id
+                  AND d.deleted_at IS NULL
+                  AND d.status IN ('open', 'investigating')
+                  AND NOT EXISTS (SELECT 1 FROM dispute_responses r WHERE r.dispute_id = d.id))
+             END AS awaiting_disputes,
+             -- الكوبونات: offers waiting for a decision and still running; an expired offer is no
+             -- longer work. Same gate, same reason.
+             CASE WHEN ${can(P.PARTNER_COUPON_DECIDE)} THEN
+               (SELECT count(*)::int FROM coupon_partners cp
+                JOIN coupons co ON co.id = cp.coupon_id
+                WHERE cp.partner_id = pa.id
+                  AND cp.status = 'pending'
+                  AND cp.deleted_at IS NULL
+                  AND co.deleted_at IS NULL
+                  AND co.ends_at > now())
+             END AS pending_coupons
       FROM partners pa
       LEFT JOIN cities ci ON ci.id = pa.city_id
       WHERE pa.id = ${partnerId} AND pa.deleted_at IS NULL
@@ -127,6 +183,15 @@ export class PropertiesService {
       propertyCount: row.property_count,
       /** Null when the partner has no published reviews — the badge is then absent, not «0». */
       reviewAverage: row.review_average,
+      /*
+        The notice badges: zero hides one, null means this reader cannot open the section. See the
+        query for what each counts.
+      */
+      notices: {
+        support: row.unread_support,
+        disputes: row.awaiting_disputes,
+        coupons: row.pending_coupons,
+      },
       city: row.city_name_ar,
       /*
         An OBJECT or null, not two loose fields.

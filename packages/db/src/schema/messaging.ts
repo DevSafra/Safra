@@ -5,6 +5,7 @@ import {
   integer,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
 } from 'drizzle-orm/pg-core';
@@ -162,6 +163,34 @@ export const messages = pgTable(
     ...createdAt,
   },
   (t) => [index('messages_conversation_idx').on(t.conversationId, t.createdAt)],
+);
+
+/**
+ * When one PERSON on the partner side last read one thread (Bashar, 2026-10-07: the partner
+ * portal's الدعم badge).
+ *
+ * A row per reader rather than a column on the thread, which is what the customer side has
+ * (`customerSeenAt`), because a business is several people. The owner reads every thread on the
+ * business and a receptionist reads the ones they opened; one shared «seen» would let whoever
+ * looked first clear the badge for everybody else, so the owner would never learn SAFRA had
+ * answered the question their receptionist asked.
+ *
+ * No row means never read. Migration 0088 wrote one for every thread that existed, so the badge
+ * counts from the day it shipped rather than announcing every reply ever written.
+ */
+export const conversationReads = pgTable(
+  'conversation_reads',
+  {
+    conversationId: foreignId('conversation_id')
+      .notNull()
+      .references(() => conversations.id),
+    userId: foreignId('user_id')
+      .notNull()
+      .references(() => users.id),
+    /** The newest message this reader was shown, not the moment they looked. See SupportService.thread. */
+    seenAt: timestamp('seen_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.conversationId] })],
 );
 
 /**

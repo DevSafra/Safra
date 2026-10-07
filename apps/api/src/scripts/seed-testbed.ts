@@ -1368,7 +1368,11 @@ async function build(db: Seeder): Promise<void> {
     reason it would not be in the seed: nothing but a testbed has threads on this database.
   */
   await db.execute(sql`ALTER TABLE messages DISABLE TRIGGER USER`);
-  await db.execute(sql`TRUNCATE TABLE messages, conversations RESTART IDENTITY`);
+  /* `conversation_reads` with them (2026-10-07): it references `conversations`, and TRUNCATE refuses
+     a table something else points at unless that table goes in the same statement. */
+  await db.execute(
+    sql`TRUNCATE TABLE conversation_reads, messages, conversations RESTART IDENTITY`,
+  );
   await db.execute(sql`ALTER TABLE messages ENABLE TRIGGER USER`);
   /*
     Notifications go FIRST, before the four things they point at.
@@ -1660,6 +1664,11 @@ async function build(db: Seeder): Promise<void> {
     WHERE c.customer_profile_id IN (${testbedProfiles})
        OR c.partner_id IN (${testbedPartners}))`);
   await db.execute(sql`ALTER TABLE messages ENABLE TRIGGER USER`);
+  /* Who on the partner side read those threads (2026-10-07): a child of the thread, so it goes first. */
+  await db.execute(sql`DELETE FROM conversation_reads WHERE conversation_id IN (
+    SELECT c.id FROM conversations c
+    WHERE c.customer_profile_id IN (${testbedProfiles})
+       OR c.partner_id IN (${testbedPartners}))`);
   await db.execute(sql`DELETE FROM conversations
     WHERE customer_profile_id IN (${testbedProfiles})
        OR partner_id IN (${testbedPartners})`);

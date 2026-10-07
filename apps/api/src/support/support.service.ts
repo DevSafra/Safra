@@ -227,21 +227,34 @@ export class SupportService {
   }
 
   /**
-   * Whether the thread holds something the customer has not opened (Bashar, 2026-10-07).
+   * Whether the thread holds something THIS reader has not opened (Bashar, 2026-10-07).
    *
-   * The same predicate as the الدعم badge in `CustomerAccountService.summary`, so a row marked new
-   * and the count beside the section cannot disagree. A partner-side reader is not tracked: the
-   * request was the customer's dashboard, and a business has several people reading one thread.
+   * The customer's mark is a column on the thread, because a customer thread has one reader. A
+   * partner-side reader's is their own row in `conversation_reads`, because a business has several:
+   * the owner and the receptionist who opened the thread each have their own idea of what they have
+   * read. Each is the same predicate as the matching sidebar badge (the customer summary, the
+   * partner profile), so a row marked new and the count beside the section cannot disagree.
    */
   private unreadOf(asker: Asker): SQL {
-    if (asker.kind !== 'customer') return sql`false`;
+    if (asker.kind === 'customer') {
+      return sql`EXISTS (
+        SELECT 1 FROM messages um
+        WHERE um.conversation_id = c.id
+          AND um.internal = false
+          AND um.sender_kind <> 'customer'
+          AND um.created_at > coalesce(c.customer_seen_at, '-infinity'::timestamptz)
+      )`;
+    }
 
     return sql`EXISTS (
       SELECT 1 FROM messages um
       WHERE um.conversation_id = c.id
         AND um.internal = false
-        AND um.sender_kind <> 'customer'
-        AND um.created_at > coalesce(c.customer_seen_at, '-infinity'::timestamptz)
+        AND um.sender_kind <> 'partner'
+        AND um.created_at > coalesce(
+          (SELECT cr.seen_at FROM conversation_reads cr
+           WHERE cr.conversation_id = c.id AND cr.user_id = ${asker.userId}::uuid),
+          '-infinity'::timestamptz)
     )`;
   }
 
@@ -440,6 +453,16 @@ export class SupportService {
           ${newest}::timestamptz
         )
         WHERE id = ${row.id}::uuid
+      `);
+    }
+
+    /* A partner-side reader marks only their OWN row: reading it clears nobody else's badge. */
+    if (asker.kind !== 'customer' && newest !== undefined) {
+      await this.db.execute(sql`
+        INSERT INTO conversation_reads (conversation_id, user_id, seen_at)
+        VALUES (${row.id}::uuid, ${asker.userId}::uuid, ${newest}::timestamptz)
+        ON CONFLICT (user_id, conversation_id)
+        DO UPDATE SET seen_at = greatest(conversation_reads.seen_at, excluded.seen_at)
       `);
     }
 

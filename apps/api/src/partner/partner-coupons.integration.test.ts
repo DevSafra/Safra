@@ -1,11 +1,12 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { ERROR } from '@safra/contracts';
+import { ERROR, PERMISSIONS as P } from '@safra/contracts';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { PartnerCouponsService } from './partner-coupons.service.js';
+import { PropertiesService } from './properties.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
 /**
@@ -146,5 +147,46 @@ describeIfDb('a partner’s coupon decisions', () => {
 
     expect(logged.rows[0]?.actor).toBe(userId);
     expect(JSON.stringify(logged.rows[0]?.after)).toContain(code);
+  });
+
+  /**
+   * The الكوبونات badge (Bashar, 2026-10-07): offers still waiting for a decision. Counted against
+   * whatever this partner already has pending, because the fixture is a real partner.
+   */
+  describe('the waiting-offers badge', () => {
+    const badgeOf = async (permissions: string[]) =>
+      (
+        await new PropertiesService(db, new AuditService(db)).profile({
+          ...partner(),
+          permissions,
+        } as unknown as AccessTokenClaims)
+      ).notices.coupons;
+
+    const decider = [P.PROPERTY_MANAGE_OWN, P.PARTNER_COUPON_DECIDE];
+
+    it('counts a pending offer and drops it once decided', async () => {
+      const before = await badgeOf(decider);
+
+      expect(before).toBeGreaterThanOrEqual(1);
+
+      await service.decide(partner(), partnerId, code, 'rejected');
+
+      expect(await badgeOf(decider)).toBe((before ?? 0) - 1);
+    });
+
+    it('does not count an offer that has already ended', async () => {
+      const before = await badgeOf(decider);
+
+      await db.execute(sql`
+        UPDATE coupons SET ends_at = now() - interval '1 minute', starts_at = now() - interval '2 days'
+        WHERE code = ${code}
+      `);
+
+      expect(await badgeOf(decider)).toBe((before ?? 0) - 1);
+    });
+
+    it('is withheld from a reader who cannot decide offers', async () => {
+      expect(await badgeOf([P.PROPERTY_MANAGE_OWN])).toBeNull();
+    });
   });
 });
