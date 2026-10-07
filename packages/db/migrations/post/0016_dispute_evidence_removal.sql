@@ -9,9 +9,11 @@
 -- So: a soft delete, never a DELETE. The row stays, the bytes stay addressable to a re-drive, and
 -- `dispute.evidence_removed` in the audit log says who removed it and when. Nothing vanishes; it
 -- stops counting and stops being served.
-ALTER TABLE dispute_evidence ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+SELECT add_column_if_missing('dispute_evidence', 'deleted_at', 'timestamptz');
 
 -- The reads all filter on it, and every one of them is per dispute.
-CREATE INDEX IF NOT EXISTS dispute_evidence_live_idx
-  ON dispute_evidence (dispute_id, created_at)
-  WHERE deleted_at IS NULL;
+SELECT create_index_if_missing('dispute_evidence_live_idx', $def$
+  CREATE INDEX dispute_evidence_live_idx
+    ON dispute_evidence (dispute_id, created_at)
+    WHERE deleted_at IS NULL
+$def$);

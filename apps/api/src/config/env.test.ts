@@ -13,8 +13,11 @@ import { loadEnv } from './env.js';
  */
 const BASE = {
   NODE_ENV: 'production',
-  APP_URL: 'https://safra.example',
-  ADMIN_URL: 'https://admin.safra.example',
+  APP_URL: 'https://safra.sy',
+  ADMIN_URL: 'https://admin.safra.sy',
+  PARTNER_URL: 'https://partner.safra.sy',
+  API_URL_SELF: 'https://api.safra.sy',
+  MAIL_FROM: 'SAFRA <no-reply@safra.sy>',
   DATABASE_URL: 'postgres://user:pw@db.internal:5432/safra',
   REDIS_URL: 'redis://cache.internal:6379',
   JWT_ACCESS_SECRET: 'a'.repeat(48),
@@ -89,12 +92,75 @@ describe('loadEnv', () => {
     );
   });
 
+  /**
+   * A partner's email linking to `http://localhost:3002`, images pointing at the API's loopback and
+   * mail sent from a domain that does not exist: each looked like success and none failed a health
+   * check (go-live audit, 2026-10-06). Every address a person is sent to, every way it can be wrong.
+   */
+  describe('refusing an address nobody outside can reach', () => {
+    it.each([
+      [
+        'PARTNER_URL left at its localhost default',
+        { PARTNER_URL: undefined },
+        /PARTNER_URL/,
+      ],
+      [
+        'API_URL_SELF left at its localhost default',
+        { API_URL_SELF: undefined },
+        /API_URL_SELF/,
+      ],
+      ['APP_URL on localhost', { APP_URL: 'https://localhost:3000' }, /APP_URL/],
+      ['ADMIN_URL on loopback', { ADMIN_URL: 'https://127.0.0.1:3001' }, /ADMIN_URL/],
+      [
+        'PARTNER_URL on a private address',
+        { PARTNER_URL: 'https://10.0.4.7' },
+        /PARTNER_URL/,
+      ],
+      [
+        'PARTNER_URL on IPv6 loopback',
+        { PARTNER_URL: 'https://[::1]:3002' },
+        /PARTNER_URL/,
+      ],
+      ['APP_URL on a reserved name', { APP_URL: 'https://safra.example' }, /APP_URL/],
+      [
+        'ADMIN_URL on a .test name',
+        { ADMIN_URL: 'https://admin.safra.test' },
+        /ADMIN_URL/,
+      ],
+      [
+        'APP_URL over plain http',
+        { APP_URL: 'http://safra.sy' },
+        /APP_URL must be https/,
+      ],
+      [
+        'S3_PUBLIC_URL on localhost',
+        { S3_PUBLIC_URL: 'http://localhost:9000' },
+        /S3_PUBLIC_URL/,
+      ],
+      ['MAIL_FROM left at its .example default', { MAIL_FROM: undefined }, /MAIL_FROM/],
+      ['MAIL_FROM from example.com', { MAIL_FROM: 'ops@mail.example.com' }, /MAIL_FROM/],
+      ['MAIL_FROM that is not an address', { MAIL_FROM: 'SAFRA' }, /MAIL_FROM/],
+    ])('rejects %s', (_label, overrides, message) => {
+      expect(() => loadEnv(env(overrides))).toThrow(message);
+    });
+
+    it('names every bad address at once', () => {
+      expect(() =>
+        loadEnv(env({ PARTNER_URL: undefined, MAIL_FROM: undefined })),
+      ).toThrow(/PARTNER_URL[\s\S]*MAIL_FROM/);
+    });
+
+    it('accepts a bare sender address on a real domain', () => {
+      expect(() => loadEnv(env({ MAIL_FROM: 'no-reply@safra.sy' }))).not.toThrow();
+    });
+  });
+
   describe('development stays convenient', () => {
     /**
      * The production-only checks must not fire in development, or every contributor
-     * needs S3 credentials and an SMTP server to run the API locally.
+     * needs S3 credentials, an SMTP server and a public domain to run the API locally.
      */
-    it('allows no SMTP and no S3 outside production', () => {
+    it('allows no SMTP, no S3 and localhost addresses outside production', () => {
       expect(() =>
         loadEnv(
           env({
@@ -103,6 +169,10 @@ describe('loadEnv', () => {
             S3_ACCESS_KEY_ID: undefined,
             S3_BUCKET: undefined,
             INTERNAL_CALLER_SECRET: undefined,
+            APP_URL: 'http://localhost:3000',
+            PARTNER_URL: undefined,
+            API_URL_SELF: undefined,
+            MAIL_FROM: undefined,
           }),
         ),
       ).not.toThrow();

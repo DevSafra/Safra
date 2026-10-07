@@ -103,11 +103,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS partner_payouts_paid_immutable ON partner_payouts;
-CREATE TRIGGER partner_payouts_paid_immutable
-  BEFORE UPDATE OR DELETE ON partner_payouts
-  FOR EACH ROW WHEN (OLD.status = 'paid')
-  EXECUTE FUNCTION deny_paid_payout_mutation();
+SELECT ensure_trigger('partner_payouts', 'partner_payouts_paid_immutable', $def$
+  CREATE TRIGGER partner_payouts_paid_immutable
+    BEFORE UPDATE OR DELETE ON partner_payouts
+    FOR EACH ROW WHEN (OLD.status = 'paid')
+    EXECUTE FUNCTION deny_paid_payout_mutation()
+$def$);
 
 -- Items of a paid payout are the reconciliation record and are equally final.
 CREATE OR REPLACE FUNCTION deny_paid_payout_item_mutation() RETURNS trigger AS $$
@@ -128,7 +129,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS partner_payout_items_paid_immutable ON partner_payout_items;
-CREATE TRIGGER partner_payout_items_paid_immutable
-  BEFORE INSERT OR UPDATE OR DELETE ON partner_payout_items
-  FOR EACH ROW EXECUTE FUNCTION deny_paid_payout_item_mutation();
+SELECT ensure_trigger('partner_payout_items', 'partner_payout_items_paid_immutable', $def$
+  CREATE TRIGGER partner_payout_items_paid_immutable
+    BEFORE INSERT OR UPDATE OR DELETE ON partner_payout_items
+    FOR EACH ROW EXECUTE FUNCTION deny_paid_payout_item_mutation()
+$def$);

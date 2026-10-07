@@ -100,11 +100,11 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS refunds_destination_guard ON refunds;
-
-CREATE TRIGGER refunds_destination_guard
-  BEFORE INSERT OR UPDATE ON refunds
-  FOR EACH ROW EXECUTE FUNCTION refund_destination_guard();
+SELECT ensure_trigger('refunds', 'refunds_destination_guard', $def$
+  CREATE TRIGGER refunds_destination_guard
+    BEFORE INSERT OR UPDATE ON refunds
+    FOR EACH ROW EXECUTE FUNCTION refund_destination_guard()
+$def$);
 
 CREATE OR REPLACE FUNCTION payment_method_frozen_after_capture() RETURNS trigger
 LANGUAGE plpgsql AS $$
@@ -123,12 +123,14 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS payments_method_frozen ON payments;
+SELECT ensure_trigger('payments', 'payments_method_frozen', $def$
+  CREATE TRIGGER payments_method_frozen
+    BEFORE UPDATE ON payments
+    FOR EACH ROW EXECUTE FUNCTION payment_method_frozen_after_capture()
+$def$);
 
-CREATE TRIGGER payments_method_frozen
-  BEFORE UPDATE ON payments
-  FOR EACH ROW EXECUTE FUNCTION payment_method_frozen_after_capture();
-
-CREATE UNIQUE INDEX IF NOT EXISTS payments_one_capture_per_booking
-  ON payments (booking_id)
-  WHERE status IN ('captured', 'partially_refunded', 'refunded') AND deleted_at IS NULL;
+SELECT create_index_if_missing('payments_one_capture_per_booking', $def$
+  CREATE UNIQUE INDEX payments_one_capture_per_booking
+    ON payments (booking_id)
+    WHERE status IN ('captured', 'partially_refunded', 'refunded') AND deleted_at IS NULL
+$def$);

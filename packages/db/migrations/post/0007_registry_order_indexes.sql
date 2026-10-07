@@ -36,5 +36,7 @@
 -- a prefix match is not enough to remove the sort, as the single-column attempt showed.
 -- ============================================================================
 
-CREATE INDEX IF NOT EXISTS partner_applications_created_idx
-  ON partner_applications (created_at DESC, reference DESC);
+SELECT create_index_if_missing('partner_applications_created_idx', $def$
+  CREATE INDEX partner_applications_created_idx
+    ON partner_applications (created_at DESC, reference DESC)
+$def$);

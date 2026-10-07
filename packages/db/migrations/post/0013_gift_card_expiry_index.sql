@@ -18,6 +18,8 @@
 -- index it uses to find them: the oldest expiry first, which is the batch that
 -- has been wrong on screen for longest.
 
-CREATE INDEX IF NOT EXISTS gift_cards_due_to_expire_idx
-  ON gift_cards (expires_at)
-  WHERE status = 'active' AND expires_at IS NOT NULL;
+SELECT create_index_if_missing('gift_cards_due_to_expire_idx', $def$
+  CREATE INDEX gift_cards_due_to_expire_idx
+    ON gift_cards (expires_at)
+    WHERE status = 'active' AND expires_at IS NOT NULL
+$def$);

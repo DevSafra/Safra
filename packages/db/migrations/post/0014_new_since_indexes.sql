@@ -18,8 +18,12 @@
 -- Partial on deleted_at IS NULL because that is the only set the registry
 -- shows, so the index answers the whole predicate rather than most of it.
 
-CREATE INDEX IF NOT EXISTS refunds_created_idx
-  ON refunds (created_at DESC) WHERE deleted_at IS NULL;
+SELECT create_index_if_missing('refunds_created_idx', $def$
+  CREATE INDEX refunds_created_idx
+    ON refunds (created_at DESC) WHERE deleted_at IS NULL
+$def$);
 
-CREATE INDEX IF NOT EXISTS partner_violations_created_idx
-  ON partner_violations (created_at DESC) WHERE deleted_at IS NULL;
+SELECT create_index_if_missing('partner_violations_created_idx', $def$
+  CREATE INDEX partner_violations_created_idx
+    ON partner_violations (created_at DESC) WHERE deleted_at IS NULL
+$def$);

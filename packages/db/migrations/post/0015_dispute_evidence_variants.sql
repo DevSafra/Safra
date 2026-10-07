@@ -21,5 +21,4 @@
 -- table needs: a row exists the moment the bytes are stored, and the picture
 -- appears when the worker has finished with it.
 
-ALTER TABLE dispute_evidence
-  ADD COLUMN IF NOT EXISTS variant_widths integer[];
+SELECT add_column_if_missing('dispute_evidence', 'variant_widths', 'integer[]');

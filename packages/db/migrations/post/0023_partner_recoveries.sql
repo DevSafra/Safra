@@ -7,10 +7,12 @@
 
   Replaced rather than added beside: two CHECKs both claiming to define `net_amount` is two answers
   to one question, and the one that fires first would decide.
+
+  Through `ensure_constraint`, which replaces only when the definition below differs from the one in
+  force. This file used to drop both CHECKs and add them back on every deploy, and adding a CHECK
+  reads every payout under an ACCESS EXCLUSIVE lock (2026-10-06).
 */
-ALTER TABLE partner_payouts DROP CONSTRAINT IF EXISTS partner_payouts_net_identity;
-ALTER TABLE partner_payouts DROP CONSTRAINT IF EXISTS partner_payouts_non_negative;
-SELECT add_constraint_if_missing('partner_payouts', 'partner_payouts_net_identity',
+SELECT ensure_constraint('partner_payouts', 'partner_payouts_net_identity',
   'CHECK (net_amount = gross_amount - fine_amount - recovery_amount)');
 /*
   `net_amount >= 0` is what forces a large recovery to be taken over SEVERAL transfers rather than
@@ -18,7 +20,7 @@ SELECT add_constraint_if_missing('partner_payouts', 'partner_payouts_net_identit
   create negative transfers.» A recovery of $500 against a gross of $200 takes $200 now and leaves
   $300 outstanding, because the database will not accept the alternative.
 */
-SELECT add_constraint_if_missing('partner_payouts', 'partner_payouts_non_negative',
+SELECT ensure_constraint('partner_payouts', 'partner_payouts_non_negative',
   'CHECK (gross_amount >= 0 AND fine_amount >= 0 AND recovery_amount >= 0 AND net_amount >= 0)');
 /*
   A recovery is a positive amount, and never more can be recovered than arose.

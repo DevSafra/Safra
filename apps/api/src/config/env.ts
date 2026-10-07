@@ -31,9 +31,9 @@ export const envSchema = z.object({
   /*
     Where the partner portal lives, for links inside notices sent to partners.
 
-    Defaulted rather than required so an existing deployment does not fail to boot on an added
-    variable — but a wrong default here is a link a partner cannot follow, so it is in
-    `.env.example` and the deployment checklist rather than left to be discovered.
+    Defaulted so a fresh checkout runs with nothing set. In production the localhost default is
+    refused at boot by `productionAddressProblems`, because a wrong value here is a link a partner
+    cannot follow and nothing else would notice.
   */
   PARTNER_URL: z.string().url().default('http://localhost:3002'),
   /*
@@ -306,6 +306,16 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     );
   }
 
+  if (env.NODE_ENV === 'production') {
+    const problems = productionAddressProblems(env);
+    if (problems.length > 0) {
+      throw new Error(
+        'Public addresses must be real in production:\n' +
+          problems.map((problem) => `  - ${problem}`).join('\n'),
+      );
+    }
+  }
+
   /**
    * A previous key identical to the current one is a rotation that did not happen —
    * almost certainly a copy-paste while setting it up. Allowing it would leave the
@@ -323,6 +333,115 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   }
 
   return env;
+}
+
+/**
+ * The addresses a person is SENT to, checked as addresses a person can reach.
+ *
+ * `PARTNER_URL` and `API_URL_SELF` default to localhost and `MAIL_FROM` to `safra.example`, so that
+ * a fresh checkout runs with nothing set. A production deploy that forgot one of them booted
+ * anyway (go-live audit, 2026-10-06), and the failure surfaces far from the cause: every link in a
+ * partner's email opens `http://localhost:3002` on their own machine, every image URL points at
+ * the API's loopback, and mail from a reserved domain is refused or junked by the receiving server
+ * while the platform records it as sent. None of it fails a health check.
+ *
+ * So production refuses, at boot, an address that cannot be public: plain `http`, a loopback,
+ * private or link-local IP, `localhost`, and the names RFC 2606 and RFC 6761 reserve so that they
+ * never resolve on the internet (`.example`, `.test`, `.invalid`, `.localhost`, plus `.local` and
+ * `.internal`, which are private by convention and by ICANN respectively). Every problem is listed
+ * at once, because a deploy that fixes one and fails on the next is three deploys.
+ */
+const PUBLIC_URL_KEYS = [
+  'APP_URL',
+  'ADMIN_URL',
+  'PARTNER_URL',
+  'API_URL_SELF',
+  'S3_PUBLIC_URL',
+] as const;
+
+const RESERVED_SUFFIXES = [
+  '.example',
+  '.test',
+  '.invalid',
+  '.localhost',
+  '.local',
+  '.internal',
+];
+const RESERVED_DOMAINS = ['example.com', 'example.net', 'example.org'];
+
+function isReservedHost(host: string): boolean {
+  const name = host
+    .toLowerCase()
+    .replace(/\.$/, '')
+    .replace(/^\[|\]$/g, '');
+
+  if (name === 'localhost') return true;
+  if (
+    RESERVED_SUFFIXES.some((suffix) => name.endsWith(suffix) || name === suffix.slice(1))
+  ) {
+    return true;
+  }
+  if (RESERVED_DOMAINS.some((domain) => name === domain || name.endsWith(`.${domain}`))) {
+    return true;
+  }
+
+  // IPv4: unspecified, loopback, private and link-local ranges.
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/.exec(name);
+  if (v4) {
+    const a = Number(v4[1]);
+    const b = Number(v4[2]);
+    return (
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168)
+    );
+  }
+
+  // IPv6: unspecified, loopback, unique-local (fc00::/7) and link-local (fe80::/10).
+  if (name.includes(':')) {
+    return (
+      name === '::' || name === '::1' || /^f[cd]/.test(name) || /^fe[89ab]/.test(name)
+    );
+  }
+
+  return false;
+}
+
+function productionAddressProblems(env: Env): string[] {
+  const problems: string[] = [];
+
+  for (const key of PUBLIC_URL_KEYS) {
+    const value = env[key];
+    if (value === undefined) continue;
+
+    const url = new URL(value);
+    if (url.protocol !== 'https:') {
+      problems.push(
+        `${key} must be https in production, got ${url.protocol}//${url.host}.`,
+      );
+    }
+    if (isReservedHost(url.hostname)) {
+      problems.push(
+        `${key} points at ${url.hostname}, which no customer or partner can reach.`,
+      );
+    }
+  }
+
+  /* `Name <address>` or a bare address; the domain is what the receiving server judges. */
+  const address = (/<([^<>]+)>\s*$/.exec(env.MAIL_FROM)?.[1] ?? env.MAIL_FROM).trim();
+  const domain = /^[^@\s]+@([^@\s]+)$/.exec(address)?.[1];
+  if (!domain) {
+    problems.push('MAIL_FROM must be an email address, optionally as "Name <address>".');
+  } else if (isReservedHost(domain)) {
+    problems.push(
+      `MAIL_FROM sends from ${domain}, a domain receiving servers refuse or treat as spam.`,
+    );
+  }
+
+  return problems;
 }
 
 export const ENV = Symbol('ENV');

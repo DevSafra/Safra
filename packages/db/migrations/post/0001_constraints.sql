@@ -7,10 +7,23 @@
 -- once. Prerequisites (extensions, sequences) are in migrations/pre/.
 --
 -- This file is IDEMPOTENT and re-applied on every deploy, so it must stay that
--- way:
---   - constraints go through add_constraint_if_missing()
---   - triggers use DROP TRIGGER IF EXISTS ... then CREATE
---   - indexes use CREATE INDEX IF NOT EXISTS
+-- way — and it must also be CHEAP once applied, which is the half that was missed
+-- (2026-10-06). An idempotent statement is not a free one: `DROP TRIGGER IF
+-- EXISTS` takes an ACCESS EXCLUSIVE lock on the table whether or not anything is
+-- there, and dropping a constraint only to add it back revalidates every row under
+-- that lock. Queued behind one long-running read, that lock stops all traffic to
+-- `bookings` for as long as the read takes. So every statement here first asks
+-- whether there is anything to do:
+--   - constraints go through add_constraint_if_missing(), or ensure_constraint()
+--     when an existing name has to be REDEFINED
+--   - old constraints go through drop_constraint_if_present()
+--   - triggers go through ensure_trigger()
+--   - columns go through add_column_if_missing()
+--   - indexes go through create_index_if_missing(), and an index on a large live
+--     table belongs in a concurrent file instead (see 0028 and migrate.ts)
+--   - a one-off repair sits inside the check for the thing it was repairing for
+-- `post-stage-idempotence.integration.test.ts` re-runs every post/ file against a
+-- migrated database and fails on a lock that would block a write, or a row changed.
 -- ============================================================================
 
 -- Postgres has no ALTER TABLE ... ADD CONSTRAINT IF NOT EXISTS, so this wraps it.
@@ -28,6 +41,125 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- `ALTER TABLE ... DROP CONSTRAINT IF EXISTS` locks the table before it looks, so the
+-- look comes first. Scoped to the table: constraint names are only unique per table.
+CREATE OR REPLACE FUNCTION drop_constraint_if_present(
+  target_table text,
+  constraint_name text
+) RETURNS void AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = constraint_name AND conrelid = to_regclass(target_table)
+  ) THEN
+    EXECUTE format('ALTER TABLE %I DROP CONSTRAINT %I', target_table, constraint_name);
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- `ADD COLUMN IF NOT EXISTS` takes the ACCESS EXCLUSIVE lock before it finds the
+-- column already there, so this looks in the catalogue first.
+CREATE OR REPLACE FUNCTION add_column_if_missing(
+  target_table text,
+  column_name text,
+  definition text
+) RETURNS void AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_attribute
+    WHERE attrelid = to_regclass(target_table)
+      AND attname = column_name
+      AND NOT attisdropped
+  ) THEN
+    EXECUTE format(
+      'ALTER TABLE %I ADD COLUMN %I %s', target_table, column_name, definition
+    );
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- `CREATE INDEX IF NOT EXISTS` takes a SHARE lock on the table, which refuses every
+-- write, before it notices the index is already there. Index names are unique per
+-- schema, so the catalogue answers the question without touching the table.
+-- `definition` is the whole CREATE INDEX statement.
+CREATE OR REPLACE FUNCTION create_index_if_missing(
+  index_name text,
+  definition text
+) RETURNS void AS $$
+BEGIN
+  IF to_regclass(index_name) IS NULL THEN
+    EXECUTE definition;
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- A trigger or a constraint whose DEFINITION may change under the same name.
+--
+-- Postgres cannot say whether an existing trigger matches the text in this file
+-- without creating a second one to compare, so the file's text is FINGERPRINTED and
+-- the fingerprint stored as the object's comment. Same text, same fingerprint,
+-- nothing to do and no lock taken. A changed text is a different fingerprint, so an
+-- edited trigger still reaches every database on its next deploy, which is what the
+-- old drop-and-recreate was for. Recreated too when it has been DISABLED: that the
+-- immutability triggers come back on every deploy is a guarantee worth keeping.
+CREATE OR REPLACE FUNCTION post_stage_fingerprint(definition text) RETURNS text AS $$
+  SELECT 'post-stage fingerprint ' || md5(definition);
+$$ LANGUAGE sql IMMUTABLE;
+
+-- `definition` is the whole CREATE TRIGGER statement.
+CREATE OR REPLACE FUNCTION ensure_trigger(
+  target_table text,
+  trigger_name text,
+  definition text
+) RETURNS void AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_trigger t
+    WHERE t.tgrelid = to_regclass(target_table)
+      AND t.tgname = trigger_name
+      AND t.tgenabled = 'O'
+      AND obj_description(t.oid, 'pg_trigger') = post_stage_fingerprint(definition)
+  ) THEN
+    RETURN;
+  END IF;
+
+  EXECUTE format('DROP TRIGGER IF EXISTS %I ON %I', trigger_name, target_table);
+  EXECUTE definition;
+  EXECUTE format(
+    'COMMENT ON TRIGGER %I ON %I IS %L',
+    trigger_name, target_table, post_stage_fingerprint(definition)
+  );
+END;
+$$ LANGUAGE plpgsql;
+
+-- `definition` is what follows ADD CONSTRAINT <name>, as for add_constraint_if_missing().
+CREATE OR REPLACE FUNCTION ensure_constraint(
+  target_table text,
+  constraint_name text,
+  definition text
+) RETURNS void AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint c
+    WHERE c.conrelid = to_regclass(target_table)
+      AND c.conname = constraint_name
+      AND c.convalidated
+      AND obj_description(c.oid, 'pg_constraint') = post_stage_fingerprint(definition)
+  ) THEN
+    RETURN;
+  END IF;
+
+  PERFORM drop_constraint_if_present(target_table, constraint_name);
+  EXECUTE format(
+    'ALTER TABLE %I ADD CONSTRAINT %I %s', target_table, constraint_name, definition
+  );
+  EXECUTE format(
+    'COMMENT ON CONSTRAINT %I ON %I IS %L',
+    constraint_name, target_table, post_stage_fingerprint(definition)
+  );
+END;
+$$ LANGUAGE plpgsql;
+
 -- ----------------------------------------------------------------------------
 -- 1. EC-005 — the last-room double booking. THE critical constraint.
 --
@@ -42,40 +174,9 @@ $$ LANGUAGE plpgsql;
 -- impossible. The losing transaction fails with SQLSTATE 23P01, which the booking
 -- service translates into a 409 and a "just taken" message.
 -- ----------------------------------------------------------------------------
--- v1 held only from pending_confirmation onward, which let two customers both
--- reach payment for the same dates. Superseded by v2, which holds from
--- pending_payment. Dropped explicitly because add_constraint_if_missing() only ever
--- adds.
-ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_no_overlapping_stays;
-
--- Any data created while v1 was in force may violate v2, and PostgreSQL refuses to
--- create an exclusion constraint that existing rows break. Overlapping
--- `pending_payment` rows are exactly what the v1 gap allowed, and they were never
--- valid reservations — none had been paid. Expiring them is the correct repair, and
--- it keeps this migration applicable to a database that ran the buggy version.
-UPDATE bookings b
-SET status = 'cancelled',
-    cancelled_at = now(),
-    cancellation_reason = 'Released: overlapping unpaid hold created before the reservation window was enforced.'
-WHERE b.status = 'pending_payment'
-  AND EXISTS (
-    SELECT 1 FROM bookings other
-    WHERE other.id <> b.id
-      AND other.unit_id = b.unit_id
-      AND other.status IN ('pending_payment', 'pending_confirmation', 'confirmed', 'checked_in')
-      AND daterange(other.check_in, other.check_out, '[)')
-          && daterange(b.check_in, b.check_out, '[)')
-      -- Keep the earliest hold; release the ones that should never have been taken.
-      AND other.created_at < b.created_at
-  );
-
-SELECT add_constraint_if_missing('bookings', 'bookings_no_overlapping_stays_v2', $def$
-  EXCLUDE USING gist (
-    unit_id WITH =,
-    daterange(check_in, check_out, '[)') WITH &&
-  )
-  WHERE (status IN ('pending_payment', 'pending_confirmation', 'confirmed', 'checked_in'))
-$def$);
+-- The constraint itself is created in section 9, inside the one guarded block that
+-- also retires v1 and v2: it has had three definitions, and the history of how a
+-- database reaches the current one belongs in one place.
 
 SELECT add_constraint_if_missing('bookings', 'bookings_checkout_after_checkin',
   'CHECK (check_out > check_in)');
@@ -139,11 +240,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS ledger_entries_must_balance ON ledger_entries;
-CREATE CONSTRAINT TRIGGER ledger_entries_must_balance
-  AFTER INSERT ON ledger_entries
-  DEFERRABLE INITIALLY DEFERRED
-  FOR EACH ROW EXECUTE FUNCTION assert_ledger_group_balanced();
+SELECT ensure_trigger('ledger_entries', 'ledger_entries_must_balance', $def$
+  CREATE CONSTRAINT TRIGGER ledger_entries_must_balance
+    AFTER INSERT ON ledger_entries
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW EXECUTE FUNCTION assert_ledger_group_balanced()
+$def$);
 
 -- ----------------------------------------------------------------------------
 -- 3. Immutability (SRS §13.3, §15, principle P-003)
@@ -182,12 +284,11 @@ BEGIN
     'booking_internal_notes'
   ]
   LOOP
-    EXECUTE format('DROP TRIGGER IF EXISTS %I ON %I', t || '_immutable', t);
-    EXECUTE format(
+    PERFORM ensure_trigger(t, t || '_immutable', format(
       'CREATE TRIGGER %I BEFORE UPDATE OR DELETE ON %I
          FOR EACH ROW EXECUTE FUNCTION deny_mutation()',
       t || '_immutable', t
-    );
+    ));
 
     -- And the hole the row trigger cannot cover.
     --
@@ -205,12 +306,11 @@ BEGIN
     -- suspend these explicitly with ALTER TABLE ... DISABLE TRIGGER. That is the
     -- point — clearing history becomes a thing somebody wrote down rather than an
     -- accident of which statement they happened to use.
-    EXECUTE format('DROP TRIGGER IF EXISTS %I ON %I', t || '_no_truncate', t);
-    EXECUTE format(
+    PERFORM ensure_trigger(t, t || '_no_truncate', format(
       'CREATE TRIGGER %I BEFORE TRUNCATE ON %I
          EXECUTE FUNCTION deny_mutation()',
       t || '_no_truncate', t
-    );
+    ));
   END LOOP;
 END $$;
 
@@ -270,10 +370,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS payment_provider_events_immutable ON payment_provider_events;
-CREATE TRIGGER payment_provider_events_immutable
-  BEFORE UPDATE OR DELETE ON payment_provider_events
-  FOR EACH ROW EXECUTE FUNCTION deny_payment_event_rewrite();
+SELECT ensure_trigger('payment_provider_events', 'payment_provider_events_immutable', $def$
+  CREATE TRIGGER payment_provider_events_immutable
+    BEFORE UPDATE OR DELETE ON payment_provider_events
+    FOR EACH ROW EXECUTE FUNCTION deny_payment_event_rewrite()
+$def$);
 
 -- ----------------------------------------------------------------------------
 -- 4. updated_at maintenance — one trigger, not scattered application code.
@@ -297,33 +398,40 @@ BEGIN
     'wallets', 'gift_cards', 'coupons', 'settings', 'emergency_modes'
   ]
   LOOP
-    EXECUTE format('DROP TRIGGER IF EXISTS %I ON %I', t || '_touch_updated_at', t);
-    EXECUTE format(
+    PERFORM ensure_trigger(t, t || '_touch_updated_at', format(
       'CREATE TRIGGER %I BEFORE UPDATE ON %I
          FOR EACH ROW EXECUTE FUNCTION touch_updated_at()',
       t || '_touch_updated_at', t
-    );
+    ));
   END LOOP;
 END $$;
 
 -- ----------------------------------------------------------------------------
 -- 5. Search support (§14.1: results in under three seconds)
 -- ----------------------------------------------------------------------------
-CREATE INDEX IF NOT EXISTS properties_name_trgm_idx ON properties
-  USING gin (name_ar gin_trgm_ops, name_en gin_trgm_ops);
+SELECT create_index_if_missing('properties_name_trgm_idx', $def$
+  CREATE INDEX properties_name_trgm_idx ON properties
+    USING gin (name_ar gin_trgm_ops, name_en gin_trgm_ops)
+$def$);
 
-CREATE INDEX IF NOT EXISTS cities_name_trgm_idx ON cities
-  USING gin (name_ar gin_trgm_ops, name_en gin_trgm_ops);
+SELECT create_index_if_missing('cities_name_trgm_idx', $def$
+  CREATE INDEX cities_name_trgm_idx ON cities
+    USING gin (name_ar gin_trgm_ops, name_en gin_trgm_ops)
+$def$);
 
 -- Only live listings are ever searched, so the index stays small as archived
 -- properties accumulate (and under P-003 they accumulate forever).
-CREATE INDEX IF NOT EXISTS properties_published_idx
-  ON properties (city_id, recommendation_score DESC)
-  WHERE status = 'published' AND deleted_at IS NULL;
+SELECT create_index_if_missing('properties_published_idx', $def$
+  CREATE INDEX properties_published_idx
+    ON properties (city_id, recommendation_score DESC)
+    WHERE status = 'published' AND deleted_at IS NULL
+$def$);
 
 -- Expired idempotency keys and refresh tokens are swept by a scheduled job.
-CREATE INDEX IF NOT EXISTS refresh_tokens_expiry_idx ON refresh_tokens (expires_at)
-  WHERE revoked_at IS NULL;
+SELECT create_index_if_missing('refresh_tokens_expiry_idx', $def$
+  CREATE INDEX refresh_tokens_expiry_idx ON refresh_tokens (expires_at)
+    WHERE revoked_at IS NULL
+$def$);
 
 -- ----------------------------------------------------------------------------
 -- 6. One settings row per key and scope (P-005)
@@ -360,9 +468,11 @@ BEGIN
   END IF;
 END $$;
 
-CREATE UNIQUE INDEX IF NOT EXISTS settings_key_scope_unique
-  ON settings (key, scope, scope_id) NULLS NOT DISTINCT
-  WHERE deleted_at IS NULL;
+SELECT create_index_if_missing('settings_key_scope_unique', $def$
+  CREATE UNIQUE INDEX settings_key_scope_unique
+    ON settings (key, scope, scope_id) NULLS NOT DISTINCT
+    WHERE deleted_at IS NULL
+$def$);
 
 -- ----------------------------------------------------------------------------
 -- 7. Sanctions screening (ADR 0002)
@@ -372,13 +482,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS settings_key_scope_unique
 -- at all. Without it every partner verification would sequentially scan the whole
 -- list — slow enough that someone would eventually be tempted to skip the check,
 -- which is the one outcome this feature cannot have.
-CREATE INDEX IF NOT EXISTS sanctions_entries_name_trgm_idx
-  ON sanctions_entries USING gin (normalised_name gin_trgm_ops);
+SELECT create_index_if_missing('sanctions_entries_name_trgm_idx', $def$
+  CREATE INDEX sanctions_entries_name_trgm_idx
+    ON sanctions_entries USING gin (normalised_name gin_trgm_ops)
+$def$);
 
 -- Screening reads the newest COMPLETE snapshot per source on every verification.
-CREATE INDEX IF NOT EXISTS sanctions_snapshots_current_idx
-  ON sanctions_snapshots (source, completed_at DESC)
-  WHERE completed_at IS NOT NULL;
+SELECT create_index_if_missing('sanctions_snapshots_current_idx', $def$
+  CREATE INDEX sanctions_snapshots_current_idx
+    ON sanctions_snapshots (source, completed_at DESC)
+    WHERE completed_at IS NOT NULL
+$def$);
 
 -- ----------------------------------------------------------------------------
 -- 8. Disputes, conversations, notifications and advertising (2026-08-04)
@@ -425,7 +539,7 @@ SELECT add_constraint_if_missing('disputes', 'disputes_compensation_non_negative
 -- customer column cannot simply join the sum, because a booking-scoped thread also carries it
 -- as a PARTICIPANT — `customer_profile_id` says who is in the thread, not what it is about.
 -- A partner's support ticket needs nothing new: `partner_id` alone was always a legal shape.
-ALTER TABLE conversations DROP CONSTRAINT IF EXISTS conversations_exactly_one_subject;
+SELECT drop_constraint_if_present('conversations', 'conversations_exactly_one_subject');
 
 SELECT add_constraint_if_missing('conversations', 'conversations_exactly_one_subject_v2', $def$
   CHECK (
@@ -450,9 +564,10 @@ SELECT add_constraint_if_missing('conversations', 'conversations_unread_non_nega
 -- message that can be edited afterwards makes the whole record worthless. This is also
 -- what makes the contact-detail redaction meaningful: the redacted body cannot later be
 -- rewritten to restore the phone number that was removed on the way in.
-DROP TRIGGER IF EXISTS messages_immutable ON messages;
-CREATE TRIGGER messages_immutable BEFORE UPDATE OR DELETE ON messages
-  FOR EACH ROW EXECUTE FUNCTION deny_mutation();
+SELECT ensure_trigger('messages', 'messages_immutable', $def$
+  CREATE TRIGGER messages_immutable BEFORE UPDATE OR DELETE ON messages
+    FOR EACH ROW EXECUTE FUNCTION deny_mutation()
+$def$);
 
 -- The TRUNCATE half, matching the six tables in the loop above.
 --
@@ -460,9 +575,10 @@ CREATE TRIGGER messages_immutable BEFORE UPDATE OR DELETE ON messages
 -- with the messaging tables in a later pass — which is exactly why the first
 -- version of this fix left it as the ONE table still truncatable. Probed live
 -- afterwards, which is how that was caught rather than shipped.
-DROP TRIGGER IF EXISTS messages_no_truncate ON messages;
-CREATE TRIGGER messages_no_truncate BEFORE TRUNCATE ON messages
-  EXECUTE FUNCTION deny_mutation();
+SELECT ensure_trigger('messages', 'messages_no_truncate', $def$
+  CREATE TRIGGER messages_no_truncate BEFORE TRUNCATE ON messages
+    EXECUTE FUNCTION deny_mutation()
+$def$);
 
 SELECT add_constraint_if_missing('messages', 'messages_redacted_count_non_negative',
   'CHECK (redacted_count >= 0)');
@@ -499,9 +615,11 @@ $def$);
 -- Only one ACTIVE contract of a given kind per partner. Replacing supersedes rather
 -- than overwrites, so without this a botched replacement leaves two live contracts and
 -- no way to say which commission applies.
-CREATE UNIQUE INDEX IF NOT EXISTS partner_contracts_one_active_per_kind
-  ON partner_contracts (partner_id, kind)
-  WHERE status = 'active' AND deleted_at IS NULL;
+SELECT create_index_if_missing('partner_contracts_one_active_per_kind', $def$
+  CREATE UNIQUE INDEX partner_contracts_one_active_per_kind
+    ON partner_contracts (partner_id, kind)
+    WHERE status = 'active' AND deleted_at IS NULL
+$def$);
 
 -- ----------------------------------------------------------------------------
 -- 9. A disputed stay still holds its dates (2026-08-25)
@@ -519,17 +637,67 @@ CREATE UNIQUE INDEX IF NOT EXISTS partner_contracts_one_active_per_kind
 --
 -- v3 rather than an ALTER: `add_constraint_if_missing` is a no-op against a name
 -- that already exists, so a redefinition needs a new name and an explicit drop of
--- the old one. Both are stated here rather than left to inference.
+-- the old one.
 --
--- Safe against existing data: nothing has ever written `disputed`, so no row can
--- violate the widened predicate, and a re-run is a no-op.
+-- ## Why all of it sits behind one check (2026-10-06)
+--
+-- This used to be three top-level statements per version, re-run on every deploy:
+-- drop v1, release overlapping holds, ADD v2, drop v2, add v3. On a database where
+-- v3 already existed, v2 was missing — the previous deploy had just dropped it — so
+-- every deploy BUILT the v2 exclusion constraint from scratch, a GiST index over the
+-- whole table under an ACCESS EXCLUSIVE lock, and then threw it away. No booking
+-- could be read or written while it ran, and it grew with the table.
+--
+-- v3 existing is the proof that everything below has happened, so its presence
+-- skips all of it. Without it, the steps run once, straight to v3:
+--
+--   * v1 and v2 are dropped if a database still carries either.
+--   * The repair: data created while v1 was in force may violate the wider
+--     predicate, and PostgreSQL refuses to create an exclusion constraint that
+--     existing rows break. Overlapping `pending_payment` rows are exactly what the
+--     v1 gap allowed, and none was ever a valid reservation — none had been paid.
+--     Releasing the later hold is the correct repair. `disputed` joins the list it
+--     is checked against because v3 holds it too; nothing had written it while v1
+--     or v2 was in force, so that changes no outcome.
+--   * v3 is added.
+--
+-- Going straight to v3 rather than through v2 is safe because v3's predicate
+-- contains v2's: any data v2 would refuse, v3 refuses too.
 -- ----------------------------------------------------------------------------
-ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_no_overlapping_stays_v2;
+DO $guarded$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'bookings_no_overlapping_stays_v3'
+      AND conrelid = 'bookings'::regclass
+  ) THEN
+    RETURN;
+  END IF;
 
-SELECT add_constraint_if_missing('bookings', 'bookings_no_overlapping_stays_v3', $def$
-  EXCLUDE USING gist (
-    unit_id WITH =,
-    daterange(check_in, check_out, '[)') WITH &&
-  )
-  WHERE (status IN ('pending_payment', 'pending_confirmation', 'confirmed', 'checked_in', 'disputed'))
-$def$);
+  PERFORM drop_constraint_if_present('bookings', 'bookings_no_overlapping_stays');
+  PERFORM drop_constraint_if_present('bookings', 'bookings_no_overlapping_stays_v2');
+
+  UPDATE bookings b
+  SET status = 'cancelled',
+      cancelled_at = now(),
+      cancellation_reason = 'Released: overlapping unpaid hold created before the reservation window was enforced.'
+  WHERE b.status = 'pending_payment'
+    AND EXISTS (
+      SELECT 1 FROM bookings other
+      WHERE other.id <> b.id
+        AND other.unit_id = b.unit_id
+        AND other.status IN ('pending_payment', 'pending_confirmation', 'confirmed', 'checked_in', 'disputed')
+        AND daterange(other.check_in, other.check_out, '[)')
+            && daterange(b.check_in, b.check_out, '[)')
+        -- Keep the earliest hold; release the ones that should never have been taken.
+        AND other.created_at < b.created_at
+    );
+
+  PERFORM add_constraint_if_missing('bookings', 'bookings_no_overlapping_stays_v3', $def$
+    EXCLUDE USING gist (
+      unit_id WITH =,
+      daterange(check_in, check_out, '[)') WITH &&
+    )
+    WHERE (status IN ('pending_payment', 'pending_confirmation', 'confirmed', 'checked_in', 'disputed'))
+  $def$);
+END $guarded$;

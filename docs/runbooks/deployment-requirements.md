@@ -66,11 +66,13 @@ because the fallback is local disk — invisible to other replicas and lost on r
 
 - **Secret manager.** ~10 secrets (see `.env.example`). One of them,
   `SANCTIONS_FEED_URL`, carries a credential in its query string.
-- **Do NOT rotate `FIELD_ENCRYPTION_KEY`.** Staff TOTP secrets are encrypted with it and
-  nothing re-encrypts them, so rotating it locks every staff account out of the console
-  at once. Recovery means single-use recovery codes, which is circular if the super
-  admin is also locked out. Two-key support is future-work item **S-6**; until it ships,
-  attach this warning to the secret itself.
+- **Rotate `FIELD_ENCRYPTION_KEY` only by
+  [`encryption-key-rotation.md`](encryption-key-rotation.md).** It encrypts TOTP seeds,
+  payout account numbers and the bank-transfer payer and refund accounts. Changing it
+  without `FIELD_ENCRYPTION_KEY_PREVIOUS` set to the old value, or removing that variable
+  before `pnpm rotate:encryption-key --dry-run` reports nothing remaining, makes those
+  values unreadable: every staff sign-in fails and bank-transfer refunds cannot be
+  settled. Attach this warning to the secret itself.
 - **TLS termination** with HSTS, and `X-Forwarded-For` set correctly. The app sets
   `trust proxy = 1` — exactly one proxy. **More than one hop requires changing that
   number**, or a client can forge its IP and walk through the rate limiter.
@@ -92,6 +94,24 @@ sense that rollback is a solved problem.
 
 **Run them as a one-shot job before the new replicas start**, never from the application
 on boot: several replicas booting at once would race the same migration.
+
+### Every deploy, and the first one
+
+The API image carries no TypeScript and no `tsx`, so these are the COMPILED entry points,
+run from `/app` in the image:
+
+| Step                    | Command                                                                   | When                                       |
+| ----------------------- | ------------------------------------------------------------------------- | ------------------------------------------ |
+| Schema                  | `node node_modules/@safra/db/dist/migrate.js`                             | Every deploy                               |
+| Reference data          | `node node_modules/@safra/db/dist/seed/index.js`                          | Every deploy; inserts only what is missing |
+| First super admin       | `BOOTSTRAP_ADMIN_EMAIL=… node dist/scripts/bootstrap-super-admin.js`      | Once; refuses if one already exists        |
+| An exchange rate to SYP | In the console, signed in as that super admin, after enrolling two-factor | Once; every quote answers 503 until then   |
+
+Both scripts need only `DATABASE_URL`. A re-run is cheap by design: the post/ stage checks
+before it locks (see the header of `post/0001`), files that build an index on a live table
+do it `CONCURRENTLY`, and a statement waits at most 10 seconds for a table lock before the
+deploy fails. A failed deploy is safe to retry as it stands. The seed never changes a row
+that exists, so what staff edit in the console survives every deploy.
 
 ### How to roll back a bad deploy
 

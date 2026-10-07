@@ -37,20 +37,26 @@
 -- above OVERSTATES it: the load generator prices 2 days in 7, which no real partner does.
 -- Accepted because search is 80 % of traffic and a calendar edit is rare by comparison.
 --
--- `IF NOT EXISTS` keeps this file idempotent, like its siblings in post/.
+-- `create_index_if_missing` keeps this file idempotent, like its siblings in post/.
 -- ============================================================================
 
 -- Nights that are closed, booked or under maintenance.
-CREATE INDEX IF NOT EXISTS availability_days_blocked_idx
-  ON availability_days (unit_id, date)
-  WHERE status <> 'available';
+SELECT create_index_if_missing('availability_days_blocked_idx', $def$
+  CREATE INDEX availability_days_blocked_idx
+    ON availability_days (unit_id, date)
+    WHERE status <> 'available'
+$def$);
 
 -- Nights carrying a minimum-stay override. Checked against the arrival night only.
-CREATE INDEX IF NOT EXISTS availability_days_min_nights_idx
-  ON availability_days (unit_id, date)
-  WHERE min_nights IS NOT NULL;
+SELECT create_index_if_missing('availability_days_min_nights_idx', $def$
+  CREATE INDEX availability_days_min_nights_idx
+    ON availability_days (unit_id, date)
+    WHERE min_nights IS NOT NULL
+$def$);
 
 -- Nights with a price override. `INCLUDE (price)` is what makes the sum index-only.
-CREATE INDEX IF NOT EXISTS availability_days_priced_idx
-  ON availability_days (unit_id, date) INCLUDE (price)
-  WHERE price IS NOT NULL;
+SELECT create_index_if_missing('availability_days_priced_idx', $def$
+  CREATE INDEX availability_days_priced_idx
+    ON availability_days (unit_id, date) INCLUDE (price)
+    WHERE price IS NOT NULL
+$def$);

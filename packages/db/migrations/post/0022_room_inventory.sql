@@ -47,15 +47,15 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS bookings_sync_units ON bookings;
-
-CREATE TRIGGER bookings_sync_units
-  AFTER UPDATE ON bookings
-  FOR EACH ROW
-  WHEN (OLD.status    IS DISTINCT FROM NEW.status
-     OR OLD.check_in  IS DISTINCT FROM NEW.check_in
-     OR OLD.check_out IS DISTINCT FROM NEW.check_out)
-  EXECUTE FUNCTION sync_booking_units();
+SELECT ensure_trigger('bookings', 'bookings_sync_units', $def$
+  CREATE TRIGGER bookings_sync_units
+    AFTER UPDATE ON bookings
+    FOR EACH ROW
+    WHEN (OLD.status    IS DISTINCT FROM NEW.status
+       OR OLD.check_in  IS DISTINCT FROM NEW.check_in
+       OR OLD.check_out IS DISTINCT FROM NEW.check_out)
+    EXECUTE FUNCTION sync_booking_units()
+$def$);
 
 -- ----------------------------------------------------------------------------
 -- Every booking holds its lead room, whoever created it
@@ -84,9 +84,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS bookings_hold_lead_room ON bookings;
-
-CREATE TRIGGER bookings_hold_lead_room
-  AFTER INSERT ON bookings
-  FOR EACH ROW
-  EXECUTE FUNCTION hold_lead_room();
+SELECT ensure_trigger('bookings', 'bookings_hold_lead_room', $def$
+  CREATE TRIGGER bookings_hold_lead_room
+    AFTER INSERT ON bookings
+    FOR EACH ROW
+    EXECUTE FUNCTION hold_lead_room()
+$def$);

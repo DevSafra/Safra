@@ -15,9 +15,11 @@
 -- `is_cover` value as a record of what the listing looked like at the time, and
 -- a plain unique index would make archiving a cover impossible without first
 -- clearing the flag — losing that record.
-CREATE UNIQUE INDEX IF NOT EXISTS property_images_one_cover
-  ON property_images (property_id)
-  WHERE is_cover = true AND deleted_at IS NULL;
+SELECT create_index_if_missing('property_images_one_cover', $def$
+  CREATE UNIQUE INDEX property_images_one_cover
+    ON property_images (property_id)
+    WHERE is_cover = true AND deleted_at IS NULL
+$def$);
 
 -- ── Order is a position, not an opinion ─────────────────────────────────────
 SELECT add_constraint_if_missing('property_images', 'property_images_sort_order_natural',

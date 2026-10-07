@@ -77,10 +77,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS reviews_no_delete ON reviews;
-CREATE TRIGGER reviews_no_delete
-  BEFORE DELETE ON reviews
-  FOR EACH ROW EXECUTE FUNCTION deny_review_deletion();
+SELECT ensure_trigger('reviews', 'reviews_no_delete', $def$
+  CREATE TRIGGER reviews_no_delete
+    BEFORE DELETE ON reviews
+    FOR EACH ROW EXECUTE FUNCTION deny_review_deletion()
+$def$);
 
 CREATE OR REPLACE FUNCTION deny_review_content_change() RETURNS trigger AS $$
 BEGIN
@@ -99,10 +100,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS reviews_content_immutable ON reviews;
-CREATE TRIGGER reviews_content_immutable
-  BEFORE UPDATE ON reviews
-  FOR EACH ROW EXECUTE FUNCTION deny_review_content_change();
+SELECT ensure_trigger('reviews', 'reviews_content_immutable', $def$
+  CREATE TRIGGER reviews_content_immutable
+    BEFORE UPDATE ON reviews
+    FOR EACH ROW EXECUTE FUNCTION deny_review_content_change()
+$def$);
 
 -- ── The aggregate cannot drift ──────────────────────────────────────────────
 --
@@ -134,7 +136,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS reviews_maintain_rating ON reviews;
-CREATE TRIGGER reviews_maintain_rating
-  AFTER INSERT OR UPDATE OF status, property_id ON reviews
-  FOR EACH ROW EXECUTE FUNCTION recompute_property_rating();
+SELECT ensure_trigger('reviews', 'reviews_maintain_rating', $def$
+  CREATE TRIGGER reviews_maintain_rating
+    AFTER INSERT OR UPDATE OF status, property_id ON reviews
+    FOR EACH ROW EXECUTE FUNCTION recompute_property_rating()
+$def$);
