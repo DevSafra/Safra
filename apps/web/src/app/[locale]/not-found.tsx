@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getLocale, getTranslations } from 'next-intl/server';
 
-import { ORNAMENT_BRAND } from '@safra/ui';
+import { SafraLockup } from '@safra/ui';
 
 /**
  * A 404 inside the site, rather than instead of it.
@@ -36,13 +36,19 @@ import { ORNAMENT_BRAND } from '@safra/ui';
  */
 export default async function LocaleNotFound() {
   const t = await getTranslations('notFound');
+  const brand = await getTranslations('brand');
   const locale = await getLocale();
 
   return (
     <section className="mx-auto grid w-full max-w-2xl place-items-center gap-4 px-4 py-16 text-center sm:py-24">
-      <p className="text-3xl text-gold" aria-hidden>
-        {ORNAMENT_BRAND}
-      </p>
+      <div className="flex justify-center">
+        {/* The Latin name in every locale; see the note in the site header. */}
+        <SafraLockup
+          layout="stacked"
+          latin={locale === 'ar' ? brand('latin') : brand('name')}
+          latinClassName="inline-flex font-display"
+        />
+      </div>
 
       <h1 className="text-2xl font-bold text-text sm:text-3xl">{t('title')}</h1>
 

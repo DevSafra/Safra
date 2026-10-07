@@ -10,8 +10,8 @@ import { HeaderNav } from '@/components/header-nav';
 import { MenuContents } from '@/components/menu-contents';
 import { MobileMenu } from '@/components/mobile-menu';
 import { HeaderShell } from '@/components/header-shell';
-import { ORNAMENT_BRAND } from '@safra/ui';
 import { partnerApplicationsOpen } from '@safra/contracts';
+import { SafraLockup } from '@safra/ui';
 
 /**
  * Site header.
@@ -181,25 +181,26 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
           exactly where the bar is tightest, and it still reads in the footer, which is the one
           place a strapline belongs.
         */}
-        <Link href={`/${locale}`} className="flex items-center gap-3 sm:h-11">
-          <span
-            aria-hidden
-            className="grid size-10 shrink-0 place-items-center rounded-card border border-gold/40 text-lg text-gold-read sm:size-11 sm:text-xl"
-          >
-            {ORNAMENT_BRAND}
-          </span>
+        {/*
+          The logo (Bashar, 2026-10-07), `SafraLockup` from @safra/ui: his pin and «سفرة | SAFRA»
+          in the service drawings' gold. The Latin half goes below `sm`, measured on a 390px phone
+          when the bar wrapped (2026-09). The link's label carries the name; the lockup is hidden
+          from assistive tech so it is not read twice.
+        */}
+        <Link
+          href={`/${locale}`}
+          aria-label={brand('name')}
+          className="flex min-h-10 shrink-0 items-center sm:h-11"
+        >
           {/*
-            The Latin half goes below `sm`. «سفرة | SAFRA» is three words wide on a bar that had
-            already wrapped to three rows once the language and currency controls arrived — 161px
-            of a 390px phone, measured. «سفرة» alone is still the brand.
+            The Latin name in every locale. The catalogue's `latin` is the OTHER script's name
+            («سفرة» on the English and German sites, where `name` is already «SAFRA»), and the
+            drawn «سفرة» is the Arabic half whatever the page's language.
           */}
-          <span className="font-display text-xl font-bold text-gold">
-            {brand('name')}
-            <span className="hidden sm:inline">
-              {' '}
-              <span className="text-text/50">|</span> {brand('latin')}
-            </span>
-          </span>
+          <SafraLockup
+            latin={locale === 'ar' ? brand('latin') : brand('name')}
+            latinClassName="hidden font-display sm:inline-flex"
+          />
         </Link>
 
         {/*

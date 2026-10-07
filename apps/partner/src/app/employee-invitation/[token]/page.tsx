@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { ORNAMENT_BRAND } from '@safra/ui';
+import { SafraLockup } from '@safra/ui';
 
 import { EmployeeInvitationForm } from '@/components/employee-invitation-form';
 import { t } from '@/lib/strings';
@@ -56,10 +56,9 @@ export default async function EmployeeInvitationPage({
   return (
     <main className="mx-auto grid min-h-screen max-w-sm content-center px-4">
       <div className="w-full">
-        {/* `aria-hidden`: an ornament is a glyph, and a screen reader announcing it says nothing. */}
-        <p className="text-3xl text-gold text-center" aria-hidden>
-          {ORNAMENT_BRAND}
-        </p>
+        <div className="flex justify-center">
+          <SafraLockup layout="stacked" latin={t.brandLatin} />
+        </div>
 
         <h1 className="mt-3 text-2xl font-semibold text-text text-center">
           {t.employeeInvitation.title}

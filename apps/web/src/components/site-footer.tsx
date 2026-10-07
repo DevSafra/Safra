@@ -10,7 +10,7 @@ import {
   partnerApplicationsOpen,
   type CustomerFacingMethod,
 } from '@safra/contracts';
-import { ORNAMENT_BRAND } from '@safra/ui';
+import { SafraLockup } from '@safra/ui';
 
 /**
  * The site footer, on every page of the customer site and nowhere else.
@@ -170,23 +170,19 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
             sentence saying what this is, and the utility controls underneath.
           */}
           <div className="lg:col-span-4">
-            <Link href={`/${locale}`} className="inline-flex items-center gap-3">
-              <span
-                aria-hidden
-                className="grid size-11 place-items-center rounded-card border border-gold/40 bg-card text-xl text-gold-read"
-              >
-                {ORNAMENT_BRAND}
-              </span>
-              {/*
-                The wordmark alone — the tagline was removed on 2026-09-10 (Bashar), not replaced.
-
-                The header dropped it earlier for the same reason; this was the last place it
-                appeared. `leading-tight` stays: it is what keeps the wordmark's box aligned with
-                the 44px ornament beside it.
-              */}
-              <span className="leading-tight font-display text-xl font-bold text-gold">
-                {brand('name')} <span className="text-text2/60">|</span> {brand('latin')}
-              </span>
+            {/*
+              The logo, as the header draws it (`SafraLockup`). The tagline was removed on
+              2026-09-10 (Bashar), not replaced. The link's label carries the name.
+            */}
+            <Link
+              href={`/${locale}`}
+              aria-label={brand('name')}
+              className="inline-flex min-h-10 items-center lg:min-h-0"
+            >
+              <SafraLockup
+                latin={locale === 'ar' ? brand('latin') : brand('name')}
+                latinClassName="inline-flex font-display"
+              />
             </Link>
 
             <p className="mt-5 max-w-prose text-14 leading-relaxed text-muted">

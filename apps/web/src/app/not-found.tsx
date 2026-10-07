@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 import { DEFAULT_LOCALE, LOCALES, LOCALE_DIRECTION, webMessages } from '@safra/i18n';
-import { ORNAMENT_BRAND } from '@safra/ui';
+import { SafraLockup } from '@safra/ui';
 
 /**
  * The tab's name, in every language this page speaks.
@@ -59,9 +59,8 @@ export default function NotFound() {
         }}
       >
         <div style={{ textAlign: 'center', padding: '2rem' }}>
-          <p style={{ color: '#a87a1f', fontSize: '2rem', margin: 0 }} aria-hidden>
-            {ORNAMENT_BRAND}
-          </p>
+          {/* The logo, which carries its own colours and layout inline: no stylesheet arrives here. */}
+          <SafraLockup layout="stacked" latin={fallback.brand.latin} />
 
           <h1 style={{ fontSize: '1.25rem', fontWeight: 700, marginTop: '1rem' }}>
             {fallback.notFound.title}

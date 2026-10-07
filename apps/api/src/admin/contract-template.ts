@@ -35,6 +35,8 @@
  * date, for each party — and the footnote says what to do with the paper afterwards.
  */
 
+import { SAFRA_LOCKUP_MARKUP } from '../brand/logo-markup.js';
+
 export interface ContractTerms {
   /** §13.2 reference, printed so a paper copy can be matched to a record. */
   readonly partnerReference: string;
@@ -149,9 +151,11 @@ export function renderContractHtml(terms: ContractTerms): string {
   .sign { display: flex; gap: 10mm; margin-top: 10mm; page-break-inside: avoid; }
   .sign div { flex: 1; border-top: 1px solid #111; padding-top: 2mm; font-size: 10pt; }
   .foot { margin-top: 8mm; font-size: 8.5pt; color: #666; }
+  .logo { margin: 0 0 4mm; }
 </style>
 </head>
 <body>
+  <div class="logo">${SAFRA_LOCKUP_MARKUP}</div>
   <h1>عقد شراكة — SAFRA Partnership Agreement</h1>
   <p class="sub">${escape(terms.partnerReference)} · ${escape(terms.issuedOn)}</p>
 

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { ORNAMENT_BRAND } from '@safra/ui';
+import { SafraLockup } from '@safra/ui';
 
 import { t } from '@/lib/strings';
 
@@ -28,9 +28,9 @@ export default function NotFound() {
   return (
     <main className="mx-auto grid min-h-screen max-w-md place-content-center px-4">
       <div className="w-full text-center">
-        <p className="text-gold text-3xl" aria-hidden>
-          {ORNAMENT_BRAND}
-        </p>
+        <div className="flex justify-center">
+          <SafraLockup layout="stacked" latin={t.brandLatin} />
+        </div>
 
         <h1 className="text-text mt-3 text-2xl font-semibold">{t.notFound.title}</h1>
 

@@ -9,6 +9,7 @@ import { DATABASE } from '../database/database.module.js';
 import { bookingLines, describeLines, type BookingLine } from './booking-lines.js';
 import { notFound } from '../common/errors/app-error.js';
 import { renderContractPdf } from '../admin/contract-pdf.js';
+import { SAFRA_LOCKUP_MARKUP } from '../brand/logo-markup.js';
 
 /**
  * The booking voucher and its QR code (SRS §6.3 step 6, §6.5).
@@ -288,7 +289,7 @@ export function voucherHtml(booking: VoucherRow, qrDataUri: string): string {
   @page { size: A4; margin: 18mm; }
   * { box-sizing: border-box; }
   body { font-family: "Noto Naskh Arabic", "Amiri", "Times New Roman", serif; color: #111; margin: 0; }
-  .brand { font-size: 26px; font-weight: 700; letter-spacing: .5px; }
+  .logo { margin: 0 0 8px; }
   .ref { font-family: "Courier New", monospace; font-size: 20px; direction: ltr; unicode-bidi: isolate; }
   .rule { border: 0; border-top: 2px solid #111; margin: 14px 0; }
   .grid { display: flex; gap: 24px; align-items: flex-start; }
@@ -303,7 +304,7 @@ export function voucherHtml(booking: VoucherRow, qrDataUri: string): string {
   .note { font-size: 11px; color: #555; margin-top: 16px; line-height: 1.7; }
 </style></head>
 <body>
-  <div class="brand">سفرة · SAFRA</div>
+  <div class="logo">${SAFRA_LOCKUP_MARKUP}</div>
   <div class="ref">${esc(booking.reference)}</div>
   <hr class="rule">
 

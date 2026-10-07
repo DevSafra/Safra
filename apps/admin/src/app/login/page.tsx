@@ -2,7 +2,7 @@ import { safeRedirect } from '@safra/session';
 
 import { StaffLoginForm } from '@/components/staff-login-form';
 import { t } from '@/lib/strings';
-import { ORNAMENT_BRAND } from '@safra/ui';
+import { SafraLockup } from '@safra/ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,9 +26,9 @@ export default async function LoginPage({
   return (
     <main className="mx-auto grid min-h-screen max-w-sm content-center px-4">
       <div className="w-full">
-        <p className="text-3xl text-gold text-center" aria-hidden>
-          {ORNAMENT_BRAND}
-        </p>
+        <div className="flex justify-center">
+          <SafraLockup layout="stacked" latin={t.brandLatin} />
+        </div>
         <h1 className="mt-3 text-2xl font-semibold text-text text-center">
           {t.login.title}
         </h1>

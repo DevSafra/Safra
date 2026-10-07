@@ -1,5 +1,5 @@
 import { safeRedirect } from '@safra/session';
-import { ORNAMENT_BRAND } from '@safra/ui';
+import { SafraLockup } from '@safra/ui';
 
 import { PartnerLoginForm } from '@/components/partner-login-form';
 import { t } from '@/lib/strings';
@@ -42,10 +42,9 @@ export default async function LoginPage({
   return (
     <main className="mx-auto grid min-h-screen max-w-sm content-center px-4">
       <div className="w-full">
-        {/* `aria-hidden`: an ornament is a glyph, and a screen reader announcing it says nothing. */}
-        <p className="text-3xl text-gold text-center" aria-hidden>
-          {ORNAMENT_BRAND}
-        </p>
+        <div className="flex justify-center">
+          <SafraLockup layout="stacked" latin={t.brandLatin} />
+        </div>
 
         {/*
           The console's heading exactly: the UI face, `font-semibold`, `text-text`.
