@@ -36,8 +36,10 @@ export default async function RegisterPage({
 
   return (
     <div className="mx-auto max-w-md px-4 py-16">
-      <h1 className="font-display text-3xl font-bold text-gold">{t('registerTitle')}</h1>
-      <p className="mt-2 text-sm text-muted">{t('registerSubtitle')}</p>
+      <h1 className="font-display text-3xl font-bold text-gold text-center">
+        {t('registerTitle')}
+      </h1>
+      <p className="mt-2 text-sm text-muted text-center">{t('registerSubtitle')}</p>
 
       <div className="mt-8 rounded-card border border-line bg-card p-6">
         <AuthForm
