@@ -21,7 +21,6 @@ import { ENV, type Env } from '../config/env.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { canFileJointContract, ERROR } from '@safra/contracts';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
-import { SettingsService } from '../settings/settings.service.js';
 import { renderContractHtml } from './contract-template.js';
 import { renderContractPdf } from './contract-pdf.js';
 import { actorName } from '../common/actor-name.sql.js';
@@ -178,7 +177,6 @@ export class PartnerContractService {
     private readonly audit: AuditService,
     private readonly mail: MailService,
     @Inject(ENV) private readonly env: Env,
-    private readonly settings: SettingsService,
   ) {}
 
   /** Every contract, newest first. Not paginated: a partner has a handful, ever. */
@@ -525,10 +523,9 @@ export class PartnerContractService {
       reference: string;
       legal_name: string;
       display_name: string;
-      address: string;
       city_id: string;
     }>(sql`
-      SELECT p.id, p.reference, p.legal_name, p.display_name, p.address, p.city_id
+      SELECT p.id, p.reference, p.legal_name, p.display_name, p.city_id
       FROM partners p
       WHERE p.reference = ${partnerReference} AND p.deleted_at IS NULL
       LIMIT 1
@@ -541,12 +538,11 @@ export class PartnerContractService {
 
     if (!row) throw notFound(ERROR.PARTNER_NOT_FOUND);
 
-    const [rate, fee, notice] = await Promise.all([
-      this.settings.getNumber('commission.partner_rate', 0.07),
-      this.settings.getNumber('commission.customer_fee_value', 1.99),
-      this.settings.getNumber('contract.notice_days', 30),
-    ]);
-
+    /*
+      No commission, fee or notice period is read from settings any more (2026-10-07): the contract
+      is now the final agreement, and it leaves all three to be agreed and written in by hand —
+      article 7 states the commission is not in its body at all.
+    */
     /*
       The issue date is passed IN rather than read inside the template, so the document stays a
       pure function of its inputs. Nothing in `renderContractHtml` calls the clock — two renders
@@ -559,11 +555,7 @@ export class PartnerContractService {
       partnerReference: row.reference,
       partnerLegalName: row.legal_name,
       partnerDisplayName: row.display_name,
-      partnerAddress: row.address,
       issuedOn,
-      commissionPercent: Math.round(rate * 1000) / 10,
-      customerFee: `$${fee.toFixed(2)}`,
-      noticeDays: notice,
     });
 
     const bytes = await renderContractPdf(html);

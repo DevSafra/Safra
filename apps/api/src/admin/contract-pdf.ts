@@ -1,5 +1,7 @@
 import { chromium, type Browser } from 'playwright-core';
 
+import { CONTRACT_PAGE_FOOTER, CONTRACT_PAGE_HEADER } from './contract-template.js';
+
 /**
  * A contract HTML document, printed to PDF by a headless browser we run.
  *
@@ -129,7 +131,19 @@ export function createContractRenderer(
           /* The template's `@page` rules are print rules, so print media is what they apply to. */
           await page.emulateMedia({ media: 'print' });
 
-          return await page.pdf({ format: 'A4', printBackground: true });
+          /*
+            The running header and footer the contract itself has (its name at the top, its title
+            and «صفحة N» at the foot). `preferCSSPageSize` keeps the template's own `@page` margins,
+            which is where Chromium draws them.
+          */
+          return await page.pdf({
+            format: 'A4',
+            printBackground: true,
+            preferCSSPageSize: true,
+            displayHeaderFooter: true,
+            headerTemplate: CONTRACT_PAGE_HEADER,
+            footerTemplate: CONTRACT_PAGE_FOOTER,
+          });
         } finally {
           await context.close().catch(() => undefined);
         }

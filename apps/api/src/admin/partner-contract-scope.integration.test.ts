@@ -7,7 +7,6 @@ import { ERROR } from '@safra/contracts';
 import { AuditService } from '../common/audit/audit.service.js';
 import { codeOf } from '../common/errors/app-error.js';
 import { PartnerContractService } from './partner-contract.service.js';
-import { SettingsService } from '../settings/settings.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import type { Env } from '../config/env.js';
 import type { MailService } from '../mail/mail.service.js';
@@ -112,7 +111,6 @@ describeIfDb('the partner contract stack honours a city scope', () => {
         PARTNER_URL: 'https://partner.example',
         ADMIN_URL: 'https://console.example',
       } as Env,
-      new SettingsService(db),
     );
 
     const cities = await db.execute<{ id: string }>(sql`
