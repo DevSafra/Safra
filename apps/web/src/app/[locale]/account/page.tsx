@@ -117,7 +117,7 @@ export default async function AccountOverviewPage({
               className="mt-3 flex flex-wrap items-baseline justify-between gap-3 rounded-card border border-line bg-card p-5 transition-colors hover:border-gold/50"
             >
               <span className="text-sm text-muted">{t('walletCurrentTitle')}</span>
-              <span className="font-display text-2xl text-gold" dir="ltr">
+              <span className="font-display text-2xl font-bold text-gold" dir="ltr">
                 {formatMoney(balance.balance, balance.currencyCode, locale)}
               </span>
             </Link>
@@ -201,7 +201,7 @@ function BookingRow({
           front page while «حجوزاتي» beside it printed the same booking with its currency, and SYP
           and USD differ by four orders of magnitude. The same call the bookings list makes.
         */}
-        <span className="text-sm text-gold-read" dir="ltr">
+        <span className="text-sm font-semibold text-gold-read" dir="ltr">
           {formatMoney(
             booking.totalAmount,
             booking.currency?.code ?? DEFAULT_MONEY_CURRENCY,

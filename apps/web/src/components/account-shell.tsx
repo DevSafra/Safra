@@ -177,7 +177,12 @@ export async function AccountShell({
             />
           </span>
 
-          <h1 className="font-display text-3xl font-bold text-gold">{title}</h1>
+          {/*
+            The page's own ink, not gold (Bashar, 2026-10-07: «use the font colour --color-text on
+            all customer dashboard titles»). The token, not #1d2333 itself, so the night theme gets
+            its own readable value.
+          */}
+          <h1 className="font-display text-3xl font-bold text-text">{title}</h1>
         </div>
 
         <div className="mt-8">{children}</div>
