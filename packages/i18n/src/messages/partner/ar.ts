@@ -215,6 +215,8 @@ export const ar = {
 
   support: {
     title: 'الدعم',
+    /* On a thread with a reply this reader has not opened (Bashar, 2026-10-07). */
+    unread: 'رد جديد',
     intro: 'اطرح مشكلتك وسيتابعها فريق سفرة معك هنا.',
     openTitle: 'طلب دعم جديد',
     bodyLabel: 'اشرح المشكلة',
@@ -308,6 +310,9 @@ export const ar = {
 
   nav: {
     heading: 'لوحة الشريك',
+    /* Read aloud after a section's name, for the red notice beside it (Bashar, 2026-10-07). */
+    noticeNew: 'جديد: {count}',
+    noticeWaiting: 'بانتظارك: {count}',
     dashboard: 'لوحة التحكم',
     properties: 'عقاراتي',
     calendars: 'التقويمات',
@@ -2037,6 +2042,8 @@ export const ar = {
    */
   disputes: {
     title: 'النزاعات',
+    /* On a live dispute nobody at the business has answered yet (Bashar, 2026-10-07). */
+    awaiting: 'بانتظار ردّك',
     intro:
       'شكاوى فتحها ضيوف على حجوزات لديك. سفرة تبتّ فيها بعد سماع الطرفين، ومستحقّ الحجز يبقى مجمّدًا حتى يُغلق النزاع.',
     empty: 'لا نزاعات على حجوزاتك.',

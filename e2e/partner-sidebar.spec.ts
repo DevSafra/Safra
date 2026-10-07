@@ -405,3 +405,32 @@ test('the theme toggle switches, relabels, and is remembered', async ({ page }) 
 
   expect(violations).toStrictEqual([]);
 });
+
+/**
+ * Every badge sits at the far end of its row, as the console draws them (Bashar, 2026-10-07).
+ *
+ * The badge carried `dir="ltr"` itself, which turned its `ms-auto` (the inline START margin) into a
+ * LEFT margin of its own direction, so on an Arabic row the auto margin opened on the wrong side and
+ * pulled the badge in against the word. The fixture partner always has listings, so at least the
+ * blue «عقاراتي» count is drawn; red notices appear when something is waiting.
+ */
+test('every sidebar badge sits at the end of its row', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${BASE}/`);
+
+  const gaps = await page.evaluate(() =>
+    Array.from(document.querySelectorAll<HTMLElement>('aside nav a')).flatMap((row) => {
+      const badge = row.querySelector<HTMLElement>('span.rounded-full');
+
+      if (!badge) return [];
+
+      /* RTL: the end of the row is its LEFT edge, inside the row's own padding. */
+      return [
+        Math.round(badge.getBoundingClientRect().left - row.getBoundingClientRect().left),
+      ];
+    }),
+  );
+
+  expect(gaps.length, 'the fixture partner shows at least one badge').toBeGreaterThan(0);
+  for (const gap of gaps) expect(gap, 'badge at the far end of its row').toBeLessThan(20);
+});

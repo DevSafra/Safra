@@ -5,6 +5,7 @@ import { requireVerifiedPartner, sectionAccess } from '@/lib/gate';
 import { Shell } from '@/components/shell';
 import { SectionRefusal } from '@/components/section-refusal';
 import { Ltr } from '@/components/ltr';
+import { NewMarker } from '@/components/new-marker';
 import { amount } from '@/lib/format';
 import { disputeKind, disputeStatus, plural, t } from '@/lib/strings';
 import { ltrIsolate } from '@safra/i18n';
@@ -107,6 +108,14 @@ export default async function DisputesPage() {
                     <Ltr>{row.reference}</Ltr>
                   </span>
                   <span className="text-13 text-muted">{disputeStatus(row.status)}</span>
+                  {/*
+                    The row-level half of the النزاعات badge: live, and nobody here has answered.
+                    The same predicate as the profile's count, so the two cannot disagree.
+                  */}
+                  {row.responseCount === 0 &&
+                  (row.status === 'open' || row.status === 'investigating') ? (
+                    <NewMarker label={t.disputes.awaiting} />
+                  ) : null}
                   <span className="text-13 text-faint">{disputeKind(row.kind)}</span>
                   {/*
                     BOTH or neither, and no fallback currency.

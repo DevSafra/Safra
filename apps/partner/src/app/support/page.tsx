@@ -4,6 +4,7 @@ import { getMyProfile, getMySupportTickets, sidebarBadges } from '@/lib/api';
 import { isLocked } from '@/lib/gate';
 import { Shell } from '@/components/shell';
 import { Ltr } from '@/components/ltr';
+import { NewMarker } from '@/components/new-marker';
 import { SupportForm } from '@/components/support-form';
 import { fill, t } from '@/lib/strings';
 
@@ -72,14 +73,18 @@ export default async function SupportPage() {
                     </span>
                   </span>
 
-                  <span
-                    className={`shrink-0 rounded-full border px-2 py-0.5 text-14 ${
-                      ticket.closed
-                        ? 'border-line bg-field text-faint'
-                        : 'border-ok/40 bg-ok/10 text-ok'
-                    }`}
-                  >
-                    {ticket.closed ? t.support.closedLabel : t.support.openLabel}
+                  {/* Beside the status it qualifies, so the two read as one fact about the thread. */}
+                  <span className="flex shrink-0 items-center gap-2">
+                    {ticket.unread ? <NewMarker label={t.support.unread} /> : null}
+                    <span
+                      className={`shrink-0 rounded-full border px-2 py-0.5 text-14 ${
+                        ticket.closed
+                          ? 'border-line bg-field text-faint'
+                          : 'border-ok/40 bg-ok/10 text-ok'
+                      }`}
+                    >
+                      {ticket.closed ? t.support.closedLabel : t.support.openLabel}
+                    </span>
                   </span>
                 </Link>
               </li>

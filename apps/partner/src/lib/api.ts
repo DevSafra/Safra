@@ -169,6 +169,16 @@ const profileSchema = z.object({
   /* The §7 sidebar badges. Defaulted so an older API still renders the shell. */
   propertyCount: z.number().default(0),
   reviewAverage: z.string().nullable().default(null),
+  /*
+    The notice badges (Bashar, 2026-10-07). NOT defaulted: a default would invent «nothing waiting»
+    for a payload that stopped sending the field, which is the one lie a notice must not tell.
+    Null is the API saying this reader cannot open that section.
+  */
+  notices: z.object({
+    support: z.number(),
+    disputes: z.number().nullable(),
+    coupons: z.number().nullable(),
+  }),
   /**
    * The hold on this account, or `null` when there is none.
    *
@@ -658,12 +668,21 @@ export async function getMyReviews(params: { page: number; limit: number }) {
 export function sidebarBadges(profile: PartnerProfile | 'failed' | 'unauthenticated'): {
   properties?: string;
   reviews?: string;
+  support?: number;
+  disputes?: number;
+  coupons?: number;
 } {
   if (profile === 'failed' || profile === 'unauthenticated') return {};
+
+  /* A notice at zero is absent, not «0»: nothing is waiting, so nothing asks for attention. */
+  const { support, disputes, coupons } = profile.notices;
 
   return {
     ...(profile.propertyCount > 0 ? { properties: String(profile.propertyCount) } : {}),
     ...(profile.reviewAverage ? { reviews: `\u2605 ${profile.reviewAverage}` } : {}),
+    ...(support > 0 ? { support } : {}),
+    ...(disputes ? { disputes } : {}),
+    ...(coupons ? { coupons } : {}),
   };
 }
 
@@ -1108,6 +1127,8 @@ const supportTicketSchema = z.object({
   closed: z.boolean(),
   messageCount: z.number(),
   lastMessage: z.string().nullable(),
+  /* Something from SAFRA or a guest that THIS reader has not opened; per person, not per business. */
+  unread: z.boolean(),
 });
 
 export type PartnerSupportTicket = z.infer<typeof supportTicketSchema>;

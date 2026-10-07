@@ -11,7 +11,8 @@ import { SidebarBackdrop, SidebarToggle, ThemeToggle } from '@safra/ui';
 
 import { SuspensionNotice } from '@/components/suspension-notice';
 import { getMyProfile } from '@/lib/api';
-import { SIDEBAR_ID, t } from '@/lib/strings';
+import { Ltr } from '@/components/ltr';
+import { SIDEBAR_ID, fill, t } from '@/lib/strings';
 import { getPartnerSession } from '@/lib/session-server';
 
 /**
@@ -73,7 +74,18 @@ export async function Shell({
    * now: the count is the partner's listings and the rating is the trigger-maintained average over
    * published reviews.
    */
-  readonly badges?: { readonly properties?: string; readonly reviews?: string };
+  readonly badges?: {
+    readonly properties?: string;
+    readonly reviews?: string;
+    /*
+      The notices (Bashar, 2026-10-07), drawn red rather than blue because they ask for something:
+      replies this person has not read, disputes the business has not answered, offers waiting on a
+      decision. Each is gone at zero.
+    */
+    readonly support?: number;
+    readonly disputes?: number;
+    readonly coupons?: number;
+  };
   /**
    * An unverified partner sees two links, not seven (Bashar, 2026-08-21).
    *
@@ -287,6 +299,8 @@ export async function Shell({
                   href="/coupons"
                   label={t.nav.coupons}
                   current={active === 'coupons'}
+                  notice={badges?.coupons}
+                  noticeLabel={t.nav.noticeWaiting}
                 />
               ) : null}
               {opens('reviews') ? (
@@ -320,6 +334,8 @@ export async function Shell({
                   href="/disputes"
                   label={t.nav.disputes}
                   current={active === 'disputes'}
+                  notice={badges?.disputes}
+                  noticeLabel={t.nav.noticeWaiting}
                 />
               ) : null}
               {/*
@@ -377,6 +393,8 @@ export async function Shell({
             href="/support"
             label={t.nav.supportPage}
             current={active === 'support'}
+            notice={badges?.support}
+            noticeLabel={t.nav.noticeNew}
           />
         </nav>
 
@@ -433,11 +451,16 @@ function Item({
   label,
   current,
   badge,
+  notice,
+  noticeLabel,
 }: {
   readonly href: string;
   readonly label: string;
   readonly current: boolean;
   readonly badge?: string | undefined;
+  readonly notice?: number | undefined;
+  /** What the count means, read aloud after the section's name: «جديد: {count}». */
+  readonly noticeLabel?: string | undefined;
 }) {
   return (
     <Link
@@ -451,15 +474,27 @@ function Item({
     >
       {label}
       {/*
-        `dir="ltr"`: a badge is a number, sometimes with a ★ in front of it, on an Arabic line.
-        Pushed to the far side with `ms-auto` so it sits at the end of the row in either direction.
+        At the END of the row (Bashar, 2026-10-07), as the console draws it. The badge carried
+        `dir="ltr"` itself, and `ms-auto` is the inline START margin: on an element whose own
+        direction is LTR that is the left, so on an Arabic row the auto margin opened on the wrong
+        side and pulled the badge in against the word. The value is isolated instead, which keeps
+        «★ 4.7» in order without changing which side the margin is on.
       */}
       {badge ? (
-        <span
-          dir="ltr"
-          className="ms-auto rounded-full bg-[rgba(var(--skyA),0.15)] px-2 py-0.5 text-12 font-bold text-sky"
-        >
-          {badge}
+        <span className="ms-auto rounded-full bg-[rgba(var(--skyA),0.15)] px-2 py-0.5 text-12 font-bold text-sky">
+          <Ltr>{badge}</Ltr>
+        </span>
+      ) : null}
+      {notice && notice > 0 ? (
+        <span className="ms-auto rounded-full bg-[rgba(var(--badA),0.18)] px-2 py-0.5 text-12 font-extrabold text-bad">
+          <span aria-hidden="true">
+            <Ltr>{String(notice)}</Ltr>
+          </span>
+          {noticeLabel ? (
+            <span className="sr-only">
+              {fill(noticeLabel, { count: String(notice) })}
+            </span>
+          ) : null}
         </span>
       ) : null}
     </Link>
