@@ -17,6 +17,7 @@ on production unless it says otherwise.
 | `ranking-recompute`    | Daily at 03:00  | `8421001`   | Recomputes `recommendation_score` and the «سفرة تُرشّح» badges   |
 | `webhook-retention`    | Daily at 03:00  | `8421004`   | Prunes unverified webhook payloads older than 30 days            |
 | `credential-retention` | Daily at 03:30  | `8421005`   | Prunes spent sign-in codes and dead refresh tokens               |
+| `export-retention`     | Daily at 03:45  | `8421011`   | Deletes booking-export files past 7 days and archives their rows |
 | `sanctions-refresh`    | Daily at 04:00  | `8421003`   | Refetches the consolidated sanctions list                        |
 
 **They run through the BullMQ `scheduled` queue**, registered once in Redis and processed at
