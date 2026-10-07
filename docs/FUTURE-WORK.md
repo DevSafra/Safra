@@ -209,6 +209,15 @@ deleting it; the reason something was blocked is often the reason it comes back.
 > the separate section under its own heading and `rel="sponsored"` on every ad link. Worth a legal
 > check before launch in any market that requires paid placements to be identifiable as ads.
 >
+> **Notices and «عرض المزيد» (Bashar, 2026-10-07):** الدعم and النزاعات badge like notifications
+> on the customer dashboard (`conversations.customer_seen_at`, `disputes.customer_seen_status`,
+> migration 0087, which starts every existing thread and dispute as seen). Every cursor list in
+> the customer account and the partner portal shows fifteen rows and grows by fifteen in place,
+> up to 300 per window (`@safra/contracts/show-more`, `ShowMore` in `@safra/ui`). **Left open:**
+> the partner portal has no unread tracking of its own (a business has several readers of one
+> thread, so «seen» needs a per-person decision); the console's tables keep their numbered pager
+> by standing rule; only the wallet statement animates the rows a press adds.
+>
 > **Found beside the work, not changed:** SAFRA's own payout accounts are still edited in place;
 > two staff starting one conversation at once can make two; the key-rotation setting
 > `safra.field_key_rotation` can be set by any database session (fix: honour it only for a
