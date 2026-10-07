@@ -189,13 +189,19 @@ deleting it; the reason something was blocked is often the reason it comes back.
 > edits of a paid-to payout account left two live accounts).
 >
 > **Decisions waiting for Bashar:** coupon caps on a percentage coupon carry no currency (require
-> one / always USD and convert / operator picks); expired gift cards stay owed for ever (move to
-> income at expiry, which needs a ledger account / keep until a legal limit / split given and
-> bought cards); whether a party larger than the chosen rooms should be stopped on the checkout
-> before the guest types their details (today the API refuses at submit, as before); the bookings
+> one / always USD and convert / operator picks); the bookings
 > search box drops «needs attention»; booking exports are archived after seven days, not deleted;
 > one of the two identical cover-photo indexes could be dropped; a failed email confirmation still
 > spends its link; converting totals to one currency stays the open «SYP or USD books» question.
+>
+> **Decided and done (Bashar, 2026-10-07):** an expired gift card's unspent balance leaves the
+> books in the same transaction that retires it: a bought card's becomes income on the new
+> `gift_card_breakage` account (migration 0086), a card SAFRA gave away reverses
+> `gift_card_issued`. A card in a currency with no rate stays active and is retried hourly. And a
+> party the chosen rooms cannot sleep is told so on the checkout, with the capacity and a way back
+> to the property carrying the stay and the party, before any details are typed. **Open:** breakage
+> is not yet shown in the reports' revenue figures or settled by a SAFRA payout, which read the
+> commission, fee and advertising accounts only.
 >
 > **Found beside the work, not changed:** SAFRA's own payout accounts are still edited in place;
 > two staff starting one conversation at once can make two; the key-rotation setting
