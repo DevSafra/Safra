@@ -24,6 +24,7 @@ export * from './partner-applications.js';
 export * from './digits.js';
 export * from './invoice.js';
 export * from './pagination.js';
+export * from './show-more.js';
 export * from './payment.js';
 export * from './payout-account.js';
 export * from './safra-payout.js';
