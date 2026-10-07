@@ -179,7 +179,8 @@ than a decision.
 - Every external input validated by schema at the boundary; unknown fields rejected.
 - Parameterised queries throughout.
 - CSP with a per-request nonce; `img-src` names its origins rather than allowing `https:`.
-- Field-level encryption for TOTP secrets, with tested key rotation.
+- Field-level encryption for TOTP secrets, payout account numbers and bank-transfer payer and
+  refund accounts, with a key rotation that covers every encrypted column (held by a sweep test).
 - Append-only audit log, enforced by trigger, surviving `TRUNCATE`.
 - Errors to clients are codes; detail stays in server logs. **No PII in logs**, including
   notification failure reasons.
