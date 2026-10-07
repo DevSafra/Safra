@@ -87,13 +87,24 @@ export default async function AccountFavouritesPage({
                 className="flex h-full flex-col gap-2 rounded-card border border-line bg-card p-4"
               >
                 <div className="flex items-start justify-between gap-3">
+                  {/*
+                    Only an AVAILABLE listing is a link. An unavailable one's page answers 404 by
+                    design (a closed market, a suspended partner, an unpublished listing), so a link
+                    would be a door to «not found»; the name stays, and so does the remove control.
+                  */}
                   <h2 className="font-display text-lg font-bold text-text">
-                    <Link
-                      href={`/${locale}/property/${item.slug}`}
-                      className="inline-flex min-h-10 items-center hover:text-gold-read lg:min-h-0"
-                    >
-                      {localisedName(item.property, locale)}
-                    </Link>
+                    {item.isAvailable ? (
+                      <Link
+                        href={`/${locale}/property/${item.slug}`}
+                        className="inline-flex min-h-10 items-center hover:text-gold-read lg:min-h-0"
+                      >
+                        {localisedName(item.property, locale)}
+                      </Link>
+                    ) : (
+                      <span className="inline-flex min-h-10 items-center lg:min-h-0">
+                        {localisedName(item.property, locale)}
+                      </span>
+                    )}
                   </h2>
                   {item.rating ? (
                     <span

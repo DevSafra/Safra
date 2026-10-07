@@ -47,11 +47,14 @@ export async function generateMetadata({
     metadataBase: siteUrl(),
     title: { default: title, template: `%s · ${t('name')}` },
     description: [home('heroPromiseLead'), home('heroPromiseCare')].join(' '),
-    // §5.4 targets SEO, so each page declares its language alternates explicitly
-    // rather than relying on a crawler to infer them.
-    alternates: {
-      languages: Object.fromEntries(routing.locales.map((l) => [l, `/${l}`])),
-    },
+    /*
+      NO `alternates` here, deliberately (audit 2026-10-06).
+
+      §5.4 targets SEO, so every page meant to be found declares its own canonical and language
+      alternates through `localeAlternates`. A default here pointing at the HOME page was inherited
+      by every page that forgot, which told a crawler the terms page in Arabic was the English home
+      page. A page that is noindex now carries no alternates at all, which is the truth about it.
+    */
     openGraph: {
       title,
       description: home('heroSubtitle'),

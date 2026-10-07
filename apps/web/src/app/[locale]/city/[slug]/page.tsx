@@ -5,7 +5,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Breadcrumb } from '@/components/breadcrumb';
 import { JsonLd } from '@/components/json-ld';
 import { StayResults } from '@/components/search/stay-results';
-import { isLocale, routing, type Locale } from '@/i18n/routing';
+import { isLocale, type Locale } from '@/i18n/routing';
 import { cityBounds } from '@/lib/basemap';
 import { getCity } from '@/lib/catalog';
 import { localisedDescription, localisedName, localisedText } from '@/lib/localise';
@@ -13,6 +13,7 @@ import { imageUrl as cityImageUrl } from '@/lib/property';
 import { breadcrumbGraph, cityGraph } from '@/lib/structured-data';
 import { siteOrigin } from '@/lib/site-url';
 import type { RawQuery } from '@/lib/search-query';
+import { localeAlternates } from '@/lib/alternates';
 
 /**
  * City page (SRS §5.4).
@@ -62,12 +63,8 @@ export async function generateMetadata({
   return {
     title: name,
     description: description ?? undefined,
-    alternates: {
-      canonical: `/${locale}/city/${slug}`,
-      languages: Object.fromEntries(
-        routing.locales.map((l) => [l, `/${l}/city/${slug}`]),
-      ),
-    },
+    /* The slug the API answered with, not the one in the request: see `localeAlternates`. */
+    alternates: localeAlternates(locale, `/city/${city.slug}`),
     openGraph: {
       title: name,
       description: description ?? undefined,

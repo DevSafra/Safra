@@ -6,6 +6,7 @@ import { LegalPage } from '@/components/legal-page';
 import { isLocale, routing } from '@/i18n/routing';
 import { ltrIsolate } from '@/lib/bidi';
 import { LEGAL_UPDATED } from '@/lib/legal';
+import { localeAlternates } from '@/lib/alternates';
 
 /**
  * سياسة الخصوصية — written from the schema, not from a template.
@@ -40,7 +41,11 @@ export async function generateMetadata({
 
   const t = await getTranslations({ locale, namespace: 'legal' });
 
-  return { title: t('privacy.title'), description: t('privacy.intro') };
+  return {
+    title: t('privacy.title'),
+    description: t('privacy.intro'),
+    alternates: localeAlternates(locale, '/privacy'),
+  };
 }
 
 export default async function PrivacyPage({

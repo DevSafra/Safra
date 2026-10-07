@@ -9,11 +9,12 @@ import { Breadcrumb } from '@/components/breadcrumb';
 import { JsonLd } from '@/components/json-ld';
 import { formatMoney, localisedText } from '@/lib/localise';
 import { getGroupTrip, hasFinished, nightsBetween } from '@/lib/group-trips';
-import { isLocale, routing } from '@/i18n/routing';
+import { isLocale } from '@/i18n/routing';
 import { breadcrumbGraph, tripGraph } from '@/lib/structured-data';
 import { imageUrl } from '@/lib/property';
 import { siteOrigin } from '@/lib/site-url';
 import { readableDateWithYear } from '@/lib/readable-date';
+import { localeAlternates } from '@/lib/alternates';
 
 /**
  * One announced trip.
@@ -79,12 +80,8 @@ export async function generateMetadata({
   return {
     title,
     description,
-    alternates: {
-      canonical: `/${locale}/groups/${slug}`,
-      languages: Object.fromEntries(
-        routing.locales.map((l) => [l, `/${l}/groups/${slug}`]),
-      ),
-    },
+    /* The slug the API answered with, not the one in the request: see `localeAlternates`. */
+    alternates: localeAlternates(locale, `/groups/${trip.slug}`),
     openGraph: { title, description, type: 'article', ...cover },
     /* Without this a large photograph is cropped to a 120px square thumbnail on X. */
     twitter: {

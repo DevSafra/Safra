@@ -17,6 +17,7 @@ import { formatMoney, localisedName } from '@/lib/localise';
 import { returnParam } from '@/lib/return-to';
 import type { Locale } from '@/i18n/routing';
 import { localStatus } from '@/lib/status-word';
+import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 
 /**
  * نظرة عامة — the account overview (handoff §6).
@@ -195,8 +196,17 @@ function BookingRow({
             locale,
           )}
         />
+        {/*
+          Money, not a bare decimal (audit 2026-10-06). This printed «200.00» on the account's own
+          front page while «حجوزاتي» beside it printed the same booking with its currency, and SYP
+          and USD differ by four orders of magnitude. The same call the bookings list makes.
+        */}
         <span className="text-sm text-gold-read" dir="ltr">
-          {booking.totalAmount}
+          {formatMoney(
+            booking.totalAmount,
+            booking.currency?.code ?? DEFAULT_MONEY_CURRENCY,
+            locale,
+          )}
         </span>
       </span>
     </Link>

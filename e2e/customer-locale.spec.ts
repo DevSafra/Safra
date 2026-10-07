@@ -305,7 +305,11 @@ test.describe('a Latin-valued field on an Arabic page', () => {
     await page.goto('/ar');
 
     const footer = page.locator('footer');
-    const brand = footer.getByRole('link', { name: /SAFRA/ }).first();
+    /*
+      The logo link, by the name it carries since the logo of 2026-10-07: «سفرة», the drawn lockup
+      being hidden from assistive tech. Exact, so «عن سفرة» does not match.
+    */
+    const brand = footer.getByRole('link', { name: 'سفرة', exact: true }).first();
     /* The last column, by its landmark rather than its position — position is what is on trial. */
     const lastColumn = footer.getByRole('navigation', { name: 'حسابي' });
 
@@ -345,11 +349,30 @@ test.describe('a Latin-valued field on an Arabic page', () => {
   }) => {
     await page.goto('/ar');
 
-    /* The head's alternates, which are what a crawler actually reads. */
+    /*
+      The alternates, where each reader looks for them (2026-10-06).
+
+      Since every page computes its own canonical and alternates, Next streams those tags into the
+      BODY for a browser and keeps them in the HEAD for a crawler that runs no JavaScript, which it
+      recognises by user agent. Google reads the rendered page; Bing and the link-preview bots read
+      the head. So the head is asserted as such a crawler receives it, and the page as a browser
+      renders it, rather than asking a browser's head for tags Next never promised to put there.
+    */
+    const asCrawler = await page.request.get('/ar', {
+      headers: {
+        'user-agent':
+          'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)',
+      },
+    });
+    const head = (await asCrawler.text()).split('</head>')[0] ?? '';
+
     for (const code of ['ar', 'en', 'de']) {
-      await expect(
-        page.locator(`head link[rel="alternate"][hreflang="${code}"]`),
-      ).toHaveCount(1);
+      expect(head, `a crawler's head names ${code}`).toMatch(
+        new RegExp(`<link rel="alternate" hrefLang="${code}"`),
+      );
+      await expect(page.locator(`link[rel="alternate"][hreflang="${code}"]`)).toHaveCount(
+        1,
+      );
     }
 
     /*

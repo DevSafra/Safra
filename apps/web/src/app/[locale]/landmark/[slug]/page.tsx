@@ -8,11 +8,12 @@ import { JsonLd } from '@/components/json-ld';
 import { PropertyCard } from '@/components/property-card';
 import { addDays, todayInDamascus } from '@/lib/settings';
 import { getCity, getLandmark, getLandmarks } from '@/lib/catalog';
-import { isLocale, routing, type Locale } from '@/i18n/routing';
+import { isLocale, type Locale } from '@/i18n/routing';
 import { localisedName, localisedText } from '@/lib/localise';
 import { breadcrumbGraph, landmarkGraph } from '@/lib/structured-data';
 import { searchSafely } from '@/lib/api';
 import { siteOrigin } from '@/lib/site-url';
+import { localeAlternates } from '@/lib/alternates';
 
 /**
  * «إقامات قرب الجامع الأموي» — a landmark as a destination page.
@@ -139,12 +140,7 @@ export async function generateMetadata({
       whatever address was asked for cannot do the one job the tag has. If the API ever resolves a
       slug loosely, this still names the one address we mean.
     */
-    alternates: {
-      canonical: `/${locale}/landmark/${resolved.landmark.slug}`,
-      languages: Object.fromEntries(
-        routing.locales.map((l) => [l, `/${l}/landmark/${resolved.landmark.slug}`]),
-      ),
-    },
+    alternates: localeAlternates(locale, `/landmark/${resolved.landmark.slug}`),
     openGraph: { title, description, type: 'website' },
   };
 }

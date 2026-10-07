@@ -5,9 +5,10 @@ import { notFound } from 'next/navigation';
 
 import { PledgeCards } from '@/components/pledge-cards';
 import { ServiceCards } from '@/components/service-cards';
-import { isLocale, routing } from '@/i18n/routing';
+import { isLocale } from '@/i18n/routing';
 import { getPublicSettings } from '@/lib/catalog';
 import { partnerApplicationsOpen } from '@safra/contracts';
+import { localeAlternates } from '@/lib/alternates';
 
 /**
  * «عن سفرة» (Bashar, 2026-10-04: «create a new page "عن سفرة" and add it to the navbar menu between
@@ -39,10 +40,7 @@ export async function generateMetadata({
   return {
     title: t('title'),
     description: footer('about'),
-    alternates: {
-      canonical: `/${locale}/about`,
-      languages: Object.fromEntries(routing.locales.map((l) => [l, `/${l}/about`])),
-    },
+    alternates: localeAlternates(locale, '/about'),
   };
 }
 

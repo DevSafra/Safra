@@ -5,7 +5,8 @@ import { notFound } from 'next/navigation';
 import { GroupTripCard } from '@/components/group-trip-card';
 import { SectionPlaceholder } from '@/components/section-placeholder';
 import { getGroupTrips } from '@/lib/group-trips';
-import { isLocale, routing } from '@/i18n/routing';
+import { isLocale } from '@/i18n/routing';
+import { localeAlternates } from '@/lib/alternates';
 
 /**
  * جروبات — the trips SAFRA puts together (Bashar, 2026-09-27; built 2026-09-28).
@@ -44,10 +45,7 @@ export async function generateMetadata({
     title: t('title'),
     description: t('body'),
     ...(trips.length === 0 ? { robots: { index: false } } : {}),
-    alternates: {
-      canonical: `/${locale}/groups`,
-      languages: Object.fromEntries(routing.locales.map((l) => [l, `/${l}/groups`])),
-    },
+    alternates: localeAlternates(locale, '/groups'),
   };
 }
 

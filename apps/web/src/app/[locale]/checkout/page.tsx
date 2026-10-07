@@ -21,6 +21,7 @@ import { getPublicSettings } from '@/lib/catalog';
 import { formatMoney, localisedName, localisedText } from '@/lib/localise';
 import { availablePaymentMethods, getProperty, quote } from '@/lib/property';
 import { getSession } from '@/lib/session-server';
+import { partyFromQuery } from '@/lib/party';
 
 /**
  * Checkout (SRS §6.3 step 3 — the payment summary).
@@ -102,13 +103,16 @@ export default async function CheckoutPage({
   const unitId = first(query['unitId']);
   const checkIn = first(query['checkIn']);
   const checkOut = first(query['checkOut']);
-  const adults = Number(first(query['adults']) ?? 2);
   /*
-    §5.2's other two, clamped the way the search page clamps them: the API bounds them again, but
-    an unclamped `?children=abc` would reach the quote as NaN and turn a typo into an error page.
+    §5.2's party, bounded by the contract here. The API bounds it again against the beds; this is
+    what stops a tampered `?adults=` from
+    reaching the summary as «NaN» or a form the API will refuse after the guest has filled it.
   */
-  const children = whole(first(query['children']), 0, 20);
-  const infants = whole(first(query['infants']), 0, 10);
+  const asked = partyFromQuery({
+    adults: first(query['adults']),
+    children: first(query['children']),
+    infants: first(query['infants']),
+  });
   /*
     How many rooms, clamped to the contract's own ceiling. The real limit is what the property has
     free, which only the API can know — it re-reads availability inside the transaction that takes
@@ -153,10 +157,9 @@ export default async function CheckoutPage({
       : {}),
     checkIn,
     checkOut,
-    /* `adults` is the one that is not clamped above, so it is the one that can arrive as NaN. */
-    adults: String(Number.isFinite(adults) ? adults : 2),
-    children: String(children),
-    infants: String(infants),
+    adults: String(asked.adults),
+    children: String(asked.children),
+    infants: String(asked.infants),
   }).toString()}`;
 
   const property = await getProperty(slug);
@@ -204,6 +207,13 @@ export default async function CheckoutPage({
       </div>
     );
   }
+
+  /*
+    The party exactly as asked, bounded only by the contract (`partyFromQuery`). NOT trimmed to the
+    quoted beds: that silently dropped children who did not fit, so the hotel would expect two
+    guests and four would arrive (e2e, 2026-10-06). Over capacity, the API refuses with its reason.
+  */
+  const { adults, children, infants } = asked;
 
   /**
    * The spendable balance, for signed-in customers only (§7.3).

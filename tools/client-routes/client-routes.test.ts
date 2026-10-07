@@ -79,6 +79,8 @@ describe('every browser call has a route handler', () => {
   });
 });
 
+const CRAWL_RULES = 'apps/web/src/lib/robots.ts';
+
 /** Every `/api/…` literal fetched from the three apps' sources, normalised. */
 function collect(): Call[] {
   const files = execFileSync(
@@ -114,6 +116,18 @@ function collect(): Call[] {
       the first version of this missed them and reported the API's own `/api/v1/…` as unanswered.
     */
     if (/\/route\.tsx?$/.test(file)) continue;
+
+    /*
+      The crawl rules, not a call (2026-10-06). `robots.ts` lists `/api/` as a path crawlers are kept
+      out of, and the literal reads exactly like a fetch target. Exempt by name, and held to it: the
+      file must never fetch anything, so the day it does it is swept like every other.
+    */
+    if (file === CRAWL_RULES) {
+      expect(readFileSync(join(REPO, file), 'utf8'), CRAWL_RULES).not.toMatch(
+        /\bfetch\s*\(/,
+      );
+      continue;
+    }
 
     /*
       Comments stripped first. A doc comment mentioning a path in backticks is not a call, and one

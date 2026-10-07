@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 
@@ -29,8 +30,26 @@ import { formatCustomerFee, partnerRate, todayInDamascus } from '@/lib/settings'
 import { dayAfter, night, retryFrom } from '@/lib/bookable-night';
 import { dynamicMessage } from '@/lib/dynamic-message';
 import { getGroupTrips, upcomingTrips } from '@/lib/group-trips';
+import { localeAlternates } from '@/lib/alternates';
 
 export const revalidate = 300;
+
+/**
+ * The home page's own canonical and alternates. It declared none and relied on the layout's
+ * default, which also leaked onto every page that declared none (see `localeAlternates`). The
+ * title and description still come from the layout.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+
+  if (!isLocale(locale)) return {};
+
+  return { alternates: localeAlternates(locale, '') };
+}
 
 /**
  * The trip features offered under the search bar, in the prototype's order.

@@ -5,7 +5,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 
 import { confirmationWindowLabel } from '@/lib/operating-rules';
 
-import { isLocale, routing, type Locale } from '@/i18n/routing';
+import { isLocale, type Locale } from '@/i18n/routing';
 import { breadcrumbGraph, faqGraph, lodgingGraph, pick } from '@/lib/structured-data';
 import { siteOrigin } from '@/lib/site-url';
 import { MAX_BASKET_ROOMS } from '@/lib/basket-limits';
@@ -33,7 +33,12 @@ import { formatMoney, localisedName, localisedText } from '@/lib/localise';
 import { getProperty, imageUrl, type PropertyDetail } from '@/lib/property';
 import { dynamicMessage } from '@/lib/dynamic-message';
 import { StarRating } from '@safra/ui';
-import { DEFAULT_MONEY_CURRENCY, preferredCurrency } from '@safra/contracts';
+import {
+  DEFAULT_MONEY_CURRENCY,
+  preferredCurrency,
+  requestedStay,
+} from '@safra/contracts';
+import { localeAlternates } from '@/lib/alternates';
 
 /**
  * Property page (SRS §5.6).
@@ -96,12 +101,8 @@ export async function generateMetadata({
   return {
     title: name,
     description: description?.slice(0, 160) ?? undefined,
-    alternates: {
-      canonical: `/${locale}/property/${slug}`,
-      languages: Object.fromEntries(
-        routing.locales.map((l) => [l, `/${l}/property/${slug}`]),
-      ),
-    },
+    /* The slug the API answered with, not the one in the request: see `localeAlternates`. */
+    alternates: localeAlternates(locale, `/property/${property.slug}`),
     openGraph: {
       title: name,
       description: description?.slice(0, 200) ?? undefined,
@@ -138,16 +139,12 @@ export default async function PropertyPage({
   /*
     The reader's OWN dates reach the API, so each room says whether it can be booked for them.
 
-    Read straight from the query rather than from `stay` below, which is built after this. Absent or
-    malformed dates simply mean no availability claim is made — the API treats the stay as optional
-    for exactly that reason.
+    Absent, impossible or out-of-order dates simply mean no availability claim is made — the API
+    treats the stay as optional for exactly that reason. `requestedStay` checks they are real
+    calendar dates: a shape test let «2026-02-31» through, and the arithmetic below then threw on a
+    `Date` that does not exist, a 500 for a typed link (audit 2026-10-06).
   */
-  const askedCheckIn = first(query['checkIn']);
-  const askedCheckOut = first(query['checkOut']);
-  const askedStay =
-    askedCheckIn && askedCheckOut && askedCheckIn < askedCheckOut
-      ? { checkIn: askedCheckIn, checkOut: askedCheckOut }
-      : undefined;
+  const askedStay = requestedStay(first(query['checkIn']), first(query['checkOut']));
 
   const property = await getProperty(slug, askedStay);
   if (!property) notFound();
@@ -171,14 +168,13 @@ export default async function PropertyPage({
   });
 
   /*
-    The dates are carried by SHAPE, because this page does not otherwise parse them — it prices
-    from `defaultStay`, computed off the calendar. `YYYY-MM-DD` or nothing: a shape test is an
-    allow-list, and it cannot pass through anything that is not a date.
+    The dates are carried only as the PAIR `requestedStay` accepted: two real dates, in order, or
+    neither — in which case the page prices from `defaultStay`, computed off the calendar. One date
+    alone, or one that does not exist, would otherwise reach the night arithmetic below as NaN.
   */
-  for (const key of ['checkIn', 'checkOut'] as const) {
-    const value = first(query[key]);
-
-    if (value && /^\d{4}-\d{2}-\d{2}$/.test(value)) stay.set(key, value);
+  if (askedStay) {
+    stay.set('checkIn', askedStay.checkIn);
+    stay.set('checkOut', askedStay.checkOut);
   }
 
   const backHere = `/${locale}/property/${property.slug}?${stay.toString()}`;

@@ -10,6 +10,7 @@ import { isLocale } from '@/i18n/routing';
 import { requireSignedIn } from '@/lib/account-page';
 import { getCities, getPartnerTypes, getPublicSettings } from '@/lib/catalog';
 import { localisedName } from '@/lib/localise';
+import { localeAlternates } from '@/lib/alternates';
 
 /**
  * «انضم كشريك» — the page a prospective partner reads, and the form they fill in.
@@ -66,7 +67,11 @@ export async function generateMetadata({
 
   const t = await getTranslations({ locale, namespace: 'partner' });
 
-  return { title: t('title'), description: t('subtitle') };
+  return {
+    title: t('title'),
+    description: t('subtitle'),
+    alternates: localeAlternates(locale, '/partners/join'),
+  };
 }
 
 export default async function JoinAsPartnerPage({

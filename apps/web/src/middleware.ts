@@ -17,6 +17,7 @@ import {
   needsRefresh,
   sessionCookieOptions,
   internalCallerHeaders,
+  isStaticAsset,
 } from '@safra/session';
 
 const intlMiddleware = createMiddleware(routing);
@@ -35,6 +36,9 @@ const intlMiddleware = createMiddleware(routing);
  * Writing the request jar first means this render sees the new token immediately.
  */
 export default async function middleware(request: NextRequest) {
+  /* A shipped file, by what it IS rather than by a dot in its path. See `isStaticAsset`. */
+  if (isStaticAsset(request.nextUrl.pathname)) return NextResponse.next();
+
   /**
    * The CSP is built HERE, per request, rather than in `next.config.ts`, because it
    * carries a nonce. A static policy cannot: Next's hydration scripts are inline and
@@ -296,5 +300,10 @@ function hasSession(request: NextRequest, rotated: string | null | undefined): b
 
 export const config = {
   // Everything except API routes, Next internals and files with an extension.
-  matcher: ['/((?!api|_next|_vercel|.*\\..*).*)'],
+  /*
+    A literal, because Next reads it at build time; `MIDDLEWARE_MATCHER` in `@safra/session` is the
+    one definition and `static-asset.test.ts` holds this copy to it. It used to exclude any path
+    with a dot, which let `/bookings/a.b` render with no session check and no CSP.
+  */
+  matcher: ['/((?!api/|_next/|_vercel/).*)'],
 };

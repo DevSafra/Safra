@@ -3,22 +3,24 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 
+import { VerifyEmailConfirm } from '@/components/verify-email-confirm';
 import { isLocale } from '@/i18n/routing';
-import { visitorHeaders } from '@/lib/visitor';
-
-const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
 
 /**
  * Confirming an email address (SRS §4).
  *
- * The confirmation happens server-side while rendering, so the customer's click on
- * the emailed link is the whole interaction — no second button to press.
+ * ## The page load does NOT confirm
  *
- * That does mean a link-scanning proxy in a corporate mail system can consume the
- * token before the customer sees it. The trade is deliberate: the alternative is an
- * extra click for every customer to protect a minority whose scanner would follow
- * the second link too. A consumed token shows the "already confirmed or expired"
- * state, from which they can request another.
+ * It used to, server-side while rendering, so that the click on the emailed link was the whole
+ * interaction. The trade was written down as deliberate and it was wrong in the case that
+ * matters: link-scanning proxies (Outlook Safe Links, corporate mail gateways) fetch EVERY link in an
+ * incoming message, so the single-use token was spent before the customer saw the email, and the
+ * customer's own click met «this link no longer works». That is not a minority to be traded away;
+ * it is every customer whose employer filters mail, and they cannot sign in until the address is
+ * confirmed.
+ *
+ * So the GET only checks the token's SHAPE and renders a button, and the button POSTs. A scanner
+ * fetches and leaves; a person presses once. Validity stays the API's question, asked only then.
  */
 export const dynamic = 'force-dynamic';
 
@@ -43,12 +45,16 @@ export default async function VerifyEmailPage({
   const raw = query['token'];
   const token = Array.isArray(raw) ? raw[0] : raw;
 
-  const outcome =
-    token && /^[A-Za-z0-9_-]{43}$/.test(token) ? await confirm(token) : 'invalid';
-
-  if (outcome === 'invalid') {
+  /*
+    A truncated or mangled link is said plainly now, before anybody presses anything — the same
+    shape check the reset page makes, for the same reason.
+  */
+  if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
     return (
-      <Shell title={t('verifyFailedTitle')} tone="bad">
+      <Shell>
+        <h1 className="font-display text-2xl font-bold text-bad">
+          {t('verifyFailedTitle')}
+        </h1>
         <p className="mt-2 text-sm text-muted">{t('verifyFailed')}</p>
         {/*
           To sign-in, not to the account. An unverified customer cannot sign in (2026-10-06), so the
@@ -65,78 +71,16 @@ export default async function VerifyEmailPage({
   }
 
   return (
-    <Shell title={t('verifiedTitle')} tone="good">
-      <p className="mt-2 text-sm text-muted">{t('verified')}</p>
-
-      {/*
-        Only mentioned when it actually happened. Telling every customer "we linked
-        your previous bookings" when there were none is noise at best and confusing
-        at worst.
-      */}
-      {outcome.claimedBookings > 0 ? (
-        <p className="mt-3 rounded-lg border border-gold/30 bg-gold/5 p-3 text-sm text-gold-read">
-          {t('claimedBookings', { count: outcome.claimedBookings })}
-        </p>
-      ) : null}
-
-      <Link
-        href={`/${locale}/account`}
-        className="mt-6 inline-block rounded-lg btn-gold px-5 py-2.5 font-semibold"
-      >
-        {t('account')}
-      </Link>
+    <Shell>
+      <VerifyEmailConfirm locale={locale} token={token} />
     </Shell>
   );
 }
 
-async function confirm(token: string): Promise<{ claimedBookings: number } | 'invalid'> {
-  /* The visitor's attempt, on the visitor's limit — outside the `try` so it cannot read as «invalid». */
-  const visitor = await visitorHeaders();
-
-  try {
-    const response = await fetch(`${API_URL}/api/v1/auth/email/verify/confirm`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        ...visitor,
-      },
-      body: JSON.stringify({ token }),
-      cache: 'no-store',
-    });
-
-    if (!response.ok) return 'invalid';
-
-    const body: unknown = await response.json().catch(() => null);
-
-    if (typeof body !== 'object' || body === null || !('claimedBookings' in body)) {
-      return { claimedBookings: 0 };
-    }
-
-    const claimed = Number(body.claimedBookings);
-
-    return { claimedBookings: Number.isFinite(claimed) ? claimed : 0 };
-  } catch {
-    return 'invalid';
-  }
-}
-
-function Shell({
-  title,
-  tone,
-  children,
-}: {
-  title: string;
-  tone: 'good' | 'bad';
-  children: React.ReactNode;
-}) {
+function Shell({ children }: { children: React.ReactNode }) {
+  /* Polite live region: the heading is replaced in place when the confirmation answers. */
   return (
-    <div className="mx-auto max-w-md px-4 py-16 text-center">
-      <h1
-        className={`font-display text-2xl font-bold ${tone === 'good' ? 'text-gold' : 'text-bad'}`}
-      >
-        {title}
-      </h1>
+    <div className="mx-auto max-w-md px-4 py-16 text-center" aria-live="polite">
       {children}
     </div>
   );

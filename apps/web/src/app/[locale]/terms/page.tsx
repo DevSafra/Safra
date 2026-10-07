@@ -15,6 +15,7 @@ import {
 import { ltrIsolate } from '@/lib/bidi';
 import { getPublicSettings } from '@/lib/catalog';
 import { LEGAL_UPDATED } from '@/lib/legal';
+import { localeAlternates } from '@/lib/alternates';
 
 /**
  * شروط الاستخدام — what SAFRA provides and what each side agrees to.
@@ -47,7 +48,11 @@ export async function generateMetadata({
 
   const t = await getTranslations({ locale, namespace: 'legal' });
 
-  return { title: t('terms.title'), description: t('terms.intro') };
+  return {
+    title: t('terms.title'),
+    description: t('terms.intro'),
+    alternates: localeAlternates(locale, '/terms'),
+  };
 }
 
 export default async function TermsPage({
