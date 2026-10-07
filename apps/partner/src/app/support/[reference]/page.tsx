@@ -100,6 +100,7 @@ export default async function SupportThreadPage({
           {thread.messages.map((message) => (
             <li
               key={message.id}
+              data-message={message.sender}
               /* Staff messages are tinted differently; the sender's name above each one carries the
                  meaning, so colour is reinforcement rather than the signal. */
               className={`rounded-lg border p-3 ${

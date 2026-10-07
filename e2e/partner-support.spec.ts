@@ -28,7 +28,19 @@ import { adminAr } from '../packages/i18n/src/admin.js';
  */
 test.use({ baseURL: BASE, storageState: PARTNER_STATE });
 
-const ENOUGH = 'مستحقاتي لم تُحدَّث هذا الشهر ولم يردّ أحد على رسالتي.';
+/**
+ * Letters unique to this run, appended to every message the spec sends (2026-10-07).
+ *
+ * The support service treats an identical message from the same person within sixty seconds as a
+ * double press and answers with the thread that already exists, by design. Fixed wording therefore
+ * made a run within a minute of the last one re-open the PREVIOUS run's ticket and have its reply
+ * swallowed as a repeat. Letters only, so the contact-detail redactor has nothing to mask in it.
+ */
+const RUN = Array.from({ length: 6 }, () =>
+  String.fromCharCode(97 + Math.floor(Math.random() * 26)),
+).join('');
+
+const ENOUGH = `مستحقاتي لم تُحدَّث هذا الشهر ولم يردّ أحد على رسالتي (${RUN}).`;
 
 /** The console, where staff answer. Its own origin, so its own base URL. */
 const ADMIN = process.env['ADMIN_URL'] ?? 'http://localhost:3001';
@@ -42,7 +54,11 @@ test.describe('الدعم', () => {
 
     /* The destination exists in the sidebar, not only as a URL. */
     await expect(
-      page.getByRole('link', { name: t.nav.supportPage, exact: true }),
+      /*
+        A prefix: the link's name carries its notice when one is showing («الدعم جديد: 1»,
+        2026-10-07), and whether one shows depends on the fixture, not on this spec.
+      */
+      page.getByRole('link', { name: new RegExp(`^${t.nav.supportPage}`) }),
     ).toBeVisible();
     await expect(page.getByRole('heading', { name: t.support.openTitle })).toBeVisible();
 
@@ -73,12 +89,21 @@ test.describe('الدعم', () => {
     await expect(thread).toContainText('حُجبت');
 
     // ── A reply lands in the same thread ──
-    const before = await page.locator('ol li').count();
+    /*
+      Exact counts, retried until the page settles: a one-shot count taken while the new thread is
+      still being pushed and refreshed can be off by one (the customer twin of this spec failed so).
+    */
+    const messages = page.locator('[data-message]');
 
-    await page.locator('textarea[name=body]').fill('هل من تحديث بشأن هذا الطلب؟');
+    await expect(messages).toHaveCount(1);
+
+    await page
+      .locator('textarea[name=body]')
+      .fill(`هل من تحديث بشأن هذا الطلب؟ (${RUN})`);
     await page.locator('form:has(textarea) button[type=submit]').click();
 
-    await expect(page.locator('ol li')).toHaveCount(before + 1, { timeout: 20_000 });
+    await expect(messages).toHaveCount(2, { timeout: 20_000 });
+    await expect(messages.last()).toContainText(`هل من تحديث بشأن هذا الطلب؟ (${RUN})`);
 
     // ── It is listed ──
     await page.goto('/support');
@@ -220,7 +245,7 @@ test.describe('الدعم', () => {
     await page.goto('/support');
     await page
       .locator('textarea[name=body]')
-      .fill('سؤال عن موعد التحويل الشهري، ولا حاجة لمتابعة بعد الرد.');
+      .fill(`سؤال عن موعد التحويل الشهري، ولا حاجة لمتابعة بعد الرد (${RUN}).`);
     await page.locator('form:has(textarea) button[type=submit]').click();
     await page.waitForURL(/\/support\/CNV-/, { timeout: 20_000 });
 

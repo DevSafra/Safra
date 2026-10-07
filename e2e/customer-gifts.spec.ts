@@ -6,6 +6,18 @@ import en from '../packages/i18n/src/messages/web/en.json' assert { type: 'json'
 import { statusWord } from '../packages/i18n/src/statuses.js';
 
 /**
+ * Letters unique to this run, appended to every message the spec sends (2026-10-07).
+ *
+ * The support service treats an identical message from the same person within sixty seconds as a
+ * double press and answers with the thread that already exists, by design. Fixed wording therefore
+ * made a run within a minute of the last one re-open the PREVIOUS run's ticket and have its reply
+ * swallowed as a repeat. Letters only, so the contact-detail redactor has nothing to mask in it.
+ */
+const RUN = Array.from({ length: 6 }, () =>
+  String.fromCharCode(97 + Math.floor(Math.random() * 26)),
+).join('');
+
+/**
  * بطاقات الهدايا, from the customer's side (handoff §6).
  *
  * ## What a browser adds over the integration tests
@@ -365,7 +377,9 @@ test.describe('بطاقات الهدايا', () => {
     /* A phone number goes in on purpose: contact details are redacted on the way IN and never kept. */
     await page
       .locator('textarea[name=body]')
-      .fill('The heating did not work for two nights. Call me on 0955123456 please.');
+      .fill(
+        `The heating did not work for two nights (${RUN}). Call me on 0955123456 please.`,
+      );
 
     /*
       `form:has(textarea)`, not the last submit on the page — the account sidebar's sign-out is itself a
@@ -381,13 +395,24 @@ test.describe('بطاقات الهدايا', () => {
     /* Announced, or the sender waits for a call that cannot come. */
     await expect(thread).toContainText('masked');
 
-    const messagesBefore = await page.locator('ol li').count();
+    /*
+      EXACT counts of message rows, each retried until the page settles.
 
-    await page.locator('textarea[name=body]').fill('It is still not fixed today.');
+      This read `ol li` once and waited for «that plus one», and failed once in three runs: opening a
+      ticket pushes to the thread AND refreshes it, so the one-shot count landed while the page was
+      still settling and the target was off by one before the reply was even sent. A new thread has
+      exactly one message, and after one reply exactly two; asserting those needs no snapshot.
+    */
+    const messages = page.locator('[data-message]');
+
+    await expect(messages).toHaveCount(1);
+
+    await page
+      .locator('textarea[name=body]')
+      .fill(`It is still not fixed today (${RUN}).`);
     await page.locator('form:has(textarea) button[type=submit]').click();
-    await expect(page.locator('ol li')).toHaveCount(messagesBefore + 1, {
-      timeout: 20_000,
-    });
+    await expect(messages).toHaveCount(2, { timeout: 20_000 });
+    await expect(messages.last()).toContainText(`It is still not fixed today (${RUN}).`);
 
     /* Listed, and a reference that is not this customer's is a 404 rather than a different error. */
     await page.goto('/en/account/support', { waitUntil: 'domcontentloaded' });
@@ -456,7 +481,12 @@ test.describe('بطاقات الهدايا', () => {
           controls and what focus lands on, and labelling both would announce the words twice.
         */
         .getByLabel(en.account.navHeading)
-        .getByRole('link', { name: en.account.navDisputes, exact: true }),
+        /*
+          A PREFIX, not an exact name: the link's accessible name carries its notice when one is
+          showing («Disputes 1 new», Bashar 2026-10-07), and whether one shows depends on the state
+          of the fixture, not on what this spec is about.
+        */
+        .getByRole('link', { name: new RegExp(`^${en.account.navDisputes}`) }),
     ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: en.account.disputesOpenTitle }),

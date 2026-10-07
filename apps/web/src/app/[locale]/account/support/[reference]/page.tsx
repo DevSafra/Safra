@@ -107,6 +107,7 @@ export default async function AccountSupportThreadPage({
             {thread.messages.map((message) => (
               <li
                 key={message.id}
+                data-message={message.sender}
                 /*
                   Staff messages are tinted differently from the reader's own. Colour is not the only
                   signal — every message carries its sender's name above it — so this is reinforcement.

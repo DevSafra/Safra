@@ -1,8 +1,9 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Browser, type Page } from '@playwright/test';
 
 import { partnerAr as t } from '../packages/i18n/src/partner.js';
-import { findReference } from './partner-fixtures.js';
+import { findPartnerReference, findReference } from './partner-fixtures.js';
 import { PARTNER_BASE as BASE, PARTNER_STATE } from './partner-session.js';
+import { MISSING_CREDENTIALS, STAFF_STATE } from './staff.js';
 
 /**
  * تعديل العقار and تقويم الإتاحة — the two screens that used to be greyed-out labels.
@@ -459,23 +460,75 @@ test.describe('الوحدات', () => {
  * place that can check the sentence is actually put in front of the partner before they confirm.
  */
 test.describe('الكوبونات', () => {
+  /**
+   * The offer this test decides is one it MAKES, through the console's own route, scoped to this
+   * partner alone.
+   *
+   * It used to take whatever offer happened to be pending and skip when there was none, and the
+   * test itself is what used one up: once a run accepted the fixture's offer, every later run
+   * skipped until somebody reset the testbed, so the permanence it exists to prove went unchecked
+   * while the suite reported nothing wrong. A partner-scoped coupon reaches exactly one partner
+   * and the testbed reset removes it with them.
+   */
+  async function offerOneTo(partnerName: string, browser: Browser): Promise<string> {
+    const staff = await browser.newContext({ storageState: STAFF_STATE });
+
+    try {
+      const console_ = await staff.newPage();
+      const partnerReference = await findPartnerReference(console_, partnerName);
+      const day = (offset: number) =>
+        new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+      const code = `E2EOFFER${Date.now().toString(36).toUpperCase()}`;
+
+      const created = await console_.request.post('http://localhost:3001/api/coupons', {
+        data: {
+          code,
+          type: 'campaign',
+          valueKind: 'percent',
+          value: '10',
+          startsOn: day(0),
+          endsOn: day(30),
+          partnerReference,
+        },
+        headers: { origin: 'http://localhost:3001' },
+      });
+
+      expect(
+        created.ok(),
+        `the console created ${code}: ${created.status()} ${await created.text()}`,
+      ).toBe(true);
+
+      return code;
+    } finally {
+      await staff.close();
+    }
+  }
+
   test('offers a coupon, warns before accepting, and will not take it back', async ({
     page,
     request,
+    browser,
   }) => {
-    await page.goto(`${BASE}/coupons`);
-
-    const pending = page
-      .locator('[data-coupon]')
-      .filter({ has: page.locator('[data-coupon-accept]') });
-
     test.skip(
-      (await pending.count()) === 0,
-      'No coupon is waiting on this partner’s decision.',
+      MISSING_CREDENTIALS,
+      'Needs a staff session to make the offer this test decides.',
     );
 
-    const card = pending.first();
-    const code = (await card.getAttribute('data-coupon')) ?? '';
+    await page.goto(`${BASE}/`);
+
+    const partnerName = (
+      await page.locator('[data-partner-name]').first().textContent()
+    )?.trim();
+
+    expect(partnerName, 'the portal names the business it is signed in as').toBeTruthy();
+
+    const code = await offerOneTo(partnerName ?? '', browser);
+
+    await page.goto(`${BASE}/coupons`);
+
+    const card = page.locator(`[data-coupon="${code}"]`);
+
+    await expect(card, 'the new offer is waiting on this partner').toBeVisible();
 
     /* The warning is on the CARD, before anything is pressed. */
     await expect(card, 'the permanence is stated before the button').toContainText(
