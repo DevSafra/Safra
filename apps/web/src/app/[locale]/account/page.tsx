@@ -47,7 +47,7 @@ export default async function AccountOverviewPage({
   /* Three independent reads, issued together — sequentially they would add two round trips. */
   const [summaryRead, bookings, wallet, pendingReviews] = await Promise.all([
     getAccountSummary(),
-    getMyBookings(),
+    getMyBookings(undefined, 20),
     getMyWallet(),
     getPendingReviews(),
   ]);

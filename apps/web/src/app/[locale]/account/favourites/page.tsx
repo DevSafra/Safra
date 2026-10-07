@@ -2,7 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
+import { readShown, shownCount } from '@safra/contracts';
+
 import { AccountShell } from '@/components/account-shell';
+import { ListMore } from '@/components/list-more';
 import { SaveButton } from '@/components/save-button';
 import { getAccountSummary, getMyFavourites } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
@@ -39,6 +42,8 @@ export default async function AccountFavouritesPage({
 
   const query = await searchParams;
   const cursor = typeof query['cursor'] === 'string' ? query['cursor'] : '';
+  /* How much of the list to show: «عرض المزيد» adds fifteen (see @safra/contracts/show-more). */
+  const shown = shownCount(query['shown']);
 
   const t = await getTranslations('account');
 
@@ -48,7 +53,11 @@ export default async function AccountFavouritesPage({
 
   const [summaryRead, favouritesRead] = await Promise.all([
     getAccountSummary(),
-    getMyFavourites(cursor || undefined),
+    readShown(
+      (limit, after) => getMyFavourites(after, limit),
+      shown,
+      cursor || undefined,
+    ),
   ]);
 
   const summary =
@@ -161,29 +170,17 @@ export default async function AccountFavouritesPage({
             ))}
           </ul>
 
-          {cursor || favourites.nextCursor ? (
-            <nav
-              aria-label={t('navFavourites')}
-              className="mt-6 flex flex-wrap items-center gap-2"
-            >
-              {cursor ? (
-                <Link
-                  href={`/${locale}/account/favourites`}
-                  className="inline-flex min-h-10 items-center rounded-lg border border-line px-4 text-sm text-muted lg:min-h-0 lg:py-2"
-                >
-                  {t('firstPage')}
-                </Link>
-              ) : null}
-              {favourites.nextCursor ? (
-                <Link
-                  href={`/${locale}/account/favourites?cursor=${encodeURIComponent(favourites.nextCursor)}`}
-                  className="inline-flex min-h-10 items-center rounded-lg border border-line px-4 text-sm text-muted lg:min-h-0 lg:py-2"
-                >
-                  {t('loadMore')}
-                </Link>
-              ) : null}
-            </nav>
-          ) : null}
+          <ListMore
+            path={`/${locale}/account/favourites`}
+            cursor={cursor || undefined}
+            shown={shown}
+            nextCursor={favourites.nextCursor}
+            labels={{
+              more: t('loadMore'),
+              loading: t('loadingMore'),
+              first: t('firstPage'),
+            }}
+          />
         </>
       )}
     </AccountShell>

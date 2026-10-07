@@ -3,9 +3,10 @@ import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
 import { AccountShell } from '@/components/account-shell';
+import { ListMore } from '@/components/list-more';
 import { DateRange } from '@/components/date-range';
 import { StatusPill, customerBookingStatus } from '@/components/booking-status-pill';
-import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
+import { DEFAULT_MONEY_CURRENCY, readShown, shownCount } from '@safra/contracts';
 import { formatMoney } from '@/lib/localise';
 import { getAccountSummary, getMyBookings } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
@@ -42,9 +43,15 @@ export default async function AccountBookingsPage({
 
   const query = await searchParams;
   const cursor = typeof query['cursor'] === 'string' ? query['cursor'] : '';
+  /* How much of the list to show: «عرض المزيد» adds fifteen (see @safra/contracts/show-more). */
+  const shown = shownCount(query['shown']);
 
   const t = await getTranslations('account');
-  const bookings = await getMyBookings(cursor || undefined);
+  const bookings = await readShown(
+    (limit, after) => getMyBookings(after, limit),
+    shown,
+    cursor || undefined,
+  );
 
   return (
     <AccountShell
@@ -113,30 +120,17 @@ export default async function AccountBookingsPage({
             })}
           </ul>
 
-          {cursor || bookings.nextCursor ? (
-            <nav
-              aria-label={t('navBookings')}
-              className="mt-6 flex flex-wrap items-center gap-2"
-            >
-              {cursor ? (
-                <Link
-                  href={`/${locale}/account/bookings`}
-                  className="inline-flex min-h-10 items-center rounded-lg border border-line px-4 text-sm text-muted lg:min-h-0 lg:py-2"
-                >
-                  {t('firstPage')}
-                </Link>
-              ) : null}
-
-              {bookings.nextCursor ? (
-                <Link
-                  href={`/${locale}/account/bookings?cursor=${encodeURIComponent(bookings.nextCursor)}`}
-                  className="inline-flex min-h-10 items-center rounded-lg border border-line px-4 text-sm text-muted lg:min-h-0 lg:py-2"
-                >
-                  {t('loadMore')}
-                </Link>
-              ) : null}
-            </nav>
-          ) : null}
+          <ListMore
+            path={`/${locale}/account/bookings`}
+            cursor={cursor || undefined}
+            shown={shown}
+            nextCursor={bookings.nextCursor}
+            labels={{
+              more: t('loadMore'),
+              loading: t('loadingMore'),
+              first: t('firstPage'),
+            }}
+          />
         </>
       )}
     </AccountShell>

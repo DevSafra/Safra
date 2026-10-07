@@ -2,7 +2,11 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
+import { readShown, shownCount } from '@safra/contracts';
+
 import { AccountShell } from '@/components/account-shell';
+import { ListMore } from '@/components/list-more';
+import { NewMarker } from '@/components/new-marker';
 import { SupportForm } from '@/components/support-forms';
 import { getAccountSummary, getMySupportTickets } from '@/lib/account';
 import { getGroupTrip } from '@/lib/group-trips';
@@ -63,9 +67,17 @@ export default async function AccountSupportPage({
 
   const cursor = typeof query['cursor'] === 'string' ? query['cursor'] : '';
 
+  /* How much of the list to show: «عرض المزيد» adds fifteen (see @safra/contracts/show-more). */
+
+  const shown = shownCount(query['shown']);
+
   const t = await getTranslations('account');
   const tg = await getTranslations('groups');
-  const tickets = await getMySupportTickets(cursor || undefined);
+  const tickets = await readShown(
+    (limit, after) => getMySupportTickets(after, limit),
+    shown,
+    cursor || undefined,
+  );
 
   /*
     `getGroupTrip` answers only for a PUBLISHED trip, so a draft's slug prefills nothing — the same
@@ -141,6 +153,7 @@ export default async function AccountSupportPage({
                     </span>
 
                     <span className="flex flex-col items-end gap-1">
+                      {ticket.unread ? <NewMarker label={t('supportUnread')} /> : null}
                       <span
                         className={`rounded-full border px-2 py-0.5 text-13 ${
                           ticket.closed
@@ -159,31 +172,17 @@ export default async function AccountSupportPage({
               ))}
             </ul>
 
-            {/* A cursor moves forward only, so the way back is offered explicitly. */}
-            {cursor || tickets.nextCursor ? (
-              <nav
-                aria-label={t('supportMineTitle')}
-                className="mt-4 flex flex-wrap items-center gap-2"
-              >
-                {cursor ? (
-                  <Link
-                    href={`/${locale}/account/support`}
-                    className="inline-flex min-h-10 items-center rounded-lg border border-line px-4 text-sm text-muted lg:min-h-0 lg:py-2"
-                  >
-                    {t('firstPage')}
-                  </Link>
-                ) : null}
-
-                {tickets.nextCursor ? (
-                  <Link
-                    href={`/${locale}/account/support?cursor=${encodeURIComponent(tickets.nextCursor)}`}
-                    className="inline-flex min-h-10 items-center rounded-lg border border-line px-4 text-sm text-muted lg:min-h-0 lg:py-2"
-                  >
-                    {t('loadMore')}
-                  </Link>
-                ) : null}
-              </nav>
-            ) : null}
+            <ListMore
+              path={`/${locale}/account/support`}
+              cursor={cursor || undefined}
+              shown={shown}
+              nextCursor={tickets.nextCursor}
+              labels={{
+                more: t('loadMore'),
+                loading: t('loadingMore'),
+                first: t('firstPage'),
+              }}
+            />
           </>
         )}
       </section>

@@ -7,6 +7,7 @@ import { partnerApplicationsOpen } from '@safra/contracts';
 import { SignOutButton } from '@/components/sign-out-button';
 import type { AccountSummary } from '@/lib/account';
 import { getPublicSettings } from '@/lib/catalog';
+import { ltrIsolate } from '@/lib/bidi';
 import { dynamicMessage } from '@/lib/dynamic-message';
 import { formatMoney } from '@/lib/localise';
 import type { Locale } from '@/i18n/routing';
@@ -150,6 +151,23 @@ export async function AccountShell({
       : {}),
   };
 
+  /*
+    The two that behave like NOTIFICATIONS (Bashar, 2026-10-07): something SAFRA sent that this
+    customer has not read yet. Each falls as it is read and the badge is gone at zero, because a
+    «0» would say «we counted, and there is nothing», which is noise in a column of places to go.
+
+    Kept apart from the counts above because they are a different kind of number: those describe
+    the account, these ask for attention, and they are drawn in a different colour for that reason.
+  */
+  const notices: Partial<Record<string, number>> = {
+    ...(summary && summary.counters.unreadSupport > 0
+      ? { support: summary.counters.unreadSupport }
+      : {}),
+    ...(summary && summary.counters.updatedDisputes > 0
+      ? { disputes: summary.counters.updatedDisputes }
+      : {}),
+  };
+
   return (
     <div className="account-layout mx-auto max-w-7xl px-4 py-10">
       {/* Print geometry lives with the layout in `globals.css`, not as `print:` utilities here. */}
@@ -215,6 +233,7 @@ export async function AccountShell({
           {SECTIONS.map((section) => {
             const current = section.id === active;
             const badge = badges[section.id as keyof typeof badges];
+            const notice = notices[section.id];
 
             return (
               <Link
@@ -230,15 +249,23 @@ export async function AccountShell({
                 {/* The key is a lookup, so it is not a literal next-intl can check. */}
                 {dynamicMessage(t, LABEL_KEY[section.id], section.id)}
                 {/*
-                  `dir="ltr"`: a badge is a number, sometimes a currency amount, on a line that may be
-                  Arabic. `ms-auto` pushes it to the far side in either direction.
+                  At the END of the row, as the console draws it (Bashar, 2026-10-07). It sat beside
+                  the label because the badge carried `dir="ltr"` itself: `ms-auto` is the INLINE
+                  START margin, and on an element whose own direction is LTR that is the left, so
+                  on an Arabic row the auto margin opened on the wrong side and pulled the badge in
+                  against the word. The value is isolated instead, which keeps «$45» reading the
+                  right way round without changing which side the element's margin is on.
                 */}
                 {badge ? (
-                  <span
-                    dir="ltr"
-                    className="ms-auto rounded-full bg-sky/15 px-2 py-0.5 text-12 font-bold text-sky"
-                  >
-                    {badge}
+                  <span className="ms-auto rounded-full bg-sky/15 px-2 py-0.5 text-12 font-bold text-sky">
+                    {ltrIsolate(badge)}
+                  </span>
+                ) : null}
+                {notice ? (
+                  <span className="ms-auto rounded-full bg-bad/15 px-2 py-0.5 text-12 font-extrabold text-bad">
+                    <span aria-hidden="true">{ltrIsolate(String(notice))}</span>
+                    {/* «2» alone, read out after «الدعم», is a number with no meaning. */}
+                    <span className="sr-only">{t('badgeNew', { count: notice })}</span>
                   </span>
                 ) : null}
               </Link>

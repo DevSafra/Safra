@@ -778,7 +778,14 @@
     "notCustomerTitle": "Dies ist kein Kundenkonto",
     "notCustomerBody": "Dieses Konto kann sich anmelden, hat aber keinen Kundendatensatz. Es gibt hier also keine Buchungen, kein Guthaben und keine Rechnungen. Partnerkonten werden über das Partnerportal verwaltet. Wenn Sie ein Kundenkonto haben, melden Sie sich ab und mit diesem wieder an.",
     "notCustomerBrowse": "Unterkünfte ansehen",
-    "bookingTotalUnpaid": "Buchungssumme (nie gezahlt)"
+    "bookingTotalUnpaid": "Buchungssumme (nie gezahlt)",
+    "loadingMore": "Wird geladen…",
+    "badgeNew": "{count} neu",
+    "supportUnread": "Neue Antwort",
+    "disputeUpdated": "Aktualisiert",
+    "walletStatementEmpty": "Noch keine Bewegungen in Ihrem Guthaben.",
+    "walletIn": "Gutschrift",
+    "walletOut": "Belastung"
   },
   "ads": {
     "title": "In der Nähe, von unseren Partnern",

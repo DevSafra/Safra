@@ -2,6 +2,8 @@ import 'server-only';
 
 import { z } from 'zod';
 
+import { SHOW_MORE_STEP } from '@safra/contracts';
+
 import { getSession } from './session-server';
 import { visitorHeaders } from './visitor';
 
@@ -123,8 +125,8 @@ const bookingsSchema = z.object({
  * bookings could not reach the twenty-first by any means. `limit` stays a constant here rather than a
  * parameter: the page size is this screen's decision, not the caller's.
  */
-export async function getMyBookings(cursor?: string) {
-  const query = new URLSearchParams({ limit: '20' });
+export async function getMyBookings(cursor?: string, limit = SHOW_MORE_STEP) {
+  const query = new URLSearchParams({ limit: String(limit) });
 
   if (cursor) query.set('cursor', cursor);
 
@@ -436,6 +438,9 @@ const accountSummarySchema = z.object({
   counters: z.object({
     bookings: z.number(),
     pendingReviews: z.number(),
+    /* Threads with a reply the customer has not opened, and disputes whose status moved since they looked. */
+    unreadSupport: z.number(),
+    updatedDisputes: z.number(),
     walletBalance: z.string().nullable(),
     walletCurrency: z.string().nullable(),
   }),
@@ -502,8 +507,8 @@ const myReviewsSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 
-export async function getMyReviews(cursor?: string) {
-  const query = new URLSearchParams({ limit: '10' });
+export async function getMyReviews(cursor?: string, limit = SHOW_MORE_STEP) {
+  const query = new URLSearchParams({ limit: String(limit) });
 
   if (cursor) query.set('cursor', cursor);
 
@@ -544,8 +549,8 @@ const favouritesSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 
-export async function getMyFavourites(cursor?: string) {
-  const query = new URLSearchParams({ limit: '12' });
+export async function getMyFavourites(cursor?: string, limit = SHOW_MORE_STEP) {
+  const query = new URLSearchParams({ limit: String(limit) });
 
   if (cursor) query.set('cursor', cursor);
 
@@ -643,8 +648,8 @@ const invoiceDetailSchema = invoiceSummarySchema.extend({
 
 export type InvoiceDetailRow = z.infer<typeof invoiceDetailSchema>;
 
-export async function getMyInvoices(cursor?: string) {
-  const query = new URLSearchParams({ limit: '10' });
+export async function getMyInvoices(cursor?: string, limit = SHOW_MORE_STEP) {
+  const query = new URLSearchParams({ limit: String(limit) });
 
   if (cursor) query.set('cursor', cursor);
 
@@ -691,8 +696,8 @@ const giftCardsSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 
-export async function getMyGiftCards(cursor?: string) {
-  const query = new URLSearchParams({ limit: '10' });
+export async function getMyGiftCards(cursor?: string, limit = SHOW_MORE_STEP) {
+  const query = new URLSearchParams({ limit: String(limit) });
 
   if (cursor) query.set('cursor', cursor);
 
@@ -726,6 +731,7 @@ const supportTicketSchema = z.object({
   closed: z.boolean(),
   messageCount: z.number(),
   lastMessage: z.string().nullable(),
+  unread: z.boolean(),
 });
 
 export type SupportTicketRow = z.infer<typeof supportTicketSchema>;
@@ -741,8 +747,8 @@ const supportListSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 
-export async function getMySupportTickets(cursor?: string) {
-  const query = new URLSearchParams({ limit: '10' });
+export async function getMySupportTickets(cursor?: string, limit = SHOW_MORE_STEP) {
+  const query = new URLSearchParams({ limit: String(limit) });
 
   if (cursor) query.set('cursor', cursor);
 
@@ -783,6 +789,7 @@ const disputeSchema = z.object({
   closedAt: z.string().nullable(),
   resolution: z.string().nullable(),
   redactedCount: z.number(),
+  updated: z.boolean(),
 });
 
 export type DisputeRow = z.infer<typeof disputeSchema>;
@@ -792,8 +799,8 @@ const disputeListSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 
-export async function getMyDisputes(cursor?: string) {
-  const query = new URLSearchParams({ limit: '10' });
+export async function getMyDisputes(cursor?: string, limit = SHOW_MORE_STEP) {
+  const query = new URLSearchParams({ limit: String(limit) });
 
   if (cursor) query.set('cursor', cursor);
 

@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
+import { readShown, shownCount } from '@safra/contracts';
+
 import { AccountShell } from '@/components/account-shell';
+import { ListMore } from '@/components/list-more';
 import { BuyForm, RedeemForm } from '@/components/gift-card-forms';
 import { getAccountSummary, getMyGiftCards, getMyWallet } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
@@ -51,9 +53,15 @@ export default async function AccountGiftsPage({
 
   const query = await searchParams;
   const cursor = typeof query['cursor'] === 'string' ? query['cursor'] : '';
+  /* How much of the list to show: «عرض المزيد» adds fifteen (see @safra/contracts/show-more). */
+  const shown = shownCount(query['shown']);
 
   const t = await getTranslations('account');
-  const cards = await getMyGiftCards(cursor || undefined);
+  const cards = await readShown(
+    (limit, after) => getMyGiftCards(after, limit),
+    shown,
+    cursor || undefined,
+  );
 
   /*
     The wallet is read for its COMPOSITION, not its total: a card may only be bought with الرصيد الحالي,
@@ -148,31 +156,17 @@ export default async function AccountGiftsPage({
               ))}
             </ul>
 
-            {/* A cursor moves forward only, so the way back is offered explicitly. */}
-            {cursor || cards.nextCursor ? (
-              <nav
-                aria-label={t('giftMineTitle')}
-                className="mt-4 flex flex-wrap items-center gap-2"
-              >
-                {cursor ? (
-                  <Link
-                    href={`/${locale}/account/gifts`}
-                    className="inline-flex min-h-10 items-center rounded-lg border border-line px-4 text-sm text-muted lg:min-h-0 lg:py-2"
-                  >
-                    {t('firstPage')}
-                  </Link>
-                ) : null}
-
-                {cards.nextCursor ? (
-                  <Link
-                    href={`/${locale}/account/gifts?cursor=${encodeURIComponent(cards.nextCursor)}`}
-                    className="inline-flex min-h-10 items-center rounded-lg border border-line px-4 text-sm text-muted lg:min-h-0 lg:py-2"
-                  >
-                    {t('loadMore')}
-                  </Link>
-                ) : null}
-              </nav>
-            ) : null}
+            <ListMore
+              path={`/${locale}/account/gifts`}
+              cursor={cursor || undefined}
+              shown={shown}
+              nextCursor={cards.nextCursor}
+              labels={{
+                more: t('loadMore'),
+                loading: t('loadingMore'),
+                first: t('firstPage'),
+              }}
+            />
           </>
         )}
       </section>

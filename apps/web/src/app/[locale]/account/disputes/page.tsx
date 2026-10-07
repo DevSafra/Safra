@@ -1,11 +1,14 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
 import { renderRedactions } from '@safra/i18n';
 
+import { readShown, shownCount } from '@safra/contracts';
+
 import { AccountShell } from '@/components/account-shell';
+import { ListMore } from '@/components/list-more';
 import { StatusPill } from '@/components/booking-status-pill';
+import { NewMarker } from '@/components/new-marker';
 import { DisputeForm } from '@/components/dispute-form';
 import { getAccountSummary, getDisputableBookings, getMyDisputes } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
@@ -62,6 +65,8 @@ export default async function AccountDisputesPage({
 
   const query = await searchParams;
   const cursor = typeof query['cursor'] === 'string' ? query['cursor'] : '';
+  /* How much of the list to show: «عرض المزيد» adds fifteen (see @safra/contracts/show-more). */
+  const shown = shownCount(query['shown']);
 
   const t = await getTranslations('account');
   /*
@@ -72,7 +77,7 @@ export default async function AccountDisputesPage({
   const tReason = await getTranslations('disputeReasons');
 
   const [disputes, disputable] = await Promise.all([
-    getMyDisputes(cursor || undefined),
+    readShown((limit, after) => getMyDisputes(after, limit), shown, cursor || undefined),
     getDisputableBookings(),
   ]);
 
@@ -175,10 +180,13 @@ export default async function AccountDisputesPage({
                     `navigation.spec.ts` holds the rule across the console's twenty sections and
                     cannot see this app, which is how three branches drifted here unnoticed.
                   */}
-                  <StatusPill
-                    status={dispute.status}
-                    label={localStatus('disputeStatus', dispute.status, locale)}
-                  />
+                  <span className="flex flex-wrap items-center gap-2">
+                    {dispute.updated ? <NewMarker label={t('disputeUpdated')} /> : null}
+                    <StatusPill
+                      status={dispute.status}
+                      label={localStatus('disputeStatus', dispute.status, locale)}
+                    />
+                  </span>
                 </div>
 
                 {/* Redacted on the way in, so rendered for this reader on the way out. */}
@@ -224,29 +232,17 @@ export default async function AccountDisputesPage({
 
           Found by a browser test that could not see a dispute it knew existed (2026-08-13).
         */}
-        {cursor || disputePage.nextCursor ? (
-          <nav
-            aria-label={t('navDisputes')}
-            className="mt-6 flex flex-wrap items-center gap-2"
-          >
-            {cursor ? (
-              <Link
-                href={`/${locale}/account/disputes`}
-                className="inline-flex min-h-10 items-center rounded-lg border border-line px-4 text-sm text-muted lg:min-h-0 lg:py-2"
-              >
-                {t('firstPage')}
-              </Link>
-            ) : null}
-            {disputePage.nextCursor ? (
-              <Link
-                href={`/${locale}/account/disputes?cursor=${encodeURIComponent(disputePage.nextCursor)}`}
-                className="inline-flex min-h-10 items-center rounded-lg border border-line px-4 text-sm text-muted lg:min-h-0 lg:py-2"
-              >
-                {t('loadMore')}
-              </Link>
-            ) : null}
-          </nav>
-        ) : null}
+        <ListMore
+          path={`/${locale}/account/disputes`}
+          cursor={cursor || undefined}
+          shown={shown}
+          nextCursor={disputePage.nextCursor}
+          labels={{
+            more: t('loadMore'),
+            loading: t('loadingMore'),
+            first: t('firstPage'),
+          }}
+        />
       </section>
     </AccountShell>
   );

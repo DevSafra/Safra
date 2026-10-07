@@ -2,7 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
+import { readShown, shownCount } from '@safra/contracts';
+
 import { AccountShell } from '@/components/account-shell';
+import { ListMore } from '@/components/list-more';
 import { DateRange } from '@/components/date-range';
 import { StatusPill, customerBookingStatus } from '@/components/booking-status-pill';
 import { getAccountSummary, getMyInvoices } from '@/lib/account';
@@ -48,6 +51,8 @@ export default async function AccountInvoicesPage({
 
   const query = await searchParams;
   const cursor = typeof query['cursor'] === 'string' ? query['cursor'] : '';
+  /* How much of the list to show: «عرض المزيد» adds fifteen (see @safra/contracts/show-more). */
+  const shown = shownCount(query['shown']);
   /*
     Set by `[reference]/pdf` when «تحميل PDF» could not be served. A flag, not a message: a sentence
     carried in a query string is a sentence somebody else can put on our page.
@@ -55,7 +60,11 @@ export default async function AccountInvoicesPage({
   const downloadFailed = query['file'] === 'unavailable';
 
   const t = await getTranslations('account');
-  const invoices = await getMyInvoices(cursor || undefined);
+  const invoices = await readShown(
+    (limit, after) => getMyInvoices(after, limit),
+    shown,
+    cursor || undefined,
+  );
 
   return (
     <AccountShell
@@ -136,31 +145,17 @@ export default async function AccountInvoicesPage({
             ))}
           </ul>
 
-          {/* A cursor moves FORWARD only, so the way back is offered explicitly — as in حجوزاتي. */}
-          {cursor || invoices.nextCursor ? (
-            <nav
-              aria-label={t('navInvoices')}
-              className="mt-6 flex flex-wrap items-center gap-2"
-            >
-              {cursor ? (
-                <Link
-                  href={`/${locale}/account/invoices`}
-                  className="inline-flex min-h-10 items-center rounded-lg border border-line px-4 text-sm text-muted lg:min-h-0 lg:py-2"
-                >
-                  {t('firstPage')}
-                </Link>
-              ) : null}
-
-              {invoices.nextCursor ? (
-                <Link
-                  href={`/${locale}/account/invoices?cursor=${encodeURIComponent(invoices.nextCursor)}`}
-                  className="inline-flex min-h-10 items-center rounded-lg border border-line px-4 text-sm text-muted lg:min-h-0 lg:py-2"
-                >
-                  {t('loadMore')}
-                </Link>
-              ) : null}
-            </nav>
-          ) : null}
+          <ListMore
+            path={`/${locale}/account/invoices`}
+            cursor={cursor || undefined}
+            shown={shown}
+            nextCursor={invoices.nextCursor}
+            labels={{
+              more: t('loadMore'),
+              loading: t('loadingMore'),
+              first: t('firstPage'),
+            }}
+          />
         </>
       )}
 

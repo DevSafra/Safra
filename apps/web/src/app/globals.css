@@ -1184,3 +1184,24 @@ body {
 .maplibregl-map .maplibregl-ctrl-bottom-left {
   z-index: 20;
 }
+
+/**
+ * Rows «عرض المزيد» has just added (Bashar, 2026-10-07).
+ *
+ * The one moment on a list that moves: the new rows rise six pixels into place, so the eye sees
+ * where the old list ended and the new part begins. Only on rows the press added, never on a first
+ * paint, and not at all for anyone who has asked for less motion. 260ms on the site's strong
+ * ease-out: an entrance, read once per press.
+ */
+@keyframes row-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .row-rise {
+    animation: row-rise 260ms var(--ease-out-strong) both;
+  }
+}

@@ -2,7 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
+import { readShown, shownCount } from '@safra/contracts';
+
 import { AccountShell } from '@/components/account-shell';
+import { ListMore } from '@/components/list-more';
 import { DateRange } from '@/components/date-range';
 import { getAccountSummary, getMyReviews, getPendingReviews } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
@@ -42,10 +45,12 @@ export default async function AccountReviewsPage({
   const reviews = await getTranslations('reviews');
   const query = await searchParams;
   const cursor = typeof query['cursor'] === 'string' ? query['cursor'] : '';
+  /* How much of the list to show: «عرض المزيد» adds fifteen (see @safra/contracts/show-more). */
+  const shown = shownCount(query['shown']);
 
   const [pending, mineRead] = await Promise.all([
     getPendingReviews(),
-    getMyReviews(cursor || undefined),
+    readShown((limit, after) => getMyReviews(after, limit), shown, cursor || undefined),
   ]);
 
   const mine = mineRead === 'failed' || mineRead === 'unauthenticated' ? null : mineRead;
@@ -160,29 +165,17 @@ export default async function AccountReviewsPage({
                   ))}
                 </ul>
 
-                {cursor || mine.nextCursor ? (
-                  <nav
-                    aria-label={t('reviewsSubmittedTitle')}
-                    className="mt-5 flex flex-wrap items-center gap-2"
-                  >
-                    {cursor ? (
-                      <Link
-                        href={`/${locale}/account/reviews`}
-                        className="inline-flex min-h-10 items-center rounded-lg border border-line px-4 text-sm text-muted lg:min-h-0 lg:py-2"
-                      >
-                        {t('firstPage')}
-                      </Link>
-                    ) : null}
-                    {mine.nextCursor ? (
-                      <Link
-                        href={`/${locale}/account/reviews?cursor=${encodeURIComponent(mine.nextCursor)}`}
-                        className="inline-flex min-h-10 items-center rounded-lg border border-line px-4 text-sm text-muted lg:min-h-0 lg:py-2"
-                      >
-                        {t('loadMore')}
-                      </Link>
-                    ) : null}
-                  </nav>
-                ) : null}
+                <ListMore
+                  path={`/${locale}/account/reviews`}
+                  cursor={cursor || undefined}
+                  shown={shown}
+                  nextCursor={mine.nextCursor}
+                  labels={{
+                    more: t('loadMore'),
+                    loading: t('loadingMore'),
+                    first: t('firstPage'),
+                  }}
+                />
               </>
             )}
           </section>
