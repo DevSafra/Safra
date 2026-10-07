@@ -61,6 +61,9 @@ describeIfDb('what a customer can learn about their own payment', () => {
       SELECT b.id, b.reference, b.customer_profile_id, b.currency_id
         FROM bookings b
        WHERE b.deleted_at IS NULL AND b.customer_profile_id IS NOT NULL
+         -- A refund holds its payment by foreign key, so the delete below cannot clear one that
+         -- has any; on a fresh database (CI's) a suite that commits had left one on the first.
+         AND NOT EXISTS (SELECT 1 FROM refunds r WHERE r.booking_id = b.id)
        ORDER BY b.reference
        LIMIT 1
     `);

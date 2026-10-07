@@ -413,7 +413,14 @@ test.describe('honesty rules the design and the register require', () => {
     test.skip((await thread.count()) === 0, 'Every seeded conversation is closed');
 
     await thread.click();
-    await page.getByRole('textbox').first().fill('اتصل بي على 0944123456 بخصوص الحجز');
+    /*
+      The reply box by its label. «the first textbox» found it until the pager's page box became a
+      text field for Arabic digits (2026-10-06); then the number went into the pager and «إرسال»
+      stayed disabled with nothing to send.
+    */
+    await page
+      .getByLabel(t.sections.messages.replyPlaceholder)
+      .fill('اتصل بي على 0944123456 بخصوص الحجز');
     await page.getByRole('button', { name: t.sections.messages.reply }).click();
 
     // The number is gone; the mask is visible; the booking word survived.

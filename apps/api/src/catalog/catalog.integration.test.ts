@@ -97,6 +97,13 @@ describeIfDb('CatalogService', () => {
             SELECT u2.property_id FROM units u2
             JOIN properties p2 ON p2.id = u2.property_id
             WHERE p2.status = 'published' AND p2.deleted_at IS NULL AND u2.deleted_at IS NULL
+              -- Not one that has the amenity already: there the inserts change nothing and the
+              -- count cannot move, which failed one fresh-database run in two (2026-10-06).
+              AND NOT EXISTS (
+                SELECT 1 FROM unit_amenities ua3
+                JOIN units u3 ON u3.id = ua3.unit_id
+                WHERE u3.property_id = u2.property_id AND ua3.amenity_id = ${amenity!.id}
+              )
             GROUP BY u2.property_id HAVING COUNT(*) >= 2 LIMIT 1
           )
         LIMIT 2

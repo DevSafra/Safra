@@ -1,5 +1,5 @@
 import { PARTNER_EMPLOYEE_PERMISSIONS, usesStarRating } from '@safra/contracts';
-import { eq, sql } from 'drizzle-orm';
+import { eq, sql, type SQL } from 'drizzle-orm';
 
 import { createDatabase, schema, type Database, type Transaction } from '@safra/db';
 
@@ -2347,7 +2347,42 @@ async function build(db: Seeder): Promise<void> {
   */
   await accruePayouts(db);
   await groupTrips(db, tripCoverRow(borrowedImages.length > 0));
+  await e2eCoupon(db, testbedPartners);
   await report(db);
+}
+
+/**
+ * `E2ECOUPON`, the code `customer-coupon.spec.ts` applies at checkout, accepted by every testbed
+ * partner (2026-10-07).
+ *
+ * It existed only by hand in the development database, and the spec passed because
+ * `post/0020_coupon_partners_backfill` re-accepted every coupon for every partner on every deploy,
+ * which quietly enrolled each new testbed partner. That backfill was the bug (go-live audit,
+ * 2026-10-06); once it stopped, the property the checkout lands on answered «this coupon does not
+ * apply». So the fixture is made here, where the partners it must cover are made: a 20% campaign
+ * running from yesterday for a year, replaced on every run like the rest of the testbed.
+ */
+async function e2eCoupon(db: Seeder, testbedPartners: SQL): Promise<void> {
+  const made = await db.execute<{ id: string }>(sql`
+    INSERT INTO coupons (code, type, value_kind, value, starts_at, ends_at, is_active)
+    VALUES ('E2ECOUPON', 'campaign', 'percent', 20,
+            now() - interval '1 day', now() + interval '365 days', true)
+    ON CONFLICT (code) WHERE deleted_at IS NULL DO UPDATE
+      SET type = 'campaign', value_kind = 'percent', value = 20,
+          starts_at = now() - interval '1 day', ends_at = now() + interval '365 days',
+          is_active = true, updated_at = now()
+    RETURNING id
+  `);
+  const couponId = made.rows[0]?.id;
+
+  if (!couponId) throw new Error('E2ECOUPON was not written');
+
+  await db.execute(sql`
+    INSERT INTO coupon_partners (coupon_id, partner_id, status, decided_at)
+    SELECT ${couponId}::uuid, pa.id, 'accepted', now()
+      FROM partners pa WHERE pa.id IN (${testbedPartners})
+    ON CONFLICT (coupon_id, partner_id) DO UPDATE SET status = 'accepted', decided_at = now()
+  `);
 }
 
 /**
