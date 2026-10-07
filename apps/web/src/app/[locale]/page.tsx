@@ -440,10 +440,16 @@ export default async function HomePage({
         </section>
       ) : null}
 
-      {/* ── The three pledges (P-001, P-002, P-007) ──────────────────────── */}
+      {/*
+        ── The three pledges (P-001, P-002, P-007) ────────────────────────
+
+        With the partner section closed this is the last band on the page, and the footer's
+        `mt-16` would show as a strip of page background between two tinted bands (Bashar,
+        2026-10-07). So the band runs on through that margin instead of stopping short of it.
+      */}
       <section
         aria-label={t('pledgesTitle')}
-        className="bg-[linear-gradient(var(--color-bg),var(--color-band))]"
+        className={`bg-[linear-gradient(var(--color-bg),var(--color-band))] ${partnerApplicationsOpen(settings) ? '' : '-mb-16 pb-16'}`}
       >
         <div className="mx-auto max-w-7xl px-4 py-12 sm:py-14">
           <SectionHeading eyebrow={t('pledgesTitle')} centred>

@@ -108,9 +108,13 @@ export default async function AboutPage({
         </div>
       </section>
 
+      {/*
+        With the partner offer closed this is the last band, and it runs on through the footer's
+        `mt-16` rather than leaving a strip of page background above the footer (2026-10-07).
+      */}
       <section
         aria-labelledby="about-services"
-        className="bg-[linear-gradient(var(--color-bg),var(--color-bg2))]"
+        className={`bg-[linear-gradient(var(--color-bg),var(--color-bg2))] ${partnersOpen ? '' : '-mb-16 pb-16'}`}
       >
         <div className="mx-auto max-w-7xl px-4 py-12 sm:py-14">
           <Heading id="about-services">{home('services.label')}</Heading>
