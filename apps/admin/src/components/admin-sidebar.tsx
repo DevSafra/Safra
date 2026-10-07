@@ -255,7 +255,7 @@ export function AdminSidebar({
         the drawer and sign-out sits below the scroll. With it the nav takes the leftover space and
         scrolls inside itself, and the controls stay visible.
       */}
-      <nav className="mt-1 grid min-h-0 flex-1 gap-0.5 overflow-y-auto">
+      <nav className="sidebar-scroll mt-1 grid min-h-0 flex-1 gap-0.5 overflow-y-auto">
         {/*
           Filtered, not disabled. A greyed-out link is a map of what somebody may not do, and this
           console hands that map to whoever is reading — which is reconnaissance for anyone

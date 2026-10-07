@@ -514,6 +514,14 @@
     top: 1.5rem;
     grid-column-start: 1;
     grid-row-start: 1;
+    /*
+      No taller than the window (Bashar, 2026-10-07). Twenty-five sections are taller than a laptop
+      screen, and a sticky column taller than the viewport sticks at its TOP: everything below the
+      fold, sign-out included, was reachable only by scrolling the page to its very end. Capped, the
+      nav scrolls inside the column (it is already `flex-1 min-h-0 overflow-y-auto`) and the account
+      controls stay pinned at its foot, as they are in the drawer.
+    */
+    max-height: calc(100dvh - 3rem);
   }
 
   .console-main {
@@ -835,4 +843,54 @@ body {
 .btn-gold-hover:hover {
   background-image: linear-gradient(135deg, #f0cb7c, #c4923e);
   color: #241a05;
+}
+
+/**
+ * The sidebar's own scrollbar (Bashar, 2026-10-07): a slim gold thumb that shows only while the
+ * pointer is over the sidebar, or while keyboard focus is inside it.
+ *
+ * Nineteen sections overflow a laptop screen, so the nav scrolls, and the browser's grey bar sat
+ * beside the gold navigation all the time, looking like something left over. Now the thumb is the
+ * console's own accent and stays out of sight until the reader is actually in the sidebar.
+ *
+ * Only the COLOUR changes, never the width, so nothing shifts when it appears. Only for a pointer
+ * that can hover: a touch screen keeps its native indicator, which is how a finger learns the list
+ * scrolls at all. The standard properties serve Chromium and Firefox; Safari reads the
+ * `::-webkit-scrollbar` ones, which Chromium ignores once `scrollbar-color` is set.
+ */
+@media (hover: hover) {
+  .sidebar-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    transition: scrollbar-color 200ms ease-out;
+  }
+
+  .console-sidebar:hover .sidebar-scroll,
+  .sidebar-scroll:focus-within {
+    scrollbar-color: rgba(var(--goldA), 0.45) transparent;
+  }
+
+  .sidebar-scroll::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .sidebar-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .sidebar-scroll::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
+    background-color: transparent;
+  }
+
+  .console-sidebar:hover .sidebar-scroll::-webkit-scrollbar-thumb,
+  .sidebar-scroll:focus-within::-webkit-scrollbar-thumb {
+    background-color: rgba(var(--goldA), 0.45);
+  }
+
+  .sidebar-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(var(--goldA), 0.7);
+  }
 }
