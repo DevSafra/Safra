@@ -62,7 +62,7 @@ export class CustomerAccountService {
     if (!profileId) throw notFound(ERROR.CUSTOMER_NOT_FOUND);
 
     /*
-      One statement, three counters as scalar subqueries.
+      One statement, every counter as a scalar subquery.
 
       Both counts are over ONE customer's rows through `bookings_customer_idx`
       (`customer_profile_id, created_at`), so neither grows with the size of the table — which is what
@@ -77,6 +77,8 @@ export class CustomerAccountService {
       preferred_locale: string;
       bookings_count: string;
       pending_reviews: string;
+      unread_support: string;
+      updated_disputes: string;
       wallet_balance: string | null;
       wallet_currency: string | null;
     }>(sql`
@@ -96,6 +98,35 @@ export class CustomerAccountService {
                  AND NOT EXISTS (
                    SELECT 1 FROM reviews r WHERE r.booking_id = b.id
                  ))::text                               AS pending_reviews,
+             /*
+               Threads with something new FROM SOMEBODY ELSE since the customer last opened them.
+               Exactly the threads الدعم lists (SupportService.scopeOf: their own, and those on
+               their bookings, never a partner's), reached through two indexes rather than an OR
+               across a join. One row per thread, not per message: the badge says how many
+               conversations are waiting to be read, which is what a person acts on.
+             */
+             (SELECT count(*) FROM conversations c
+               WHERE c.deleted_at IS NULL
+                 AND c.partner_id IS NULL
+                 AND c.id IN (
+                   SELECT id FROM conversations WHERE customer_profile_id = cp.id
+                   UNION
+                   SELECT c2.id FROM conversations c2
+                   JOIN bookings b ON b.id = c2.booking_id
+                   WHERE b.customer_profile_id = cp.id
+                 )
+                 AND EXISTS (
+                   SELECT 1 FROM messages m
+                   WHERE m.conversation_id = c.id
+                     AND m.internal = false
+                     AND m.sender_kind <> 'customer'
+                     AND m.created_at > coalesce(c.customer_seen_at, '-infinity'::timestamptz)
+                 ))::text                               AS unread_support,
+             -- A status the customer has not been shown yet; through disputes_customer_idx.
+             (SELECT count(*) FROM disputes d
+               WHERE d.customer_profile_id = cp.id
+                 AND d.deleted_at IS NULL
+                 AND d.status IS DISTINCT FROM d.customer_seen_status)::text AS updated_disputes,
              w.balance::text                            AS wallet_balance,
              cur.code                                   AS wallet_currency
       FROM customer_profiles cp
@@ -119,6 +150,8 @@ export class CustomerAccountService {
       counters: {
         bookings: Number(row.bookings_count),
         pendingReviews: Number(row.pending_reviews),
+        unreadSupport: Number(row.unread_support),
+        updatedDisputes: Number(row.updated_disputes),
         /*
           Absent rather than zero when there is no wallet row. A customer who has never been
           compensated has no wallet, which is not the same statement as a balance of nothing — and

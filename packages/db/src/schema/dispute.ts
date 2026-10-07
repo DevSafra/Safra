@@ -89,6 +89,17 @@ export const disputes = pgTable(
 
     kind: disputeKind('kind').notNull(),
     status: disputeStatus('status').notNull().default('open'),
+    /**
+     * The status the CUSTOMER last saw this dispute in (Bashar, 2026-10-07: النزاعات badges like a
+     * notification).
+     *
+     * A status rather than a time: `updated_at` is touched by a trigger on every write, including
+     * an operator reassigning the case, which the customer never sees. What they see change is the
+     * STATUS — taken up, resolved, rejected — so the badge counts disputes whose status differs from
+     * this, and it falls the moment their list shows them the new one. NULL means never seen, which
+     * is right for a dispute staff opened on their behalf.
+     */
+    customerSeenStatus: disputeStatus('customer_seen_status'),
     /** One line, as the design's card shows it. */
     title: text('title').notNull(),
     /** The customer's own account, verbatim. Never summarised into the title. */

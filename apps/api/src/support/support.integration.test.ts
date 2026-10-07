@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { SupportService } from './support.service.js';
+import { CustomerAccountService } from '../auth/customer-account.service.js';
 import { interleaved } from '../common/testing/interleaved.testing.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
@@ -265,6 +266,111 @@ describeIfDb('SupportService', () => {
 
     expect(seen.messages).toHaveLength(2);
     expect(seen.messages[1]?.sender).toBe('staff');
+  });
+
+  // ─── What the customer has not read (Bashar, 2026-10-07) ─────────────────────
+
+  /**
+   * The الدعم badge, end to end: the summary's count and the list row's flag, raised by a reply
+   * from somebody else and cleared by the customer opening the thread. Both are read, because the
+   * badge and the row marker are two queries and the point is that they agree.
+   */
+  describe('unread for the customer', () => {
+    /** The summary needs none of the account service's other collaborators. */
+    const unreadOf = async (claims = customer()) =>
+      (
+        await new CustomerAccountService(
+          db,
+          null as never,
+          null as never,
+          null as never,
+        ).summary(claims)
+      ).counters.unreadSupport;
+
+    const reply = async (reference: string, senderKind: string, internal = false) => {
+      await db.execute(sql`
+        INSERT INTO messages (conversation_id, sender_kind, body, redacted_count, internal, created_at)
+        SELECT c.id, ${senderKind}::message_sender, 'We have contacted the partner.', 0,
+               ${internal}, now() + INTERVAL '1 second'
+        FROM conversations c WHERE c.reference = ${reference}`);
+    };
+
+    const rowOf = async (reference: string, claims = customer()) =>
+      (await support.list(claims, { limit: 20 })).items.find(
+        (ticket) => ticket.reference === reference,
+      );
+
+    it('counts a staff reply until the customer opens the thread', async () => {
+      const thread = await support.open(customer(), LONG);
+
+      /* The control: their own opening message is not news to them. */
+      expect(await unreadOf()).toBe(0);
+      expect((await rowOf(thread.reference))?.unread).toBe(false);
+
+      await reply(thread.reference, 'staff');
+
+      expect(await unreadOf()).toBe(1);
+      expect((await rowOf(thread.reference))?.unread).toBe(true);
+
+      await support.thread(customer(), thread.reference);
+
+      expect(await unreadOf()).toBe(0);
+      expect((await rowOf(thread.reference))?.unread).toBe(false);
+    });
+
+    it('counts a host or system message the same way', async () => {
+      const thread = await support.open(customer(), LONG);
+
+      await reply(thread.reference, 'system');
+
+      expect(await unreadOf()).toBe(1);
+    });
+
+    it('never counts an internal note, whose existence the customer must not learn', async () => {
+      const thread = await support.open(customer(), LONG);
+
+      await reply(thread.reference, 'staff', true);
+
+      expect(await unreadOf()).toBe(0);
+      expect((await rowOf(thread.reference))?.unread).toBe(false);
+    });
+
+    it("never counts the customer's own reply", async () => {
+      const thread = await support.open(customer(), LONG);
+
+      await reply(thread.reference, 'customer');
+
+      expect(await unreadOf()).toBe(0);
+    });
+
+    it('counts threads, not messages', async () => {
+      const thread = await support.open(customer(), LONG);
+
+      await reply(thread.reference, 'staff');
+      await reply(thread.reference, 'staff');
+
+      expect(await unreadOf()).toBe(1);
+    });
+
+    it("counts only the reader's own threads", async () => {
+      const theirs = await support.open(customer(OTHER_PROFILE_ID, OTHER_USER_ID), LONG);
+
+      await reply(theirs.reference, 'staff');
+
+      expect(await unreadOf()).toBe(0);
+      expect(await unreadOf(customer(OTHER_PROFILE_ID, OTHER_USER_ID))).toBe(1);
+    });
+
+    it('is not cleared by somebody else reading, and a partner row is never marked', async () => {
+      const thread = await support.open(partner, LONG);
+
+      await reply(thread.reference, 'staff');
+      await support.thread(partner, thread.reference);
+
+      expect((await rowOf(thread.reference, partner))?.unread).toBe(false);
+      /* A partner's thread is not a customer's: nothing on it reaches this customer's badge. */
+      expect(await unreadOf()).toBe(0);
+    });
   });
 
   // ─── Replying ─────────────────────────────────────────────────────────────

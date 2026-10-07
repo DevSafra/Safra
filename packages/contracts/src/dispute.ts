@@ -131,6 +131,11 @@ export interface DisputeSummary {
   readonly resolution: string | null;
   /** How many spans the redactor removed from the title and description together. */
   readonly redactedCount: number;
+  /**
+   * Its status has moved since the customer last saw it — the row-level half of the النزاعات badge.
+   * True on the read that shows the change; the same read records it as seen.
+   */
+  readonly updated: boolean;
 }
 
 export interface DisputeDetail extends DisputeSummary {

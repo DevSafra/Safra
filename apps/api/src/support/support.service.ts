@@ -67,6 +67,7 @@ type TicketRow = {
   closed_at: string | null;
   message_count: number;
   last_message: string | null;
+  unread: boolean;
 };
 
 /**
@@ -213,15 +214,35 @@ export class SupportService {
   }
 
   /** The columns a ticket row needs, listed once so the list and the thread cannot diverge. */
-  private get projection() {
+  private projection(asker: Asker) {
     return sql`
       c.id, c.reference,
       c.created_at::text      AS created_at,
       c.last_message_at::text AS last_message_at,
       c.closed_at::text       AS closed_at,
       coalesce(m.n, 0)::int   AS message_count,
-      last.body               AS last_message
+      last.body               AS last_message,
+      ${this.unreadOf(asker)} AS unread
     `;
+  }
+
+  /**
+   * Whether the thread holds something the customer has not opened (Bashar, 2026-10-07).
+   *
+   * The same predicate as the الدعم badge in `CustomerAccountService.summary`, so a row marked new
+   * and the count beside the section cannot disagree. A partner-side reader is not tracked: the
+   * request was the customer's dashboard, and a business has several people reading one thread.
+   */
+  private unreadOf(asker: Asker): SQL {
+    if (asker.kind !== 'customer') return sql`false`;
+
+    return sql`EXISTS (
+      SELECT 1 FROM messages um
+      WHERE um.conversation_id = c.id
+        AND um.internal = false
+        AND um.sender_kind <> 'customer'
+        AND um.created_at > coalesce(c.customer_seen_at, '-infinity'::timestamptz)
+    )`;
   }
 
   /** The joins for the projection. `internal = false` in BOTH, or a count would leak a note's existence. */
@@ -253,6 +274,7 @@ export class SupportService {
       closed: row.closed_at !== null,
       messageCount: row.message_count,
       lastMessage: row.last_message,
+      unread: row.unread,
     };
   }
 
@@ -295,7 +317,7 @@ export class SupportService {
     }
 
     const found = await this.db.execute<TicketRow>(sql`
-      SELECT ${this.projection}
+      SELECT ${this.projection(asker)}
       ${this.joins}
       WHERE c.reference = ${reference}
         AND c.deleted_at IS NULL
@@ -395,7 +417,37 @@ export class SupportService {
     const asker = this.askerOf(claims);
     const row = await this.findOwn(asker, reference);
 
-    return { ...this.ticketOf(row), messages: await this.messagesOf(row.id) };
+    const messages = await this.messagesOf(row.id);
+    const newest = messages.at(-1)?.createdAt;
+
+    /*
+      Reading the thread is what clears it from the الدعم badge. Only for the customer, and only in
+      the scope `findOwn` has just proved: the id comes from that row, never from the request.
+
+      Seen up to the newest message this read RETURNED, not up to now(). A reply is stamped with the
+      moment its transaction began, so one that commits just after this read can carry a time before
+      it, and «now» would mark it read without anybody having been shown it. `greatest` keeps the
+      mark from going backwards when two tabs read at once.
+
+      A GET that writes, which this codebase is careful about, and right here: the write records the
+      very read it is part of, and only a fetch with the customer's own session can make it.
+    */
+    if (asker.kind === 'customer' && newest !== undefined) {
+      await this.db.execute(sql`
+        UPDATE conversations
+        SET customer_seen_at = greatest(
+          coalesce(customer_seen_at, '-infinity'::timestamptz),
+          ${newest}::timestamptz
+        )
+        WHERE id = ${row.id}::uuid
+      `);
+    }
+
+    return {
+      ...this.ticketOf(row),
+      unread: false,
+      messages,
+    };
   }
 
   /** Adds a message to a ticket the caller owns. */
@@ -547,7 +599,7 @@ export class SupportService {
       : sql``;
 
     const rows = await this.db.execute<TicketRow>(sql`
-      SELECT ${this.projection}
+      SELECT ${this.projection(asker)}
       ${this.joins}
       WHERE c.deleted_at IS NULL
         AND ${this.scopeOf(asker)}

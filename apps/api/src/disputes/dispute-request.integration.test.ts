@@ -6,6 +6,7 @@ import { createRollbackDatabase, type Database } from '@safra/db';
 import { silentDisputeNotifier } from '../admin/dispute-notifier.testing.js';
 import { DisputeRequestService } from './dispute-request.service.js';
 import { DisputeService } from '../admin/dispute.service.js';
+import { CustomerAccountService } from '../auth/customer-account.service.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { FxRateService } from '../fx/fx-rate.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
@@ -345,6 +346,102 @@ describeIfDb('DisputeRequestService', () => {
     expect(seen.status).toBe('resolved');
     expect(seen.resolution).toBe('عُوّض العميل بالكامل.');
     expect(seen.closedAt).not.toBeNull();
+  });
+
+  // ─── What the customer has not seen (Bashar, 2026-10-07) ──────────────────────
+
+  /**
+   * The النزاعات badge: a dispute whose STATUS moved since the customer last saw it, cleared by the
+   * list or the detail showing them the new one. The summary's count and the row's flag are both
+   * read, because they are two queries that must agree.
+   */
+  describe('updated for the customer', () => {
+    const updatedOf = async (claims = customer()) =>
+      (
+        await new CustomerAccountService(
+          db,
+          null as never,
+          null as never,
+          null as never,
+        ).summary(claims)
+      ).counters.updatedDisputes;
+
+    const decide = (reference: string) =>
+      db.execute(sql`
+        UPDATE disputes
+        SET status = 'resolved', resolution = 'عُوّض العميل بالكامل.', closed_at = now()
+        WHERE reference = ${reference}
+      `);
+
+    it('is not news to the customer who raised it', async () => {
+      await open();
+
+      expect(await updatedOf()).toBe(0);
+      expect((await disputes.list(customer(), { limit: 20 })).items[0]?.updated).toBe(
+        false,
+      );
+    });
+
+    it('counts a decision until the list shows it, and flags the row on that one read', async () => {
+      const raised = await open();
+
+      await decide(raised.reference);
+
+      expect(await updatedOf()).toBe(1);
+
+      const first = await disputes.list(customer(), { limit: 20 });
+
+      expect(first.items.find((d) => d.reference === raised.reference)?.updated).toBe(
+        true,
+      );
+      expect(await updatedOf()).toBe(0);
+
+      const again = await disputes.list(customer(), { limit: 20 });
+
+      expect(again.items.find((d) => d.reference === raised.reference)?.updated).toBe(
+        false,
+      );
+    });
+
+    it('is cleared by reading the dispute itself', async () => {
+      const raised = await open();
+
+      await decide(raised.reference);
+      await disputes.detail(customer(), raised.reference);
+
+      expect(await updatedOf()).toBe(0);
+    });
+
+    it('ignores a write the customer cannot see', async () => {
+      const raised = await open();
+
+      /* Reassigning the case touches the row and changes nothing the customer is shown. */
+      await db.execute(sql`
+        UPDATE disputes SET assigned_to_user_id = ${userId}::uuid
+        WHERE reference = ${raised.reference}
+      `);
+
+      expect(await updatedOf()).toBe(0);
+    });
+
+    it('counts a dispute staff opened for them, which they have never seen', async () => {
+      const raised = await open();
+
+      await db.execute(sql`
+        UPDATE disputes SET customer_seen_status = NULL WHERE reference = ${raised.reference}
+      `);
+
+      expect(await updatedOf()).toBe(1);
+    });
+
+    it('is not cleared by another customer reading their own list', async () => {
+      const raised = await open();
+
+      await decide(raised.reference);
+      await disputes.list(customer(otherProfileId, otherUserId), { limit: 20 });
+
+      expect(await updatedOf()).toBe(1);
+    });
   });
 
   // ─── The form's picker ─────────────────────────────────────────────────────

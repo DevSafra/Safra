@@ -90,6 +90,16 @@ export const conversations = pgTable(
      * to the customer app and is a different number.
      */
     unreadForStaff: integer('unread_for_staff').notNull().default(0),
+    /**
+     * When the CUSTOMER last opened this thread — the other half of `unreadForStaff`.
+     *
+     * A moment rather than a counter (Bashar, 2026-10-07: الدعم badges like a notification). Staff,
+     * the host and the system all write into a customer's threads, from four services; a counter
+     * would have to be bumped in every one of them and would drift the first time one forgot. A
+     * timestamp needs no writer to remember anything: a thread is unread when a message the
+     * customer did not write is newer than this. Set when the customer reads the thread.
+     */
+    customerSeenAt: timestamp('customer_seen_at', { withTimezone: true }),
     closedAt: timestamp('closed_at', { withTimezone: true }),
 
     ...timestamps,

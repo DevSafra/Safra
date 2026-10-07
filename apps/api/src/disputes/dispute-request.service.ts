@@ -38,6 +38,7 @@ type DisputeRow = {
   redacted_count: number;
   opened_at: string;
   closed_at: string | null;
+  updated: boolean;
 };
 
 /**
@@ -103,6 +104,8 @@ export class DisputeRequestService {
       d.resolution,
       d.created_at::text AS opened_at,
       d.closed_at::text  AS closed_at,
+      -- The same predicate as the النزاعات badge in CustomerAccountService.summary.
+      (d.status IS DISTINCT FROM d.customer_seen_status) AS updated,
       /*
         Recomputed on READ rather than stored.
 
@@ -156,7 +159,27 @@ export class DisputeRequestService {
       closedAt: row.closed_at,
       resolution: row.resolution,
       redactedCount: Number(row.redacted_count ?? 0),
+      updated: row.updated,
     };
+  }
+
+  /**
+   * Records that the customer has now been shown these disputes in their current status, which is
+   * what brings the النزاعات badge down (Bashar, 2026-10-07).
+   *
+   * Only the rows the read actually returned, by the ids that read produced inside the caller's own
+   * scope — never ids from the request — and the profile is in the predicate again regardless.
+   * `status IS DISTINCT FROM` keeps an ordinary page view from rewriting rows that are already seen.
+   */
+  private async markSeen(profileId: string, ids: readonly string[]) {
+    if (ids.length === 0) return;
+
+    await this.db.execute(sql`
+      UPDATE disputes SET customer_seen_status = status
+      WHERE id = ANY(${`{${ids.join(',')}}`}::uuid[])
+        AND customer_profile_id = ${profileId}::uuid
+        AND status IS DISTINCT FROM customer_seen_status
+    `);
   }
 
   /**
@@ -310,6 +333,7 @@ export class DisputeRequestService {
         `${title.redactedCount + description.redactedCount > 0 ? ' with contact details masked' : ''}.`,
     );
 
+    /* Through `detail`, which also records it as seen: their own new dispute is not news to them. */
     return this.detail(claims, reference);
   }
 
@@ -322,8 +346,8 @@ export class DisputeRequestService {
 
     if (!REFERENCE_PATTERN.test(reference)) throw notFound(ERROR.DISPUTE_NOT_FOUND);
 
-    const found = await this.db.execute<DisputeRow>(sql`
-      SELECT ${this.projection}
+    const found = await this.db.execute<DisputeRow & { id: string }>(sql`
+      SELECT d.id, ${this.projection}
       FROM disputes d
       JOIN bookings b ON b.id = d.booking_id
       WHERE d.reference = ${reference}
@@ -335,6 +359,8 @@ export class DisputeRequestService {
 
     /* Scoped IN the query. Fetch-then-compare answers differently for somebody else's reference. */
     if (!row) throw notFound(ERROR.DISPUTE_NOT_FOUND);
+
+    await this.markSeen(profileId, [row.id]);
 
     return { ...this.summaryOf(row), description: row.description };
   }
@@ -374,6 +400,12 @@ export class DisputeRequestService {
 
     const page = rows.rows.slice(0, query.limit);
     const last = page.at(-1);
+
+    /* After the read, so each row still says whether it was news; the next read will not. */
+    await this.markSeen(
+      profileId,
+      page.filter((row) => row.updated).map((row) => row.id),
+    );
 
     return {
       items: page.map((row) => this.summaryOf(row)),
