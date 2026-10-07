@@ -176,6 +176,7 @@ export default async function CouponParticipationPage({
         <TablePagination
           basePath={`/coupons/${encodeURIComponent(code)}`}
           section="coupons"
+          record={code}
           query={carry}
           page={result.partners.page}
           pages={result.partners.pages}

@@ -8,7 +8,7 @@ import {
   type PendingPartnerPage,
   getOperatingSettings,
 } from '@/lib/api';
-import { amount, count, customerFeeLabel } from '@/lib/format';
+import { amount, amounts, count, customerFeeLabel } from '@/lib/format';
 import { AdminSidebar } from '@/components/admin-sidebar';
 import { RevenueChart } from '@/components/revenue-chart';
 import { ConsoleHeader } from '@/components/console-header';
@@ -226,9 +226,13 @@ function Overview({
           underneath, from the day the platform priced in five currencies and a reader needed both.
           It prices in one now, and a second rendering of one figure is a second thing to reconcile.
         */}
+        {/*
+          One figure per currency, never a sum across them: the API returns today's revenue per
+          currency, and on a single-currency platform that is one figure in dollars as before.
+        */}
         <Kpi
           label={t.admin.kpiRevenue}
-          value={amount(counters.revenue_today_usd, 'USD')}
+          value={amounts(counters.revenue_today)}
           valueClass="text-gold-read"
         />
         <Kpi
@@ -269,13 +273,18 @@ function Overview({
         </div>
 
         <div className="grid min-w-0 gap-4">
-          <RevenueChart
-            series={overview.revenue}
-            sub={fill(t.admin.weekRevenueSub, {
-              rate: partnerCommissionPercent(settings),
-              fee: customerFeeLabel(settings),
-            })}
-          />
+          {/* One chart per currency: a bar that adds a dollar to a pound has no height to mean. */}
+          {overview.revenue.map((week) => (
+            <RevenueChart
+              key={week.currency}
+              series={week.days}
+              currency={overview.revenue.length > 1 ? week.currency : undefined}
+              sub={fill(t.admin.weekRevenueSub, {
+                rate: partnerCommissionPercent(settings),
+                fee: customerFeeLabel(settings),
+              })}
+            />
+          ))}
           <PartnerQueue partners={partners} />
           <RecentActivity rows={overview.recentAudit} />
         </div>

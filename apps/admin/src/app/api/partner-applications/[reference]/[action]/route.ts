@@ -27,7 +27,11 @@ export async function POST(
   { params }: { params: Promise<{ reference: string; action: string }> },
 ): Promise<NextResponse> {
   const { reference, action } = await params;
-  const upstream = ACTIONS[action];
+  /*
+    `hasOwn` first: `ACTIONS.constructor` is the `Object` function, truthy, and was interpolated
+    into the upstream path as its own source text.
+  */
+  const upstream = Object.hasOwn(ACTIONS, action) ? ACTIONS[action] : undefined;
 
   if (!upstream) {
     return NextResponse.json({ message: 'Unknown action.' }, { status: 404 });

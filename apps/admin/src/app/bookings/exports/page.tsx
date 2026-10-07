@@ -10,7 +10,7 @@ import {
 } from '@/components/admin-table';
 import { TablePagination } from '@/components/table-pagination';
 import { BackLink } from '@/components/back-link';
-import { label, t } from '@/lib/strings';
+import { bookingStatus, fill, label, t } from '@/lib/strings';
 import { statusTone } from '@/lib/status-tone';
 import { listParamsFor } from '@/lib/table-size';
 import { ExportsRefresh } from '@/components/exports-refresh';
@@ -61,9 +61,7 @@ const COLUMNS: AdminColumn<ExportItem>[] = [
     key: 'filters',
     header: t.table.colFilter,
     render: (row) => {
-      const parts = Object.entries(row.filters)
-        .filter(([, value]) => value)
-        .map(([key, value]) => `${key}: ${String(value)}`);
+      const parts = filterParts(row.filters);
 
       /* "كل الحجوزات" rather than an empty cell: an unfiltered export is a fact, not a blank. */
       return (
@@ -214,4 +212,24 @@ export default async function ExportsPage({
       </ConsolePanel>
     </ConsoleShell>
   );
+}
+
+/**
+ * The stored filters in the reader's words, in the order the registry's toolbar shows them.
+ *
+ * A closed list of known keys, never `Object.entries`: the column printed `status: confirmed`, a key
+ * and an enum value in Latin, and an unknown key in the row would have reached the screen the same way.
+ */
+function filterParts(filters: ExportItem['filters']): string[] {
+  const parts: string[] = [];
+  const q = filters['q'];
+  const status = filters['status'];
+  const attention = filters['attention'];
+
+  if (q) parts.push(fill(t.sections.exports.filterSearch, { q }));
+  if (status) parts.push(bookingStatus(String(status)));
+  if (filters['expiring']) parts.push(t.sections.bookings.expiringOnly);
+  if (attention) parts.push(label(t.sections.exports.attention, String(attention)));
+
+  return parts;
 }

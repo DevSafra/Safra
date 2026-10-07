@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { t, apiErrorOf } from '@/lib/strings';
-import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
+import { DEFAULT_MONEY_CURRENCY, typedDigits } from '@safra/contracts';
 
 /**
  * Closing a dispute (design handoff §8, "فتح النزاع ←").
@@ -31,23 +31,14 @@ import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 const MIN_RESOLUTION = 10;
 
 /**
- * Arabic-Indic and Persian digits, and the separators that come with them, as ASCII.
+ * The typed amount as a decimal string: the separators an Arabic or European keyboard adds.
  *
- * The console is Arabic-only, so «١٠٫٥٠» is not an exotic input — it is what the keyboard in front
- * of the operator produces. Everything downstream speaks `numeric`, so the conversion happens once,
- * here, at the point the value is read.
+ * The digits themselves are already ASCII by the time this runs, because the field calls
+ * `typedDigits` as it is typed. What remains is punctuation: a comma is what a European keyboard
+ * offers for the decimal point, and «٬» groups thousands and means nothing to a parser.
  */
-function westernDigits(value: string): string {
-  return (
-    value
-      .trim()
-      .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
-      .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
-      /* «٫» is the Arabic decimal separator; a comma is what a European keyboard offers. */
-      .replace(/[٫,]/g, '.')
-      /* «٬» groups thousands and means nothing to a parser. */
-      .replace(/[٬\s]/g, '')
-  );
+function decimalOf(value: string): string {
+  return value.trim().replace(/,/g, '.').replace(/[٬\s]/g, '');
 }
 
 export function CloseDisputeForm({ reference }: { reference: string }) {
@@ -65,11 +56,11 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
     A compensation amount must look like money before the button arms. The API and the database
     both re-check; this stops the obvious typo from costing a round trip.
 
-    Read through `westernDigits`, because this console is Arabic and «١٠٫٠٠» is what somebody types
+    Read through `decimalOf`, because this console is Arabic and «١٠٫٠٠» is what somebody types
     on an Arabic keyboard. It was tested against ASCII digits only, so those four characters left
     the button dark with nothing on screen saying why (Bashar, 2026-09-01).
   */
-  const amount = westernDigits(compensationAmount);
+  const amount = decimalOf(compensationAmount);
   const amountValid = !compensate || /^\d{1,10}(\.\d{1,2})?$/.test(amount);
   const resolutionValid = resolution.trim().length >= MIN_RESOLUTION;
   const ready = resolutionValid && amountValid && !busy;
@@ -202,7 +193,7 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
           <span className="sr-only">{t.sections.disputes.compensation}</span>
           <input
             value={compensationAmount}
-            onChange={(event) => setCompensationAmount(event.target.value)}
+            onChange={(event) => setCompensationAmount(typedDigits(event.currentTarget))}
             inputMode="decimal"
             placeholder="10.00"
             /* No `dir`: a field a person types into follows the page (docs/i18n.md §9). */

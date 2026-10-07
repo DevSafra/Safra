@@ -1,6 +1,6 @@
 import { getFinance, type FinanceItem } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
-import { amount, money, shortDateTime } from '@/lib/format';
+import { amounts, money, shortDateTime } from '@/lib/format';
 import Link from 'next/link';
 
 import { ConsolePanel, ConsoleShell, Kpi, KpiRow } from '@/components/console-shell';
@@ -109,28 +109,22 @@ export default async function PaymentsPage({
           <KpiRow label={t.nav.payments}>
             <Kpi
               label={t.sections.payments.kpiCaptured}
-              value={amount(result.counters.captured_today, result.counters.currency)}
+              value={amounts(result.counters.captured_today)}
               valueClass="text-gold-read"
             />
             <Kpi
               label={t.sections.payments.kpiRefunded}
-              value={amount(result.counters.refunded_today, result.counters.currency)}
+              value={amounts(result.counters.refunded_today)}
               valueClass="text-bad"
             />
             <Kpi
               label={t.sections.payments.kpiPayable}
-              value={amount(
-                result.counters.partner_payable_outstanding,
-                result.counters.currency,
-              )}
+              value={amounts(result.counters.partner_payable_outstanding)}
               sub={t.sections.payments.payableNote}
             />
             <Kpi
               label={t.sections.payments.kpiFines}
-              value={amount(
-                result.counters.fines_collected_month,
-                result.counters.currency,
-              )}
+              value={amounts(result.counters.fines_collected_month)}
               valueClass="text-warn"
             />
             {/*
@@ -142,7 +136,7 @@ export default async function PaymentsPage({
             */}
             <Kpi
               label={t.sections.payments.kpiAdRevenue}
-              value={amount(result.counters.ad_revenue_month, result.counters.currency)}
+              value={amounts(result.counters.ad_revenue_month)}
               valueClass="text-gold-read"
             />
           </KpiRow>

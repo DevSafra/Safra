@@ -1117,6 +1117,17 @@ export async function getStaffMember(userId: string) {
  * rendered differently. The note here used to say the feature did not exist, which stopped being
  * true and went on being read.
  */
+/**
+ * A money aggregate, one entry PER CURRENCY (the API never sums across currencies).
+ *
+ * An empty list is «nothing»; `amounts()` renders it as a zero in the platform currency.
+ */
+const currencyTotalsSchema = z.array(
+  z.object({ currency: z.string(), amount: z.string() }),
+);
+
+export type CurrencyTotals = z.infer<typeof currencyTotalsSchema>;
+
 const dashboardSchema = z.object({
   counters: z.object({
     /* The live catalogue and how much of it is operationally incomplete — see the KPI. */
@@ -1137,10 +1148,15 @@ const dashboardSchema = z.object({
     partners_pending_verification: z.number(),
     properties_pending_review: z.number(),
     partner_applications_open: z.number(),
-    revenue_today_usd: z.string(),
-    revenue_today_syp: z.string(),
+    revenue_today: currencyTotalsSchema,
   }),
-  revenue: z.array(z.object({ day: z.string(), amount: z.string() })),
+  /* One week per currency: a bar summing a dollar and a pound would have no meaning. */
+  revenue: z.array(
+    z.object({
+      currency: z.string(),
+      days: z.array(z.object({ day: z.string(), amount: z.string() })),
+    }),
+  ),
   recentBookings: z.array(
     z.object({
       reference: z.string(),
@@ -1376,13 +1392,12 @@ const financeItemSchema = z.object({
 
 const financeSchema = offsetPage(financeItemSchema).extend({
   counters: z.object({
-    captured_today: z.string(),
-    refunded_today: z.string(),
-    fines_collected_month: z.string(),
+    captured_today: currencyTotalsSchema,
+    refunded_today: currencyTotalsSchema,
+    fines_collected_month: currencyTotalsSchema,
     /* §9.3 — advertising settled this month, beside the booking commission. */
-    ad_revenue_month: z.string(),
-    partner_payable_outstanding: z.string(),
-    currency: z.string(),
+    ad_revenue_month: currencyTotalsSchema,
+    partner_payable_outstanding: currencyTotalsSchema,
   }),
 });
 
@@ -1795,6 +1810,8 @@ const landmarkKindSchema = z.object({
 export type LandmarkKind = z.infer<typeof landmarkKindSchema>;
 
 const landmarkSchema = z.object({
+  /* What an edit addresses: a slug is unique only within its city. */
+  id: z.string(),
   slug: z.string(),
   nameAr: z.string(),
   nameEn: z.string(),
@@ -1868,6 +1885,8 @@ const reportsSchema = z.object({
         'cancellations',
         'partner_response',
       ]),
+      /* A revenue card's currency; one card per currency it earned in. Null for every rate. */
+      currency: z.string().nullable(),
       value: z.string(),
       previous: z.string().nullable(),
       series: z.array(z.object({ bucket: z.string(), value: z.string() })),

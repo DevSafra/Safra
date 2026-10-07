@@ -258,6 +258,21 @@ export function amount(value: string | null | undefined, currency: string): stri
 }
 
 /**
+ * A money aggregate that the API returns PER CURRENCY, written as one line.
+ *
+ * Each figure keeps its own symbol and its own isolated run, so «120.00 $ · 91,000.00 ل.س» reads as
+ * two amounts and never as one. Nothing at all is a zero in the platform currency, the fallback
+ * `DEFAULT_MONEY_CURRENCY` exists for: «nothing today» is a fact, a bare `0` is not money.
+ */
+export function amounts(totals: readonly { currency: string; amount: string }[]): string {
+  if (totals.length === 0) return ltrIsolate(amount('0', DEFAULT_MONEY_CURRENCY));
+
+  return totals
+    .map((total) => ltrIsolate(amount(total.amount, total.currency)))
+    .join(' · ');
+}
+
+/**
  * SAFRA's service fee, written the way the ACTIVE configuration means it.
  *
  * Two settings decide this and a screen that read only one would be confidently wrong: `flat` mode

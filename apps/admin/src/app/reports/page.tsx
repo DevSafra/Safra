@@ -1,9 +1,13 @@
 import { getOperatingSettings, getReports, type ReportCard } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
-import { customerFeeLabel, durationLabel, money, percent } from '@/lib/format';
+import { amount, customerFeeLabel, durationLabel, percent } from '@/lib/format';
 import { ConsoleShell } from '@/components/console-shell';
 import { fill, t } from '@/lib/strings';
-import { confirmationWindowMinutes, partnerCommissionPercent } from '@safra/contracts';
+import {
+  DEFAULT_MONEY_CURRENCY,
+  confirmationWindowMinutes,
+  partnerCommissionPercent,
+} from '@safra/contracts';
 import { refuseSection } from '@/components/section-refusal';
 
 /**
@@ -64,7 +68,14 @@ export default async function ReportsPage() {
       ) : (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-4">
           {result.cards.map((card) => (
-            <Card key={card.key} card={card} settings={settings} />
+            /* A revenue measure is one card per currency, so the key carries the currency. */
+            <Card
+              key={[card.key, card.currency].join(':')}
+              card={card}
+              settings={settings}
+              /* Named only when the measure earned in two currencies and so has two cards. */
+              named={result.cards.filter((one) => one.key === card.key).length > 1}
+            />
           ))}
         </div>
       )}
@@ -75,8 +86,11 @@ export default async function ReportsPage() {
 function Card({
   card,
   settings,
+  named,
 }: {
   card: ReportCard;
+  /** Whether to print the card's currency beside its title, because a sibling card shares it. */
+  named: boolean;
   /** Live configuration: the commission card names a fee and a rate a super admin can change. */
   settings: Record<string, unknown>;
 }) {
@@ -86,7 +100,14 @@ function Card({
 
   return (
     <section className="rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
-      <h2 className="text-16 font-extrabold text-gold-read">{meta.title}</h2>
+      <h2 className="text-16 font-extrabold text-gold-read">
+        {meta.title}
+        {named && card.currency ? (
+          <span dir="ltr" className="ms-2 text-13 font-bold text-muted">
+            {card.currency}
+          </span>
+        ) : null}
+      </h2>
 
       <p className="mt-3 text-2xl font-extrabold text-text">{format(card)}</p>
       <Trend card={card} />
@@ -193,10 +214,13 @@ const COPY: Record<
 /** Each measure has its own unit; a shared formatter would print "$71" for occupancy. */
 function format(card: ReportCard): string {
   switch (card.key) {
-    /* Both revenue cards are money, and neither may print a bare figure. */
+    /*
+      Both revenue cards are money, in the currency the CARD states. It printed «$» before every
+      figure whatever the rows were in, which put a pound total behind a dollar sign.
+    */
     case 'commission_revenue':
     case 'ad_revenue':
-      return `$${money(card.value)}`;
+      return amount(card.value, card.currency ?? DEFAULT_MONEY_CURRENCY);
     case 'partner_response':
       return `${Number(card.value).toLocaleString('en-US')} ${t.sections.reports.minutes}`;
     default:
@@ -208,7 +232,7 @@ function formatDelta(card: ReportCard, delta: number): string {
   switch (card.key) {
     case 'commission_revenue':
     case 'ad_revenue':
-      return `$${money(String(delta))}`;
+      return amount(String(delta), card.currency ?? DEFAULT_MONEY_CURRENCY);
     case 'partner_response':
       return `${Math.round(delta).toLocaleString('en-US')} ${t.sections.reports.minutes}`;
     default:

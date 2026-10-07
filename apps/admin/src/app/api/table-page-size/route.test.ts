@@ -305,6 +305,101 @@ describe('the rows-per-page bar', () => {
     expect(location).toContain('status=confirmed');
   });
 
+  /*
+    Every filter a screen reads, per table (go-live audit, 2026-10-06). The route copied `q` and
+    `status` only, so each of these was dropped on a submit and the reader was shown everything.
+  */
+  it.each([
+    ['bookings', { expiring: '1', attention: 'unpaid' }],
+    ['properties', { gap: 'photos' }],
+    ['propertiesPending', { gap: 'photos' }],
+    ['audit', { action: 'booking.cancel' }],
+    ['ads', { iq: 'INV-2026' }],
+    ['adInvoices', { iq: 'INV-2026' }],
+    ['staff', { activityQ: 'login' }],
+    ['staffActivity', { activityQ: 'login' }],
+    ['landmarks', { citySlug: 'damascus', kindCode: 'museum' }],
+  ] as const)(
+    'keeps every filter %s reads through a submit',
+    async (section, filters) => {
+      const response = await POST(submit({ section, size: '25', ...filters }));
+      const location = new URL(
+        response.headers.get('location') ?? '',
+        'http://console.test',
+      );
+
+      for (const [name, value] of Object.entries(filters)) {
+        expect(location.searchParams.get(name), name).toBe(value);
+      }
+    },
+  );
+
+  it('does not reflect a field no screen reads', async () => {
+    const response = await POST(
+      submit({ section: 'bookings', size: '25', next: '//evil.test', gap: 'photos' }),
+    );
+    const location = response.headers.get('location') ?? '';
+
+    expect(location).not.toContain('next=');
+    /* `gap` is a filter of العقارات, not of الحجوزات. */
+    expect(location).not.toContain('gap=');
+  });
+
+  /*
+    A table under a RECORD stays on that record. These redirected to the registry, so choosing 25
+    rows on a partner's violations took the reader to الشركاء.
+  */
+  it.each([
+    ['partnerViolations', 'PAR-000002', '/partners/PAR-000002/violations'],
+    [
+      'staffMemberActivity',
+      '0b9c3f0e-1c2d-4e5f-8a9b-0c1d2e3f4a5b',
+      '/staff/0b9c3f0e-1c2d-4e5f-8a9b-0c1d2e3f4a5b',
+    ],
+    ['coupons', 'SAFRA20', '/coupons/SAFRA20'],
+  ] as const)('keeps %s on its record', async (section, record, path) => {
+    const response = await POST(
+      submit({ section, record, size: '25', from: 'bookings:BKG-2026-000431' }),
+    );
+    const location = new URL(
+      response.headers.get('location') ?? '',
+      'http://console.test',
+    );
+
+    expect(location.pathname).toBe(path);
+    expect(location.searchParams.get('from')).toBe('bookings:BKG-2026-000431');
+  });
+
+  it.each([
+    ['partnerViolations', '../../settings', '/partners'],
+    ['partnerViolations', '%2F%2Fevil.test', '/partners'],
+    ['staffMemberActivity', 'not-a-uuid', '/staff'],
+    ['coupons', 'a/b', '/coupons'],
+    /* A section with no record screen ignores the field entirely. */
+    ['bookings', 'PAR-000002', '/bookings'],
+  ] as const)(
+    'falls back to the registry for %s given %s',
+    async (section, record, path) => {
+      const response = await POST(submit({ section, record, size: '25' }));
+      const location = new URL(
+        response.headers.get('location') ?? '',
+        'http://console.test',
+      );
+
+      expect(location.origin).toBe('http://console.test');
+      expect(location.pathname).toBe(path);
+    },
+  );
+
+  /* «٤» from an Arabic keyboard, Persian «۴» too, is page 4 on a submit made without JavaScript. */
+  it.each(['٤', '۴'])('reads the page %s as 4', async (typed) => {
+    const response = await POST(
+      submit({ section: 'bookings', page: typed, size: '25', pages: '40' }),
+    );
+
+    expect(response.headers.get('location')).toContain('page=4');
+  });
+
   it('answers a body-less request with a redirect, not a parse error', async () => {
     const response = await POST(
       new Request('http://console.test/api/table-page-size', { method: 'POST' }),

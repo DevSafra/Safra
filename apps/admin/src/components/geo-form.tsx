@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 
-import { TIMEZONE_CATALOGUE, utcOffset } from '@safra/contracts';
+import { TIMEZONE_CATALOGUE, typedDigits, utcOffset } from '@safra/contracts';
 
 /**
  * The form primitives every geography panel is built from.
@@ -49,6 +49,7 @@ export function Field({
   disabled,
   className,
   inputMode,
+  digits,
 }: {
   readonly label: string;
   readonly value: string;
@@ -65,14 +66,30 @@ export function Field({
   readonly className?: string | undefined;
   /** So a decimal field offers a numeric keypad on a phone without becoming `type="number"`. */
   readonly inputMode?: 'decimal' | 'numeric' | undefined;
+  /**
+   * Read Arabic-Indic and Persian digits as ASCII, for a field that is not numeric enough for a
+   * number pad: a `YYYY-MM-DD` date, an account number. Implied by `inputMode`.
+   */
+  readonly digits?: boolean | undefined;
 }) {
+  /*
+    A numeric field reads «١٢» as 12 HERE, once, rather than in each form that reads it (audit
+    2026-10-06). Every caller's check is an ASCII regex or `Number()`, and the callers that forgot to
+    convert kept their button dark with nothing on screen saying why.
+  */
+  const numeric = digits === true || inputMode !== undefined;
+
   return (
     <label className="grid gap-1.5 text-13 font-semibold text-muted">
       {label}
       <input
         {...(name ? { name } : {})}
         value={value}
-        onChange={(event) => onChange?.(event.target.value)}
+        onChange={(event) =>
+          onChange?.(
+            numeric ? typedDigits(event.currentTarget) : event.currentTarget.value,
+          )
+        }
         readOnly={disabled ?? false}
         disabled={disabled ?? false}
         {...(inputMode ? { inputMode } : {})}

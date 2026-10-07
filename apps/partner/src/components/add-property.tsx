@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { TRIP_ATTRIBUTES, usesStarRating } from '@safra/contracts';
+import { TRIP_ATTRIBUTES, typedDigits, usesStarRating } from '@safra/contracts';
 
 import type { PropertyFormReference } from '@/lib/api';
 import { codeOfResponse, refusalFor } from '@/lib/refusal';
@@ -233,25 +233,20 @@ export function AddProperty({
               <Field
                 name="basePrice"
                 label={t.properties.fPrice}
-                type="number"
-                min={0}
+                inputMode="decimal"
                 required
               />
               <Field
                 name="unitCount"
                 label={t.properties.fUnits}
-                type="number"
-                min={1}
-                max={50}
+                inputMode="numeric"
                 defaultValue="1"
                 required
               />
               <Field
                 name="maxGuests"
                 label={t.properties.fGuests}
-                type="number"
-                min={1}
-                max={50}
+                inputMode="numeric"
                 defaultValue="2"
                 required
               />
@@ -356,8 +351,7 @@ function Field({
   label,
   type = 'text',
   required,
-  min,
-  max,
+  inputMode,
   maxLength,
   placeholder,
   defaultValue,
@@ -366,8 +360,12 @@ function Field({
   readonly label: string;
   readonly type?: string;
   readonly required?: boolean;
-  readonly min?: number;
-  readonly max?: number;
+  /**
+   * A count or a price. Typed as text with a number pad rather than `type="number"`, which DROPS
+   * «١٢» entirely: the field reports an empty value and the property was refused for a price nobody
+   * could see was missing (audit 2026-10-06).
+   */
+  readonly inputMode?: 'numeric' | 'decimal';
   /** Matches the contract's own cap, so the browser refuses before the API has to. */
   readonly maxLength?: number;
   readonly placeholder?: string;
@@ -380,8 +378,13 @@ function Field({
         name={name}
         type={type}
         required={required}
-        {...(min === undefined ? {} : { min })}
-        {...(max === undefined ? {} : { max })}
+        {...(inputMode === undefined
+          ? {}
+          : {
+              inputMode,
+              onChange: (event: ChangeEvent<HTMLInputElement>) =>
+                typedDigits(event.currentTarget),
+            })}
         {...(maxLength === undefined ? {} : { maxLength })}
         {...(placeholder === undefined ? {} : { placeholder })}
         {...(defaultValue === undefined ? {} : { defaultValue })}

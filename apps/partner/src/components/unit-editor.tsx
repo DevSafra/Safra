@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
+import { typedDigits } from '@safra/contracts';
+
 import type { OfferableAmenity, PartnerPropertyDetail } from '@/lib/api';
 import { codeOfResponse, refusalFor } from '@/lib/refusal';
 import { AddUnit } from '@/components/add-unit';
@@ -376,28 +378,24 @@ function UnitRow({
           value={form.maxGuests}
           onChange={set('maxGuests')}
           id={`unit-guests-${unit.id}`}
-          min={1}
         />
         <Number_
           label={t.editProperty.unitBedrooms}
           value={form.bedrooms}
           onChange={set('bedrooms')}
           id={`unit-bedrooms-${unit.id}`}
-          min={0}
         />
         <Number_
           label={t.editProperty.unitBeds}
           value={form.beds}
           onChange={set('beds')}
           id={`unit-beds-${unit.id}`}
-          min={1}
         />
         <Number_
           label={t.editProperty.unitBathrooms}
           value={form.bathrooms}
           onChange={set('bathrooms')}
           id={`unit-bathrooms-${unit.id}`}
-          min={0}
         />
       </div>
 
@@ -425,22 +423,19 @@ function UnitRow({
           value={form.basePrice}
           onChange={set('basePrice')}
           id={`unit-price-${unit.id}`}
-          min={0}
-          step="0.01"
+          decimal
         />
         <Number_
           label={t.editProperty.unitMinNights}
           value={form.minNights}
           onChange={set('minNights')}
           id={`unit-min-${unit.id}`}
-          min={1}
         />
         <Number_
           label={t.editProperty.unitMaxNights}
           value={form.maxNights}
           onChange={set('maxNights')}
           id={`unit-max-${unit.id}`}
-          min={1}
         />
       </div>
 
@@ -580,26 +575,23 @@ function Number_({
   label,
   value,
   onChange,
-  min,
-  step,
+  decimal,
 }: {
   readonly id: string;
   readonly label: string;
   readonly value: string;
   readonly onChange: (value: string) => void;
-  readonly min: number;
-  readonly step?: string;
+  /** A price rather than a count, so the keypad offers a decimal point. */
+  readonly decimal?: boolean;
 }) {
   return (
     <label className="grid gap-1">
       <span className="text-13 text-muted">{label}</span>
       <input
         id={id}
-        type="number"
-        min={min}
-        {...(step ? { step } : {})}
+        inputMode={decimal ? 'decimal' : 'numeric'}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => onChange(typedDigits(event.currentTarget))}
         className="field-ltr min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-14 text-text lg:min-h-0"
       />
     </label>

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 
 import {
   BOOKING_CANCEL_REASON_MIN,
+  typedDigits,
   DISPUTE_KINDS,
   ENFORCEMENT_REASON_MIN,
   normaliseBankAccount,
@@ -805,6 +806,7 @@ function CompensationForm({
             name="amount"
             required
             inputMode="decimal"
+            onChange={(event) => typedDigits(event.currentTarget)}
             pattern="\d{1,10}(\.\d{1,2})?"
             disabled={busy}
             className="w-32 rounded-lg border border-line bg-field px-3 py-2 text-14 text-text disabled:cursor-not-allowed min-h-10 lg:min-h-0"

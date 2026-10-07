@@ -21,7 +21,8 @@ const ENTITIES = {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function pathFor(entity: string, id: string): string | null {
-  if (!(entity in ENTITIES) || !UUID.test(id)) return null;
+  // `hasOwn`, not `in`: `constructor` and `toString` are inherited, not entities.
+  if (!Object.hasOwn(ENTITIES, entity) || !UUID.test(id)) return null;
 
   return `/admin/faq/${entity}/${id}`;
 }

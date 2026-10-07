@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ERROR } from '@safra/contracts';
+import { ERROR, typedDigits } from '@safra/contracts';
 import { PasswordField, replaceInto } from '@safra/ui';
 
 import { t } from '@/lib/strings';
@@ -268,6 +268,7 @@ export function PartnerLoginForm({ next }: { readonly next: string }) {
             hint={byEmail ? t.login.codeLabelEmail : t.login.codeLabel}
             dir="ltr"
             inputMode={byEmail ? 'numeric' : 'text'}
+            onChange={(event) => typedDigits(event.currentTarget)}
             autoComplete="one-time-code"
             required
           />

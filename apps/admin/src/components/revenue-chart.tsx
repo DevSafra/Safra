@@ -42,9 +42,16 @@ const BAR_GAP = 12;
  */
 export function RevenueChart({
   series,
+  currency,
   sub,
 }: {
   series: readonly { day: string; amount: string }[];
+  /**
+   * Which currency these bars are in, shown only when the week earned in more than one and the
+   * dashboard therefore draws more than one chart. A lone chart is in the platform currency, as
+   * its subtitle already says.
+   */
+  readonly currency?: string | undefined;
   /**
    * The subtitle, composed by the caller from the ACTIVE configuration (finding 217).
    *
@@ -63,17 +70,27 @@ export function RevenueChart({
    */
   const peak = Math.max(...values, 1);
 
+  /* The chart is named by its own heading, so two charts on the page name two currencies. */
+  const headingId = `week-revenue-${currency ?? 'platform'}`;
+
   return (
     <div className="rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
       {/* `h2` like every other panel title, so the console has one heading outline. */}
-      <h2 className="text-16 font-extrabold text-gold-read">{t.admin.weekRevenue}</h2>
+      <h2 id={headingId} className="text-16 font-extrabold text-gold-read">
+        {t.admin.weekRevenue}
+        {currency ? (
+          <span dir="ltr" className="ms-2 text-13 font-bold text-muted">
+            {currency}
+          </span>
+        ) : null}
+      </h2>
       <p className="mt-1 mb-3.5 text-14 text-faint">{sub}</p>
 
       <svg
         viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
         className="block w-full"
         role="img"
-        aria-label={t.admin.weekRevenue}
+        aria-labelledby={headingId}
       >
         <defs>
           <linearGradient id="safra-goldbar" x1="0" y1="0" x2="0" y2="1">

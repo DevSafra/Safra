@@ -25,6 +25,9 @@ const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
  */
 export const dynamic = 'force-dynamic';
 
+/** The registry's filter names; the API's `.strict()` schema validates their values. */
+const EXPORT_FILTERS = ['q', 'status', 'expiring', 'attention'] as const;
+
 export async function POST(request: Request): Promise<Response> {
   const session = await getStaffSession();
 
@@ -39,7 +42,11 @@ export async function POST(request: Request): Promise<Response> {
   const form = await request.formData().catch(() => new FormData());
   const body: Record<string, string> = {};
 
-  for (const key of ['q', 'status'] as const) {
+  /*
+    Every filter الحجوزات reads. This was `q` and `status`, so an export pressed on an alert view
+    (`?expiring=1`, `?attention=no_check_in`) built every booking in scope (go-live audit, 2026-10-06).
+  */
+  for (const key of EXPORT_FILTERS) {
     const value = form.get(key);
 
     if (typeof value === 'string' && value) body[key] = value;

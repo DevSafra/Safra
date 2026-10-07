@@ -407,6 +407,7 @@ function AddAccount({ onClose }: { readonly onClose: () => void }) {
           label={c.accountNumber}
           value={form.accountNumber}
           onChange={set('accountNumber')}
+          digits
           hint={c.accountNumberHint}
         />
       </Row>

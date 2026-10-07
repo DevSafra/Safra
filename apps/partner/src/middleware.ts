@@ -16,6 +16,7 @@ import {
   sessionCookieOptions,
   type Session,
   internalCallerHeaders,
+  isStaticAsset,
 } from '@safra/session';
 
 /** The only path reachable without a partner session. */
@@ -64,6 +65,9 @@ const PUBLIC_PATHS = ['/login', '/invitation', '/employee-invitation'];
  * the tooling; it is not what keeps one partner out of another's bookings.
  */
 export default async function middleware(request: NextRequest) {
+  /* A shipped file, by what it IS rather than by a dot in its path. See `isStaticAsset`. */
+  if (isStaticAsset(request.nextUrl.pathname)) return NextResponse.next();
+
   /*
     Built per request because it carries a nonce, and set on the forwarded REQUEST headers as well
     as the response — that is how Next learns the nonce and stamps it onto its own inline scripts.
@@ -256,5 +260,10 @@ function matches(pathname: string, paths: string[]): boolean {
 }
 
 export const config = {
-  matcher: ['/((?!api|_next|_vercel|.*\\..*).*)'],
+  /*
+    A literal, because Next reads it at build time; `MIDDLEWARE_MATCHER` in `@safra/session` is the
+    one definition and `static-asset.test.ts` holds this copy to it. It used to exclude any path
+    with a dot, which let `/bookings/a.b` render with no session check and no CSP.
+  */
+  matcher: ['/((?!api/|_next/|_vercel/).*)'],
 };

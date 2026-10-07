@@ -3,7 +3,12 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { COUPON_TYPES, preferredCurrency, type CouponType } from '@safra/contracts';
+import {
+  COUPON_TYPES,
+  type CouponType,
+  typedDigits,
+  preferredCurrency,
+} from '@safra/contracts';
 
 import { t, apiErrorOf, label } from '@/lib/strings';
 import { TableToolbar } from './table-toolbar';
@@ -183,7 +188,7 @@ export function CouponsToolbar({
           {c.fValue}
           <input
             value={value}
-            onChange={(e) => setValue(e.target.value)}
+            onChange={(e) => setValue(typedDigits(e.currentTarget))}
             inputMode="decimal"
             placeholder={valueKind === 'percent' ? '10' : '0.00'}
             className={field}
@@ -212,7 +217,7 @@ export function CouponsToolbar({
           {c.fMaxDiscount}
           <input
             value={maxDiscount}
-            onChange={(e) => setMaxDiscount(e.target.value)}
+            onChange={(e) => setMaxDiscount(typedDigits(e.currentTarget))}
             inputMode="decimal"
             placeholder="0.00"
             className={field}
@@ -223,7 +228,7 @@ export function CouponsToolbar({
           {c.fMinBooking}
           <input
             value={minBooking}
-            onChange={(e) => setMinBooking(e.target.value)}
+            onChange={(e) => setMinBooking(typedDigits(e.currentTarget))}
             inputMode="decimal"
             placeholder="0.00"
             className={field}
@@ -254,7 +259,7 @@ export function CouponsToolbar({
           {c.fMaxRedemptions}
           <input
             value={maxRedemptions}
-            onChange={(e) => setMaxRedemptions(e.target.value)}
+            onChange={(e) => setMaxRedemptions(typedDigits(e.currentTarget))}
             inputMode="numeric"
             placeholder="∞"
             className={field}
@@ -265,7 +270,7 @@ export function CouponsToolbar({
           {c.fPerCustomer}
           <input
             value={perCustomer}
-            onChange={(e) => setPerCustomer(e.target.value)}
+            onChange={(e) => setPerCustomer(typedDigits(e.currentTarget))}
             inputMode="numeric"
             className={field}
           />

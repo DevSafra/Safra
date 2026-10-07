@@ -352,6 +352,7 @@ function PolicyForm({
               <Field
                 label={c.tierHours}
                 value={String(tier.hoursBeforeCheckIn)}
+                inputMode="numeric"
                 onChange={(value) =>
                   setTier(index, { hoursBeforeCheckIn: Number(value) || 0 })
                 }
@@ -361,6 +362,7 @@ function PolicyForm({
               <Field
                 label={c.tierPercent}
                 value={String(tier.refundPercent)}
+                inputMode="numeric"
                 onChange={(value) =>
                   setTier(index, { refundPercent: Number(value) || 0 })
                 }
@@ -402,7 +404,13 @@ function PolicyForm({
       </div>
 
       <Row>
-        <Field label={c.floor} value={floor} onChange={setFloor} hint={c.floorHint} />
+        <Field
+          label={c.floor}
+          value={floor}
+          onChange={setFloor}
+          inputMode="numeric"
+          hint={c.floorHint}
+        />
         {policy ? (
           <CheckboxField
             label={c.activePolicyLabel}

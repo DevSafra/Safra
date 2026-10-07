@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import type { Violation } from '@/lib/api';
-import { ENFORCEMENT_REASON_MIN, FINE_CURRENCIES } from '@safra/contracts';
+import { typedDigits, FINE_CURRENCIES, ENFORCEMENT_REASON_MIN } from '@safra/contracts';
 
 import { text } from '@/lib/form';
 import { apiErrorOf, t } from '@/lib/strings';
@@ -248,6 +248,7 @@ export function ViolationActions({
                 required
                 inputMode="decimal"
                 pattern="\d{1,10}(\.\d{1,2})?"
+                onChange={(event) => typedDigits(event.currentTarget)}
                 placeholder={t.sections.enforcement.fineAmountPlaceholder}
                 className="w-32 rounded-lg border border-line bg-field px-3 py-2 text-14 text-text"
               />
@@ -298,6 +299,7 @@ export function ViolationActions({
                 name="customerCompensation"
                 inputMode="decimal"
                 pattern="\d{1,10}(\.\d{1,2})?"
+                onChange={(event) => typedDigits(event.currentTarget)}
                 className="w-32 rounded-lg border border-line bg-field px-3 py-2 text-14 text-text"
               />
             </label>

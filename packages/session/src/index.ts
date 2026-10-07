@@ -12,6 +12,7 @@ export * from './redirect.js';
 export * from './request-origin.js';
 export * from './internal-caller.js';
 export * from './csp.js';
+export * from './static-asset.js';
 
 /* Where a browser fetches listing photography — shared so the two apps cannot drift. */
 export * from './media.js';

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 
-import { BOOKING_VERIFICATION_MINUTES } from '@safra/contracts';
+import { BOOKING_VERIFICATION_MINUTES, typedDigits } from '@safra/contracts';
 
 import { text } from '@/lib/form';
 import { Ltr } from '@/components/admin-table';
@@ -174,6 +174,7 @@ export function BookingVerification() {
               name="code"
               required
               inputMode="numeric"
+              onChange={(event) => typedDigits(event.currentTarget)}
               pattern="\d{6}"
               maxLength={6}
               disabled={busy}

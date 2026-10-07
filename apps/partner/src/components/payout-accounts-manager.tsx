@@ -3,7 +3,12 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { offerableCurrencies, preferredCurrency, PAYOUT_METHODS } from '@safra/contracts';
+import {
+  offerableCurrencies,
+  preferredCurrency,
+  PAYOUT_METHODS,
+  typedDigits,
+} from '@safra/contracts';
 import { statusTone, useConfirm } from '@safra/ui';
 import { errorMessage } from '@safra/i18n';
 
@@ -328,7 +333,7 @@ function AccountForm({
         <input
           type="text"
           value={number}
-          onChange={(event) => setNumber(event.target.value)}
+          onChange={(event) => setNumber(typedDigits(event.currentTarget))}
           required
           minLength={4}
           maxLength={40}

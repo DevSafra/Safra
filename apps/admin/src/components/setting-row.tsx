@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   ANNOUNCEMENT_LOCALES,
   ANNOUNCEMENT_MAX_LENGTH,
+  typedDigits,
   SANCTIONS_POLICIES,
 } from '@safra/contracts';
 import type { ConfirmRequest } from '@safra/ui';
@@ -667,7 +668,7 @@ function ValueInput({
         }}
         inputMode="decimal"
         value={typed}
-        onChange={(event) => onTyped(event.target.value)}
+        onChange={(event) => onTyped(typedDigits(event.currentTarget))}
         required
         /* No `dir`: a field a person types into follows the page (docs/i18n.md §9). */
         className={common}

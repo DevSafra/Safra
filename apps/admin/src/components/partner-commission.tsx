@@ -121,6 +121,7 @@ export function PartnerCommission({
           name="commissionRate"
           value={percent}
           onChange={setPercent}
+          inputMode="decimal"
           hint={c.commissionRateHint}
         />
         <Field
@@ -128,6 +129,7 @@ export function PartnerCommission({
           name="commissionCapUsd"
           value={cap}
           onChange={setCap}
+          inputMode="decimal"
           hint={c.commissionCapHint}
         />
       </Row>

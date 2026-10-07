@@ -25,7 +25,8 @@ export async function POST(
 ): Promise<NextResponse> {
   const { id, action } = await params;
 
-  if (!(action in ACTIONS)) return new NextResponse(null, { status: 404 });
+  // `hasOwn`, not `in`: `constructor` and `toString` are inherited, not actions.
+  if (!Object.hasOwn(ACTIONS, action)) return new NextResponse(null, { status: 404 });
 
   const schema = ACTIONS[action as keyof typeof ACTIONS];
   let body: unknown;

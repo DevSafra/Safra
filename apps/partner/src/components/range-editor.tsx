@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { typedDigits } from '@safra/contracts';
+
 import { codeOfResponse, refusalFor } from '@/lib/refusal';
 import { dayStatus, t } from '@/lib/strings';
 
@@ -204,12 +206,10 @@ export function RangeEditor({
             always wrong on a field.
           */}
           <input
-            type="number"
-            min={0}
-            step="0.01"
+            inputMode="decimal"
             value={price === 'clear' ? '' : price}
             placeholder={t.unitCalendar.priceUnchanged}
-            onChange={(event) => setPrice(event.target.value)}
+            onChange={(event) => setPrice(typedDigits(event.currentTarget))}
             className="field-ltr min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-14 text-text lg:min-h-0"
           />
           <button
@@ -227,11 +227,9 @@ export function RangeEditor({
         <label className="grid gap-1">
           <span className="text-13 text-muted">{t.unitCalendar.minNights}</span>
           <input
-            type="number"
-            min={1}
-            max={365}
+            inputMode="numeric"
             value={minNights}
-            onChange={(event) => setMinNights(event.target.value)}
+            onChange={(event) => setMinNights(typedDigits(event.currentTarget))}
             className="field-ltr min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-14 text-text lg:min-h-0"
           />
         </label>

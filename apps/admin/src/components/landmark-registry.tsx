@@ -169,7 +169,7 @@ export function LandmarkRegistry({
             ) : (
               items.map((landmark) => (
                 <tr
-                  key={landmark.slug}
+                  key={landmark.id}
                   className="border-b border-line/60 text-14 text-text"
                 >
                   <td className="p-2">
@@ -297,9 +297,7 @@ function LandmarkEditor({
 
     try {
       const response = await fetch(
-        landmark
-          ? `/api/landmarks/${encodeURIComponent(landmark.slug)}`
-          : '/api/landmarks',
+        landmark ? `/api/landmarks/${encodeURIComponent(landmark.id)}` : '/api/landmarks',
         {
           method: landmark ? 'PATCH' : 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -343,12 +341,9 @@ function LandmarkEditor({
     setError(null);
 
     try {
-      const response = await fetch(
-        `/api/landmarks/${encodeURIComponent(landmark.slug)}`,
-        {
-          method: 'DELETE',
-        },
-      );
+      const response = await fetch(`/api/landmarks/${encodeURIComponent(landmark.id)}`, {
+        method: 'DELETE',
+      });
 
       if (!response.ok) {
         /*

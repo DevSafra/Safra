@@ -470,8 +470,15 @@ function GroupTripForm({
           value={startsOn}
           onChange={setStartsOn}
           hint="YYYY-MM-DD"
+          digits
         />
-        <Field label={c.endsOn} value={endsOn} onChange={setEndsOn} hint="YYYY-MM-DD" />
+        <Field
+          label={c.endsOn}
+          value={endsOn}
+          onChange={setEndsOn}
+          hint="YYYY-MM-DD"
+          digits
+        />
         <Field label={c.seats} value={seats} onChange={setSeats} inputMode="numeric" />
       </Row>
 

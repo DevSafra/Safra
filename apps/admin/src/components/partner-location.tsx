@@ -1,5 +1,6 @@
 'use client';
 
+import { typedDigits } from '@safra/contracts';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -92,6 +93,7 @@ export function PartnerLocation({
             name="latitude"
             required
             inputMode="decimal"
+            onChange={(event) => typedDigits(event.currentTarget)}
             defaultValue={latitude ?? ''}
             placeholder="33.5138"
             disabled={busy}
@@ -105,6 +107,7 @@ export function PartnerLocation({
             name="longitude"
             required
             inputMode="decimal"
+            onChange={(event) => typedDigits(event.currentTarget)}
             defaultValue={longitude ?? ''}
             placeholder="36.2765"
             disabled={busy}

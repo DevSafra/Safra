@@ -2,19 +2,24 @@ import { NextResponse } from 'next/server';
 
 import { proxy } from '@/lib/proxy';
 
-/** Editing a landmark — its names, its city, its kind, its position, or its visibility. */
+/**
+ * Editing a landmark — its names, its city, its kind, its position, or its visibility.
+ *
+ * By ID. The slug was the segment until 2026-10-06, and a slug is unique only within a city, so
+ * an edit to Aleppo's «airport» could land on Damascus's. The API refuses anything but a UUID.
+ */
 export async function PATCH(
   request: Request,
-  { params }: { params: Promise<{ slug: string }> },
+  { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
-  const { slug } = await params;
+  const { id } = await params;
   const body: unknown = await request.json().catch(() => null);
 
   if (typeof body !== 'object' || body === null) {
     return NextResponse.json({ message: 'A body is required.' }, { status: 400 });
   }
 
-  return proxy(`/admin/landmarks/${encodeURIComponent(slug)}`, { method: 'PATCH', body });
+  return proxy(`/admin/landmarks/${encodeURIComponent(id)}`, { method: 'PATCH', body });
 }
 
 /**
@@ -26,9 +31,9 @@ export async function PATCH(
  */
 export async function DELETE(
   _request: Request,
-  { params }: { params: Promise<{ slug: string }> },
+  { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
-  const { slug } = await params;
+  const { id } = await params;
 
-  return proxy(`/admin/landmarks/${encodeURIComponent(slug)}`, { method: 'DELETE' });
+  return proxy(`/admin/landmarks/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }

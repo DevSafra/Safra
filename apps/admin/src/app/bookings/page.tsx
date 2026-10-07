@@ -214,6 +214,10 @@ export default async function BookingsPage({
                 >
                   {q ? <input type="hidden" name="q" value={q} /> : null}
                   {status ? <input type="hidden" name="status" value={status} /> : null}
+                  {expiring ? <input type="hidden" name="expiring" value="1" /> : null}
+                  {attention ? (
+                    <input type="hidden" name="attention" value={attention} />
+                  ) : null}
                   <button
                     type="submit"
                     className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line bg-field px-3.5 text-14 text-text2 hover:border-gold hover:text-gold-read lg:min-h-0 lg:py-2"

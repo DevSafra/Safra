@@ -8,6 +8,7 @@ import {
   type TableSection,
   isTableSection,
   tablePageSizeSchema,
+  westernDigits,
 } from '@safra/contracts';
 
 import { barState } from '@/components/table-pagination-state';
@@ -206,7 +207,10 @@ function listUrl(
   size: number | undefined,
   field: (name: string) => string | undefined,
 ): URL {
-  const url = new URL(TABLE_SECTION_PATHS[section], request.url);
+  const url = new URL(
+    recordPath(section, field('record')) ?? TABLE_SECTION_PATHS[section],
+    request.url,
+  );
   /*
     The parameter NAMES come from the section too, not from the form. `/staff` carries two paged
     tables and the second namespaces its parameters; letting the request name them would let it
@@ -232,7 +236,9 @@ function listUrl(
     ? Math.min(MAX_PAGE, Math.max(1, Math.trunc(declared)))
     : MAX_PAGE;
 
-  const page = Number(field(names.page));
+  /* «٤» typed on an Arabic keyboard is page 4, for a submit made without JavaScript too. */
+  const typedPage = field(names.page);
+  const page = Number(typedPage === undefined ? undefined : westernDigits(typedPage));
   const clampedPage = Number.isFinite(page)
     ? Math.min(ceiling, MAX_PAGE, Math.max(1, Math.trunc(page)))
     : 1;
@@ -246,7 +252,7 @@ function listUrl(
     );
   }
 
-  for (const name of ['q', 'status']) {
+  for (const name of filtersOf(section)) {
     const value = field(name);
 
     if (value !== undefined) url.searchParams.set(name, value);
@@ -295,4 +301,79 @@ function listUrl(
   }
 
   return url;
+}
+
+/**
+ * The filters a table's screen reads, beyond the `q` and `status` every registry shares.
+ *
+ * The bar posts every filter as a hidden field, and this route rebuilds the URL from a CLOSED list
+ * of names rather than from whatever the form carried, because it is a redirector. That list was
+ * `q` and `status` for every table, so a submit on الحجوزات dropped `expiring` and `attention`, on
+ * سجل التدقيق `action`, on العقارات `gap`, on المعالم `citySlug` and `kindCode`, and on the two
+ * search boxes that namespace their term (`iq`, `activityQ`) the search itself: the reader chose a
+ * size and was shown a page of EVERYTHING under a bar that still read as their view (go-live audit,
+ * 2026-10-06). `from` belongs to the record screens, whose «رجوع» reads it and re-validates it
+ * through `resolveOrigin` on render.
+ *
+ * The values are re-encoded by `URLSearchParams`, and each screen re-validates its own filters, so
+ * nothing here becomes more than a parameter on a console path.
+ */
+const EXTRA_FILTERS: Readonly<Partial<Record<TableSection, readonly string[]>>> = {
+  bookings: ['expiring', 'attention'],
+  properties: ['gap'],
+  propertiesPending: ['gap'],
+  audit: ['action'],
+  ads: ['iq'],
+  adInvoices: ['iq'],
+  staff: ['activityQ'],
+  staffActivity: ['activityQ'],
+  landmarks: ['citySlug', 'kindCode'],
+  partnerViolations: ['from'],
+  staffMemberActivity: ['from'],
+  coupons: ['from'],
+};
+
+function filtersOf(section: TableSection): readonly string[] {
+  return ['q', 'status', ...(EXTRA_FILTERS[section] ?? [])];
+}
+
+/** A console reference (`PAR-000002`): one path segment, no `/`, `.`, `:` or `%` — see `search-params.ts`. */
+const REFERENCE = /^[A-Z]{3}-[A-Za-z0-9-]{1,48}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** A normalised coupon code, the shape `couponCodeSchema` stores. */
+const COUPON_CODE = /^[A-Z0-9]{4,32}$/;
+
+/**
+ * The record screens whose table lives UNDER a record, and how to rebuild that record's URL.
+ *
+ * `TABLE_SECTION_PATHS` can only name a registry, so a real submit on a partner's violations, a
+ * staff member's activity or a coupon's partners redirected to الشركاء, الموظفون or الكوبونات: the
+ * reader chose 25 rows and was taken off the record they were reading. The record travels as a
+ * hidden `record` field, and it is held to the same standard as a `?from=` reference: a literal
+ * prefix, ONE segment matching a strict pattern, so `../x`, `%2F%2Fevil.test` or an empty value
+ * fall back to the registry and can never make this redirector leave the console. Whether the
+ * reader may see that record is decided by the screen's own request, exactly as for a typed URL.
+ */
+const RECORD_PATHS: Readonly<
+  Partial<Record<TableSection, { pattern: RegExp; path: (record: string) => string }>>
+> = {
+  partnerViolations: {
+    pattern: REFERENCE,
+    path: (reference) => `/partners/${reference}/violations`,
+  },
+  staffMemberActivity: { pattern: UUID, path: (userId) => `/staff/${userId}` },
+  coupons: { pattern: COUPON_CODE, path: (code) => `/coupons/${code}` },
+};
+
+function recordPath(
+  section: TableSection,
+  record: string | undefined,
+): string | undefined {
+  const target = RECORD_PATHS[section];
+
+  if (target === undefined || record === undefined || !target.pattern.test(record)) {
+    return undefined;
+  }
+
+  return target.path(encodeURIComponent(record));
 }

@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { statusTone } from '@safra/ui';
 
-import { getMyPayoutBookings, getMyPayouts } from '@/lib/api';
+import { getMyPayout, getMyPayoutBookings } from '@/lib/api';
 import { requireVerifiedPartner } from '@/lib/gate';
 import { Shell } from '@/components/shell';
 import { Ltr } from '@/components/ltr';
@@ -14,16 +14,15 @@ import { payoutStatus, t } from '@/lib/strings';
 /**
  * One payout, and the bookings it is made of.
  *
- * ## Why this reads the LIST rather than a detail endpoint
+ * ## Why this reads its own endpoint, not the list
  *
- * `GET /partner/payouts` is scoped to the signed-in partner and returns their payouts; finding one
- * in it is a filter over a list that is bounded by the partner's own history. Adding a detail route
- * would be a second endpoint enforcing the same scoping rule, and two places that must agree about
- * who may see what is one more than necessary. The covered bookings DO come from their own
- * endpoint, because that is the unbounded part.
+ * It found the payout by searching `GET /partner/payouts`, on the reasoning that the list was
+ * bounded by the partner's own history. It was bounded by `LIMIT 50`, so every transfer past the
+ * fiftieth answered 404 to the business it was paid to (go-live audit, 2026-10-06). The detail
+ * route is scoped in its WHERE clause exactly like the list.
  *
- * A reference belonging to another partner simply is not in the list, so it renders as not found —
- * which is also what the API answers if the bookings endpoint is called directly.
+ * A reference belonging to another partner answers like one that does not exist, so it renders as
+ * not found, which is also what the API answers if the bookings endpoint is called directly.
  */
 export const dynamic = 'force-dynamic';
 
@@ -34,30 +33,25 @@ export default async function PayoutPage({
 }) {
   const { reference } = await params;
 
-  const [profile, payouts, bookings] = await Promise.all([
+  const [profile, payout, bookings] = await Promise.all([
     requireVerifiedPartner(),
-    getMyPayouts(),
+    getMyPayout(reference),
     getMyPayoutBookings(reference),
   ]);
 
   const name =
     profile === 'failed' || profile === 'unauthenticated' ? '' : profile.displayName;
 
-  if (payouts === 'unauthenticated' || payouts === 'failed') {
+  if (payout === 'unauthenticated') {
     return (
       <Shell title={t.payouts.title} partnerName={name} active="payouts">
-        <p className="text-sm text-muted">
-          {payouts === 'unauthenticated'
-            ? t.dashboard.sessionExpired
-            : t.dashboard.loadFailed}
-        </p>
+        <p className="text-sm text-muted">{t.dashboard.sessionExpired}</p>
       </Shell>
     );
   }
 
-  const payout = payouts.find((row) => row.reference === reference);
-
-  if (!payout) notFound();
+  /* `partnerFetch` folds the API's 404 into `failed`; not theirs and not there read the same. */
+  if (payout === 'failed') notFound();
 
   /*
     A failed load is NOT an empty payout.

@@ -10,6 +10,7 @@ import {
   type PartnerRecovery,
   type WithheldBooking,
   type PartnerPayout,
+  type PartnerPayoutTotals,
   sidebarBadges,
 } from '@/lib/api';
 import { requireVerifiedPartner, sectionAccess } from '@/lib/gate';
@@ -17,7 +18,6 @@ import { Shell } from '@/components/shell';
 import { SectionRefusal } from '@/components/section-refusal';
 import { Ltr } from '@/components/ltr';
 import { amount, count } from '@/lib/format';
-import { addMoney } from '@/lib/money';
 import {
   disputeKind,
   disputeStatus,
@@ -74,7 +74,14 @@ export const dynamic = 'force-dynamic';
   enum is one more than can stay in step, and this is what that costs on a screen about money.
 */
 
-export default async function PayoutsPage() {
+export default async function PayoutsPage({
+  searchParams,
+}: {
+  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const raw = (await searchParams)['cursor'];
+  const cursor = Array.isArray(raw) ? raw[0] : raw;
+
   /*
     An EMPLOYEE is told this belongs to the owner, before the fetch that would refuse them.
 
@@ -111,7 +118,7 @@ export default async function PayoutsPage() {
     none. Both reads are the partner's own and neither blocks the other, so they go together.
   */
   const [payouts, accounts, withheld, recoveries, fines] = await Promise.all([
-    getMyPayouts(),
+    getMyPayouts(cursor),
     getMyPayoutAccounts(),
     getMyWithheldPayouts(),
     getMyRecoveries(),
@@ -154,7 +161,7 @@ export default async function PayoutsPage() {
           ) : null}
 
           <Summary
-            payouts={payouts}
+            totals={payouts.totals}
             accounts={
               accounts === 'failed' || accounts === 'unauthenticated' ? [] : accounts
             }
@@ -175,7 +182,7 @@ export default async function PayoutsPage() {
                 ? []
                 : withheld.withheld
             }
-            payouts={payouts}
+            payouts={payouts.items}
           />
 
           {/*
@@ -205,7 +212,7 @@ export default async function PayoutsPage() {
             rows={fines === 'failed' || fines === 'unauthenticated' ? [] : fines.fines}
           />
 
-          {payouts.length === 0 ? (
+          {payouts.items.length === 0 ? (
             <p className="rounded-card border border-line bg-card p-5 text-center text-14 text-faint">
               {t.payouts.empty}
             </p>
@@ -213,14 +220,27 @@ export default async function PayoutsPage() {
             <>
               <Group
                 heading={t.payouts.groupOpen}
-                rows={payouts.filter((one) => !payoutIsSettled(one.status))}
+                rows={payouts.items.filter((one) => !payoutIsSettled(one.status))}
               />
               <Group
                 heading={t.payouts.groupSettled}
-                rows={payouts.filter((one) => payoutIsSettled(one.status))}
+                rows={payouts.items.filter((one) => payoutIsSettled(one.status))}
               />
             </>
           )}
+
+          {/*
+            The next page, the way the portal's other lists page (violations, arrivals). This list
+            stopped at fifty with no way past it, so a partner's oldest transfers were unreachable.
+          */}
+          {payouts.nextCursor ? (
+            <Link
+              href={`/payouts?cursor=${encodeURIComponent(payouts.nextCursor)}`}
+              className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-line px-4 text-sm text-muted transition-colors hover:border-gold hover:text-gold-read lg:min-h-0 lg:py-2"
+            >
+              {t.payouts.loadMore}
+            </Link>
+          ) : null}
 
           <p className="text-13 leading-relaxed text-faint">{t.payouts.note}</p>
           <p className="text-13 leading-relaxed text-faint">{t.payouts.readOnly}</p>
@@ -233,41 +253,31 @@ export default async function PayoutsPage() {
 /**
  * The two questions, answered in sentences.
  *
- * Sums are computed over rows that share ONE currency — the partner's own — so `addMoney` is safe
- * here in a way it would not be on a staff screen spanning five. If a partner ever has payouts in
- * two currencies the total would be wrong, so it is only shown when every open row agrees; that is
- * cheaper and more honest than inventing a conversion this screen has no rate for.
+ * From the API's totals over EVERY payout, never from the rows on screen: this added up the page,
+ * and the page stopped at fifty, so «حُوِّل إليك حتى الآن» lost the oldest transfers without saying
+ * so (go-live audit, 2026-10-06). The totals arrive per currency and are never summed across them;
+ * a figure is only shown when one currency holds it, which is cheaper and more honest than inventing
+ * a conversion this screen has no rate for.
  */
 function Summary({
-  payouts,
+  totals,
   accounts,
 }: {
-  readonly payouts: readonly PartnerPayout[];
+  readonly totals: readonly PartnerPayoutTotals[];
   readonly accounts: readonly {
     status: string;
     bankName: string | null;
     last4: string;
   }[];
 }) {
-  const open = payouts.filter((one) => !payoutIsSettled(one.status));
-  const settled = payouts.filter((one) => payoutIsSettled(one.status) && one.paidAt);
+  const open = totals.filter((one) => one.openCount > 0);
+  const settled = totals.filter((one) => one.paidCount > 0);
+  const pending = open.length === 1 ? open[0] : undefined;
+  const paid = settled.length === 1 ? settled[0] : undefined;
 
-  const currency = open[0]?.currencyCode;
-  const oneCurrency = open.every((one) => one.currencyCode === currency);
-  const pending =
-    currency && oneCurrency
-      ? open.reduce((sum, one) => addMoney(sum, one.netAmount, currency), '0')
-      : null;
-
-  const paidCurrency = settled[0]?.currencyCode;
-  const paid =
-    paidCurrency && settled.every((one) => one.currencyCode === paidCurrency)
-      ? settled.reduce((sum, one) => addMoney(sum, one.netAmount, paidCurrency), '0')
-      : null;
-
-  /* The earliest date SAFRA has committed to, if any row carries one. */
-  const next = open
-    .map((one) => one.scheduledFor)
+  /* The earliest date SAFRA has committed to, if any open payout carries one. */
+  const next = totals
+    .map((one) => one.nextScheduled)
     .filter((one): one is string => one !== null)
     .sort()[0];
 
@@ -300,10 +310,10 @@ function Summary({
       </span>
 
       <p className="text-16 leading-relaxed font-semibold text-text">
-        {pending && currency && open.length > 0 ? (
+        {pending ? (
           plural(t.payouts.summaryPending, {
-            amount: amount(pending, currency),
-            n: open.length,
+            amount: amount(pending.openTotal, pending.currencyCode),
+            n: pending.openCount,
           })
         ) : (
           <span className="text-muted">{t.payouts.summaryNothingPending}</span>
@@ -312,8 +322,10 @@ function Summary({
 
       <p className="text-14 leading-relaxed text-muted">
         {next ? <>{fill(t.payouts.summaryNext, { date: next })} </> : null}
-        {paid && paidCurrency && settled.length > 0
-          ? fill(t.payouts.summaryPaid, { amount: amount(paid, paidCurrency) })
+        {paid
+          ? fill(t.payouts.summaryPaid, {
+              amount: amount(paid.paidTotal, paid.currencyCode),
+            })
           : null}
       </p>
 

@@ -9,7 +9,7 @@ import { Ltr } from '@/components/admin-table';
 import { ViolationActions } from '@/components/violation-actions';
 import { RaiseViolation } from '@/components/raise-violation';
 import { refuseSection } from '@/components/section-refusal';
-import { backTarget, rowAnchor } from '@/lib/search-params';
+import { backTarget, first, rowAnchor } from '@/lib/search-params';
 import { listParamsFor } from '@/lib/table-size';
 import { fill, label, t, violationDescription } from '@/lib/strings';
 
@@ -170,7 +170,18 @@ export default async function PartnerViolationsPage({
               <TablePagination
                 basePath={`/partners/${reference}/violations`}
                 section="partnerViolations"
-                query={{}}
+                record={reference}
+                /*
+                  «رجوع» reads the reader's place in الشركاء from this URL, so paging the violations
+                  must carry it, or the second page's back link returns to page one of everything.
+                */
+                query={Object.fromEntries(
+                  (['page', 'size', 'q', 'status', 'from'] as const)
+                    .map((key) => [key, first(query, key)])
+                    .filter(
+                      (entry): entry is [string, string] => typeof entry[1] === 'string',
+                    ),
+                )}
                 page={result.page}
                 pages={result.pages}
                 total={result.total}

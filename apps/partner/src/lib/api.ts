@@ -408,8 +408,45 @@ const partnerPayoutSchema = z.object({
 
 export type PartnerPayout = z.infer<typeof partnerPayoutSchema>;
 
-export async function getMyPayouts() {
-  return partnerFetch('/partner/payouts', z.array(partnerPayoutSchema));
+/**
+ * The sums over EVERY payout, per currency, as the API aggregates them.
+ *
+ * Required, never defaulted: the screen used to add up the page it was given, and a total
+ * computed from fewer rows than exist is the wrong answer about a partner's own money.
+ */
+const payoutTotalsSchema = z.object({
+  currencyCode: z.string(),
+  openCount: z.number(),
+  openTotal: z.string(),
+  paidCount: z.number(),
+  paidTotal: z.string(),
+  nextScheduled: z.string().nullable(),
+});
+
+export type PartnerPayoutTotals = z.infer<typeof payoutTotalsSchema>;
+
+/** One page of the partner's payouts, newest first, with the totals over all of them. */
+export async function getMyPayouts(cursor?: string) {
+  const query = new URLSearchParams({ limit: '20' });
+
+  if (cursor) query.set('cursor', cursor);
+
+  return partnerFetch(
+    `/partner/payouts?${query.toString()}`,
+    z.object({
+      items: z.array(partnerPayoutSchema),
+      nextCursor: z.string().nullable(),
+      totals: z.array(payoutTotalsSchema),
+    }),
+  );
+}
+
+/** One of the partner's payouts. A reference that is not theirs answers like one that does not exist. */
+export async function getMyPayout(reference: string) {
+  return partnerFetch(
+    `/partner/payouts/${encodeURIComponent(reference)}`,
+    partnerPayoutSchema,
+  );
 }
 
 /**

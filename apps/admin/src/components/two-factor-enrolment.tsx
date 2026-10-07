@@ -1,5 +1,6 @@
 'use client';
 
+import { typedDigits } from '@safra/contracts';
 import { useEffect, useState } from 'react';
 import { reloadInto } from '@safra/ui';
 import { t } from '@/lib/strings';
@@ -190,6 +191,7 @@ export function TwoFactorEnrolment() {
           name="code"
           inputMode="numeric"
           autoComplete="one-time-code"
+          onChange={(event) => typedDigits(event.currentTarget)}
           pattern="[0-9]{6}"
           required
           disabled={!setup}

@@ -354,8 +354,14 @@ function OpenPayout({ onClose }: { readonly onClose: () => void }) {
           No `dir` override. A field a person types into follows the page, which here is RTL, and
           an ISO date is a left-to-right RUN the bidi algorithm lays out correctly inside it.
         */}
-        <Field label={c.periodStart} value={from} onChange={setFrom} hint="YYYY-MM-DD" />
-        <Field label={c.periodEnd} value={to} onChange={setTo} hint="YYYY-MM-DD" />
+        <Field
+          label={c.periodStart}
+          value={from}
+          onChange={setFrom}
+          hint="YYYY-MM-DD"
+          digits
+        />
+        <Field label={c.periodEnd} value={to} onChange={setTo} hint="YYYY-MM-DD" digits />
       </Row>
       <Row>
         <Field label={c.notes} value={notes} onChange={setNotes} />

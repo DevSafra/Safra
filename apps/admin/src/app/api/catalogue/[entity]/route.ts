@@ -36,7 +36,13 @@ export async function POST(
   { params }: { params: Promise<{ entity: string }> },
 ): Promise<NextResponse> {
   const { entity } = await params;
-  const schema = ENTITIES[entity as keyof typeof ENTITIES];
+  /*
+    `hasOwn` first: a bare lookup of `constructor` returns `Object`, which is truthy, and the
+    `safeParse` below then throws — a 500 for a URL that should be a 404.
+  */
+  const schema = Object.hasOwn(ENTITIES, entity)
+    ? ENTITIES[entity as keyof typeof ENTITIES]
+    : undefined;
 
   /* 404 rather than 400: an entity nobody offers is not a bad request, it is not a route. */
   if (!schema) return new NextResponse(null, { status: 404 });

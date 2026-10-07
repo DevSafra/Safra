@@ -26,7 +26,8 @@ const ENTITIES = {
 } as const;
 
 function pathFor(entity: string, code: string): string | null {
-  if (!(entity in ENTITIES)) return null;
+  // `hasOwn`, not `in`: `constructor` and `toString` are inherited, not entities.
+  if (!Object.hasOwn(ENTITIES, entity)) return null;
 
   return `/admin/catalogue/${entity}/${encodeURIComponent(code)}`;
 }

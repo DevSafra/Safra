@@ -5,10 +5,11 @@ import { useState } from 'react';
 
 import {
   AD_BILLING_PERIODS,
-  ADVERTISER_KINDS,
-  preferredCurrency,
   type AdBillingPeriod,
+  ADVERTISER_KINDS,
   type AdvertiserKind,
+  typedDigits,
+  preferredCurrency,
 } from '@safra/contracts';
 
 import { t, apiErrorOf, label } from '@/lib/strings';
@@ -376,7 +377,7 @@ export function AdsToolbar({
             {c.fPrice}
             <input
               value={price}
-              onChange={(e) => setPrice(e.target.value)}
+              onChange={(e) => setPrice(typedDigits(e.currentTarget))}
               inputMode="decimal"
               placeholder="0.00"
               className={field}

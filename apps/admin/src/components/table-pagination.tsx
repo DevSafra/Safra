@@ -3,9 +3,10 @@ import Link from 'next/link';
 import { TABLE_SECTION_PARAMS, type TableSection } from '@safra/contracts';
 
 import { count } from '@/lib/format';
+import { PageNumberInput } from './page-number-input';
 import { PagerForm } from './pager-form';
 import { barState } from './table-pagination-state';
-import { MAX_PAGE, MAX_PAGE_SIZE, MIN_PAGE_SIZE } from '@/lib/search-params';
+import { MAX_PAGE_SIZE, MIN_PAGE_SIZE } from '@/lib/search-params';
 import { fill, t, plural } from '@/lib/strings';
 
 /**
@@ -49,6 +50,7 @@ export function TablePagination({
   total,
   capped,
   size,
+  record,
   label = t.table.paginationLabel,
 }: {
   readonly basePath: string;
@@ -77,6 +79,15 @@ export function TablePagination({
    */
   /** Overridden on a route with two bars, so the two landmarks are distinguishable. */
   readonly label?: string;
+  /**
+   * The record this table belongs to, for a table that lives on a record screen — a partner's
+   * violations, a staff member's activity, a coupon's partners.
+   *
+   * The save endpoint can only redirect to a path it builds itself, so it rebuilds the record's
+   * URL from this, against a strict pattern per section; without it a submit landed on the
+   * registry and took the reader off the record. See `RECORD_PATHS` in the route.
+   */
+  readonly record?: string;
 }) {
   /*
     The parameter names come from the SECTION, not from a prop.
@@ -175,6 +186,7 @@ export function TablePagination({
         className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2"
       >
         <input type="hidden" name="section" value={section} />
+        {record ? <input type="hidden" name="record" value={record} /> : null}
 
         {/*
           How many pages there are, so a request for one that does not exist lands nowhere new
@@ -225,12 +237,8 @@ export function TablePagination({
             glyph="→"
           />
 
-          <input
-            type="number"
+          <PageNumberInput
             name={pageParam}
-            inputMode="numeric"
-            min={1}
-            max={MAX_PAGE}
             /*
               `key` so the number actually CHANGES when the page does (Bashar, 2026-08-24).
 

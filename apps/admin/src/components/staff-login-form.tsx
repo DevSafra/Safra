@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import { PasswordField, replaceInto } from '@safra/ui';
 
 import { t, apiError } from '@/lib/strings';
-import { ERROR } from '@safra/contracts';
+import { typedDigits, ERROR } from '@safra/contracts';
 
 /** A six-digit authenticator code, as opposed to a recovery code. */
 const TOTP_PATTERN = /^\d{6}$/;
@@ -240,7 +240,7 @@ export function StaffLoginForm({ next }: { next: string }) {
             name="code"
             label={t.login.code}
             value={code}
-            onChange={(event) => setCode(event.target.value)}
+            onChange={(event) => setCode(typedDigits(event.currentTarget))}
             inputMode="numeric"
             /**
              * `one-time-code` is the correct semantic and tells a password manager this

@@ -358,13 +358,14 @@ export default async function StaffMemberPage({
               <TablePagination
                 basePath={`/staff/${encodeURIComponent(userId)}`}
                 section="staffMemberActivity"
+                record={userId}
                 /*
                   The registry position is carried FORWARD, so paging the trail does not lose where
                   «رجوع» goes. Only the four fields `backTarget` reads — anything else in the URL is
                   not ours to reflect back into a link on our own page.
                 */
                 query={Object.fromEntries(
-                  (['page', 'size', 'q', 'status'] as const)
+                  (['page', 'size', 'q', 'status', 'from'] as const)
                     .map((key) => [key, query[key]])
                     .filter(
                       (entry): entry is [string, string] => typeof entry[1] === 'string',

@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { preferredCurrency, type GiftCardCurrency } from '@safra/contracts';
+import { typedDigits, type GiftCardCurrency, preferredCurrency } from '@safra/contracts';
 
 import { t, apiErrorOf } from '@/lib/strings';
 import { TableToolbar } from './table-toolbar';
@@ -189,7 +189,7 @@ export function GiftCardsToolbar({
           {/* No `dir` at all — a field follows the PAGE's direction; the bidi algorithm lays out digits. */}
           <input
             value={amount}
-            onChange={(event) => setAmount(event.target.value)}
+            onChange={(event) => setAmount(typedDigits(event.currentTarget))}
             placeholder={c.issueAmountPlaceholder}
             inputMode="decimal"
             className="rounded-lg border border-line bg-card px-3 py-2 text-14 text-text"

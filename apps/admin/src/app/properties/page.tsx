@@ -219,9 +219,10 @@ export default async function PropertiesPage({
             <TablePagination
               basePath="/properties"
               section="propertiesPending"
-              /* And the registry's place, the other way round. */
+              /* And the registry's place, the other way round, filter included. */
               query={{
                 q,
+                ...(gap ? { gap } : {}),
                 ...(page > 1 ? { page: String(page) } : {}),
                 size: String(size),
               }}

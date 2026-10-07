@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { typedDigits } from '@safra/contracts';
+
 import { AmenityPicker } from '@/components/amenity-picker';
 import type { OfferableAmenity } from '@/lib/api';
 import { codeOfResponse, refusalFor } from '@/lib/refusal';
@@ -211,11 +213,9 @@ export function AddUnit({
         <label className="grid gap-1">
           <span className="text-13 text-muted">{t.editProperty.unitGuestsField}</span>
           <input
-            type="number"
-            min={1}
-            max={50}
+            inputMode="numeric"
             value={form.maxGuests}
-            onChange={(event) => set('maxGuests')(event.target.value)}
+            onChange={(event) => set('maxGuests')(typedDigits(event.currentTarget))}
             required
             className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-14 text-text lg:min-h-0"
           />
@@ -240,11 +240,9 @@ export function AddUnit({
         <label className="grid gap-1">
           <span className="text-13 text-muted">{t.editProperty.unitPrice}</span>
           <input
-            type="number"
-            min={0}
-            step="0.01"
+            inputMode="decimal"
             value={form.basePrice}
-            onChange={(event) => set('basePrice')(event.target.value)}
+            onChange={(event) => set('basePrice')(typedDigits(event.currentTarget))}
             required
             className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-14 text-text lg:min-h-0"
           />
@@ -279,11 +277,9 @@ export function AddUnit({
       <label className="grid gap-1">
         <span className="text-13 text-muted">{t.editProperty.unitQuantity}</span>
         <input
-          type="number"
-          min={1}
-          max={50}
+          inputMode="numeric"
           value={form.quantity}
-          onChange={(event) => set('quantity')(event.target.value)}
+          onChange={(event) => set('quantity')(typedDigits(event.currentTarget))}
           required
           className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-14 text-text sm:w-40 lg:min-h-0"
         />

@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { statusTone } from '@safra/ui';
+import { statusTone, useConfirm } from '@safra/ui';
 
 import type { ContractItem } from '@/lib/api';
 import { Chip } from '@/components/admin-table';
@@ -58,6 +58,7 @@ export function PartnerContractPanel({
   readonly allowJointUpload?: boolean;
 }) {
   const router = useRouter();
+  const { ask, dialog } = useConfirm();
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,6 +100,46 @@ export function PartnerContractPanel({
     current !== undefined &&
     current.status !== 'superseded' &&
     current.status !== 'terminated';
+
+  /*
+    The two irreversible presses ask first, `tone: 'danger'` so Enter out of habit cancels.
+
+    A new version SUPERSEDES the current contract, and handing the step back takes a signed one out
+    of force and emails the partner; both ran on a single click (go-live audit, 2026-10-06). The
+    first generation supersedes nothing, so it does not ask.
+  */
+  async function generate(): Promise<void> {
+    if (
+      current &&
+      !(await ask({
+        title: t.sections.partnerContract.regenerateTitle,
+        message: t.sections.partnerContract.regenerateMessage,
+        confirmLabel: t.sections.partnerContract.regenerateConfirm,
+        cancelLabel: t.sections.dialog.cancel,
+        tone: 'danger',
+      }))
+    ) {
+      return;
+    }
+
+    await post('/api/contracts/generate', { partnerReference, kind: 'base' });
+  }
+
+  async function reopen(contractId: string): Promise<void> {
+    if (
+      !(await ask({
+        title: t.sections.partnerContract.reopenTitle,
+        message: t.sections.partnerContract.reopenMessage,
+        confirmLabel: t.sections.partnerContract.reopenConfirm,
+        cancelLabel: t.sections.dialog.cancel,
+        tone: 'danger',
+      }))
+    ) {
+      return;
+    }
+
+    await post(`/api/contracts/${contractId}/reopen`, {});
+  }
 
   async function post(path: string, body: unknown): Promise<void> {
     if (busy) return;
@@ -206,6 +247,7 @@ export function PartnerContractPanel({
       data-contract-status={current?.status ?? 'none'}
       className="rounded-lg border border-line bg-card p-4"
     >
+      {dialog}
       <p className="text-14 leading-relaxed text-muted">
         {current ? state : t.sections.partnerContract.intro}
       </p>
@@ -231,9 +273,7 @@ export function PartnerContractPanel({
         <button
           type="button"
           disabled={busy}
-          onClick={() =>
-            void post('/api/contracts/generate', { partnerReference, kind: 'base' })
-          }
+          onClick={() => void generate()}
           className="cursor-pointer rounded-lg btn-gold px-3 py-1.5 text-xs font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy
@@ -282,7 +322,7 @@ export function PartnerContractPanel({
           <button
             type="button"
             disabled={busy}
-            onClick={() => void post(`/api/contracts/${current.id}/reopen`, {})}
+            onClick={() => void reopen(current.id)}
             className="cursor-pointer rounded-lg border border-gold/50 px-3 py-1.5 text-xs text-gold-read btn-gold-hover hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy
