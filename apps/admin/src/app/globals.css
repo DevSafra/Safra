@@ -846,12 +846,14 @@ body {
 }
 
 /**
- * The sidebar's own scrollbar (Bashar, 2026-10-07): a slim gold thumb that shows only while the
- * pointer is over the sidebar, or while keyboard focus is inside it.
+ * The sidebar's own scrollbar (Bashar, 2026-10-07): a slim light-gray thumb that shows only while
+ * the pointer is over the sidebar, or while keyboard focus is inside it.
  *
  * Nineteen sections overflow a laptop screen, so the nav scrolls, and the browser's grey bar sat
- * beside the gold navigation all the time, looking like something left over. Now the thumb is the
- * console's own accent and stays out of sight until the reader is actually in the sidebar.
+ * beside the gold navigation all the time, looking like something left over. Now it is a quiet gray
+ * (Bashar asked for light gray over the first gold version) drawn from the console's own muted ink,
+ * so it reads as light gray on the day card and on the night one, and stays out of sight until the
+ * reader is actually in the sidebar.
  *
  * Only the COLOUR changes, never the width, so nothing shifts when it appears. Only for a pointer
  * that can hover: a touch screen keeps its native indicator, which is how a finger learns the list
@@ -867,7 +869,7 @@ body {
 
   .console-sidebar:hover .sidebar-scroll,
   .sidebar-scroll:focus-within {
-    scrollbar-color: rgba(var(--goldA), 0.45) transparent;
+    scrollbar-color: color-mix(in srgb, var(--color-muted) 35%, transparent) transparent;
   }
 
   .sidebar-scroll::-webkit-scrollbar {
@@ -887,10 +889,10 @@ body {
 
   .console-sidebar:hover .sidebar-scroll::-webkit-scrollbar-thumb,
   .sidebar-scroll:focus-within::-webkit-scrollbar-thumb {
-    background-color: rgba(var(--goldA), 0.45);
+    background-color: color-mix(in srgb, var(--color-muted) 35%, transparent);
   }
 
   .sidebar-scroll::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(var(--goldA), 0.7);
+    background-color: color-mix(in srgb, var(--color-muted) 55%, transparent);
   }
 }
