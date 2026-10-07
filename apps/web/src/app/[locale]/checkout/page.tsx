@@ -215,6 +215,58 @@ export default async function CheckoutPage({
   */
   const { adults, children, infants } = asked;
 
+  /*
+    What the QUOTED rooms sleep, from the priced lines, never from the query string, so an edited
+    `lines=` cannot raise the ceiling it is measured against. Infants take no bed, as the API counts
+    them. Unknown when a quoted room type is missing from the property: then the form is shown and
+    the API decides, rather than refusing on a guess.
+  */
+  const beds = priced.lines.every((line) =>
+    property.units.some((unit) => unit.id === line.unitId),
+  )
+    ? priced.lines.reduce(
+        (sum, line) =>
+          sum +
+          (property.units.find((unit) => unit.id === line.unitId)?.maxGuests ?? 0) *
+            line.rooms,
+        0,
+      )
+    : null;
+
+  /*
+    A party the rooms cannot sleep is told so HERE, before a name, a phone or a card is typed
+    (Bashar, 2026-10-07). The API refuses such a booking, but only at submit, after the guest has
+    filled everything in. Nobody is dropped from the party to make it fit: the way out is back to
+    the property page, with the stay and the party carried, to add a room or change the numbers.
+  */
+  if (beds !== null && adults + children > beds) {
+    const back = new URLSearchParams({
+      checkIn,
+      checkOut,
+      adults: String(adults),
+      children: String(children),
+      infants: String(infants),
+    });
+
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-16 text-center">
+        <h1 className="font-display text-2xl font-bold text-text">
+          {t('partyTooLarge')}
+        </h1>
+        <p className="mt-3 text-sm text-muted">{t('partyTooLargeHint')}</p>
+        <p className="mt-4 text-sm font-semibold text-text2">
+          {t('partyCapacity', { beds, party: adults + children })}
+        </p>
+        <Link
+          href={`/${locale}/property/${slug}?${back.toString()}`}
+          className="btn-gold mt-6 inline-flex min-h-10 cursor-pointer items-center rounded-lg px-5 py-2.5 text-sm font-bold lg:min-h-0"
+        >
+          {t('changeRooms')}
+        </Link>
+      </div>
+    );
+  }
+
   /**
    * The spendable balance, for signed-in customers only (§7.3).
    *

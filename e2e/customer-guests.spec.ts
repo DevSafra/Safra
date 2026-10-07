@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Locator } from '@playwright/test';
 
 import ar from '../packages/i18n/src/messages/web/ar.json' assert { type: 'json' };
 
@@ -93,7 +93,38 @@ test.describe('عدد الضيوف', () => {
     }
 
     // ── And the property's «احجز الآن» carries it into checkout ───────────────
-    await page.goto(toProperty);
+    /*
+      A room that SLEEPS the party (2026-10-07). The first room of the first result sleeps two, and
+      since the checkout tells a party it does not fit instead of taking its details, a family of
+      four walked into it no longer reaches the payment summary this test is about. The room is
+      chosen by the capacity it states, «حتى N ضيوف», trying the next result when a property has
+      none; the party is never shrunk to fit.
+    */
+    const guests = Number(PARTY.adults) + Number(PARTY.children);
+    const candidates = [
+      toProperty,
+      ...(await page
+        .locator('a[href*="/property/"]')
+        .evaluateAll((links) => links.map((link) => link.getAttribute('href') ?? ''))),
+    ];
+    let room: Locator | undefined;
+
+    for (const href of [...new Set(candidates)].slice(0, 12)) {
+      await page.goto(href);
+
+      for (const unit of await page.locator('#units > ul > li').all()) {
+        const sleeps = /حتى (\d+) (?:ضيوف|ضيفًا|ضيف)/.exec(await unit.innerText());
+
+        if (sleeps && Number(sleeps[1]) >= guests) {
+          room = unit;
+          break;
+        }
+      }
+
+      if (room) break;
+    }
+
+    if (!room) throw new Error(`No room in the first results sleeps ${guests}.`);
 
     /*
       A room has to be CHOSEN first. The page used to link every row straight to checkout; since
@@ -101,11 +132,7 @@ test.describe('عدد الضيوف', () => {
       they want — deliberately, so that pressing «احجز الآن» can never mean a room they did not
       pick. So the party is now carried across two hops rather than one, and both are walked here.
     */
-    await page
-      .locator('#units > ul > li')
-      .first()
-      .getByRole('button', { name: /أضف إلى الحجز|في الحجز/ })
-      .click();
+    await room.getByRole('button', { name: /أضف إلى الحجز|في الحجز/ }).click();
 
     const book = page.locator('aside#booking').locator('a[href*="/checkout?"]').first();
 
