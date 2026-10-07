@@ -4,10 +4,14 @@ import { sql } from 'drizzle-orm';
 import type { Database } from '@safra/db';
 import {
   COUNT_CAP,
+  type CursorQuery,
   DEFAULT_SANCTIONS_POLICY,
   ERROR,
   PERMISSIONS as P,
   SANCTIONS_POLICY_SETTING,
+  SETTLED_PAYOUT_STATUSES,
+  decodeCursor,
+  encodeCursor,
   isSanctionsPolicy,
   type OffsetPage,
   type PageQuery,
@@ -670,22 +674,124 @@ export class PayoutService {
   }
 
   /**
-   * The signed-in partner's own payouts.
+   * The signed-in partner's own payouts, a page at a time, with the summary over ALL of them.
    *
    * Scoped to the token's `partnerId`. There is no overload that takes one, so a partner cannot
    * ask about another's transfers.
+   *
+   * ## Why the summary is computed here
+   *
+   * This was `LIMIT 50` with no cursor, and مستحقاتي added up whatever came back: from the
+   * fifty-first payout on, the oldest transfers silently fell off the screen AND out of «حُوِّل
+   * إليك حتى الآن», a figure about the partner's own money that was wrong without saying so, and
+   * the detail screen answered 404 for every payout past the cut (go-live audit, 2026-10-06). The
+   * list is now a keyset page like the portal's other lists, and the totals are aggregated over the
+   * same `fromWhere`, so the figure describes the set the pages walk and not the page in view.
+   *
+   * The aggregate is bounded by the partner, not by the platform: `partner_payouts_partner_idx`
+   * serves the predicate, and one business accrues a payout per period.
    */
-  async listForPartner(claims: AccessTokenClaims | undefined) {
+  async listForPartner(
+    claims: AccessTokenClaims | undefined,
+    query: CursorQuery = { limit: 20 },
+  ) {
+    const partnerId = requirePartnerId(claims, P.PAYOUT_READ_OWN);
+
+    let keyset = sql``;
+
+    if (query.cursor !== undefined) {
+      const decoded = decodeCursor(query.cursor);
+
+      if (!decoded) throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
+
+      keyset = sql`AND (p.created_at, p.id) < (${decoded.sortKey}::timestamptz, ${decoded.id}::uuid)`;
+    }
+
+    const fromWhere = sql`
+      FROM partner_payouts p
+      JOIN currencies cur ON cur.id = p.currency_id
+      JOIN partners pa    ON pa.id = p.partner_id
+      WHERE p.partner_id = ${partnerId} AND p.deleted_at IS NULL`;
+
+    const settled = sql.join(
+      SETTLED_PAYOUT_STATUSES.map((status) => sql`${status}`),
+      sql`, `,
+    );
+
+    const [rows, totals] = await Promise.all([
+      this.db.execute<PayoutRow & { sort_key: string }>(sql`
+        ${PAYOUT_COLUMNS}, p.created_at::text AS sort_key
+        ${fromWhere}
+        ${keyset}
+        ORDER BY p.created_at DESC, p.id DESC
+        LIMIT ${query.limit + 1}
+      `),
+      this.db.execute<{
+        currency_code: string;
+        open_count: number;
+        open_total: string;
+        paid_count: number;
+        paid_total: string;
+        next_scheduled: string | null;
+      }>(sql`
+        SELECT cur.code AS currency_code,
+               count(*) FILTER (WHERE p.status::text NOT IN (${settled}))::int AS open_count,
+               coalesce(sum(p.net_amount) FILTER (WHERE p.status::text NOT IN (${settled})), 0)::text
+                 AS open_total,
+               count(*) FILTER (WHERE p.status::text IN (${settled}) AND p.paid_at IS NOT NULL)::int
+                 AS paid_count,
+               coalesce(sum(p.net_amount)
+                 FILTER (WHERE p.status::text IN (${settled}) AND p.paid_at IS NOT NULL), 0)::text
+                 AS paid_total,
+               (min(p.scheduled_for) FILTER (WHERE p.status::text NOT IN (${settled})))::text
+                 AS next_scheduled
+        ${fromWhere}
+        GROUP BY cur.code
+        ORDER BY cur.code
+      `),
+    ]);
+
+    const page = rows.rows.slice(0, query.limit);
+    const last = page.at(-1);
+
+    return {
+      items: page.map(toView),
+      nextCursor:
+        rows.rows.length > query.limit && last
+          ? encodeCursor(last.sort_key, last.id)
+          : null,
+      /* One entry per currency the partner has been paid or is owed in — never summed across. */
+      totals: totals.rows.map((row) => ({
+        currencyCode: row.currency_code,
+        openCount: row.open_count,
+        openTotal: row.open_total,
+        paidCount: row.paid_count,
+        paidTotal: row.paid_total,
+        nextScheduled: row.next_scheduled,
+      })),
+    };
+  }
+
+  /**
+   * One of the signed-in partner's payouts, by reference.
+   *
+   * The detail screen found its payout by searching the LIST, so a transfer past the list's cut
+   * was a 404 to the business it was paid to. Scoped in the WHERE clause: another partner's
+   * reference answers exactly like one that does not exist.
+   */
+  async oneForPartner(claims: AccessTokenClaims | undefined, reference: string) {
     const partnerId = requirePartnerId(claims, P.PAYOUT_READ_OWN);
 
     const rows = await this.db.execute<PayoutRow>(sql`
       ${PAYOUT_SELECT}
-      WHERE p.partner_id = ${partnerId} AND p.deleted_at IS NULL
-      ORDER BY p.created_at DESC
-      LIMIT 50
+      WHERE p.partner_id = ${partnerId} AND p.reference = ${reference} AND p.deleted_at IS NULL
+      LIMIT 1
     `);
+    const row = rows.rows[0];
 
-    return rows.rows.map(toView);
+    if (!row) throw notFound(ERROR.PAYOUT_NOT_FOUND);
+
+    return toView(row);
   }
 
   /**

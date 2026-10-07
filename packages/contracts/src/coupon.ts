@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { digitString } from './digits.js';
+
 import { ERROR } from './error-codes.js';
 
 /**
@@ -47,9 +49,9 @@ export const couponCodeSchema = z
   .refine((v) => /^[A-Z0-9]{4,32}$/.test(v), ERROR.COUPON_INVALID);
 
 /** A money amount, at the scale a money column holds. Never a number — see `MONEY_SCALE`. */
-const moneyString = z
-  .string()
-  .regex(/^\d{1,10}(\.\d{1,3})?$/, ERROR.VALIDATION_DECIMAL_STRING);
+const moneyString = digitString(
+  z.string().regex(/^\d{1,10}(\.\d{1,3})?$/, ERROR.VALIDATION_DECIMAL_STRING),
+);
 
 /**
  * Creating a coupon — §9.3's «+ كوبون جديد».

@@ -14,6 +14,10 @@ import { redactIncomingMessage } from '../messaging/redaction.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
+import {
+  NOTIFICATION_CITY,
+  NOTIFICATION_SUBJECT_JOINS,
+} from '../notifications/notification-scope.js';
 import { notFound } from '../common/errors/app-error.js';
 
 export const staffReplySchema = z
@@ -203,21 +207,19 @@ export class MessagingService {
       );
     }
 
-    // One fragment, used by both queries below — see `countOf`.
+    /*
+      One fragment, used by both queries below — see `countOf`. It holds only what decides WHICH
+      threads are listed; the message figures are joined to the page afterwards.
+
+      The message count was a `GROUP BY conversation_id` over the whole messages table, joined
+      here, and Postgres cannot push a join key into a grouped subquery: every view of the inbox
+      aggregated every message ever written to show ten threads. Per thread of the page it is one
+      range on `messages_conversation_idx`.
+    */
     const fromWhere = sql`
       FROM conversations c
       ${this.subjectJoins}
       LEFT JOIN customer_profiles cust ON cust.id = c.customer_profile_id
-      LEFT JOIN (
-        SELECT conversation_id, count(*) AS n FROM messages GROUP BY conversation_id
-      ) m ON m.conversation_id = c.id
-      -- LATERAL rather than a window over every message: the inbox needs one row per thread and
-      -- this stops at the newest, using the (conversation_id, created_at) index.
-      LEFT JOIN LATERAL (
-        SELECT body FROM messages
-        WHERE conversation_id = c.id AND internal = false
-        ORDER BY created_at DESC LIMIT 1
-      ) last ON TRUE
       WHERE ${sql.join(conditions, sql` AND `)}`;
 
     const [result, total] = await Promise.all([
@@ -234,9 +236,9 @@ export class MessagingService {
              -- partner's ticket printed PAR-… — the party, already named on the row. Two tickets
              -- from one host were then indistinguishable: same line, same «subject», nothing to
              -- tell them apart. A ticket is about nothing else; the KIND says what it is.
-             coalesce(b.reference, d.reference) AS subject_reference,
-             cust.full_name                 AS customer,
-             p.display_name                 AS partner,
+             c.subject_reference,
+             c.customer,
+             c.partner,
              c.unread_for_staff,
              (c.closed_at IS NOT NULL)      AS closed,
              coalesce(m.n, 0)::int          AS message_count,
@@ -244,9 +246,27 @@ export class MessagingService {
              to_char(c.last_message_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
                AS last_message_at,
              c.created_at
-      ${fromWhere}
+      FROM (
+        SELECT c.id, c.reference, c.booking_id, c.dispute_id, c.partner_id,
+               c.unread_for_staff, c.closed_at, c.last_message_at, c.created_at,
+               coalesce(b.reference, d.reference) AS subject_reference,
+               cust.full_name                     AS customer,
+               p.display_name                     AS partner
+        ${fromWhere}
+        ORDER BY c.created_at DESC, c.id DESC
+        LIMIT ${query.limit} ${this.pageOffset(query)}
+      ) c
+      LEFT JOIN LATERAL (
+        SELECT count(*) AS n FROM messages WHERE conversation_id = c.id
+      ) m ON TRUE
+      -- LATERAL rather than a window over every message: the inbox needs one row per thread and
+      -- this stops at the newest, using the (conversation_id, created_at) index.
+      LEFT JOIN LATERAL (
+        SELECT body FROM messages
+        WHERE conversation_id = c.id AND internal = false
+        ORDER BY created_at DESC LIMIT 1
+      ) last ON TRUE
       ORDER BY c.created_at DESC, c.id DESC
-      LIMIT ${query.limit} ${this.pageOffset(query)}
       `),
       this.countOf(fromWhere),
     ]);
@@ -719,7 +739,36 @@ export class MessagingService {
     // Staff are not exempt — see the class note.
     const redacted = redactIncomingMessage(input.body);
 
-    await this.db.transaction(async (tx) => {
+    const written = await this.db.transaction(async (tx) => {
+      /*
+        Locked and read again, as `SupportService.reply` does and for the same two reasons: an
+        answer racing a close was posted into a closed thread, and two presses of «إرسال» posted it
+        twice and emailed the asker twice. The second press finds the first under the lock and
+        writes nothing; the window is `SupportService`'s sixty seconds.
+      */
+      const locked = await tx.execute<{ closed: boolean; replay: boolean }>(sql`
+        SELECT c.closed_at IS NOT NULL AS closed,
+               coalesce(
+                 (SELECT m.sender_user_id = ${actor?.sub}::uuid
+                         AND m.body = ${redacted.body}
+                         AND m.internal = ${input.internal}
+                         AND m.created_at > now() - interval '60 seconds'
+                  FROM messages m
+                  WHERE m.conversation_id = c.id
+                  ORDER BY m.created_at DESC, m.id DESC
+                  LIMIT 1),
+                 false
+               ) AS replay
+        FROM conversations c
+        WHERE c.id = ${conversation.id}::uuid
+        FOR UPDATE OF c
+      `);
+
+      const state = locked.rows[0];
+
+      if (!state || state.closed) throw notFound(ERROR.CONVERSATION_NOT_FOUND_OR_CLOSED);
+      if (state.replay) return false;
+
       await tx.execute(sql`
         INSERT INTO messages
           (conversation_id, sender_kind, sender_user_id, body, redacted_count, internal)
@@ -732,6 +781,8 @@ export class MessagingService {
         SET last_message_at = now(), unread_for_staff = 0
         WHERE id = ${conversation.id}::uuid
       `);
+
+      return true;
     });
 
     /*
@@ -748,7 +799,7 @@ export class MessagingService {
       it already records `queued` before sending and swallows a failed send, so a reply is never
       undone by an unreachable mailbox.
     */
-    if (!input.internal) {
+    if (written && !input.internal) {
       await this.notifyOfReply(conversation.id);
     }
 
@@ -974,7 +1025,7 @@ export class MessagingService {
   }): Promise<OffsetPage<NotificationRow>> {
     const conditions: SQL[] = [
       sql`n.deleted_at IS NULL`,
-      scopeFilter(query.actor, 'coalesce(b.city_id, p.city_id)'),
+      scopeFilter(query.actor, NOTIFICATION_CITY),
     ];
 
     if (query.status) {
@@ -992,9 +1043,7 @@ export class MessagingService {
     // One fragment, used by both queries below — see `countOf`.
     const fromWhere = sql`
       FROM notifications n
-      LEFT JOIN bookings b ON b.id = n.booking_id
-      LEFT JOIN disputes d ON d.id = n.dispute_id
-      LEFT JOIN partners p ON p.id = n.partner_id
+      ${NOTIFICATION_SUBJECT_JOINS}
       WHERE ${sql.join(conditions, sql` AND `)}`;
 
     const [result, total] = await Promise.all([
@@ -1045,8 +1094,13 @@ export class MessagingService {
    * One grouped query. The interesting number is failures — a template failing for every German
    * recipient is a bug, three scattered failures are the network — so the shape is per template
    * as well as per status.
+   *
+   * Scoped like the list beneath it. Unscoped, a member restricted to one city read the delivery
+   * volume and failure counts of every city, above a list that showed them their own.
    */
-  async notificationCounters(): Promise<NotificationCounters> {
+  async notificationCounters(
+    actor: AccessTokenClaims | undefined,
+  ): Promise<NotificationCounters> {
     const result = await this.db.execute<{
       channel: string;
       status: string;
@@ -1054,7 +1108,9 @@ export class MessagingService {
     }>(sql`
       SELECT n.channel::text AS channel, n.status::text AS status, count(*)::text AS n
       FROM notifications n
+      ${NOTIFICATION_SUBJECT_JOINS}
       WHERE n.deleted_at IS NULL AND n.created_at >= current_date - interval '30 days'
+        AND ${scopeFilter(actor, NOTIFICATION_CITY)}
       GROUP BY n.channel, n.status
     `);
 

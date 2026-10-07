@@ -1,6 +1,6 @@
 import { Controller, Get, Module, Param, Query } from '@nestjs/common';
 
-import { ERROR } from '@safra/contracts';
+import { ERROR, requestedStay } from '@safra/contracts';
 
 import { notFound } from '../common/errors/app-error.js';
 
@@ -66,13 +66,11 @@ class CatalogController {
     @Query('checkIn') checkIn?: string,
     @Query('checkOut') checkOut?: string,
   ) {
-    const iso = /^\d{4}-\d{2}-\d{2}$/;
-    const stay =
-      checkIn && checkOut && iso.test(checkIn) && iso.test(checkOut) && checkIn < checkOut
-        ? { checkIn, checkOut }
-        : undefined;
-
-    return this.properties.bySlug(slug, stay);
+    /*
+      Real dates or no stay at all — see `requestedStay`. A shape test here let «2026-02-31» reach a
+      Postgres date cast, and the property page answered 500 (audit 2026-10-06).
+    */
+    return this.properties.bySlug(slug, requestedStay(checkIn, checkOut));
   }
 
   /**

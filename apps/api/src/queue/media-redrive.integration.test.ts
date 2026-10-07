@@ -49,6 +49,8 @@ describeIfDb('re-driving a lost image render', () => {
 
         return Promise.resolve();
       },
+      /* Nothing retained: the lost-job case. A retained one is tested against a real Redis. */
+      getJob: () => Promise.resolve(undefined),
     } as never);
 
     /* A clean slate INSIDE the rollback: real stuck rows would make every count ambiguous. */

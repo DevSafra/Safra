@@ -38,6 +38,11 @@
 import { statusWords, unambiguousStatusWords } from '../../statuses.js';
 
 export const ar = {
+  /**
+   * The Latin half of the logo, «سفرة | SAFRA» (2026-10-07). The Arabic half is drawn, so this is
+   * the only word of the logo a catalogue holds. The brand's own spelling in every language.
+   */
+  brandLatin: 'SAFRA',
   /** Document metadata — the browser tab and any bookmark. */
   meta: {
     /*
@@ -995,6 +1000,16 @@ export const ar = {
       by: 'الطالب',
       download: 'تنزيل',
       filtersNone: 'كل الحجوزات',
+      /*
+        How a stored filter reads in المرشِّح. The column printed `status: confirmed` and would have
+        printed `attention: no_check_in` once the export learnt the alert filters (2026-10-06).
+      */
+      filterSearch: 'بحث: {q}',
+      attention: {
+        no_check_in: 'مضى موعد وصولها ولم يُسجَّل',
+        unconfirmed: 'ردّ عليها الشريك ولم تتغيّر حالتها',
+        refund_owed: 'ألغتها سفرة ولم يبدأ استردادها',
+      },
       failed: 'تعذّر إنشاء الملف.',
       requestFailed: 'تعذّر إرسال الطلب. حاول مرة أخرى.',
       /**
@@ -3768,6 +3783,19 @@ export const ar = {
       reopening: 'جارٍ الفتح…',
       reopenHint:
         'يعيد الخطوة إلى الشريك ليرفع نسخة موقّعة جديدة، ويصله إشعار بذلك. تبقى نسخته السابقة محفوظة في السجل.',
+      /*
+        Asked before either irreversible step (go-live audit, 2026-10-06). Both ran on one press:
+        a new version supersedes the current contract, and handing the step back takes a signed
+        contract out of force and emails the partner. Neither can be undone from this screen.
+      */
+      regenerateTitle: 'إنشاء نسخة جديدة من العقد؟',
+      regenerateMessage:
+        'تُستبدل النسخة الحالية ولا يمكن استعادتها، وتبدأ خطوات التوقيع من جديد. تبقى النسخة السابقة في السجل.',
+      regenerateConfirm: 'إنشاء نسخة جديدة',
+      reopenTitle: 'إعادة العقد إلى توقيع الشريك؟',
+      reopenMessage:
+        'يتوقّف سريان العقد ويُلغى توقيع الشريك المحفوظ، ويصله إشعار بالبريد. لا يمكن التراجع عن ذلك.',
+      reopenConfirm: 'نعم، أعِد الخطوة إلى الشريك',
       /* Said next to the approval control, because that is where it changes what somebody does. */
       notSignedYet: 'لا يوجد عقد ساري لهذا الشريك بعد.',
     },
@@ -4512,6 +4540,11 @@ export const ar = {
      * the payload at all is that a dispute can turn on which fine was applied.
      */
     payloadKey: {
+      /*
+        بطاقات الهدايا (2026-10-06): هل أُرسلت البطاقة إلى مستلم. يحلّ محل عنوان المستلم الذي كان
+        يُكتب هنا، فسجل التدقيق يحمل المعرّفات لا العناوين.
+      */
+      toRecipient: 'مرسلة إلى مستلم',
       /*
         ── الأسئلة الشائعة وجروبات (2026-09-28) ───────────────────────────────
 

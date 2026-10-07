@@ -14,7 +14,7 @@ import {
 import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { DisputeNotifier } from './dispute-notifier.js';
-import { evidenceVariant } from '../disputes/dispute-evidence.service.js';
+import { evidenceVariant, filedBySql } from '../disputes/dispute-evidence.service.js';
 import { openDisputeThread } from '../disputes/dispute-thread.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
@@ -321,11 +321,9 @@ export class DisputeService {
                'variantWidths', e.variant_widths,
                -- Three parties, from the uploader's ROLE. Was 'byStaff', a boolean that could only
                -- say customer-or-staff and therefore said staff about the host's own photograph.
-               'filedBy', CASE
-                            WHEN e.uploaded_by_user_id IS NULL THEN 'customer'
-                            WHEN u.role = 'partner' THEN 'partner'
-                            ELSE 'staff'
-                          END,
+               -- The fragment the evidence service reads with, so an employee's upload is the
+               -- partner's here too and not SAFRA's.
+               'filedBy', ${filedBySql('e', 'u')},
                'sharedWithPartner', e.shared_with_partner)
                ORDER BY e.created_at, e.id) AS items
       FROM dispute_evidence e

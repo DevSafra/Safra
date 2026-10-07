@@ -12,6 +12,33 @@ export interface StoredObject {
 }
 
 /**
+ * The object store could not answer — which is not the same as the object not existing.
+ *
+ * ## Why the difference has to be a TYPE
+ *
+ * The media worker used to read an upload through `get`, which answers null for a missing object
+ * AND for a timeout, a 503 or a dropped connection. Null was then taken at its word: «the bytes are
+ * gone», the photograph marked failed for good, no retry. A five-second blip at the bucket turned
+ * a partner's upload into a dead tile that only a second upload could replace.
+ *
+ * So anything that writes a PERMANENT conclusion from a read uses `read`, which throws this for
+ * every fault except «no such key». A throw is how a job asks to be retried, and the class lets the
+ * worker tell a store that is unwell from a render that cannot succeed.
+ */
+export class StorageUnavailableError extends Error {
+  override readonly name = 'StorageUnavailableError';
+
+  constructor(operation: string, cause: unknown) {
+    super(`Object storage could not complete ${operation}.`, { cause });
+  }
+}
+
+/** Whether an error, however it reached us, is a store that could not answer. */
+export function isStorageUnavailable(error: unknown): boolean {
+  return error instanceof Error && error.name === 'StorageUnavailableError';
+}
+
+/**
  * Object storage behind one interface.
  *
  * Two implementations, chosen by configuration: S3 for deployed environments and
@@ -39,6 +66,14 @@ export abstract class StorageService {
    * than a 500.
    */
   abstract get(key: string): Promise<Buffer | null>;
+
+  /**
+   * Reads an object, answering null ONLY when it does not exist.
+   *
+   * Every other fault throws `StorageUnavailableError`. For a caller that turns «missing» into a
+   * permanent state — see that class — rather than into a 404 somebody can retry.
+   */
+  abstract read(key: string): Promise<Buffer | null>;
 }
 
 @Injectable()
@@ -59,8 +94,13 @@ export class LocalDiskStorage extends StorageService {
   async put(key: string, body: Buffer, contentType: string): Promise<StoredObject> {
     const target = this.resolveWithin(key);
 
-    await mkdir(dirname(target), { recursive: true });
-    await writeFile(target, body);
+    try {
+      await mkdir(dirname(target), { recursive: true });
+      await writeFile(target, body);
+    } catch (error) {
+      /* A full disk or a permissions fault: the store is unwell, the upload is not wrong. */
+      throw new StorageUnavailableError('a write', error);
+    }
 
     return { key, contentType, size: body.byteLength };
   }
@@ -79,6 +119,20 @@ export class LocalDiskStorage extends StorageService {
     } catch {
       // Missing is a 404 for the caller, not a server fault.
       return null;
+    }
+  }
+
+  async read(key: string): Promise<Buffer | null> {
+    const target = this.resolveWithin(key);
+
+    try {
+      return await readFile(target);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+
+      if (code === 'ENOENT' || code === 'ENOTDIR') return null;
+
+      throw new StorageUnavailableError('a read', error);
     }
   }
 

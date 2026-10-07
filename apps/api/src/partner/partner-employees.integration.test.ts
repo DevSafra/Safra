@@ -372,6 +372,50 @@ describeIfDb('a partner managing its own staff', () => {
       ).rejects.toMatchObject({ response: { code: ERROR.EMPLOYEE_NOT_FOUND } });
     });
 
+    /*
+      Another partner's ROLE, both ways in. Roles are per partner, and the lookup matched the id
+      alone, so a partner could hand their employee a role (and its permissions) that another
+      business defined. Watched to fail against the id-only lookup on both paths.
+    */
+    const theirRole = async () =>
+      (
+        await db.execute<{ id: string }>(sql`
+          INSERT INTO partner_employee_roles (partner_id, name, permissions)
+          VALUES (${otherPartnerId}::uuid, 'غريب-' || gen_random_uuid(),
+                  ARRAY['booking.read_own'])
+          RETURNING id
+        `)
+      ).rows[0]?.id ?? '';
+
+    it('refuses to invite somebody into another partner’s role', async () => {
+      const foreign = await theirRole();
+
+      await expect(invite({ roleId: foreign })).rejects.toMatchObject({
+        response: { code: ERROR.EMPLOYEE_ROLE_NOT_FOUND },
+      });
+
+      const placed = await db.execute<{ n: string }>(sql`
+        SELECT count(*)::text AS n FROM partner_employees WHERE role_id = ${foreign}::uuid
+      `);
+
+      expect(placed.rows[0]?.n).toBe('0');
+    });
+
+    it('refuses to move an employee into another partner’s role', async () => {
+      const [employee] = await invite();
+      const foreign = await theirRole();
+
+      await expect(
+        service.update(owner(), partnerId, employee?.id ?? '', { roleId: foreign }),
+      ).rejects.toMatchObject({ response: { code: ERROR.EMPLOYEE_ROLE_NOT_FOUND } });
+
+      const kept = await db.execute<{ role_id: string }>(sql`
+        SELECT role_id FROM partner_employees WHERE id = ${employee?.id ?? ''}::uuid
+      `);
+
+      expect(kept.rows[0]?.role_id).toBe(roleId);
+    });
+
     it('refuses an update that changes nothing', async () => {
       const [employee] = await invite();
 

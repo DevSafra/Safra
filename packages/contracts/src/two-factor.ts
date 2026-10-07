@@ -1,4 +1,6 @@
 import { z } from 'zod';
+
+import { digitString } from './digits.js';
 import { ERROR } from './error-codes.js';
 
 /**
@@ -8,10 +10,12 @@ import { ERROR } from './error-codes.js';
  * member actually turn it on. Without them the feature was unreachable.
  */
 
-export const totpCodeSchema = z
-  .string()
-  .trim()
-  .regex(/^\d{6}$/, ERROR.VALIDATION_CODE_SIX_DIGITS);
+export const totpCodeSchema = digitString(
+  z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, ERROR.VALIDATION_CODE_SIX_DIGITS),
+);
 
 /** Confirming enrolment proves the authenticator app is genuinely configured. */
 export const totpEnableSchema = z.object({ code: totpCodeSchema }).strict();

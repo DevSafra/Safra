@@ -45,9 +45,18 @@ export function parseEuSanctionsXml(xml: string): ParsedList {
      * `subjectType` distinguishes a person from an organisation. It is used for
      * display and to explain a hit; matching runs against both regardless, because a
      * partner's legal name and their signatory are both worth checking.
+     *
+     * The published shape is `<subjectType code="person" classificationCode="P"/>`,
+     * and `code="enterprise" classificationCode="E"` for an organisation. This read
+     * `code === 'P'`, the two attributes the wrong way round, so it never matched and
+     * every designated PERSON was imported as an entity. Either attribute is accepted,
+     * so a feed that drops one of them still labels a person as one.
      */
     const subjectType =
-      attributeIn(body, 'subjectType', 'code') === 'P' ? 'person' : 'entity';
+      attributeIn(body, 'subjectType', 'code')?.toLowerCase() === 'person' ||
+      attributeIn(body, 'subjectType', 'classificationCode')?.toUpperCase() === 'P'
+        ? 'person'
+        : 'entity';
 
     const programme = attributeIn(body, 'regulation', 'programme');
 
@@ -128,7 +137,7 @@ function attribute(attributes: string, name: string): string | undefined {
   return value && value.length > 0 ? value : undefined;
 }
 
-/** Finds an attribute on a nested element, e.g. `subjectType code="P"`. */
+/** Finds an attribute on a nested element, e.g. `subjectType code="person"`. */
 function attributeIn(body: string, element: string, name: string): string | undefined {
   const match = new RegExp(`<${element}\\b([^>]*)`, 'i').exec(body);
 

@@ -1163,7 +1163,7 @@ export class PropertiesService {
 
     const currency = await this.db.query.currencies.findFirst({
       where: eq(schema.currencies.code, input.currencyCode.toUpperCase()),
-      columns: { id: true },
+      columns: { id: true, code: true },
     });
 
     if (!currency) throw badRequest(ERROR.GEO_CURRENCY_UNKNOWN);
@@ -1262,6 +1262,7 @@ export class PropertiesService {
               propertyReference,
               maxGuests: input.maxGuests,
               basePrice: input.basePrice,
+              currency: currency.code,
               /*
                 The quantity, and deliberately NOT the type code.
 
@@ -1344,6 +1345,17 @@ export class PropertiesService {
         }
       }
 
+      /* A new base price is in the unit's own currency, and the audit row says which. */
+      const currency =
+        patch['basePrice'] === undefined
+          ? undefined
+          : (
+              await tx.execute<{ code: string }>(sql`
+                SELECT cur.code FROM units u JOIN currencies cur ON cur.id = u.currency_id
+                WHERE u.id = ${unitId}::uuid
+              `)
+            ).rows[0]?.code;
+
       await this.audit.record(
         {
           actorUserId: claims?.sub,
@@ -1351,7 +1363,11 @@ export class PropertiesService {
           action: 'unit.updated',
           subjectType: 'unit',
           subjectId: unitId,
-          after: { ...patch, amenityCodes: input.amenityCodes },
+          after: {
+            ...patch,
+            ...(currency ? { currency } : {}),
+            amenityCodes: input.amenityCodes,
+          },
         },
         tx as unknown as Database,
       );

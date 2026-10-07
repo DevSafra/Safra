@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { digitString } from './digits.js';
+
 import { ERROR } from './error-codes.js';
 import { cursorQuerySchema } from './pagination.js';
 
@@ -263,10 +265,12 @@ export function giftCardCeilingKey(currency: GiftCardCurrency): string {
  */
 export const giftCardIssueSchema = z
   .object({
-    amount: z
-      .string()
-      .regex(/^\d{1,10}(\.\d{1,3})?$/, ERROR.VALIDATION_DECIMAL_STRING)
-      .refine((v) => Number(v) > 0, ERROR.VALIDATION_AMOUNT_POSITIVE),
+    amount: digitString(
+      z
+        .string()
+        .regex(/^\d{1,10}(\.\d{1,3})?$/, ERROR.VALIDATION_DECIMAL_STRING)
+        .refine((v) => Number(v) > 0, ERROR.VALIDATION_AMOUNT_POSITIVE),
+    ),
     currency: z.enum(GIFT_CARD_CURRENCIES, {
       message: ERROR.VALIDATION_CURRENCY_CODE,
     }),

@@ -137,8 +137,10 @@ export const TABLE_SECTION_PATHS: Readonly<Record<TableSection, string>> = {
   /*
     The base path only — the reference comes from the screen. `TABLE_SECTION_PATHS` feeds the save
     endpoint's REDIRECT, which must never take a path from a request, so a section whose real URL
-    contains a record reference cannot express it here. It redirects to the registry and the reader
-    is one click from where they were, which is the safe half of that trade.
+    contains a record reference cannot express it here. This is the FALLBACK: the save endpoint
+    rebuilds the record URL itself from a pattern-checked `record` field (`RECORD_PATHS` in
+    `apps/admin/src/app/api/table-page-size/route.ts`), and lands here only when that is absent or
+    malformed.
   */
   partnerViolations: '/partners',
   properties: '/properties',
@@ -167,7 +169,7 @@ export const TABLE_SECTION_PATHS: Readonly<Record<TableSection, string>> = {
   /*
     The registry, not the record — for the reason `partnerViolations` states above. This section's
     real URL carries a user id, and a path in this map feeds the save endpoint's REDIRECT, which
-    must never take a path from a request. The reader lands one click from where they were.
+    must never take a path from a request. The fallback only, as for `partnerViolations`.
   */
   staffMemberActivity: '/staff',
 };

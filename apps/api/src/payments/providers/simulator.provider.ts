@@ -224,7 +224,13 @@ function normalise(rawBody: string, logger: Logger): NormalisedEvent | null {
     return null;
   }
 
-  const outcome = OUTCOME_BY_EVENT[type] ?? 'ignored';
+  /*
+    `hasOwn`, not a bare lookup: `type` is the sender's, and `OUTCOME_BY_EVENT.constructor` is the
+    `Object` function, which `??` lets through as an outcome.
+  */
+  const outcome = Object.hasOwn(OUTCOME_BY_EVENT, type)
+    ? (OUTCOME_BY_EVENT[type] ?? 'ignored')
+    : 'ignored';
   const amount = body['amount'];
   const currency = body['currency'];
   const fee = body['fee'];

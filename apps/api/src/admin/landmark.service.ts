@@ -6,6 +6,7 @@ import {
   COUNT_CAP,
   ERROR,
   LANDMARK_MAX_KM_FROM_CITY,
+  canWriteInCity,
   distanceMetres,
   type CreateLandmarkInput,
   type CreateLandmarkKindInput,
@@ -16,7 +17,8 @@ import {
 import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
-import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
+import { badRequest, conflict, forbidden, notFound } from '../common/errors/app-error.js';
+import { assertCanWrite, scopeFilter, scopeOf } from '../rbac/scope.sql.js';
 
 export interface LandmarkKindRow {
   readonly code: string;
@@ -31,6 +33,12 @@ export interface LandmarkKindRow {
 }
 
 export interface LandmarkRow {
+  /**
+   * What an edit addresses. Not the slug: a slug is unique only WITHIN a city, so «airport» names
+   * a landmark in Damascus and another in Aleppo, and `PATCH /landmarks/airport` edited whichever
+   * the database happened to return first.
+   */
+  readonly id: string;
   readonly slug: string;
   readonly nameAr: string;
   readonly nameEn: string;
@@ -309,6 +317,7 @@ export class LandmarkService {
     const total = counted.rows[0]?.total ?? 0;
 
     const rows = await this.db.execute<{
+      id: string;
       slug: string;
       name_ar: string;
       name_en: string;
@@ -323,17 +332,18 @@ export class LandmarkService {
       is_active: boolean;
       sort_order: number;
     }>(sql`
-      SELECT l.slug, l.name_ar, l.name_en, l.name_de,
+      SELECT l.id::text, l.slug, l.name_ar, l.name_en, l.name_de,
              c.slug AS city_slug, c.name_ar AS city_name_ar,
              k.code AS kind_code, k.name_ar AS kind_name_ar, k.icon_paths,
              l.latitude::text, l.longitude::text, l.is_active, l.sort_order
       ${fromWhere}
-      ORDER BY c.sort_order, c.slug, l.sort_order, l.slug
+      ORDER BY c.sort_order, c.slug, l.sort_order, l.slug, l.id
       LIMIT ${query.size} OFFSET ${(query.page - 1) * query.size}
     `);
 
     return {
       items: rows.rows.map((r) => ({
+        id: r.id,
         slug: r.slug,
         nameAr: r.name_ar,
         nameEn: r.name_en,
@@ -360,6 +370,7 @@ export class LandmarkService {
     const city = await this.city(input.citySlug);
     const kind = await this.kind(input.kindCode);
 
+    this.assertCanFileIn(actor, city.id);
     this.assertNearCity(city, input.latitude, input.longitude);
 
     const clash = await this.db.execute<{ retired: boolean }>(sql`
@@ -415,25 +426,32 @@ export class LandmarkService {
 
   async update(
     actor: AccessTokenClaims | undefined,
-    slug: string,
+    id: string,
     input: UpdateLandmarkInput,
   ): Promise<{ slug: string }> {
-    const found = await this.db.execute<{
-      id: string;
-      city_id: string;
-      latitude: string;
-      longitude: string;
-    }>(sql`
-      SELECT id::text, city_id::text, latitude::text, longitude::text
-      FROM landmarks WHERE slug = ${slug} AND deleted_at IS NULL LIMIT 1
-    `);
-    const row = found.rows[0];
-    if (!row) throw notFound(ERROR.LANDMARK_NOT_FOUND);
+    const row = await this.load(actor, id);
 
     const city = input.citySlug
       ? await this.city(input.citySlug)
       : await this.cityById(row.city_id);
     const kind = input.kindCode ? await this.kind(input.kindCode) : null;
+
+    /* Moving it is filing it somewhere new, so the destination has to be the actor's too. */
+    this.assertCanFileIn(actor, city.id);
+
+    /*
+      A slug is unique per city, so moving «airport» into a city that already has one would hit
+      the partial unique index and answer a 500. Asked first, and answered as the create does.
+    */
+    if (city.id !== row.city_id) {
+      const clash = await this.db.execute<{ id: string }>(sql`
+        SELECT id::text FROM landmarks
+        WHERE city_id = ${city.id}::uuid AND slug = ${row.slug} AND deleted_at IS NULL
+        LIMIT 1
+      `);
+
+      if (clash.rows[0]) throw conflict(ERROR.LANDMARK_SLUG_TAKEN);
+    }
 
     /*
       Checked against whatever the row will HOLD, not against what the patch happens to name:
@@ -469,24 +487,20 @@ export class LandmarkService {
           action: 'landmark.updated',
           subjectType: 'landmark',
           subjectId: row.id,
-          after: { slug, ...input },
+          after: { slug: row.slug, ...input },
         },
         tx as unknown as Database,
       );
     });
 
-    return { slug };
+    return { slug: row.slug };
   }
 
   async archive(
     actor: AccessTokenClaims | undefined,
-    slug: string,
+    id: string,
   ): Promise<{ slug: string }> {
-    const found = await this.db.execute<{ id: string }>(sql`
-      SELECT id::text FROM landmarks WHERE slug = ${slug} AND deleted_at IS NULL LIMIT 1
-    `);
-    const row = found.rows[0];
-    if (!row) throw notFound(ERROR.LANDMARK_NOT_FOUND);
+    const row = await this.load(actor, id);
 
     await this.db.transaction(async (tx) => {
       /*
@@ -505,16 +519,57 @@ export class LandmarkService {
           action: 'landmark.archived',
           subjectType: 'landmark',
           subjectId: row.id,
-          after: { slug },
+          after: { slug: row.slug },
         },
         tx as unknown as Database,
       );
     });
 
-    return { slug };
+    return { slug: row.slug };
   }
 
   // ── Lookups ──────────────────────────────────────────────────────────────
+
+  /**
+   * One live landmark, by id, as the actor may write it.
+   *
+   * The house shape for a scoped write: the LOOKUP is narrowed with `scopeFilter`, so a landmark
+   * in a city a `none` member cannot see answers exactly as one that does not exist, and
+   * `assertCanWrite` then refuses a `read_only` member, who can see it, with a 403.
+   */
+  private async load(actor: AccessTokenClaims | undefined, id: string) {
+    const found = await this.db.execute<{
+      id: string;
+      slug: string;
+      city_id: string;
+      latitude: string;
+      longitude: string;
+    }>(sql`
+      SELECT l.id::text, l.slug, l.city_id::text, l.latitude::text, l.longitude::text
+      FROM landmarks l
+      WHERE l.id = ${id}::uuid AND l.deleted_at IS NULL
+        AND ${scopeFilter(actor, 'l.city_id')}
+      LIMIT 1
+    `);
+    const row = found.rows[0];
+    if (!row) throw notFound(ERROR.LANDMARK_NOT_FOUND);
+
+    assertCanWrite(actor, row.city_id);
+
+    return row;
+  }
+
+  /**
+   * Whether the actor may file a landmark under this city — the create, and the destination of a
+   * move.
+   *
+   * Not `assertCanWrite`: that answers a `none` member with a 404 because the ROW is not supposed
+   * to exist for them. A city is geography every member can see in the picker, so «not there»
+   * would be false; «not permitted» is the honest answer in both modes.
+   */
+  private assertCanFileIn(actor: AccessTokenClaims | undefined, cityId: string): void {
+    if (!canWriteInCity(scopeOf(actor), cityId)) throw forbidden(ERROR.SCOPE_OUTSIDE);
+  }
 
   private async city(slug: string) {
     const found = await this.db.execute<{

@@ -9,9 +9,13 @@ import { ERROR } from '@safra/contracts';
 
 import { DeadLetterService } from './dead-letter.service.js';
 import { MediaProcessor } from './media.processor.js';
-import { MEDIA_JOB, mediaJobId } from './media.job.js';
+import { MEDIA_JOB, creativeJobId, mediaJobId } from './media.job.js';
+import { MediaRedriveService } from './media-redrive.service.js';
 import { ImageService } from '../storage/image.service.js';
-import type { StorageService } from '../storage/storage.service.js';
+import {
+  StorageUnavailableError,
+  type StorageService,
+} from '../storage/storage.service.js';
 
 /**
  * The `media` queue, against a real Redis, a real BullMQ worker and real `sharp`.
@@ -51,7 +55,15 @@ describeIfReady('the media queue', () => {
   const db: Database = harness.db;
 
   const objects = new Map<string, Buffer>();
-  /* Structurally a StorageService — all four members — so no cast is needed or allowed. */
+  /*
+    How many READS the store fails before it answers again — a bucket having a bad minute.
+
+    `get` reports a fault as null, which is what the real `get` does and why the worker must not use
+    it; `read` throws the typed error. Both draw on the same counter, so a worker reading through
+    the wrong one meets the same fault and reaches the wrong conclusion from it.
+  */
+  let readFaults = 0;
+  /* Structurally a StorageService — all five members — so no cast is needed or allowed. */
   const storage: StorageService = {
     put: (key: string, body: Buffer, contentType: string) => {
       objects.set(key, body);
@@ -59,7 +71,26 @@ describeIfReady('the media queue', () => {
       return Promise.resolve({ key, contentType, size: body.byteLength });
     },
 
-    get: (key: string) => Promise.resolve(objects.get(key) ?? null),
+    get: (key: string) => {
+      if (readFaults > 0) {
+        readFaults -= 1;
+
+        return Promise.resolve(null);
+      }
+
+      return Promise.resolve(objects.get(key) ?? null);
+    },
+    read: (key: string) => {
+      if (readFaults > 0) {
+        readFaults -= 1;
+
+        return Promise.reject(
+          new StorageUnavailableError('a read', new Error('503 Slow Down')),
+        );
+      }
+
+      return Promise.resolve(objects.get(key) ?? null);
+    },
     remove: (key: string) => {
       objects.delete(key);
 
@@ -92,6 +123,7 @@ describeIfReady('the media queue', () => {
   beforeEach(async () => {
     await harness.begin();
     objects.clear();
+    readFaults = 0;
 
     propertyId = await seedProperty();
 
@@ -340,6 +372,228 @@ describeIfReady('the media queue', () => {
     expect(objects.size, 'nothing was written a second time').toBe(after);
   });
 
+  // ─── A store that is unwell is not a broken photograph (go-live audit) ────
+
+  /**
+   * A transient read fault is RETRIED, and the photograph renders.
+   *
+   * The defect: the worker read the upload through `get`, which answers null for a timeout as for a
+   * missing object, and null took the terminal branch — «the bytes are gone», failed for good, no
+   * retry, on a five-second blip. Two faults and three attempts: the third succeeds.
+   */
+  it(
+    'retries a transient storage fault instead of failing the upload',
+    { timeout: 30_000 },
+    async () => {
+      const { imageId, fileKey, originalKey } = await park();
+
+      readFaults = 2;
+
+      await queue.add(
+        MEDIA_JOB,
+        { imageId, originalKey, fileKey },
+        {
+          jobId: mediaJobId(imageId),
+          attempts: 3,
+          backoff: { type: 'fixed', delay: 50 },
+        },
+      );
+
+      expect(
+        await until(async () => (await rowOf(imageId))?.status !== 'processing'),
+        'the row left processing',
+      ).toBe(true);
+
+      const row = await rowOf(imageId);
+
+      expect(row?.status).toBe('ready');
+      expect(row?.failure_code).toBeNull();
+    },
+  );
+
+  /**
+   * And a store that stays down leaves the row `processing`, for the re-drive — never `failed`.
+   *
+   * Nothing is wrong with the file, and the original is still parked, so a permanent state would be
+   * a false one. The dead letter is still written: a store that is down is worth paging about.
+   */
+  it(
+    'leaves the row processing when the store is still down after every attempt',
+    { timeout: 30_000 },
+    async () => {
+      const { imageId, fileKey, originalKey } = await park();
+
+      readFaults = 1_000;
+
+      await queue.add(
+        MEDIA_JOB,
+        { imageId, originalKey, fileKey },
+        {
+          jobId: mediaJobId(imageId),
+          attempts: 2,
+          backoff: { type: 'fixed', delay: 50 },
+        },
+      );
+
+      expect(await until(async () => (await deadLetterCount(imageId)) > 0)).toBe(true);
+
+      const row = await rowOf(imageId);
+
+      expect(row?.status).toBe('processing');
+      expect(row?.failure_code).toBeNull();
+      expect(row?.original_key, 'the bytes are still there to retry from').toBe(
+        originalKey,
+      );
+    },
+  );
+
+  // ─── A campaign creative, replaced and failed ──────────────────────────────
+
+  /**
+   * An old render must not publish over its replacement.
+   *
+   * A campaign's creative reuses the row, and the claim was on the row alone: the job for the FIRST
+   * upload, still queued when the second arrived, rendered the old picture, set `ready` on a row now
+   * pointing at the new key, and the new job found nothing to do. The console showed a broken image.
+   */
+  it(
+    'does not let a replaced creative´s render publish over the replacement',
+    { timeout: 30_000 },
+    async () => {
+      const campaignId = await aCampaign();
+      const first = await parkCreative();
+      const second = await parkCreative();
+
+      await pointCampaignAt(campaignId, second);
+
+      await queue.add(
+        MEDIA_JOB,
+        { imageId: campaignId, subject: 'ad_campaign', ...first },
+        { jobId: creativeJobId(first.fileKey) },
+      );
+
+      expect(
+        await until(
+          async () =>
+            (await (await queue.getJob(creativeJobId(first.fileKey)))?.getState()) ===
+            'completed',
+        ),
+      ).toBe(true);
+
+      expect(await creativeOf(campaignId), 'still waiting on the replacement').toEqual({
+        image_status: 'processing',
+        image_file_key: second.fileKey,
+      });
+
+      await queue.add(
+        MEDIA_JOB,
+        { imageId: campaignId, subject: 'ad_campaign', ...second },
+        { jobId: creativeJobId(second.fileKey) },
+      );
+
+      expect(
+        await until(async () => (await creativeOf(campaignId))?.image_status === 'ready'),
+        'the replacement itself renders',
+      ).toBe(true);
+      expect((await creativeOf(campaignId))?.image_file_key).toBe(second.fileKey);
+    },
+  );
+
+  /**
+   * An exhausted creative render marks the CAMPAIGN failed, so the console can say so.
+   *
+   * `onFailed` called `fail` without the job's subject, so it wrote to `property_images`, matched
+   * nothing, and left the campaign at `processing` for ever: a spinner with no failure to show and
+   * nothing for an operator to recover from.
+   */
+  it(
+    'marks the campaign failed when its creative cannot render',
+    { timeout: 30_000 },
+    async () => {
+      const campaignId = await aCampaign();
+      const upload = await parkCreative(Buffer.from('this is not an image'));
+
+      await pointCampaignAt(campaignId, upload);
+
+      await queue.add(
+        MEDIA_JOB,
+        { imageId: campaignId, subject: 'ad_campaign', ...upload },
+        { jobId: creativeJobId(upload.fileKey), attempts: 1 },
+      );
+
+      expect(
+        await until(
+          async () => (await creativeOf(campaignId))?.image_status === 'failed',
+        ),
+        'the campaign reached failed',
+      ).toBe(true);
+
+      const failed = await db.execute<{ image_failure_code: string | null }>(sql`
+      SELECT image_failure_code FROM ad_campaigns WHERE id = ${campaignId}::uuid
+    `);
+
+      expect(failed.rows[0]?.image_failure_code).toBe(
+        ERROR.UPLOAD_IMAGE_PROCESSING_FAILED,
+      );
+    },
+  );
+
+  /**
+   * The re-drive actually re-runs a render whose job is still in Redis.
+   *
+   * The job failed against a store that was down, so the row was left `processing` for the sweep —
+   * and the sweep's `add` under the same id met the retained failed job and did nothing, every five
+   * minutes. Now the job is retried in place and the creative renders.
+   */
+  it(
+    're-drives a creative whose failed job is still in Redis',
+    { timeout: 30_000 },
+    async () => {
+      const campaignId = await aCampaign();
+      const upload = await parkCreative();
+
+      await pointCampaignAt(campaignId, upload);
+
+      readFaults = 1_000;
+
+      await queue.add(
+        MEDIA_JOB,
+        { imageId: campaignId, subject: 'ad_campaign', ...upload },
+        { jobId: creativeJobId(upload.fileKey), attempts: 1 },
+      );
+
+      expect(
+        await until(
+          async () =>
+            (await (await queue.getJob(creativeJobId(upload.fileKey)))?.getState()) ===
+            'failed',
+        ),
+      ).toBe(true);
+
+      readFaults = 0;
+
+      /* Old enough to count as lost, and nothing else in the database stuck beside it. */
+      await db.execute(sql`
+      UPDATE property_images SET status = 'ready' WHERE status = 'processing'
+    `);
+      await db.execute(sql`
+      UPDATE ad_campaigns SET image_status = NULL
+      WHERE image_status = 'processing' AND id <> ${campaignId}::uuid
+    `);
+      await db.execute(sql`
+      UPDATE ad_campaigns SET updated_at = now() - INTERVAL '30 minutes'
+      WHERE id = ${campaignId}::uuid
+    `);
+
+      expect((await new MediaRedriveService(db, queue).run()).creatives).toBe(1);
+
+      expect(
+        await until(async () => (await creativeOf(campaignId))?.image_status === 'ready'),
+        'the re-driven creative rendered',
+      ).toBe(true);
+    },
+  );
+
   // ─── Fixtures ──────────────────────────────────────────────────────────────
 
   const deadLetterCount = async (imageId: string): Promise<number> =>
@@ -377,6 +631,72 @@ describeIfReady('the media queue', () => {
 
     return { imageId: id, fileKey, originalKey };
   }
+
+  /** A campaign with no creative yet, planted rather than borrowed from the database. */
+  async function aCampaign(): Promise<string> {
+    const rows = await db.execute<{ id: string }>(sql`
+      WITH ref AS (
+        SELECT (SELECT id FROM cities WHERE deleted_at IS NULL ORDER BY id LIMIT 1) AS city_id
+      ), adv AS (
+        INSERT INTO advertisers (name, kind, city_id)
+        SELECT 'معلن الاختبار', 'restaurant', ref.city_id FROM ref
+        RETURNING id
+      )
+      INSERT INTO ad_campaigns (advertiser_id, city_id, status, starts_at, ends_at,
+                                headline_ar, headline_en, headline_de, target_url)
+      SELECT adv.id, ref.city_id, 'active', now() - interval '1 day', now() + interval '30 days',
+             'عنوان', 'Headline', 'Titel', 'https://example.test/x'
+      FROM adv, ref
+      RETURNING id::text
+    `);
+
+    const id = rows.rows[0]?.id;
+
+    if (!id) throw new Error('Campaign fixture produced no row.');
+
+    return id;
+  }
+
+  /** One creative upload's keys, its bytes parked as `AdCreativeService.upload` parks them. */
+  async function parkCreative(
+    bytes?: Buffer,
+  ): Promise<{ fileKey: string; originalKey: string }> {
+    const fileKey = images.keyFor({ kind: 'ads', owner: 'ADS-TEST' });
+    const originalKey = images.incomingKeyFor(fileKey);
+
+    await storage.put(
+      originalKey,
+      bytes ?? (await photograph()),
+      'application/octet-stream',
+    );
+
+    return { fileKey, originalKey };
+  }
+
+  /** The row as an upload leaves it: pointing at this file, waiting on its render. */
+  async function pointCampaignAt(
+    campaignId: string,
+    upload: { fileKey: string; originalKey: string },
+  ): Promise<void> {
+    await db.execute(sql`
+      UPDATE ad_campaigns
+      SET image_status = 'processing', image_file_key = ${upload.fileKey},
+          image_original_key = ${upload.originalKey}, image_variant_widths = '{}'::integer[],
+          image_failure_code = NULL
+      WHERE id = ${campaignId}::uuid
+    `);
+  }
+
+  const creativeOf = async (campaignId: string) =>
+    (
+      await db.execute<{
+        image_status: string | null;
+        image_file_key: string | null;
+      }>(sql`
+        SELECT image_status::text AS image_status, image_file_key
+        FROM ad_campaigns WHERE id = ${campaignId}::uuid
+      `)
+    ).rows[0];
 
   /** A partner with one property, so the images have something to hang off. */
   async function seedProperty(): Promise<string> {

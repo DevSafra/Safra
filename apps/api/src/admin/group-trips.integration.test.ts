@@ -190,6 +190,27 @@ describeIfDb('group trips', () => {
     expect((await publicTrips.list()).items).toHaveLength(0);
   });
 
+  /*
+    A trip whose city is gone is not offered, by the list or by its own page. Deleting the city is
+    refused while a live trip goes there, so this is the row that reached that state some other way
+    (or before the refusal existed). Watched to fail against the read that joined any city.
+  */
+  it('leaves the public list when its city has been removed', async () => {
+    await console_.create(admin(), draft('orphaned'));
+    await publish('orphaned');
+    expect((await publicTrips.list()).items).toHaveLength(1);
+
+    await db.execute(sql`
+      UPDATE cities SET deleted_at = now()
+      WHERE id = (SELECT city_id FROM group_trips WHERE slug = 'orphaned')
+    `);
+
+    expect((await publicTrips.list()).items).toHaveLength(0);
+    await expect(publicTrips.bySlug('orphaned')).rejects.toSatisfy(
+      (error: unknown) => codeOf(error) === ERROR.GROUP_TRIP_NOT_FOUND,
+    );
+  });
+
   it('refuses a slug that is already taken', async () => {
     await console_.create(admin(), draft('taken-slug'));
 

@@ -406,7 +406,7 @@ export class CommsController {
   ) {
     const [page, counters] = await Promise.all([
       this.messaging.notifications({ ...query, actor: user }),
-      this.messaging.notificationCounters(),
+      this.messaging.notificationCounters(user),
     ]);
 
     /*

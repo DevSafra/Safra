@@ -317,17 +317,6 @@ export class RegistryService {
   // ── العملاء ────────────────────────────────────────────────────────────────
 
   /**
-   * The customer registry.
-   *
-   * `is_guest` drives the design's النوع column: a guest holds only the data from one
-   * booking and can be upgraded to a full account, which is a different support conversation
-   * from a registered customer who has forgotten their password.
-   *
-   * The booking count and wallet balance are joined rather than counted per row — a
-   * correlated subquery here would be an N+1 inside one statement, which is the shape that
-   * looks fine at 4,891 customers and stops working at half a million.
-   */
-  /**
    * ONE customer, and everything the platform has recorded about them.
    *
    * ## Why this exists
@@ -352,8 +341,23 @@ export class RegistryService {
    * tell «the last ten» from «all ten». Five small indexed queries rather than one join: joining
    * six one-to-many relations in a single statement multiplies the rows and then needs them
    * de-duplicated in code.
+   *
+   * ## The customer is not scoped; what they did in a city is
+   *
+   * A customer belongs to no city — they book Latakia in July and Damascus in August — so the
+   * record itself opens for every reader of العملاء, as the registry does. Their BOOKINGS do have a
+   * city, and so does everything hanging off one: the dispute about a stay, the review of a
+   * property, the notice about a booking. Those sections are narrowed with `scopeFilter`, so a
+   * member limited to Aleppo reads the Aleppo half of this person's history and the totals beside
+   * it count that half. Without it the record was a way round every scoped registry: the booking a
+   * member could not open from الحجوزات was listed here with its amount and its property.
+   *
+   * Nothing on this record is wholly out of reach, so nothing answers «not there» that exists: the
+   * one whole record that is scoped, a booking, already answers 404 when it is opened.
+   *
+   * The wallet stays whole, deliberately — the reason is on `FinanceService.wallet`.
    */
-  async customerDetail(reference: string) {
+  async customerDetail(reference: string, actor?: AccessTokenClaims) {
     const profile = await this.db.execute<{
       id: string;
       reference: string;
@@ -410,6 +414,7 @@ export class RegistryService {
         JOIN currencies cur ON cur.id = b.currency_id
         JOIN properties pr  ON pr.id = b.property_id
         WHERE b.customer_profile_id = ${id} AND b.deleted_at IS NULL
+          AND ${scopeFilter(actor, 'b.city_id')}
         ORDER BY b.created_at DESC
         LIMIT ${RECENT}
       `),
@@ -444,6 +449,7 @@ export class RegistryService {
         FROM reviews r
         JOIN properties pr ON pr.id = r.property_id
         WHERE r.customer_profile_id = ${id}
+          AND ${scopeFilter(actor, 'pr.city_id')}
         ORDER BY r.created_at DESC
         LIMIT ${RECENT}
       `),
@@ -461,6 +467,7 @@ export class RegistryService {
         FROM disputes d
         LEFT JOIN bookings b ON b.id = d.booking_id
         WHERE d.customer_profile_id = ${id}
+          AND ${scopeFilter(actor, 'b.city_id')}
         ORDER BY d.created_at DESC
         LIMIT ${RECENT}
       `),
@@ -479,7 +486,11 @@ export class RegistryService {
         SELECT n.template_key, n.channel::text AS channel, n.status::text AS status,
                n.created_at::text, count(*) OVER ()::text AS total
         FROM notifications n
+        -- A notice about a booking is about that booking's city. One with no booking is about the
+        -- account (a password reset, a gift card) and belongs to no city, which scopeFilter allows.
+        LEFT JOIN bookings nb ON nb.id = n.booking_id
         WHERE n.customer_profile_id = ${id}
+          AND ${scopeFilter(actor, 'nb.city_id')}
         ORDER BY n.created_at DESC
         LIMIT ${RECENT}
       `),
@@ -561,6 +572,17 @@ export class RegistryService {
     };
   }
 
+  /**
+   * The customer registry.
+   *
+   * `is_guest` drives the design's النوع column: a guest holds only the data from one
+   * booking and can be upgraded to a full account, which is a different support conversation
+   * from a registered customer who has forgotten their password.
+   *
+   * The booking count and wallet balance are joined to the PAGE, never to the registry: a
+   * lookup per row of a ten-row page is ten index probes, where an aggregate joined to the whole
+   * table is the shape that looks fine at 4,891 customers and stops working at half a million.
+   */
   async customers(query: {
     limit: number;
     page: number;
@@ -576,18 +598,19 @@ export class RegistryService {
       );
     }
 
-    const where = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
+    /*
+      One fragment, used by both queries below — see `countOf`. It holds only what decides WHICH
+      customers are listed; what is shown about each one is joined to the page afterwards.
 
-    // One fragment, used by both queries below — see `countOf`.
+      The booking figures were a `GROUP BY customer_profile_id` over the whole bookings table,
+      joined here, and Postgres cannot push a join key into a grouped subquery: every page view
+      aggregated every booking ever made to show ten rows. Measured on safra_load (5,087,045
+      bookings, 2026-10-06) it read 4.1 million buffers and took 2.9 s for page one. Per row of the
+      page it is one index-only lookup on `bookings_customer_idx`.
+    */
     const fromWhere = sql`
       FROM customer_profiles c
-      LEFT JOIN (
-      SELECT customer_profile_id, count(*) AS n, max(created_at) AS last_at
-      FROM bookings GROUP BY customer_profile_id
-      ) b ON b.customer_profile_id = c.id
-      LEFT JOIN wallets w     ON w.customer_profile_id = c.id AND w.deleted_at IS NULL
-      LEFT JOIN currencies cur ON cur.id = w.currency_id
-      ${where}`;
+      WHERE ${sql.join(conditions, sql` AND `)}`;
 
     const [result, total] = await Promise.all([
       this.db.execute<CustomerRowSql>(sql`
@@ -599,9 +622,19 @@ export class RegistryService {
                AS last_activity,
              to_char(c.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                AS created_at
-        ${fromWhere}
+        FROM (
+          SELECT c.id, c.reference, c.full_name, c.is_guest, c.created_at
+          ${fromWhere}
+          ORDER BY c.created_at DESC, c.id DESC
+          LIMIT ${query.limit} ${this.pageOffset(query)}
+        ) c
+        LEFT JOIN LATERAL (
+          SELECT count(*) AS n, max(bk.created_at) AS last_at
+          FROM bookings bk WHERE bk.customer_profile_id = c.id
+        ) b ON true
+        LEFT JOIN wallets w     ON w.customer_profile_id = c.id AND w.deleted_at IS NULL
+        LEFT JOIN currencies cur ON cur.id = w.currency_id
         ORDER BY c.created_at DESC, c.id DESC
-        LIMIT ${query.limit} ${this.pageOffset(query)}
       `),
       this.countOf(fromWhere),
     ]);

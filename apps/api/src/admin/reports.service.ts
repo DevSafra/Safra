@@ -6,6 +6,7 @@ import type { Database } from '@safra/db';
 import { DATABASE } from '../database/database.module.js';
 import { scopeFilter } from '../rbac/scope.sql.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { seriesByCurrency } from './currency-totals.js';
 
 export interface ReportCard {
   readonly key:
@@ -14,6 +15,14 @@ export interface ReportCard {
     | 'occupancy'
     | 'cancellations'
     | 'partner_response';
+  /**
+   * The currency of a MONEY card, and `null` for every other measure.
+   *
+   * A revenue card is drawn once per currency it has rows in — see `currency-totals.ts`. On a
+   * single-currency platform that is one card, as before; the day a second currency earns
+   * something, the screen shows two cards rather than one sum that means neither.
+   */
+  readonly currency: string | null;
   /** The headline figure, already formatted as a decimal string. */
   readonly value: string;
   /** Same measure over the previous period, so the UI can state the delta honestly. */
@@ -61,7 +70,7 @@ export class ReportsService {
     ]);
 
     /* Beside the commission, because they are SAFRA's two revenue streams and read as a pair. */
-    return [revenue, ads, occupancy, cancellations, response];
+    return [...revenue, ...ads, occupancy, cancellations, response];
   }
 
   /**
@@ -70,8 +79,12 @@ export class ReportsService {
    * Never the booking total — that is the partner's money passing through. Getting this wrong
    * would overstate revenue by roughly fourteen times.
    */
-  private async commissionRevenue(actor?: AccessTokenClaims): Promise<ReportCard> {
-    const result = await this.db.execute<{ bucket: string; value: string }>(sql`
+  private async commissionRevenue(actor?: AccessTokenClaims): Promise<ReportCard[]> {
+    const result = await this.db.execute<{
+      bucket: string;
+      currency: string | null;
+      value: string;
+    }>(sql`
       WITH weeks AS (
         SELECT generate_series(
           date_trunc('week', current_date) - interval '${sql.raw(String(BUCKETS - 1))} weeks',
@@ -80,6 +93,7 @@ export class ReportsService {
         ) AS bucket
       )
       SELECT to_char(w.bucket, 'YYYY-MM-DD') AS bucket,
+             cur.code AS currency,
              coalesce(sum(b.partner_commission_amount + b.customer_fee_amount), 0)::text
                AS value
       FROM weeks w
@@ -87,11 +101,16 @@ export class ReportsService {
         ON date_trunc('week', b.created_at) = w.bucket
        AND b.status IN ('confirmed','checked_in','completed')
        AND ${scopeFilter(actor, 'b.city_id')}
-      GROUP BY w.bucket
+      -- Each booking's own currency: a week holding a dollar booking and a pound booking is two
+      -- figures, never their sum.
+      LEFT JOIN currencies cur ON cur.id = b.currency_id
+      GROUP BY w.bucket, cur.code
       ORDER BY w.bucket
     `);
 
-    return this.card('commission_revenue', result.rows);
+    return seriesByCurrency(result.rows).map(({ currency, series }) =>
+      this.card('commission_revenue', series, currency),
+    );
   }
 
   /**
@@ -117,8 +136,12 @@ export class ReportsService {
    * `paid_at`, not `created_at`: an invoice issued in March and settled in May is May's revenue,
    * which is the whole reason the ledger posts on payment rather than on issue.
    */
-  private async adRevenue(actor?: AccessTokenClaims): Promise<ReportCard> {
-    const result = await this.db.execute<{ bucket: string; value: string }>(sql`
+  private async adRevenue(actor?: AccessTokenClaims): Promise<ReportCard[]> {
+    const result = await this.db.execute<{
+      bucket: string;
+      currency: string | null;
+      value: string;
+    }>(sql`
       WITH weeks AS (
         SELECT generate_series(
           date_trunc('week', current_date) - interval '${sql.raw(String(BUCKETS - 1))} weeks',
@@ -126,20 +149,29 @@ export class ReportsService {
           interval '1 week'
         ) AS bucket
       )
+      -- The scope is part of the JOIN, not a WHERE after it. Filtering the joined rows dropped a
+      -- week whose only invoices were outside the reader's cities, and the sparkline then had
+      -- seven bars under eight labels.
       SELECT to_char(w.bucket, 'YYYY-MM-DD') AS bucket,
+             cur.code AS currency,
              coalesce(sum(i.amount), 0)::text AS value
       FROM weeks w
-      LEFT JOIN ad_invoices i
+      LEFT JOIN (
+        ad_invoices i
+        JOIN ad_campaigns c ON c.id = i.campaign_id
+        JOIN currencies cur ON cur.id = i.currency_id
+      )
         ON date_trunc('week', i.paid_at) = w.bucket
        AND i.status = 'paid'
        AND i.deleted_at IS NULL
-      LEFT JOIN ad_campaigns c ON c.id = i.campaign_id
-      WHERE i.id IS NULL OR ${scopeFilter(actor, 'c.city_id')}
-      GROUP BY w.bucket
+       AND ${scopeFilter(actor, 'c.city_id')}
+      GROUP BY w.bucket, cur.code
       ORDER BY w.bucket
     `);
 
-    return this.card('ad_revenue', result.rows);
+    return seriesByCurrency(result.rows).map(({ currency, series }) =>
+      this.card('ad_revenue', series, currency),
+    );
   }
 
   /** Booked nights against recorded availability — see the class note on what this measures. */
@@ -165,11 +197,16 @@ export class ReportsService {
       -- Occupancy scopes through the unit's property, which is the only city an availability
       -- day has. A scoped member sees the occupancy of their own cities, which is the number
       -- they can act on.
-      LEFT JOIN availability_days a
+      --
+      -- The scope is part of the JOIN. As a WHERE after the outer join it dropped every week whose
+      -- only availability was outside the reader's cities, and the sparkline lost a bar.
+      LEFT JOIN (
+        availability_days a
+        JOIN units u      ON u.id = a.unit_id
+        JOIN properties pr ON pr.id = u.property_id
+      )
         ON date_trunc('week', a.date) = w.bucket
-      LEFT JOIN units u     ON u.id = a.unit_id
-      LEFT JOIN properties pr ON pr.id = u.property_id
-      WHERE ${scopeFilter(actor, 'pr.city_id')}
+       AND ${scopeFilter(actor, 'pr.city_id')}
       GROUP BY w.bucket
       ORDER BY w.bucket
     `);
@@ -247,10 +284,11 @@ export class ReportsService {
   private card(
     key: ReportCard['key'],
     rows: readonly { bucket: string; value: string }[],
+    currency: string | null = null,
   ): ReportCard {
     const current = rows.at(-1)?.value ?? '0';
     const previous = rows.length >= 2 ? (rows.at(-2)?.value ?? null) : null;
 
-    return { key, value: current, previous, series: rows };
+    return { key, currency, value: current, previous, series: rows };
   }
 }

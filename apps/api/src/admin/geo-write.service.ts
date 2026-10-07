@@ -287,8 +287,8 @@ export class GeoWriteService {
   /**
    * Removes a currency, unless the platform has priced anything in it.
    *
-   * Seventeen tables point at `currencies`. All seventeen are counted, because a currency that is
-   * gone from the console while a wallet still holds a balance in it is a balance nobody can name.
+   * Every table that prices something in a currency is counted, because a currency that is gone
+   * from the console while a wallet still holds a balance in it is a balance nobody can name.
    * SYP is refused outright and separately: `ledger_entries.amount_syp` is DENOMINATED in it, so it
    * is not a row that becomes deletable when the counts happen to be zero.
    */
@@ -338,6 +338,11 @@ export class GeoWriteService {
       {
         what: 'fx_rates',
         count: sql`(SELECT count(*) FROM fx_rates WHERE base_currency_id = ${id}::uuid OR quote_currency_id = ${id}::uuid)`,
+      },
+      /* A trip priced in it; missing from the count the way it was missing from `deleteCity`'s. */
+      {
+        what: 'group_trips',
+        count: sql`(SELECT count(*) FROM group_trips WHERE currency_id = ${id}::uuid)`,
       },
       {
         what: 'gift_cards',
@@ -462,7 +467,7 @@ export class GeoWriteService {
    * longer has would keep that category undeletable for ever, which is the shape «Before deleting,
    * ask what it DID» warns about in reverse.
    *
-   * The eight tables that BLOCK are records ABOUT other things that merely name this city.
+   * The nine tables that BLOCK are records ABOUT other things that merely name this city.
    */
   async deleteCity(
     actor: AccessTokenClaims | undefined,
@@ -509,6 +514,19 @@ export class GeoWriteService {
       {
         what: 'staff_scope_cities',
         count: sql`(SELECT count(*) FROM staff_scope_cities WHERE city_id = ${id}::uuid)`,
+      },
+      /*
+        A trip TO this city. Missing from the list, so the city went and its published trips stayed
+        on the public رحلات جماعية section, linking to a city page that answered 404. A draft or a
+        published trip blocks; a deleted or ARCHIVED one does not, unlike the rows above, because a
+        trip that was ever published cannot be deleted, only archived, and counting it would keep
+        the city undeletable for ever with nothing an operator could do about it.
+      */
+      {
+        what: 'group_trips',
+        count: sql`(SELECT count(*) FROM group_trips
+                    WHERE city_id = ${id}::uuid AND deleted_at IS NULL
+                      AND status <> 'archived')`,
       },
     ]);
 

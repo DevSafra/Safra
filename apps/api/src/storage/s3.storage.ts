@@ -7,7 +7,11 @@ import {
 import { Inject, Injectable } from '@nestjs/common';
 
 import { ENV, type Env } from '../config/env.js';
-import { StorageService, type StoredObject } from './storage.service.js';
+import {
+  StorageService,
+  StorageUnavailableError,
+  type StoredObject,
+} from './storage.service.js';
 
 /**
  * S3-compatible object storage — Cloudflare R2, MinIO, Hetzner, or AWS itself.
@@ -41,20 +45,29 @@ export class S3Storage extends StorageService {
   }
 
   async put(key: string, body: Buffer, contentType: string): Promise<StoredObject> {
-    await this.client.send(
-      new PutObjectCommand({
-        Bucket: this.bucket,
-        Key: key,
-        Body: body,
-        ContentType: contentType,
-        // Long-lived cache: keys are content-addressed, so a changed image is a
-        // new key rather than a mutation of an existing one.
-        CacheControl: 'public, max-age=31536000, immutable',
-        // Forces a download rather than inline rendering if the content type is
-        // ever wrong — defence in depth against a stored-XSS via an image route.
-        ContentDisposition: 'inline',
-      }),
-    );
+    /*
+      Every failure is the STORE's, never the caller's: the key and the bytes were produced by us,
+      so a refusal is a timeout, a throttle, a 5xx or a misconfigured bucket. Typed, so the media
+      worker retries it instead of declaring the photograph broken.
+    */
+    await this.client
+      .send(
+        new PutObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+          Body: body,
+          ContentType: contentType,
+          // Long-lived cache: keys are content-addressed, so a changed image is a
+          // new key rather than a mutation of an existing one.
+          CacheControl: 'public, max-age=31536000, immutable',
+          // Forces a download rather than inline rendering if the content type is
+          // ever wrong — defence in depth against a stored-XSS via an image route.
+          ContentDisposition: 'inline',
+        }),
+      )
+      .catch((error: unknown) => {
+        throw new StorageUnavailableError('a write', error);
+      });
 
     return { key, contentType, size: body.byteLength };
   }
@@ -79,7 +92,45 @@ export class S3Storage extends StorageService {
     }
   }
 
+  async read(key: string): Promise<Buffer | null> {
+    try {
+      const result = await this.client.send(
+        new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+      );
+
+      const bytes = await result.Body?.transformToByteArray();
+
+      return bytes ? Buffer.from(bytes) : null;
+    } catch (error) {
+      if (isMissing(error)) return null;
+
+      throw new StorageUnavailableError('a read', error);
+    }
+  }
+
   publicUrl(key: string): string {
     return `${this.publicBase}/${key}`;
   }
+}
+
+/**
+ * «No such key», as each S3-compatible provider says it.
+ *
+ * The SDK's `NoSuchKey` name on AWS and R2, a bare 404 from MinIO and Hetzner when the error body
+ * does not parse. Anything else — a 403, a 5xx, a socket that closed — is the store failing to
+ * answer, and is not evidence that the object is gone.
+ */
+function isMissing(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+
+  const name = 'name' in error ? error.name : undefined;
+  const status =
+    '$metadata' in error &&
+    typeof error.$metadata === 'object' &&
+    error.$metadata !== null &&
+    'httpStatusCode' in error.$metadata
+      ? error.$metadata.httpStatusCode
+      : undefined;
+
+  return name === 'NoSuchKey' || name === 'NotFound' || status === 404;
 }

@@ -49,6 +49,14 @@ export const SCHEDULED_JOBS = {
    * against the primary, and stacking them puts the heaviest half-hour of the night on one minute.
    */
   'credential-retention': '30 3 * * *',
+  /**
+   * Deleting booking exports past their seven days — the promise الخصوصية makes and nothing kept.
+   *
+   * 03:45, after `credential-retention` at 03:30 and before `sanctions-refresh` at 04:00, for the
+   * reason 03:30 gives: the night's batch deletes are spread rather than stacked. A file outliving
+   * its expiry by a day at most is inside what the page promises, which is deletion, not an instant.
+   */
+  'export-retention': '45 3 * * *',
   'sanctions-refresh': '0 4 * * *',
   /**
    * Retiring gift cards whose expiry has passed — `expired` had no writer at all.

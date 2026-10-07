@@ -1,4 +1,6 @@
 import { z } from 'zod';
+
+import { digitString } from './digits.js';
 import { ERROR } from './error-codes.js';
 
 /**
@@ -29,11 +31,13 @@ export const setFxRateSchema = z
      * eleven-digit rate passed here and the INSERT failed with a numeric overflow: a 500
      * for a typo the person could have been told about (audit 2026-10-06).
      */
-    rate: z
-      .string()
-      .regex(/^\d+(\.\d{1,8})?$/, ERROR.VALIDATION_DECIMAL_STRING)
-      .refine((v) => /^0*\d{1,10}(\.|$)/.test(v), ERROR.VALIDATION_RATE_TOO_LARGE)
-      .refine((v) => Number(v) > 0, ERROR.VALIDATION_RATE_POSITIVE),
+    rate: digitString(
+      z
+        .string()
+        .regex(/^\d+(\.\d{1,8})?$/, ERROR.VALIDATION_DECIMAL_STRING)
+        .refine((v) => /^0*\d{1,10}(\.|$)/.test(v), ERROR.VALIDATION_RATE_TOO_LARGE)
+        .refine((v) => Number(v) > 0, ERROR.VALIDATION_RATE_POSITIVE),
+    ),
 
     /**
      * When it takes effect. Future-dating is allowed so a rate change can be

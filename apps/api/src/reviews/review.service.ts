@@ -104,53 +104,59 @@ export class ReviewService {
       partner_id: string;
       customer_profile_id: string;
       status: string;
-      owner_user_id: string | null;
       already: string | null;
     }>(sql`
       SELECT b.id, b.property_id, b.unit_id, b.partner_id, b.customer_profile_id,
              b.status::text AS status,
-             cp.user_id AS owner_user_id,
              (SELECT r.id FROM reviews r WHERE r.booking_id = b.id) AS already
       FROM bookings b
       JOIN customer_profiles cp ON cp.id = b.customer_profile_id
       WHERE b.reference = ${input.bookingReference}
+        AND cp.user_id = ${claims.sub}::uuid
     `);
 
     const row = booking.rows[0];
 
-    if (!row) throw notFound(ERROR.BOOKING_NOT_FOUND);
-
     /*
-      The booking must be the caller's OWN.
+      The booking must be the caller's OWN, and that is in the WHERE.
 
       Compared on the profile's `user_id`, not on anything in the request. A guest booking has no
-      user id at all, so it fails this check — which is correct: a guest who never made an account
+      user id at all, so it never matches — which is correct: a guest who never made an account
       cannot be authenticated as the person who stayed, and `REVIEW_CREATE` is a permission only a
       signed-in customer holds.
+
+      Somebody else's booking answers exactly as one that does not exist. It used to be a 403 with
+      its own code after a 404 for a reference nobody issued, so the form could be used to learn
+      which references belong to a real stay.
     */
-    if (!row.owner_user_id || row.owner_user_id !== claims.sub) {
-      throw forbidden(ERROR.REVIEW_NOT_YOUR_BOOKING);
-    }
+    if (!row) throw notFound(ERROR.BOOKING_NOT_FOUND);
 
     if (row.status !== 'completed') throw conflict(ERROR.REVIEW_STAY_NOT_COMPLETED);
 
     /*
       A courteous early refusal. The unique index is the real control — this check races with a
-      concurrent request and the index does not — so a duplicate that gets past here still fails,
-      loudly, at the database.
+      concurrent request and the index does not.
     */
     if (row.already) throw conflict(ERROR.REVIEW_ALREADY_WRITTEN);
 
     const created = await this.db.transaction(async (tx) => {
+      /*
+        `ON CONFLICT DO NOTHING` so the request that loses the race is told the same thing the
+        early check tells it. Without it the index still refused the second review, but as a raw
+        unique violation, and two presses of «إرسال» answered the second one with a 500.
+      */
       const inserted = await tx.execute<{ id: string; reference: string }>(sql`
         INSERT INTO reviews (booking_id, property_id, unit_id, partner_id,
                              customer_profile_id, rating, body)
         VALUES (${row.id}, ${row.property_id}, ${row.unit_id}, ${row.partner_id},
                 ${row.customer_profile_id}, ${input.rating}, ${input.body})
+        ON CONFLICT (booking_id) DO NOTHING
         RETURNING id, reference
       `);
 
       const review = inserted.rows[0];
+
+      if (!review) throw conflict(ERROR.REVIEW_ALREADY_WRITTEN);
 
       await this.audit.record(
         {
@@ -158,13 +164,13 @@ export class ReviewService {
           actorRole: claims.role,
           action: 'review.created',
           subjectType: 'review',
-          subjectId: review?.id ?? null,
+          subjectId: review.id,
           after: { rating: input.rating, bookingReference: input.bookingReference },
         },
         tx as unknown as Database,
       );
 
-      return { reference: review?.reference ?? '' };
+      return { reference: review.reference };
     });
 
     /*
@@ -581,11 +587,19 @@ export class ReviewService {
     if (review.partner_reply) throw conflict(ERROR.REVIEW_ALREADY_REPLIED);
 
     const replied = await this.db.transaction(async (tx) => {
-      await tx.execute(sql`
+      /*
+        `partner_reply IS NULL` in the WHERE, not only in the check above: two replies sent at once
+        both passed that check, the second silently overwrote the first in public, and the guest
+        was emailed twice about one reply.
+      */
+      const updated = await tx.execute<{ id: string }>(sql`
         UPDATE reviews
         SET partner_reply = ${replyText}, partner_replied_at = now(), updated_at = now()
-        WHERE id = ${review.id}
+        WHERE id = ${review.id} AND partner_reply IS NULL
+        RETURNING id
       `);
+
+      if (!updated.rows[0]) throw conflict(ERROR.REVIEW_ALREADY_REPLIED);
 
       await this.audit.record(
         {
@@ -682,12 +696,16 @@ export class ReviewService {
     if (review.report_status !== 'none') throw conflict(ERROR.REVIEW_ALREADY_REPORTED);
 
     return this.db.transaction(async (tx) => {
-      await tx.execute(sql`
+      /* The state in the WHERE, for the reason `reply` gives: a second report must not overwrite the first. */
+      const updated = await tx.execute<{ id: string }>(sql`
         UPDATE reviews
         SET report_status = 'open', report_reason = ${reason},
             reported_at = now(), updated_at = now()
-        WHERE id = ${review.id}
+        WHERE id = ${review.id} AND report_status = 'none'
+        RETURNING id
       `);
+
+      if (!updated.rows[0]) throw conflict(ERROR.REVIEW_ALREADY_REPORTED);
 
       await this.audit.record(
         {
@@ -791,7 +809,8 @@ export class ReviewService {
     const upheld = input.decision === 'uphold';
 
     return this.db.transaction(async (tx) => {
-      await tx.execute(sql`
+      /* Still `open` in the WHERE: two moderators deciding at once must not both have the last word. */
+      const updated = await tx.execute<{ id: string }>(sql`
         UPDATE reviews
         SET report_status = ${upheld ? 'upheld' : 'dismissed'}::review_report_status,
             status = ${upheld ? 'hidden' : 'published'}::review_status,
@@ -799,8 +818,11 @@ export class ReviewService {
             moderated_at = now(),
             moderation_note = ${input.note},
             updated_at = now()
-        WHERE id = ${review.id}
+        WHERE id = ${review.id} AND report_status = 'open'
+        RETURNING id
       `);
+
+      if (!updated.rows[0]) throw conflict(ERROR.REVIEW_NOT_REPORTED);
 
       await this.audit.record(
         {

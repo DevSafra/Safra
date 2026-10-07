@@ -1,4 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+} from '@nestjs/common';
 
 import {
   PERMISSIONS as P,
@@ -81,7 +90,7 @@ export class SafraPayoutController {
   )
   async updateAccount(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(safraPayoutAccountUpdateSchema))
     body: SafraPayoutAccountUpdateInput,
   ) {
@@ -97,7 +106,7 @@ export class SafraPayoutController {
   )
   async verifyAccount(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     await this.safra.verifyAccount(user, id);
 
@@ -111,7 +120,7 @@ export class SafraPayoutController {
   )
   async rejectAccount(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(safraPayoutAccountRejectSchema))
     body: SafraPayoutReasonInput,
   ) {
@@ -127,7 +136,7 @@ export class SafraPayoutController {
   )
   async removeAccount(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     await this.safra.removeAccount(user, id);
 
@@ -163,7 +172,7 @@ export class SafraPayoutController {
   @AuditExempt('SafraPayoutService records safra_payout.released in the transaction.')
   async release(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     await this.safra.release(user, id);
 
@@ -175,7 +184,7 @@ export class SafraPayoutController {
   @AuditExempt('SafraPayoutService records safra_payout.paid in the transaction.')
   async markPaid(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(safraPayoutPaidSchema)) body: SafraPayoutPaidInput,
   ) {
     await this.safra.markPaid(user, id, body);
@@ -188,7 +197,7 @@ export class SafraPayoutController {
   @AuditExempt('SafraPayoutService records safra_payout.held in the transaction.')
   async hold(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(safraPayoutReasonSchema)) body: SafraPayoutReasonInput,
   ) {
     await this.safra.hold(user, id, body);
@@ -201,7 +210,7 @@ export class SafraPayoutController {
   @AuditExempt('SafraPayoutService records safra_payout.cancelled in the transaction.')
   async cancel(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(safraPayoutReasonSchema)) body: SafraPayoutReasonInput,
   ) {
     await this.safra.cancel(user, id, body);

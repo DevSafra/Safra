@@ -71,6 +71,8 @@ describeIfDb('re-driving lost notifications', () => {
   let partnerId = '';
   let partnerEmail = '';
   let bookingId = '';
+  let bookingReference = '';
+  let customerProfileId = '';
 
   beforeEach(async () => {
     await harness.begin();
@@ -109,6 +111,8 @@ describeIfDb('re-driving lost notifications', () => {
     partnerId = seeded.partnerId;
     partnerEmail = seeded.partnerEmail;
     bookingId = seeded.bookingId;
+    bookingReference = seeded.bookingReference;
+    customerProfileId = seeded.customerProfileId;
   });
 
   afterEach(async () => {
@@ -482,16 +486,138 @@ describeIfDb('re-driving lost notifications', () => {
     expect(new Set(queue.jobIds).size).toBe(1);
   });
 
+  // ─── Where a rebuilt notice points (go-live audit, 2026-10-06) ─────────────
+
+  /**
+   * Every template's rebuilt notice goes to that template's own screen, on the reader's own site.
+   *
+   * The defect: a three-way conditional whose last branch was the CUSTOMER's reviews page, so every
+   * template it did not name went there. A partner whose dispute closed was sent
+   * `safra.test/ar/account/reviews` — a customer screen on a site they cannot sign in to. One case
+   * per audience and per shape of link: a record the row names, a list, the partner site, the
+   * customer site.
+   */
+  it.each([
+    {
+      template: 'dispute.payout_released',
+      subject: (): Record<string, string> => ({ partnerId }),
+      to: (): string => partnerEmail,
+      url: (): string => 'https://partner.safra.test/disputes',
+    },
+    {
+      template: 'partner.fined',
+      subject: (): Record<string, string> => ({ partnerId }),
+      to: (): string => partnerEmail,
+      url: (): string => 'https://partner.safra.test/violations',
+    },
+    {
+      template: 'booking.refunded',
+      subject: (): Record<string, string> => ({ bookingId, customerProfileId }),
+      to: (): string => '',
+      url: (): string => `https://safra.test/ar/account/bookings/${bookingReference}`,
+    },
+    {
+      template: 'booking.invoice',
+      subject: (): Record<string, string> => ({ bookingId }),
+      to: (): string => '',
+      url: (): string => `https://safra.test/ar/account/invoices/${bookingReference}`,
+    },
+    {
+      template: 'support.replied',
+      subject: (): Record<string, string> => ({ customerProfileId }),
+      to: (): string => '',
+      url: (): string => 'https://safra.test/ar/account/support',
+    },
+  ])('points a rebuilt $template at its own screen', async (example) => {
+    await lose(example.template, example.subject());
+
+    const result = await redrive.run();
+
+    expect(result['redriven']).toBe(1);
+
+    const rebuilt = queue.jobs[0]?.mail;
+    const links = (rebuilt?.text ?? '').match(/https:\/\/[^\s)>\]]+/g) ?? [];
+
+    expect(links, 'the rebuilt notice carries its link').toContain(example.url());
+    expect(
+      links.some((link) => link.includes('/account/reviews')),
+      'and no other screen',
+    ).toBe(false);
+
+    if (example.to()) expect(rebuilt?.to).toBe(example.to());
+  });
+
+  /**
+   * A template with no known destination is NOT sent with a guess.
+   *
+   * It used to fall through to the reviews link for whoever the row named. Reported instead, and
+   * moved where the sweep stops reading it.
+   */
+  it('never sends a notice it has no destination for', async () => {
+    const id = await lose('redrive.test.unknown', { partnerId });
+
+    const result = await redrive.run();
+
+    expect(result['redriven']).toBe(0);
+    expect(result['unreconstructable']).toBe(1);
+    expect(queue.jobs).toHaveLength(0);
+    expect(await statusOf(id)).toBe('abandoned');
+  });
+
+  /**
+   * «Needs your answer» is only re-sent while the booking still does.
+   *
+   * A lost notice for a booking the partner has since confirmed — or that expired — would tell them
+   * something false. Both the timer and the console button go through the same check.
+   */
+  it('does not tell a partner a booking needs them once it no longer does', async () => {
+    await db.execute(
+      sql`UPDATE bookings SET status = 'confirmed' WHERE id = ${bookingId}::uuid`,
+    );
+
+    const swept = await lose('booking.needs_action', { bookingId, partnerId });
+    const pressed = await failAt(
+      'partner.deadline_reminder',
+      { bookingId, partnerId },
+      { ageMinutes: 120, attempts: 5, status: 'abandoned' },
+    );
+
+    const result = await redrive.run();
+
+    expect(result['redriven']).toBe(0);
+    expect(await redrive.redriveOne(pressed, anyCity)).toBe('unreconstructable');
+    expect(queue.jobs).toHaveLength(0);
+    expect(await statusOf(swept)).toBe('abandoned');
+  });
+
+  /**
+   * A row that cannot be rebuilt stops filling the batch.
+   *
+   * It stayed `queued` and came back first on every tick, oldest first, so two hundred of them
+   * held the batch for good and the notices behind them were never reached. Watched on the second
+   * run, which is where the starvation lived.
+   */
+  it('stops re-reading a notice it could not rebuild', async () => {
+    await lose('review.received', {});
+
+    expect((await redrive.run())['unreconstructable']).toBe(1);
+    expect((await redrive.run())['found'], 'the second pass finds nothing').toBe(0);
+  });
+
   /** A partner with one paid booking, so a lost notice has something to point at. */
   async function seed(): Promise<{
     partnerId: string;
     partnerEmail: string;
     bookingId: string;
+    bookingReference: string;
+    customerProfileId: string;
   }> {
     const made = await db.execute<{
       partner_id: string;
       partner_email: string;
       booking_id: string;
+      booking_reference: string;
+      customer_profile_id: string;
     }>(sql`
       WITH ref AS (
         SELECT (SELECT id FROM cities WHERE deleted_at IS NULL LIMIT 1) AS city_id,
@@ -544,9 +670,10 @@ describeIfDb('re-driving lost notifications', () => {
                'pending_confirmation'::booking_status, now(), now() + INTERVAL '30 minutes',
                '200.00', '1.99', '1.99', '0.0700', '14.00', '201.99', '186.00',
                ref.currency_id, '13000.00000000', '2625870.00', '{"code":"flex"}'::jsonb
-        FROM cp, un, pr, ref RETURNING id
+        FROM cp, un, pr, ref RETURNING id, reference, customer_profile_id
       )
-      SELECT pr.partner_id, pu.email AS partner_email, bk.id AS booking_id
+      SELECT pr.partner_id, pu.email AS partner_email, bk.id AS booking_id,
+             bk.reference AS booking_reference, bk.customer_profile_id
       FROM pr, pu, bk
     `);
 
@@ -558,6 +685,8 @@ describeIfDb('re-driving lost notifications', () => {
       partnerId: row.partner_id,
       partnerEmail: row.partner_email,
       bookingId: row.booking_id,
+      bookingReference: row.booking_reference,
+      customerProfileId: row.customer_profile_id,
     };
   }
 });

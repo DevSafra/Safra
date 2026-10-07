@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { digitString } from './digits.js';
+
 import { ERROR } from './error-codes.js';
 
 /**
@@ -165,7 +167,9 @@ export type FineCurrency = (typeof FINE_CURRENCIES)[number];
 /** Attaching a fine. Optional in the progression, so it is its own step rather than a field. */
 export const violationFineSchema = z
   .object({
-    amount: z.string().regex(/^\d{1,10}(\.\d{1,3})?$/, ERROR.VALIDATION_REQUIRED),
+    amount: digitString(
+      z.string().regex(/^\d{1,10}(\.\d{1,3})?$/, ERROR.VALIDATION_REQUIRED),
+    ),
     /*
       A coded message, like every other refusal here.
 
@@ -181,10 +185,9 @@ export const violationFineSchema = z
      * Separate from the fine because they are two movements with two destinations, and a screen
      * showing only the total cannot answer "how much did the guest actually get".
      */
-    customerCompensation: z
-      .string()
-      .regex(/^\d{1,10}(\.\d{1,3})?$/, ERROR.VALIDATION_REQUIRED)
-      .optional(),
+    customerCompensation: digitString(
+      z.string().regex(/^\d{1,10}(\.\d{1,3})?$/, ERROR.VALIDATION_REQUIRED),
+    ).optional(),
   })
   .strict();
 export type ViolationFineInput = z.infer<typeof violationFineSchema>;

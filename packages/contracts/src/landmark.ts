@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { digitString } from './digits.js';
+
 import { ERROR } from './error-codes.js';
 
 /**
@@ -107,17 +109,21 @@ export const landmarkSlugSchema = z
  * The asymmetry IS the model — the listing is the secret, the landmark is the reference frame,
  * and the distance between them is computed from the listing's ROUNDED pair.
  */
-const latitudeSchema = z
-  .string()
-  .trim()
-  .regex(/^-?\d{1,2}(\.\d{1,8})?$/, ERROR.VALIDATION_LATITUDE_FORMAT)
-  .refine((v) => Math.abs(Number(v)) <= 90, ERROR.VALIDATION_LATITUDE_RANGE);
+const latitudeSchema = digitString(
+  z
+    .string()
+    .trim()
+    .regex(/^-?\d{1,2}(\.\d{1,8})?$/, ERROR.VALIDATION_LATITUDE_FORMAT)
+    .refine((v) => Math.abs(Number(v)) <= 90, ERROR.VALIDATION_LATITUDE_RANGE),
+);
 
-const longitudeSchema = z
-  .string()
-  .trim()
-  .regex(/^-?\d{1,3}(\.\d{1,8})?$/, ERROR.VALIDATION_LONGITUDE_FORMAT)
-  .refine((v) => Math.abs(Number(v)) <= 180, ERROR.VALIDATION_LONGITUDE_RANGE);
+const longitudeSchema = digitString(
+  z
+    .string()
+    .trim()
+    .regex(/^-?\d{1,3}(\.\d{1,8})?$/, ERROR.VALIDATION_LONGITUDE_FORMAT)
+    .refine((v) => Math.abs(Number(v)) <= 180, ERROR.VALIDATION_LONGITUDE_RANGE),
+);
 
 export const createLandmarkSchema = z
   .object({

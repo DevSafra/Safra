@@ -473,7 +473,12 @@ export class EnforcementService {
           action: 'fine.waived',
           subjectType: 'partner',
           subjectId: violation.partner_id,
-          before: { fineAmount: violation.fine_amount, waived: false },
+          /* With the fine's own currency: «الغرامة 50.00» on the audit trail is 50 of nothing. */
+          before: {
+            fineAmount: violation.fine_amount,
+            currency: found.code,
+            waived: false,
+          },
           after: { waived: true, ledgerGroupId: entryGroupId },
           reason: input.reason,
         },

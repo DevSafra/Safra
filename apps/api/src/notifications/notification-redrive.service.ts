@@ -2,10 +2,12 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
+import { resolveLocale } from '@safra/i18n';
 
 import { DATABASE } from '../database/database.module.js';
 import { retryWindowMs } from '../queue/queue.definitions.js';
-import { scopeFilter } from '../rbac/scope.sql.js';
+import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
+import { NOTIFICATION_CITY, NOTIFICATION_SUBJECT_JOINS } from './notification-scope.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { ENV, type Env } from '../config/env.js';
 import { NotificationService } from './notification.service.js';
@@ -47,9 +49,116 @@ type QueuedRow = {
   template_key: string;
   locale: string;
   booking_id: string | null;
+  dispute_id: string | null;
   customer_profile_id: string | null;
   partner_id: string | null;
 };
+
+/** The two notices whose content is a booking still waiting on its partner. */
+const BOOKING_NOTICES = new Set(['booking.needs_action', 'partner.deadline_reminder']);
+
+/** What a rebuilt «something is waiting» link may be built from — references, never row text. */
+type LinkParts = {
+  readonly partnerUrl: string;
+  readonly appUrl: string;
+  readonly locale: string;
+  readonly booking: string | null;
+  readonly dispute: string | null;
+};
+
+type Route = {
+  readonly audience: 'partner' | 'customer' | 'either';
+  readonly partner?: (parts: LinkParts) => string;
+  readonly customer?: (parts: LinkParts) => string;
+};
+
+const toPartner = (path: (parts: LinkParts) => string): Route => ({
+  audience: 'partner',
+  partner: path,
+});
+
+const toCustomer = (path: (parts: LinkParts) => string): Route => ({
+  audience: 'customer',
+  customer: path,
+});
+
+const partnerDispute = toPartner(({ partnerUrl, dispute }) =>
+  dispute
+    ? `${partnerUrl}/disputes/${encodeURIComponent(dispute)}`
+    : `${partnerUrl}/disputes`,
+);
+
+const customerBooking = toCustomer(({ appUrl, locale, booking }) =>
+  booking
+    ? `${appUrl}/${locale}/account/bookings/${encodeURIComponent(booking)}`
+    : `${appUrl}/${locale}/account/bookings`,
+);
+
+/**
+ * Where each template's notice sends its reader, when only the row survives.
+ *
+ * ## Why every key is written out
+ *
+ * This was a three-way conditional whose last branch was the customer's reviews page — so every
+ * template it did not name went there. A partner whose dispute closed, a customer whose refund was
+ * on its way, a partner who had been fined: each was told «something is waiting» and handed a link
+ * to a customer screen about reviews, the partner on a site they cannot even sign in to. Twelve of
+ * the sixteen templates that write rows took that branch.
+ *
+ * A template missing from this table is NOT re-sent with a guess. It is reported unreconstructable,
+ * which a person can see on سجل المراسلات and act on; a wrong link in somebody's inbox is the
+ * one outcome that cannot be taken back. `notification-redrive-coverage.test.ts` fails if a
+ * template anything sends is neither here nor in `BOOKING_NOTICES`.
+ *
+ * Each destination is the screen the ORIGINAL notice pointed at, or its list where the original
+ * named a record the row cannot (a support ticket: the row carries the person, not the thread).
+ * Literal paths and references read from the database by id, never text taken from a row: this
+ * URL goes into an email, which is the one place a crafted value would be followed by somebody who
+ * trusts us.
+ */
+export const WAITING_ROUTES: Readonly<Record<string, Route>> = {
+  'review.received': toPartner(({ partnerUrl }) => `${partnerUrl}/reviews`),
+  'partner.dispute_opened': partnerDispute,
+  'partner.dispute_under_review': partnerDispute,
+  'dispute.payout_released': partnerDispute,
+  'partner.warned': toPartner(({ partnerUrl }) => `${partnerUrl}/violations`),
+  'partner.fined': toPartner(({ partnerUrl }) => `${partnerUrl}/violations`),
+  'partner.fine_waived': toPartner(({ partnerUrl }) => `${partnerUrl}/violations`),
+  'partner.suspended': toPartner(({ partnerUrl }) => `${partnerUrl}/`),
+  'partner.unsuspended': toPartner(({ partnerUrl }) => `${partnerUrl}/`),
+  'review.replied': toCustomer(
+    ({ appUrl, locale }) => `${appUrl}/${locale}/account/reviews`,
+  ),
+  'booking.confirmed': customerBooking,
+  'booking.refunded': customerBooking,
+  'booking.cancelled_refund': customerBooking,
+  'booking.invoice': toCustomer(({ appUrl, locale, booking }) =>
+    booking
+      ? `${appUrl}/${locale}/account/invoices/${encodeURIComponent(booking)}`
+      : `${appUrl}/${locale}/account/invoices`,
+  ),
+  'dispute.resolved': toCustomer(
+    ({ appUrl, locale }) => `${appUrl}/${locale}/account/disputes`,
+  ),
+  'dispute.rejected': toCustomer(
+    ({ appUrl, locale }) => `${appUrl}/${locale}/account/disputes`,
+  ),
+  'support.replied': {
+    audience: 'either',
+    partner: ({ partnerUrl }) => `${partnerUrl}/support`,
+    customer: ({ appUrl, locale }) => `${appUrl}/${locale}/account/support`,
+  },
+  'support.closed': {
+    audience: 'either',
+    partner: ({ partnerUrl }) => `${partnerUrl}/support`,
+    customer: ({ appUrl, locale }) => `${appUrl}/${locale}/account/support`,
+  },
+};
+
+/** The templates a lost job can be re-sent for, in full or as a «something is waiting» notice. */
+export function isRedrivable(templateKey: string): boolean {
+  return BOOKING_NOTICES.has(templateKey) || templateKey in WAITING_ROUTES;
+}
 
 /**
  * Re-sending notices whose jobs were lost, from the database rows alone.
@@ -120,7 +229,7 @@ export class NotificationRedriveService {
    */
   async run(): Promise<Record<string, number>> {
     const stale = await this.db.execute<QueuedRow>(sql`
-      SELECT id, template_key, locale, booking_id, customer_profile_id, partner_id
+      SELECT id, template_key, locale, booking_id, dispute_id, customer_profile_id, partner_id
       FROM notifications
       WHERE (
               status = 'queued'
@@ -147,21 +256,28 @@ export class NotificationRedriveService {
     let unreconstructable = 0;
 
     for (const row of stale.rows) {
-      const mail = await this.rebuild(row);
+      const outcome = await this.resend(row);
 
-      if (!mail) {
+      if (outcome === 'queued') redriven += 1;
+
+      if (outcome === 'unreconstructable') {
         /*
           Counted rather than logged per row. The interesting number is how many notices could not
-          be rebuilt at all — a recipient who has since been archived, a booking soft-deleted — and
-          a log line each would bury it during exactly the incident this runs in.
+          be rebuilt at all — a recipient who has since been archived, a booking already answered —
+          and a log line each would bury it during exactly the incident this runs in.
+
+          And moved to `abandoned`, which the sweep does not read. Left where it was, the row came
+          back on every tick, oldest first, and two hundred of them filled the batch for good: the
+          sweep then reported «found 200, re-drove 0» while the notices behind them waited. A person
+          can still press re-drive on an abandoned row, which is where a decision about it belongs.
         */
         unreconstructable += 1;
-        continue;
+
+        await this.db.execute(sql`
+          UPDATE notifications SET status = 'abandoned'
+          WHERE id = ${row.id}::uuid AND status IN ('queued', 'failed')
+        `);
       }
-
-      const sent = await this.notifications.reenqueue(row.id, row.template_key, mail);
-
-      if (sent) redriven += 1;
     }
 
     if (redriven > 0 || unreconstructable > 0) {
@@ -173,34 +289,100 @@ export class NotificationRedriveService {
     return { found: stale.rows.length, redriven, unreconstructable };
   }
 
+  /**
+   * One row back on the queue, if it is still owed and can still be sent.
+   *
+   * «Still owed» is asked BEFORE the queue is, because the original job — which is what gets re-sent
+   * when Redis still has it — is a description of a moment. A partner told today that a booking
+   * needs their answer, when they answered it yesterday or it expired at noon, is being told
+   * something false with our name on it.
+   */
+  private async resend(
+    row: QueuedRow,
+  ): Promise<'queued' | 'in_flight' | 'delivered' | 'unreconstructable' | 'error'> {
+    if (!isRedrivable(row.template_key)) return 'unreconstructable';
+
+    if (
+      BOOKING_NOTICES.has(row.template_key) &&
+      !(await this.stillAwaitingPartner(row))
+    ) {
+      return 'unreconstructable';
+    }
+
+    return this.notifications.reenqueue(row.id, row.template_key, () =>
+      this.rebuild(row),
+    );
+  }
+
   /** The mail for one lost row, or nothing if the row no longer points at anybody reachable. */
   private async rebuild(row: QueuedRow): Promise<OutgoingMail | null> {
-    if (row.template_key === 'booking.needs_action') return this.rebuildBooking(row);
+    if (BOOKING_NOTICES.has(row.template_key)) return this.rebuildBooking(row);
 
-    const recipient = await this.recipientOf(row);
+    const route = WAITING_ROUTES[row.template_key];
+
+    if (!route) return null;
+
+    const recipient =
+      route.audience === 'partner' || (route.audience === 'either' && row.partner_id)
+        ? await this.partnerOf(row)
+        : await this.customerOf(row);
 
     if (!recipient) return null;
 
-    /*
-      Where to send them, chosen from the TEMPLATE KEY rather than from anything in the row.
+    const path = recipient.isPartner ? route.partner : route.customer;
 
-      A literal per branch, never a path assembled from data: this URL goes into an email, and an
-      email is the one place a crafted value would be followed by somebody who trusts us.
-    */
-    const url =
-      row.template_key === 'review.received'
-        ? `${this.env.PARTNER_URL}/reviews`
-        : row.template_key === 'support.replied'
-          ? recipient.isPartner
-            ? `${this.env.PARTNER_URL}/support`
-            : `${this.env.APP_URL}/${recipient.locale}/account/support`
-          : `${this.env.APP_URL}/${recipient.locale}/account/reviews`;
+    if (!path) return null;
+
+    const references = await this.referencesOf(row);
 
     return notificationWaitingMail({
       to: recipient.email,
       locale: recipient.locale,
-      url,
+      url: path({
+        partnerUrl: this.env.PARTNER_URL,
+        appUrl: this.env.APP_URL,
+        /* Resolved, because it becomes a path segment and the customer site serves three. */
+        locale: resolveLocale(recipient.locale),
+        booking: references.booking,
+        dispute: references.dispute,
+      }),
     });
+  }
+
+  /** The booking's and the dispute's REFERENCES, for links that name a record. */
+  private async referencesOf(
+    row: QueuedRow,
+  ): Promise<{ booking: string | null; dispute: string | null }> {
+    if (!row.booking_id && !row.dispute_id) return { booking: null, dispute: null };
+
+    const found = await this.db.execute<{
+      booking: string | null;
+      dispute: string | null;
+    }>(sql`
+      SELECT
+        (SELECT reference FROM bookings WHERE id = ${row.booking_id}::uuid) AS booking,
+        (SELECT reference FROM disputes WHERE id = ${row.dispute_id}::uuid) AS dispute
+    `);
+
+    return {
+      booking: found.rows[0]?.booking ?? null,
+      dispute: found.rows[0]?.dispute ?? null,
+    };
+  }
+
+  /** Whether the booking a partner notice is about is still waiting on that partner. */
+  private async stillAwaitingPartner(row: QueuedRow): Promise<boolean> {
+    if (!row.booking_id) return false;
+
+    const found = await this.db.execute<{ id: string }>(sql`
+      SELECT id FROM bookings
+      WHERE id = ${row.booking_id}::uuid
+        AND deleted_at IS NULL
+        AND status = 'pending_confirmation'
+      LIMIT 1
+    `);
+
+    return found.rows.length > 0;
   }
 
   /**
@@ -232,7 +414,7 @@ export class NotificationRedriveService {
     /*
       The SAME city scope the delivery log is read through.
 
-      MessagingService.notifications filters on coalesce(b.city_id, p.city_id), so a support agent
+      MessagingService.notifications filters on NOTIFICATION_CITY, so a support agent
       scoped to Damascus sees Damascus rows. Without the identical filter here that agent could
       re-send a notice about an Aleppo booking they cannot see — acting on a row outside their
       scope by knowing its id, which is the gap this codebase closes by writing the scope into the
@@ -241,15 +423,16 @@ export class NotificationRedriveService {
       Caught by scope-coverage.test.ts rather than by review: the route reached business data,
       declared no scope, and was not on the exemption list, so the sweep named it.
     */
-    const found = await this.db.execute<QueuedRow>(sql`
-      SELECT n.id, n.template_key, n.locale, n.booking_id, n.customer_profile_id, n.partner_id
+    const found = await this.db.execute<QueuedRow & { city_id: string | null }>(sql`
+      SELECT n.id, n.template_key, n.locale, n.booking_id, n.dispute_id,
+             n.customer_profile_id, n.partner_id,
+             ${sql.raw(NOTIFICATION_CITY)} AS city_id
       FROM notifications n
-      LEFT JOIN bookings b ON b.id = n.booking_id
-      LEFT JOIN partners p ON p.id = n.partner_id
+      ${NOTIFICATION_SUBJECT_JOINS}
       WHERE n.id = ${notificationId}::uuid
         AND n.deleted_at IS NULL
         AND n.status IN ('queued', 'failed', 'abandoned')
-        AND ${scopeFilter(claims, 'coalesce(b.city_id, p.city_id)')}
+        AND ${scopeFilter(claims, NOTIFICATION_CITY)}
       LIMIT 1
     `);
 
@@ -257,13 +440,26 @@ export class NotificationRedriveService {
 
     if (!row) return null;
 
-    const mail = await this.rebuild(row);
+    /*
+      The read above lets a member whose scope is read-only outside their cities SEE every notice;
+      a re-drive sends mail, so it is a write and is held to the write rule (security pass,
+      2026-10-06). `NOTIFICATION_CITY` is a constant expression, not input.
+    */
+    assertCanWrite(claims, row.city_id);
 
-    if (!mail) return 'unreconstructable';
+    const outcome = await this.resend(row);
 
-    const sent = await this.notifications.reenqueue(row.id, row.template_key, mail);
+    /*
+      A job that COMPLETED was accepted by the provider: the notice went out, whatever the row
+      says. Answered exactly like a delivered row — the guard above, reached from the other side.
+    */
+    if (outcome === 'delivered') return null;
 
-    if (!sent) return 'unreconstructable';
+    if (outcome === 'unreconstructable' || outcome === 'error')
+      return 'unreconstructable';
+
+    /* Already waiting on a worker: nothing to add, and «queued» is where it is. */
+    if (outcome === 'in_flight') return 'queued';
 
     /*
       `abandoned` is moved back by hand, because `reenqueue` only rescues a `failed` row.
@@ -304,6 +500,8 @@ export class NotificationRedriveService {
       LEFT JOIN properties pr ON pr.id = b.property_id
       WHERE b.id = ${row.booking_id}::uuid
         AND b.deleted_at IS NULL
+        /* Only while it is still waiting, as resend asks first. Checked again here, at the read. */
+        AND b.status = 'pending_confirmation'
         /* An archived partner is not emailed, and is why this returns null rather than throwing. */
         AND u.status = 'active'
       LIMIT 1
@@ -326,51 +524,51 @@ export class NotificationRedriveService {
   }
 
   /**
-   * Who the row was for, from whichever subject FK it carries.
+   * The partner a row was for — its own `partner_id`, or the partner of the booking it is about.
    *
-   * Both are checked because `support.replied` sets one or the other depending on which side of a
-   * ticket was answered, and `review.replied` sets both. The partner is preferred when both are
-   * present only for the URL; either address is the right recipient for its own template.
+   * Only when the row is FOR a partner: the route decides that, from the template, so a customer
+   * notice that happens to carry a booking is never redirected to that booking's host.
    */
-  private async recipientOf(
+  private async partnerOf(
     row: QueuedRow,
   ): Promise<{ email: string; locale: string; isPartner: boolean } | null> {
-    if (row.template_key === 'review.replied' && row.customer_profile_id) {
-      return this.customer(row);
-    }
+    const found = await this.db.execute<{ email: string; locale: string | null }>(sql`
+      SELECT u.email, u.preferred_locale AS locale
+      FROM partners pa JOIN users u ON u.id = pa.user_id
+      WHERE pa.id = coalesce(
+              ${row.partner_id}::uuid,
+              (SELECT partner_id FROM bookings WHERE id = ${row.booking_id}::uuid)
+            )
+        AND u.status = 'active'
+      LIMIT 1
+    `);
 
-    if (row.partner_id) {
-      const found = await this.db.execute<{ email: string; locale: string | null }>(sql`
-        SELECT u.email, u.preferred_locale AS locale
-        FROM partners pa JOIN users u ON u.id = pa.user_id
-        WHERE pa.id = ${row.partner_id}::uuid AND u.status = 'active'
-        LIMIT 1
-      `);
+    const partner = found.rows[0];
 
-      const partner = found.rows[0];
+    if (!partner) return null;
 
-      if (partner) {
-        return {
-          email: partner.email,
-          locale: partner.locale ?? row.locale,
-          isPartner: true,
-        };
-      }
-    }
-
-    return this.customer(row);
+    return {
+      email: partner.email,
+      locale: partner.locale ?? row.locale,
+      isPartner: true,
+    };
   }
 
-  private async customer(
+  /** The customer a row was for — its own profile, or the booking's guest. */
+  private async customerOf(
     row: QueuedRow,
   ): Promise<{ email: string; locale: string; isPartner: boolean } | null> {
-    if (!row.customer_profile_id) return null;
-
-    const found = await this.db.execute<{ email: string; locale: string | null }>(sql`
+    const found = await this.db.execute<{
+      email: string | null;
+      locale: string | null;
+    }>(sql`
       SELECT coalesce(cp.email, u.email) AS email, u.preferred_locale AS locale
       FROM customer_profiles cp
       LEFT JOIN users u ON u.id = cp.user_id
-      WHERE cp.id = ${row.customer_profile_id}::uuid
+      WHERE cp.id = coalesce(
+              ${row.customer_profile_id}::uuid,
+              (SELECT customer_profile_id FROM bookings WHERE id = ${row.booking_id}::uuid)
+            )
         AND (u.id IS NULL OR u.status = 'active')
       LIMIT 1
     `);

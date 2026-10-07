@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Put,
@@ -67,6 +68,7 @@ import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { CurrentUser, RequirePermissions } from '../rbac/decorators.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import type { ExportFilters } from './booking-export.service.js';
 import { BookingListService } from './booking-list.service.js';
 import { RegistryService } from './registry.service.js';
 import { FinanceService } from './finance.service.js';
@@ -257,11 +259,14 @@ export class RegistriesController {
           .object({
             q: z.string().trim().min(1).max(80).optional(),
             status: bookingStatusSchema.optional(),
+            /* The list's own definitions, so the file and the registry accept the same filters. */
+            expiring: bookingListQuerySchema.shape.expiring,
+            attention: bookingListQuerySchema.shape.attention,
           })
           .strict(),
       ),
     )
-    body: { q?: string | undefined; status?: string | undefined },
+    body: ExportFilters,
   ) {
     return this.exportRequests.request(user, body);
   }
@@ -342,7 +347,7 @@ export class RegistriesController {
   @RequirePermissions(P.STAFF_MANAGE)
   async setStaffScope(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('userId') userId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
     @Body(new ZodValidationPipe(setStaffScopeSchema)) body: SetStaffScopeInput,
     @Req() request: Request,
   ) {
@@ -394,8 +399,12 @@ export class RegistriesController {
   @Get('customers/:reference')
   @RequirePermissions(P.CUSTOMER_READ)
   @AuditExempt('Reading a customer record; changes nothing.')
-  async customerDetail(@Param('reference') reference: string) {
-    return this.registry.customerDetail(reference);
+  async customerDetail(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+  ) {
+    /* The actor, because the bookings on the record are scoped even though the customer is not. */
+    return this.registry.customerDetail(reference, user);
   }
 
   // ── الدفع والفواتير · المحفظة ───────────────────────────────────────────────
@@ -580,8 +589,9 @@ export class RegistriesController {
     @Param('code') code: string,
     @Query(new ZodValidationPipe(couponPartnersQuerySchema))
     query: z.infer<typeof couponPartnersQuerySchema>,
+    @CurrentUser() user: AccessTokenClaims | undefined,
   ) {
-    return this.promotions.couponParticipation(code, query);
+    return this.promotions.couponParticipation(code, query, user);
   }
 
   // ── المدن والدول والعملات ───────────────────────────────────────────────────
@@ -741,25 +751,30 @@ export class RegistriesController {
     return this.landmarkRegistry.create(user, body);
   }
 
-  @Patch('landmarks/:slug')
+  /*
+    Addressed by ID, not by slug. A slug is unique only within its city, so the slug route edited
+    or archived whichever same-named landmark the database returned first: archiving Aleppo's
+    «airport» could take Damascus's off every distance list in the country.
+  */
+  @Patch('landmarks/:id')
   @RequirePermissions(P.GEO_MANAGE)
   @AuditExempt('LandmarkService records landmark.updated inside the transaction.')
   async updateLandmark(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('slug') slug: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(updateLandmarkSchema)) body: UpdateLandmarkInput,
   ) {
-    return this.landmarkRegistry.update(user, slug, body);
+    return this.landmarkRegistry.update(user, id, body);
   }
 
-  @Delete('landmarks/:slug')
+  @Delete('landmarks/:id')
   @RequirePermissions(P.GEO_MANAGE)
   @AuditExempt('LandmarkService records landmark.archived inside the transaction.')
   async archiveLandmark(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('slug') slug: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return this.landmarkRegistry.archive(user, slug);
+    return this.landmarkRegistry.archive(user, id);
   }
 
   @Post('geo/currencies')
@@ -943,7 +958,7 @@ export class RegistriesController {
   @RequirePermissions(P.EMERGENCY_MODE_ACTIVATE)
   async deactivateEmergency(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(deactivateEmergencySchema))
     body: z.infer<typeof deactivateEmergencySchema>,
   ) {

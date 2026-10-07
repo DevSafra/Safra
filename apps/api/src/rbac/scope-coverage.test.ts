@@ -74,8 +74,12 @@ const NO_CITY: readonly { readonly route: RegExp; readonly why: string }[] = [
   { route: /admin\/cities/, why: 'geo — the cities themselves' },
   { route: /admin\/geo/, why: 'geo' },
   {
-    route: /admin\/landmarks/,
-    why: 'geo — the landmarks INSIDE the cities, and reference data on the same footing. A landmark names a city, so a scope could be enforced; it is not, for the reason /admin/cities is not: geography is curated centrally and a city-scoped operator does not add cities either. Gated on GEO_MANAGE, the same authority',
+    route: /^Get \/admin\/landmarks$/,
+    why: 'المعالم, READ only — the same landmarks every guest reads on a property page, so narrowing the registry would hide public reference data from staff. The WRITES are scoped (LandmarkService.load and assertCanFileIn), because a role holding GEO_MANAGE can be limited to cities and a landmark names one',
+  },
+  {
+    route: /admin\/landmarks\/kinds/,
+    why: 'landmark kinds — a kind carries an icon and a name, and belongs to no city',
   },
   {
     route: /admin\/safra-payouts/,
@@ -84,10 +88,17 @@ const NO_CITY: readonly { readonly route: RegExp; readonly why: string }[] = [
   { route: /admin\/fx-rates/, why: 'currencies — platform-level' },
   { route: /admin\/staff(-roles)?/, why: 'staff administration — unscoped by decision' },
   { route: /admin\/me/, why: "the reader's own display preferences" },
-  { route: /admin\/customers/, why: 'customers — a customer belongs to no city' },
+  {
+    route: /^Get \/admin\/customers$/,
+    why: 'the customer REGISTRY — a customer belongs to no city. The record (customers/:reference) is not here: it scopes the bookings, disputes, reviews and notices on it, which do',
+  },
   { route: /admin\/wallet/, why: 'wallet — a platform-wide value instrument' },
   { route: /admin\/gift-cards/, why: 'gift_cards — a platform-wide value instrument' },
-  { route: /admin\/coupons/, why: 'coupons — a platform-wide value instrument' },
+  /* Except a coupon's PARTNER list, which is a partner directory and is scoped by the partner's city. */
+  {
+    route: /admin\/coupons(?!\/:code\/partners)/,
+    why: 'coupons — a platform-wide value instrument',
+  },
   { route: /admin\/emergency/, why: 'Emergency Mode is platform-wide (EC-009)' },
   {
     route: /admin\/sanctions\/(status|import)/,

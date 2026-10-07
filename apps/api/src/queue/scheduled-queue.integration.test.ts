@@ -129,6 +129,8 @@ describeIfReady('the scheduled queue', () => {
       { sweep: () => stub('gift-card-expiry').run() } as never,
       /* The hourly pass that retires ad campaigns past their paid window. */
       { sweep: () => stub('ad-campaign-expiry').run() } as never,
+      /* The nightly pass that deletes booking exports past their seven days. */
+      { sweep: () => stub('export-retention').run() } as never,
       runs,
       new DeadLetterService(db),
     );

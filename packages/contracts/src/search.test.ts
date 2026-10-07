@@ -6,6 +6,7 @@ import {
   evaluateArrival,
   firstBookableDate,
   isSameDayClosed,
+  requestedStay,
   searchQuerySchema,
 } from './search.js';
 
@@ -361,5 +362,35 @@ describe('the same-day cutoff, switched on and off', () => {
     it('is always today when the cutoff is off', () => {
       expect(firstBookableDate(AFTER, DAMASCUS, 17, false)).toBe(TODAY);
     });
+  });
+});
+
+/**
+ * `requestedStay` — the optional stay on a property URL (audit 2026-10-06).
+ *
+ * REGRESSION: a shape test accepted «2026-02-31», and the property page answered 500 for a link
+ * anybody can type. Every bad input must come back as «no stay», never as a stay that throws later.
+ */
+describe('requestedStay', () => {
+  it('passes two real dates in order through unchanged', () => {
+    expect(requestedStay('2026-02-27', '2026-03-01')).toStrictEqual({
+      checkIn: '2026-02-27',
+      checkOut: '2026-03-01',
+    });
+  });
+
+  it.each([
+    ['an arrival that does not exist', '2026-02-31', '2026-03-03'],
+    ['a departure that does not exist', '2026-02-27', '2026-02-30'],
+    ['a thirteenth month', '2026-13-01', '2027-01-02'],
+    ['a day zero', '2026-03-00', '2026-03-02'],
+    ['a departure before the arrival', '2026-03-05', '2026-03-01'],
+    ['a departure on the arrival', '2026-03-05', '2026-03-05'],
+    ['garbage', 'tomorrow', '2026-03-05'],
+    ['an injection attempt', "2026-03-01'; DROP TABLE units;--", '2026-03-05'],
+    ['a missing departure', '2026-03-01', undefined],
+    ['a repeated parameter', ['2026-03-01', '2026-03-02'], '2026-03-05'],
+  ])('treats %s as no stay at all', (_label, checkIn, checkOut) => {
+    expect(requestedStay(checkIn, checkOut)).toBeUndefined();
   });
 });

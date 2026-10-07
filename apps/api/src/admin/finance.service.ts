@@ -7,6 +7,7 @@ import { COUNT_CAP, type OffsetPage, offsetPage } from '@safra/contracts';
 import { DATABASE } from '../database/database.module.js';
 import { scopeFilter } from '../rbac/scope.sql.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { currencyTotals, type CurrencyTotal } from './currency-totals.js';
 
 export interface FinanceRow {
   /** The human reference of the underlying operation. */
@@ -22,14 +23,14 @@ export interface FinanceRow {
   readonly at: string;
 }
 
+/** Each card is one figure PER CURRENCY — see `currency-totals.ts` for why never one across them. */
 export interface FinanceCounters {
-  readonly captured_today: string;
-  readonly refunded_today: string;
-  readonly fines_collected_month: string;
+  readonly captured_today: CurrencyTotal[];
+  readonly refunded_today: CurrencyTotal[];
+  readonly fines_collected_month: CurrencyTotal[];
   /** Advertising settled this month — the platform's second revenue stream (§9.3). */
-  readonly ad_revenue_month: string;
-  readonly partner_payable_outstanding: string;
-  readonly currency: string;
+  readonly ad_revenue_month: CurrencyTotal[];
+  readonly partner_payable_outstanding: CurrencyTotal[];
 }
 
 /**
@@ -91,60 +92,88 @@ export class FinanceService {
    * payment row. `partner_payable_outstanding` is what SAFRA owes and has not paid.
    */
   async counters(actor?: AccessTokenClaims): Promise<FinanceCounters> {
+    /*
+      Every card under the same scope as the table beneath it, and each summed per currency.
+
+      Two defects were in the version this replaces. Captured, refunded and fines read the whole
+      ledger, so a member limited to Aleppo saw what the country took today above a table showing
+      only Aleppo. And every card added amounts in whatever currency each row was written in,
+      then printed the sum with ONE code — a legacy SYP entry beside a day of dollar captures.
+
+      A ledger leg reaches its city through its booking, and a fine through its booking or else
+      its partner, which is exactly how the table's own branches scope them. A leg with no booking
+      (a gift card sold) has no city and is platform-level, which `scopeFilter` allows.
+    */
+    const scoped = (column: string): SQL => scopeFilter(actor, column);
+
     const result = await this.db.execute<{
-      captured_today: string;
-      refunded_today: string;
-      fines_collected_month: string;
-      ad_revenue_month: string;
-      partner_payable_outstanding: string;
+      metric: keyof FinanceCounters;
       currency: string;
+      amount: string;
     }>(sql`
-      WITH today AS (SELECT current_date AS d)
-      SELECT
-        coalesce((SELECT sum(l.amount) FROM ledger_entries l, today
-                  WHERE l.account = 'customer_payment' AND l.direction = 'credit'
-                    AND l.created_at >= today.d), 0)::text AS captured_today,
-        coalesce((SELECT sum(l.amount) FROM ledger_entries l, today
-                  WHERE l.account = 'refund' AND l.direction = 'debit'
-                    AND l.created_at >= today.d), 0)::text AS refunded_today,
-        coalesce((SELECT sum(v.fine_amount) FROM partner_violations v
-                  WHERE v.collected_at IS NOT NULL
-                    AND v.collected_at >= date_trunc('month', current_date)), 0)::text
-          AS fines_collected_month,
-        -- Advertising settled this month (§9.3). From the INVOICE rather than from the ledger,
-        -- for the same reason the report card is: an ad_revenue leg carries no city, and every
-        -- other figure on this screen is scoped. The two are the same number by construction --
-        -- markPaid posts the pair in the transaction that sets the status.
-        coalesce((SELECT sum(i.amount) FROM ad_invoices i
-                  JOIN ad_campaigns c ON c.id = i.campaign_id
-                  WHERE i.status = 'paid' AND i.deleted_at IS NULL
-                    AND i.paid_at >= date_trunc('month', current_date)
-                    AND ${scopeFilter(actor, 'c.city_id')}), 0)::text
-          AS ad_revenue_month,
-        coalesce((SELECT sum(b.partner_payable_amount) FROM bookings b
-                  WHERE b.status IN ('confirmed','checked_in','completed')
-                    AND ${scopeFilter(actor, 'b.city_id')}), 0)::text
-          AS partner_payable_outstanding,
-        (SELECT code FROM currencies WHERE code = 'USD' LIMIT 1) AS currency
+      SELECT 'captured_today' AS metric, cur.code AS currency, sum(l.amount)::text AS amount
+        FROM ledger_entries l
+        JOIN currencies cur  ON cur.id = l.currency_id
+        LEFT JOIN bookings b ON b.id = l.booking_id
+        WHERE l.account = 'customer_payment' AND l.direction = 'credit'
+          AND l.created_at >= current_date
+          AND ${scoped('b.city_id')}
+        GROUP BY cur.code
+      UNION ALL
+      SELECT 'refunded_today', cur.code, sum(l.amount)::text
+        FROM ledger_entries l
+        JOIN currencies cur  ON cur.id = l.currency_id
+        LEFT JOIN bookings b ON b.id = l.booking_id
+        WHERE l.account = 'refund' AND l.direction = 'debit'
+          AND l.created_at >= current_date
+          AND ${scoped('b.city_id')}
+        GROUP BY cur.code
+      UNION ALL
+      SELECT 'fines_collected_month', cur.code, sum(v.fine_amount)::text
+        FROM partner_violations v
+        JOIN currencies cur  ON cur.id = v.fine_currency_id
+        LEFT JOIN bookings b ON b.id = v.booking_id
+        LEFT JOIN partners p ON p.id = v.partner_id
+        WHERE v.collected_at IS NOT NULL
+          AND v.collected_at >= date_trunc('month', current_date)
+          AND ${scoped('coalesce(b.city_id, p.city_id)')}
+        GROUP BY cur.code
+      UNION ALL
+      -- Advertising settled this month (§9.3). From the INVOICE rather than from the ledger, for
+      -- the same reason the report card is: an ad_revenue leg carries no city, and every other
+      -- figure on this screen is scoped. The two are the same number by construction -- markPaid
+      -- posts the pair in the transaction that sets the status.
+      SELECT 'ad_revenue_month', cur.code, sum(i.amount)::text
+        FROM ad_invoices i
+        JOIN ad_campaigns c ON c.id = i.campaign_id
+        JOIN currencies cur ON cur.id = i.currency_id
+        WHERE i.status = 'paid' AND i.deleted_at IS NULL
+          AND i.paid_at >= date_trunc('month', current_date)
+          AND ${scoped('c.city_id')}
+        GROUP BY cur.code
+      UNION ALL
+      SELECT 'partner_payable_outstanding', cur.code, sum(b.partner_payable_amount)::text
+        FROM bookings b
+        JOIN currencies cur ON cur.id = b.currency_id
+        WHERE b.status IN ('confirmed','checked_in','completed')
+          AND ${scoped('b.city_id')}
+        GROUP BY cur.code
     `);
 
-    const row = result.rows[0];
-
     /*
-      A missing row would mean the CTE returned nothing, which cannot happen — but returning
-      zeroes rather than throwing keeps one bad aggregate from blanking the whole screen, and
-      the values are labelled, so a zero reads as "nothing today" not as "unknown".
+      A metric with no rows is an empty list, which the screen renders as a zero in the platform
+      currency: «nothing today» is a statement it can make, and one the rows support.
     */
-    return (
-      row ?? {
-        captured_today: '0',
-        refunded_today: '0',
-        fines_collected_month: '0',
-        ad_revenue_month: '0',
-        partner_payable_outstanding: '0',
-        currency: 'USD',
-      }
-    );
+    const of = (metric: keyof FinanceCounters): CurrencyTotal[] =>
+      currencyTotals(result.rows.filter((row) => row.metric === metric));
+
+    return {
+      captured_today: of('captured_today'),
+      refunded_today: of('refunded_today'),
+      fines_collected_month: of('fines_collected_month'),
+      ad_revenue_month: of('ad_revenue_month'),
+      partner_payable_outstanding: of('partner_payable_outstanding'),
+    };
   }
 
   async list(query: {

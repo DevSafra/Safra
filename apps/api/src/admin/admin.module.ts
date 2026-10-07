@@ -72,6 +72,7 @@ import { AdvertisingService } from './advertising.service.js';
 import { PartnerContractService } from './partner-contract.service.js';
 import { BookingExportService } from './booking-export.service.js';
 import { ExportRequestService } from './export-request.service.js';
+import { ExportRetentionService } from './export-retention.service.js';
 import { StaffScopeService } from './staff-scope.service.js';
 
 @Module({
@@ -160,6 +161,7 @@ import { StaffScopeService } from './staff-scope.service.js';
     StaffScopeService,
     BookingExportService,
     ExportRequestService,
+    ExportRetentionService,
   ],
   /*
     `PartnerContractService` is exported because the PARTNER portal writes through it too: the
@@ -171,6 +173,8 @@ import { StaffScopeService } from './staff-scope.service.js';
   exports: [
     ReviewService,
     BookingExportService,
+    /* For the worker's nightly `export-retention` pass. */
+    ExportRetentionService,
     PartnerContractService,
     AdExpiryService,
     /*

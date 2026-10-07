@@ -3,7 +3,10 @@ import { sql } from 'drizzle-orm';
 
 import { createRollbackDatabase, type Database } from '@safra/db';
 
+import { ERROR } from '@safra/contracts';
+
 import { AuditService } from '../common/audit/audit.service.js';
+import { interleaved } from '../common/testing/interleaved.testing.js';
 import { MessagingService } from './messaging.service.js';
 import { SupportService } from '../support/support.service.js';
 import { NotificationService } from '../notifications/notification.service.js';
@@ -408,6 +411,43 @@ describeIfDb('MessagingService — telling the asker a reply arrived', () => {
     expect(row?.failure_reason).toBeTruthy();
     /* Never the recipient: this table is read by more people than the database. */
     expect(row?.failure_reason).not.toContain('@');
+  });
+
+  // ─── Two at once ───────────────────────────────────────────────────────────
+
+  /*
+    The other press, or the asker's close, is run in full at the moment this reply opens its
+    transaction. Both were watched to fail against the unlocked write.
+  */
+  const racedOver = (before: () => Promise<unknown>) =>
+    new MessagingService(interleaved(db, before), new AuditService(db), notifications, {
+      APP_URL: 'http://localhost:3000',
+      PARTNER_URL: 'http://localhost:3002',
+    } as unknown as Env);
+
+  it('posts an answer pressed twice at once once, and emails the asker once', async () => {
+    const ticket = await support.open(customer(), ASKED);
+    const answer = { body: ANSWERED, internal: false };
+    const raced = racedOver(() => messaging.reply(agent(), ticket.reference, answer));
+
+    const thread = await raced.reply(agent(), ticket.reference, answer);
+
+    expect(thread.messages).toHaveLength(2);
+    expect(await countOf('support.replied')).toBe(1);
+  });
+
+  it('refuses an answer that races the asker closing the ticket', async () => {
+    const ticket = await support.open(customer(), ASKED);
+    const raced = racedOver(() => support.close(customer(), ticket.reference));
+
+    await expect(
+      raced.reply(agent(), ticket.reference, { body: ANSWERED, internal: false }),
+    ).rejects.toMatchObject({
+      response: { code: ERROR.CONVERSATION_NOT_FOUND_OR_CLOSED },
+    });
+
+    expect((await support.thread(customer(), ticket.reference)).messages).toHaveLength(1);
+    expect(await countOf('support.replied')).toBe(0);
   });
 
   /**

@@ -398,3 +398,35 @@ export function evaluateArrival(
  * refused and every heart drawn empty.
  */
 export const FAVOURITE_STATUS_BATCH = 60;
+
+/**
+ * The stay a URL asks about, or nothing: two REAL calendar dates, the departure after the arrival.
+ *
+ * ## Why a shape test was not enough (audit 2026-10-06)
+ *
+ * The property page and its API both accepted anything matching `YYYY-MM-DD`. «?checkIn=2026-02-31»
+ * then became a `Date` that does not exist on the page, whose first `toISOString()` threw, and a
+ * Postgres date cast that failed in the API: a 500 for a link anybody can type, mistype or tamper
+ * with.
+ *
+ * ## Both dates or neither
+ *
+ * An impossible date, a departure on or before the arrival, a repeated parameter and plain garbage
+ * are all treated exactly like dates that were not sent, because the stay on a property URL is
+ * OPTIONAL. The page renders its default window and claims nothing about availability, rather than
+ * half a stay assembled from whichever value happened to parse.
+ *
+ * One function for both sides, built on `calendarDateSchema`, so the page cannot accept a date its
+ * own API, or the checkout after it, would refuse.
+ */
+export function requestedStay(
+  checkIn: unknown,
+  checkOut: unknown,
+): { checkIn: string; checkOut: string } | undefined {
+  const arrival = calendarDateSchema.safeParse(checkIn);
+  const departure = calendarDateSchema.safeParse(checkOut);
+
+  return arrival.success && departure.success && arrival.data < departure.data
+    ? { checkIn: arrival.data, checkOut: departure.data }
+    : undefined;
+}

@@ -2,6 +2,23 @@
 export const EXPORT_JOB = 'export.build' as const;
 
 /**
+ * Where a built CSV lives.
+ *
+ * `exports/`, outside the `properties/*` anonymous-read grant — the same reasoning as `incoming/`
+ * and a stronger case: this is not one stranger's photograph, it is every booking a filter matched,
+ * with customer names in it. It is fetched through the API by an authorised caller whose download
+ * writes an audit row, never by a URL that works for anybody holding it.
+ *
+ * One function for the worker that writes the file and the retention sweep that deletes it. The
+ * sweep also deletes it for a row that FAILED, which carries no `file_key` but may have had its
+ * bytes written before the row update that would have recorded them failed — so the key has to be
+ * derivable from the reference alone, by the same rule both times.
+ */
+export function exportFileKey(reference: string): string {
+  return `exports/${reference}.csv`;
+}
+
+/**
  * What a worker needs to build one CSV.
  *
  * ## Only the row id travels

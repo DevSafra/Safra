@@ -8,6 +8,7 @@ import { DATABASE } from '../database/database.module.js';
 import { describeError } from '../common/errors/safe-error.js';
 import { JOB_OPTIONS } from './queue.definitions.js';
 import { MEDIA_QUEUE } from './queue.tokens.js';
+import { requeue } from './requeue.js';
 import { MEDIA_JOB, creativeJobId, mediaJobId, type MediaJobData } from './media.job.js';
 
 /**
@@ -69,7 +70,7 @@ export class MediaRedriveService {
 
   constructor(
     @Inject(DATABASE) private readonly db: Database,
-    @Inject(MEDIA_QUEUE) private readonly media: Queue<MediaJobData>,
+    @Inject(MEDIA_QUEUE) private readonly media: Queue,
   ) {}
 
   /** Re-enqueues every stuck render it can find. Returns what it did, for the job record. */
@@ -165,7 +166,13 @@ export class MediaRedriveService {
   }
 
   /**
-   * One `add`, and a failure that does not stop the sweep.
+   * One re-drive, and a failure that does not stop the sweep.
+   *
+   * Through `requeue`, not a bare `add`: the row is stuck at `processing` most often BECAUSE its job
+   * finished without moving it — exhausted against a store that was down, which now deliberately
+   * leaves the row for this sweep — and an `add` over a finished job's id is silently ignored. A
+   * completed job is retried too (`repeatCompleted`), because a render is claimed against its row
+   * and a second run of one that already landed matches nothing and does nothing.
    *
    * A queue that refuses one job must not cost the other 199 their re-drive, and the next run is
    * five minutes away — so this logs and carries on rather than throwing. The same reasoning the
@@ -173,9 +180,15 @@ export class MediaRedriveService {
    */
   private async enqueue(data: MediaJobData, jobId: string): Promise<boolean> {
     try {
-      await this.media.add(MEDIA_JOB, data, { ...JOB_OPTIONS.media, jobId });
+      const outcome = await requeue<MediaJobData>(
+        this.media,
+        MEDIA_JOB,
+        { ...JOB_OPTIONS.media, jobId },
+        () => data,
+        { repeatCompleted: true },
+      );
 
-      return true;
+      return outcome === 'retried' || outcome === 'added';
     } catch (error) {
       this.logger.error(
         `Could not re-drive render ${jobId}: ${describeError(error)}. ` +

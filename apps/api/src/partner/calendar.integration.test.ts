@@ -101,6 +101,29 @@ describeIfDb('CalendarService.updateRange — field-level upsert semantics', () 
     expect(days.every((d) => d.isPriceOverridden)).toBe(true);
   });
 
+  /*
+    A nightly price is in the unit's currency, and the audit row says which. Watched to fail
+    against the payload that carried `price` alone.
+  */
+  it('audits a price with the unit’s currency', async () => {
+    const recorded: { after?: Record<string, unknown> }[] = [];
+    const recording = new CalendarService(db, {
+      record: (entry: { after?: Record<string, unknown> }) => {
+        recorded.push(entry);
+
+        return Promise.resolve();
+      },
+    } as unknown as AuditService);
+
+    await recording.updateRange(claims, UNIT_ID, {
+      from: '2030-01-10',
+      to: '2030-01-12',
+      price: 150,
+    });
+
+    expect(recorded[0]?.after).toMatchObject({ price: 150, currency: 'USD' });
+  });
+
   it('PRESERVES a closed status when only the price is edited', async () => {
     await service.updateRange(claims, UNIT_ID, {
       from: '2030-02-01',

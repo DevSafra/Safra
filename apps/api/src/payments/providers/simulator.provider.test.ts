@@ -186,4 +186,13 @@ describe('SimulatorProvider.parseWebhook payload validation', () => {
     const raw = body({ type });
     expect(provider().parseWebhook(raw, headersFor(raw))?.outcome).toBe(expected);
   });
+
+  /* Inherited from `Object.prototype`, so a bare lookup answered a function, not an outcome. */
+  it.each(['constructor', 'toString', '__proto__', 'hasOwnProperty'])(
+    'maps an inherited name (%s) to "ignored"',
+    (type) => {
+      const raw = body({ type });
+      expect(provider().parseWebhook(raw, headersFor(raw))?.outcome).toBe('ignored');
+    },
+  );
 });

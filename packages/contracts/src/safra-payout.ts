@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { digitString } from './digits.js';
 import { ERROR } from './error-codes.js';
 import { PAYOUT_METHODS } from './payout-account.js';
 
@@ -38,12 +39,14 @@ const holder = z
  * The same shape check too: digits, spaces and hyphens, because an IBAN and a wallet number are
  * both written that way and neither is a free-text field.
  */
-const accountNumber = z
-  .string()
-  .trim()
-  .min(4, ERROR.VALIDATION_REQUIRED)
-  .max(64, ERROR.VALIDATION_TOO_LONG)
-  .regex(/^[A-Za-z0-9 -]+$/, ERROR.VALIDATION_ACCOUNT_NUMBER);
+const accountNumber = digitString(
+  z
+    .string()
+    .trim()
+    .min(4, ERROR.VALIDATION_REQUIRED)
+    .max(64, ERROR.VALIDATION_TOO_LONG)
+    .regex(/^[A-Za-z0-9 -]+$/, ERROR.VALIDATION_ACCOUNT_NUMBER),
+);
 
 const SWIFT = /^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/;
 
@@ -111,8 +114,12 @@ export type SafraPayoutAccountUpdateInput = z.infer<
  */
 export const safraPayoutOpenSchema = z
   .object({
-    periodStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, ERROR.VALIDATION_DATE_FORMAT),
-    periodEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, ERROR.VALIDATION_DATE_FORMAT),
+    periodStart: digitString(
+      z.string().regex(/^\d{4}-\d{2}-\d{2}$/, ERROR.VALIDATION_DATE_FORMAT),
+    ),
+    periodEnd: digitString(
+      z.string().regex(/^\d{4}-\d{2}-\d{2}$/, ERROR.VALIDATION_DATE_FORMAT),
+    ),
     notes: z.string().trim().max(500, ERROR.VALIDATION_TOO_LONG).optional(),
   })
   .strict()

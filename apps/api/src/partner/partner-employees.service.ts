@@ -222,9 +222,16 @@ export class PartnerEmployeesService {
     partnerId: string,
     input: EmployeeInviteInput,
   ): Promise<EmployeePage> {
+    /*
+      THIS partner's role. A role is defined per partner, and the lookup matched the id alone, so a
+      partner could hand their employee another business's role by its id. Another partner's role
+      answers exactly as one that does not exist.
+    */
     const role = await this.db.execute<{ id: string }>(sql`
       SELECT id FROM partner_employee_roles
-      WHERE id = ${input.roleId}::uuid AND deleted_at IS NULL LIMIT 1
+      WHERE id = ${input.roleId}::uuid AND partner_id = ${partnerId}::uuid
+        AND deleted_at IS NULL
+      LIMIT 1
     `);
 
     if (!role.rows[0]) throw notFound(ERROR.EMPLOYEE_ROLE_NOT_FOUND);
@@ -340,9 +347,12 @@ export class PartnerEmployeesService {
     if (!employee) throw notFound(ERROR.EMPLOYEE_NOT_FOUND);
 
     if (input.roleId) {
+      /* This partner's own role only, as in `invite`. */
       const role = await this.db.execute<{ id: string }>(sql`
         SELECT id FROM partner_employee_roles
-        WHERE id = ${input.roleId}::uuid AND deleted_at IS NULL LIMIT 1
+        WHERE id = ${input.roleId}::uuid AND partner_id = ${partnerId}::uuid
+          AND deleted_at IS NULL
+        LIMIT 1
       `);
 
       if (!role.rows[0]) throw notFound(ERROR.EMPLOYEE_ROLE_NOT_FOUND);

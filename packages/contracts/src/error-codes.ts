@@ -514,8 +514,6 @@ export const ERROR = {
   REVIEW_STAY_NOT_COMPLETED: 'review.stay_not_completed',
   /** One review per booking — the rule that makes a rating mean anything. */
   REVIEW_ALREADY_WRITTEN: 'review.already_written',
-  /** The booking belongs to somebody else. */
-  REVIEW_NOT_YOUR_BOOKING: 'review.not_your_booking',
   /** A partner may reply once; changing a published answer is a different feature. */
   REVIEW_ALREADY_REPLIED: 'review.already_replied',
   /** Reporting a review that is already reported, or already decided. */

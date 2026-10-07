@@ -5,13 +5,13 @@ import type { Database } from '@safra/db';
 
 import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
-import { scopeFilter } from '../rbac/scope.sql.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import {
+  bookingRegistryConditions,
+  type BookingRegistryFilters,
+} from './booking-list.service.js';
 
-export interface ExportFilters {
-  readonly q?: string | undefined;
-  readonly status?: string | undefined;
-}
+export type ExportFilters = Omit<BookingRegistryFilters, 'actor'>;
 
 /** Hard ceiling. 20,000 rows is a generous real export and a bounded response. */
 /**
@@ -94,25 +94,14 @@ export class BookingExportService {
       audit?: boolean;
     },
   ): Promise<{ csv: string; rowCount: number; truncated: boolean }> {
+    /*
+      The registry's own predicate, so the file is the set on screen; `deleted_at` is the one term
+      the export adds, and it can only narrow that set.
+    */
     const conditions: SQL[] = [
       sql`b.deleted_at IS NULL`,
-      scopeFilter(actor, 'b.city_id'),
+      ...bookingRegistryConditions({ ...filters, actor }),
     ];
-
-    if (filters.status) {
-      conditions.push(sql`b.status = ${filters.status}::booking_status`);
-    }
-
-    if (filters.q) {
-      const term = `%${filters.q}%`;
-
-      conditions.push(
-        sql`(b.reference ILIKE ${filters.q + '%'}
-             OR p.name_ar ILIKE ${term}
-             OR p.name_en ILIKE ${term}
-             OR c.full_name ILIKE ${term})`,
-      );
-    }
 
     const where = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
 
@@ -171,6 +160,8 @@ export class BookingExportService {
           filters: {
             q: filters.q ?? null,
             status: filters.status ?? null,
+            expiring: filters.expiring ? '1' : null,
+            attention: filters.attention ?? null,
           },
           rowCount: rows.rows.length,
           matchedCount: total,

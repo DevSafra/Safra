@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { digitString } from './digits.js';
+
 import { calendarDateSchema, tripAttributeSchema } from './search.js';
 import { emailSchema, phoneSchema } from './auth.js';
 import { ERROR } from './error-codes.js';
@@ -239,10 +241,12 @@ export function preferredCurrency<T extends string>(
  */
 export const bookingCompensationSchema = z
   .object({
-    amount: z
-      .string()
-      .regex(/^\d{1,10}(\.\d{1,3})?$/, ERROR.VALIDATION_DECIMAL_STRING)
-      .refine((value) => Number(value) > 0, ERROR.VALIDATION_AMOUNT_POSITIVE),
+    amount: digitString(
+      z
+        .string()
+        .regex(/^\d{1,10}(\.\d{1,3})?$/, ERROR.VALIDATION_DECIMAL_STRING)
+        .refine((value) => Number(value) > 0, ERROR.VALIDATION_AMOUNT_POSITIVE),
+    ),
     /**
      * The ENUM, not a three-letter pattern — the lesson `FINE_CURRENCIES` records.
      *
@@ -396,10 +400,12 @@ export const BOOKING_VERIFICATION_ATTEMPTS = 3;
 /** Redeeming that code. Six digits, and the code is never echoed back. */
 export const bookingVerificationSchema = z
   .object({
-    code: z
-      .string()
-      .trim()
-      .regex(/^\d{6}$/, ERROR.VALIDATION_REQUIRED),
+    code: digitString(
+      z
+        .string()
+        .trim()
+        .regex(/^\d{6}$/, ERROR.VALIDATION_REQUIRED),
+    ),
   })
   .strict();
 

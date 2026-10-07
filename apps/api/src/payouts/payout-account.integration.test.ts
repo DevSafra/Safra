@@ -6,6 +6,7 @@ import { PERMISSIONS as P, payoutAccountInputSchema } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { FieldEncryptionService } from '../common/crypto/field-encryption.service.js';
+import { interleaved } from '../common/testing/interleaved.testing.js';
 import { PayoutAccountService } from './payout-account.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import type { Env } from '../config/env.js';
@@ -731,6 +732,155 @@ describeIfDb('PayoutAccountService', () => {
 
     await expect(service.removeForPartner(created.id, clerk)).rejects.toMatchObject({
       response: { code: 'payout_account.in_use' },
+    });
+  });
+
+  /*
+    A paid transfer keeps the destination it was paid to (audit 2026-10-06). The payout names its
+    account by id, and the edit used to rewrite that row in place, so a March transfer read, after
+    a May correction, as though it had gone to the new IBAN. Watched to fail against the in-place
+    edit; the first case is the opposite control.
+  */
+  describe('a paid payout and a later edit', () => {
+    const payoutOn = async (accountId: string, status: 'paid' | 'scheduled') =>
+      (
+        await db.execute<{ id: string }>(sql`
+          INSERT INTO partner_payouts (partner_id, reference, period_start, period_end,
+                                       gross_amount, fine_amount, net_amount, currency_id,
+                                       status, payout_account_id, scheduled_for,
+                                       released_at, released_by_user_id, paid_at,
+                                       entry_group_id)
+          VALUES (${partnerId}, 'PO-TEST-' || substr(gen_random_uuid()::text, 1, 8),
+                  current_date - 30, current_date, '100.00', '0.00', '100.00',
+                  (SELECT id FROM currencies WHERE code = 'USD'),
+                  ${status}::payout_status, ${accountId}, current_date + 1, now(),
+                  ${clerk.sub ?? null},
+                  ${status === 'paid' ? sql`now()` : sql`NULL`},
+                  ${status === 'paid' ? sql`gen_random_uuid()` : sql`NULL`})
+          RETURNING id
+        `)
+      ).rows[0]?.id ?? '';
+
+    const destinationOf = async (payoutId: string) =>
+      (
+        await db.execute<{ id: string; last4: string; holder: string }>(sql`
+          SELECT a.id, a.account_number_last4 AS last4, a.account_holder AS holder
+          FROM partner_payouts po JOIN partner_payout_accounts a ON a.id = po.payout_account_id
+          WHERE po.id = ${payoutId}::uuid
+        `)
+      ).rows[0];
+
+    it('edits in place an account nothing has been paid to', async () => {
+      const created = await service.createOwn(
+        input,
+        partnerClaims(partnerId, partnerUserId),
+      );
+
+      const edited = await service.updateOwn(
+        created.id,
+        { ...input, accountHolder: 'Palmyra Hotels LLC' },
+        partnerClaims(partnerId, partnerUserId),
+      );
+
+      expect(edited.id).toBe(created.id);
+    });
+
+    it('leaves a paid payout pointing at the details it was paid to', async () => {
+      const created = await service.createOwn(
+        input,
+        partnerClaims(partnerId, partnerUserId),
+      );
+
+      await service.verify(created.id, approver);
+
+      const paid = await payoutOn(created.id, 'paid');
+
+      const edited = await service.updateOwn(
+        created.id,
+        {
+          ...input,
+          accountHolder: 'Someone Else',
+          accountNumber: 'SY0000000000000000009999',
+        },
+        partnerClaims(partnerId, partnerUserId),
+      );
+
+      expect(await destinationOf(paid)).toMatchObject({
+        id: created.id,
+        last4: IBAN.slice(-4),
+        holder: 'Palmyra Hotels',
+      });
+
+      /* The partner sees one account, the edited one, waiting for verification again. */
+      expect(edited.id).not.toBe(created.id);
+      expect(edited.status).toBe('pending');
+
+      const listed = await service.listOwn(partnerClaims(partnerId, partnerUserId));
+
+      expect(listed.map((account) => account.id)).toEqual([edited.id]);
+    });
+
+    /*
+      Two edits of one paid-to account at once (security pass, 2026-10-06). The second waited on the
+      first's lock, then retired the row the first had ALREADY retired and inserted a second
+      replacement: two live accounts, both able to be primary. Staged with `interleaved`, so the
+      first edit lands exactly as the second opens its transaction.
+    */
+    it('leaves one live account when two edits race', async () => {
+      const created = await service.createOwn(
+        input,
+        partnerClaims(partnerId, partnerUserId),
+      );
+
+      await service.verify(created.id, approver);
+      await payoutOn(created.id, 'paid');
+
+      const raced = new PayoutAccountService(
+        interleaved(db, () =>
+          service.updateOwn(
+            created.id,
+            { ...input, accountHolder: 'First Edit' },
+            partnerClaims(partnerId, partnerUserId),
+          ),
+        ),
+        new AuditService(db),
+        crypto,
+      );
+
+      await expect(
+        raced.updateOwn(
+          created.id,
+          { ...input, accountHolder: 'Second Edit' },
+          partnerClaims(partnerId, partnerUserId),
+        ),
+      ).rejects.toMatchObject({ status: 404 });
+
+      const live = await db.execute<{ holder: string }>(sql`
+        SELECT account_holder AS holder FROM partner_payout_accounts
+        WHERE partner_id = ${partnerId} AND deleted_at IS NULL
+      `);
+
+      expect(live.rows.map((row) => row.holder)).toEqual(['First Edit']);
+    });
+
+    it('moves a released, unpaid payout to the edited account', async () => {
+      const created = await service.createOwn(
+        input,
+        partnerClaims(partnerId, partnerUserId),
+      );
+
+      await service.verify(created.id, approver);
+
+      await payoutOn(created.id, 'paid');
+      const scheduled = await payoutOn(created.id, 'scheduled');
+
+      const edited = await service.updateOwn(
+        created.id,
+        { ...input, accountHolder: '  Palmyra   Hotels ' },
+        partnerClaims(partnerId, partnerUserId),
+      );
+
+      expect((await destinationOf(scheduled))?.id).toBe(edited.id);
     });
   });
 });

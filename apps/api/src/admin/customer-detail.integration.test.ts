@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ERROR } from '@safra/contracts';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
+import type { AccessTokenClaims } from '../auth/token.service.js';
 import { RegistryService } from './registry.service.js';
 
 /**
@@ -144,6 +145,100 @@ describeIfDb("a customer's record", () => {
     });
   });
 
+  /* ── Scope: the customer has no city, the bookings on their record do ─────── */
+
+  const scopedTo = (
+    cityIds: string[],
+    outside: 'none' | 'read_only',
+  ): AccessTokenClaims =>
+    ({
+      sub: '00000000-0000-0000-0000-000000000000',
+      role: 'operations_manager',
+      permissions: ['customer.read'],
+      scope: { kind: 'cities', cityIds, outside },
+    }) as unknown as AccessTokenClaims;
+
+  /**
+   * Two bookings in one city and three in another, on one customer, with the dispute, review and
+   * notice each booking can carry.
+   *
+   * Every section is asserted, because every section was its own query and its own way round the
+   * scope: one booking-scoped list beside an unscoped dispute list would still name the Damascus
+   * stay under the Aleppo member's eyes.
+   */
+  async function seedTwoCities(): Promise<{ here: string; there: string }> {
+    const cities = await db.execute<{ id: string }>(sql`
+      SELECT id::text FROM cities WHERE deleted_at IS NULL ORDER BY id LIMIT 2
+    `);
+    const [here, there] = cities.rows.map((row) => row.id);
+
+    if (!here || !there) throw new Error('the scope fixture needs two cities');
+
+    await seedBookings(mine, 2, here);
+    await seedBookings(mine, 3, there);
+
+    await db.execute(sql`
+      WITH b AS (
+        SELECT b.id, b.property_id, b.unit_id, b.partner_id, b.customer_profile_id
+        FROM bookings b
+        JOIN customer_profiles c ON c.id = b.customer_profile_id
+        WHERE c.reference = ${mine}
+      ), d AS (
+        INSERT INTO disputes (booking_id, partner_id, customer_profile_id, kind, status, title)
+        SELECT id, partner_id, customer_profile_id, 'not_as_described', 'open', 'شكوى'
+        FROM b RETURNING id
+      ), r AS (
+        INSERT INTO reviews (booking_id, property_id, unit_id, partner_id, customer_profile_id,
+                             rating, body)
+        SELECT id, property_id, unit_id, partner_id, customer_profile_id, 4, 'إقامة جيدة'
+        FROM b RETURNING id
+      )
+      INSERT INTO notifications (channel, template_key, locale, booking_id, customer_profile_id)
+      SELECT 'email', 'booking.confirmed', 'ar', id, customer_profile_id FROM b
+    `);
+
+    /* And one notice about the ACCOUNT, which belongs to no city and every reader may see. */
+    await db.execute(sql`
+      INSERT INTO notifications (channel, template_key, locale, customer_profile_id)
+      SELECT 'email', 'auth.password_reset', 'ar', id
+      FROM customer_profiles WHERE reference = ${mine}
+    `);
+
+    return { here, there };
+  }
+
+  it("shows a city-scoped member only the record's history in their cities", async () => {
+    const { here } = await seedTwoCities();
+
+    const record = await registry.customerDetail(mine, scopedTo([here], 'none'));
+
+    expect(record.reference, 'the record itself opens: a customer has no city').toBe(
+      mine,
+    );
+    expect(record.bookings.total, 'bookings').toBe(2);
+    expect(record.bookings.items).toHaveLength(2);
+    expect(record.disputes.total, 'disputes about those stays').toBe(2);
+    expect(record.reviews.total, 'reviews of those properties').toBe(2);
+    expect(
+      record.notifications.total,
+      'notices about those bookings, plus the account',
+    ).toBe(3);
+  });
+
+  /** The opposite control: the same record, read unscoped and read-only, is whole. */
+  it('shows the whole history to an unscoped and to a read-only member', async () => {
+    const { here } = await seedTwoCities();
+
+    for (const actor of [undefined, scopedTo([here], 'read_only')]) {
+      const record = await registry.customerDetail(mine, actor);
+
+      expect(record.bookings.total).toBe(5);
+      expect(record.disputes.total).toBe(5);
+      expect(record.reviews.total).toBe(5);
+      expect(record.notifications.total).toBe(6);
+    }
+  });
+
   async function seedCustomer(name: string): Promise<string> {
     const made = await db.execute<{ reference: string }>(sql`
       INSERT INTO customer_profiles (full_name, email, phone, is_guest)
@@ -159,10 +254,18 @@ describeIfDb("a customer's record", () => {
   }
 
   /** `n` bookings against one customer, on a property this test makes for the purpose. */
-  async function seedBookings(reference: string, n: number): Promise<void> {
+  async function seedBookings(
+    reference: string,
+    n: number,
+    cityId?: string,
+  ): Promise<void> {
+    const city = cityId
+      ? sql`${cityId}::uuid`
+      : sql`(SELECT id FROM cities WHERE deleted_at IS NULL LIMIT 1)`;
+
     await db.execute(sql`
       WITH ref AS (
-        SELECT (SELECT id FROM cities WHERE deleted_at IS NULL LIMIT 1) AS city_id,
+        SELECT ${city} AS city_id,
                (SELECT id FROM currencies WHERE code = 'USD')           AS currency_id,
                (SELECT id FROM property_types LIMIT 1)                  AS type_id,
                (SELECT id FROM partner_types LIMIT 1)                   AS partner_type_id,

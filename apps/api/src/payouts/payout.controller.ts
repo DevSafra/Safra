@@ -5,14 +5,17 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseUUIDPipe,
   Post,
   Query,
 } from '@nestjs/common';
 import { z } from 'zod';
 
 import {
+  type CursorQuery,
   PAYOUT_STATUSES,
   PERMISSIONS as P,
+  cursorQuerySchema,
   pageQuerySchema,
   payoutPaidSchema,
   payoutReasonSchema,
@@ -44,8 +47,11 @@ export class PartnerPayoutController {
   @Get()
   @RequirePermissions(P.PAYOUT_READ_OWN)
   @AuditExempt('A partner reading their own transfers; changes nothing.')
-  async list(@CurrentUser() user: AccessTokenClaims | undefined) {
-    return this.payouts.listForPartner(user);
+  async list(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Query(new ZodValidationPipe(cursorQuerySchema)) query: CursorQuery,
+  ) {
+    return this.payouts.listForPartner(user, query);
   }
 
   /** What one payout covers — the answer to "what is this $1,240 for". */
@@ -98,6 +104,21 @@ export class PartnerPayoutController {
   )
   async fines(@CurrentUser() user: AccessTokenClaims | undefined) {
     return { fines: await this.payouts.finesForPartner(user) };
+  }
+
+  /**
+   * One payout, for the detail screen — which used to find it by searching the list, and so
+   * answered 404 for every transfer past the list's cut. Declared after the literal routes above
+   * so `withheld`, `recoveries` and `fines` are never read as a reference.
+   */
+  @Get(':reference')
+  @RequirePermissions(P.PAYOUT_READ_OWN)
+  @AuditExempt('A partner reading one of their own transfers; changes nothing.')
+  async one(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+  ) {
+    return this.payouts.oneForPartner(user, reference);
   }
 
   @Get(':reference/bookings')
@@ -223,7 +244,7 @@ export class AdminPayoutController {
   @AuditExempt('Audited by PayoutService as partner_payout.closed.')
   async close(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
     await this.payouts.close(id, user);
   }
@@ -234,7 +255,7 @@ export class AdminPayoutController {
   @AuditExempt('Audited by PayoutService as partner_payout.released.')
   async release(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(releaseSchema)) body: z.infer<typeof releaseSchema>,
   ): Promise<void> {
     await this.payouts.release(id, body, user);
@@ -248,7 +269,7 @@ export class AdminPayoutController {
   )
   async markPaid(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(paidSchema)) body: z.infer<typeof paidSchema>,
   ): Promise<void> {
     await this.payouts.markPaid(id, body, user);
@@ -260,7 +281,7 @@ export class AdminPayoutController {
   @AuditExempt('Audited by PayoutService as partner_payout.held.')
   async hold(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(reasonSchema)) body: z.infer<typeof reasonSchema>,
   ): Promise<void> {
     await this.payouts.hold(id, body, user);
@@ -272,7 +293,7 @@ export class AdminPayoutController {
   @AuditExempt('Audited by PayoutService as partner_payout.hold_lifted.')
   async liftHold(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
     await this.payouts.release_hold(id, user);
   }
@@ -283,7 +304,7 @@ export class AdminPayoutController {
   @AuditExempt('Audited by PayoutService as partner_payout.cancelled.')
   async cancel(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(reasonSchema)) body: z.infer<typeof reasonSchema>,
   ): Promise<void> {
     await this.payouts.cancel(id, body, user);

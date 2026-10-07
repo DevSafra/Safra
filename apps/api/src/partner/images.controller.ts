@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   UploadedFile,
@@ -120,7 +121,7 @@ export class PartnerImagesController {
   async setCover(
     @CurrentUser() user: AccessTokenClaims | undefined,
     @Param('reference') reference: string,
-    @Param('imageId') imageId: string,
+    @Param('imageId', ParseUUIDPipe) imageId: string,
   ) {
     return this.images.setCover(user, reference, imageId);
   }
@@ -134,7 +135,7 @@ export class PartnerImagesController {
   async setAlt(
     @CurrentUser() user: AccessTokenClaims | undefined,
     @Param('reference') reference: string,
-    @Param('imageId') imageId: string,
+    @Param('imageId', ParseUUIDPipe) imageId: string,
     @Body(new ZodValidationPipe(propertyImageAltSchema)) body: PropertyImageAltInput,
   ) {
     return this.images.setAlt(user, reference, imageId, body);
@@ -149,7 +150,7 @@ export class PartnerImagesController {
   async remove(
     @CurrentUser() user: AccessTokenClaims | undefined,
     @Param('reference') reference: string,
-    @Param('imageId') imageId: string,
+    @Param('imageId', ParseUUIDPipe) imageId: string,
   ) {
     return this.images.archive(user, reference, imageId);
   }

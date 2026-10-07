@@ -6,6 +6,7 @@ import { createRollbackDatabase, type Database } from '@safra/db';
 import { AuditService } from '../common/audit/audit.service.js';
 import { FxRateService } from '../fx/fx-rate.service.js';
 import { PricingService } from './pricing.service.js';
+import { openListing } from '../catalog/open-listing.js';
 import { SettingsService } from '../settings/settings.service.js';
 
 /**
@@ -49,6 +50,10 @@ describeIfDb('a partner’s negotiated commission', () => {
     /*
       A real seeded unit priced in USD, and the partner behind it. Using what is there rather than
       building a property tree keeps the test about PRICING; every column it needs already exists.
+
+      An OPEN one, because pricing refuses any other since 2026-10-06 (a closed market or a
+      suspended partner has no price): the first USD unit the table happened to return could be
+      either, and then this suite failed for a reason unrelated to commission.
     */
     const found = await db.execute<{
       unit_id: string;
@@ -58,7 +63,8 @@ describeIfDb('a partner’s negotiated commission', () => {
       FROM units u
       JOIN properties pr ON pr.id = u.property_id
       JOIN currencies cur ON cur.id = u.currency_id
-      WHERE cur.code = 'USD' AND u.deleted_at IS NULL AND pr.deleted_at IS NULL
+      WHERE cur.code = 'USD' AND u.is_active AND u.deleted_at IS NULL
+        AND ${openListing(sql`pr`)}
       LIMIT 1
     `);
 

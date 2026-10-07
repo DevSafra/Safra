@@ -400,7 +400,6 @@ export const de = {
   'review.stay_not_completed':
     'Eine Bewertung ist erst nach abgeschlossenem Aufenthalt möglich.',
   'review.already_written': 'Für diese Buchung liegt bereits eine Bewertung vor.',
-  'review.not_your_booking': 'Diese Buchung können Sie nicht bewerten.',
   'review.already_replied': 'Sie haben auf diese Bewertung bereits geantwortet.',
   'review.already_reported': 'Diese Bewertung wurde bereits gemeldet.',
   'review.not_reported':

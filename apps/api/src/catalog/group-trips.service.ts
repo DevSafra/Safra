@@ -82,6 +82,8 @@ export class PublicGroupTripsService {
         JOIN countries co ON co.id = c.country_id
         LEFT JOIN currencies cur ON cur.id = g.currency_id
        WHERE g.deleted_at IS NULL AND g.status = 'published'
+         -- A trip to a city that has been removed is not offered: its city page is gone.
+         AND c.deleted_at IS NULL
        -- Upcoming soonest first, then past NEWEST first: the cap below keeps the recent evidence
        -- (audit 2026-10-04; oldest first crowded last month's trips out behind years-old ones).
        ORDER BY (g.ends_on < current_date),
@@ -112,6 +114,7 @@ export class PublicGroupTripsService {
         JOIN countries co ON co.id = c.country_id
         LEFT JOIN currencies cur ON cur.id = g.currency_id
        WHERE g.slug = ${slug} AND g.deleted_at IS NULL AND g.status = 'published'
+         AND c.deleted_at IS NULL
     `);
 
     const row = rows.rows[0];

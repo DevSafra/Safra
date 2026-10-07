@@ -241,39 +241,56 @@ export class PartnerApplicationService {
 
     if (open.rows[0]) throw conflict(ERROR.PARTNER_APPLICATION_ALREADY_OPEN);
 
-    const created = await this.db.execute<{ id: string; reference: string }>(sql`
-      INSERT INTO partner_applications
-        (submitted_by_user_id, contact_name, email, phone, legal_name, display_name,
-         partner_type_id, city_id, address, property_count, website, message, preferred_locale)
-      VALUES (${context.userId}, ${input.contactName}, ${account.email}, ${input.phone},
-              ${input.legalName}, ${input.displayName}, ${partnerType.id}, ${city.id},
-              ${input.address}, ${input.propertyCount ?? null}, ${input.website ?? null},
-              ${input.message ?? null}, ${input.preferredLocale})
-      RETURNING id, reference
-    `);
+    /*
+      One transaction, and `ON CONFLICT DO NOTHING` against the partial index.
 
-    const row = created.rows[0];
+      Two forms sent in the same second both passed the check above, and the index refused the
+      second as a raw unique violation, so the applicant who pressed twice was shown a 500 for a
+      request that had in fact been stored. The loser now gets the same answer as the check.
+    */
+    const row = await this.db.transaction(async (tx) => {
+      const created = await tx.execute<{ id: string; reference: string }>(sql`
+        INSERT INTO partner_applications
+          (submitted_by_user_id, contact_name, email, phone, legal_name, display_name,
+           partner_type_id, city_id, address, property_count, website, message, preferred_locale)
+        VALUES (${context.userId}, ${input.contactName}, ${account.email}, ${input.phone},
+                ${input.legalName}, ${input.displayName}, ${partnerType.id}, ${city.id},
+                ${input.address}, ${input.propertyCount ?? null}, ${input.website ?? null},
+                ${input.message ?? null}, ${input.preferredLocale})
+        ON CONFLICT (lower(email))
+          WHERE status IN ('submitted', 'contacted') AND deleted_at IS NULL
+          DO NOTHING
+        RETURNING id, reference
+      `);
 
-    if (!row) throw badRequest(ERROR.REQUEST_VALIDATION_FAILED);
+      const inserted = created.rows[0];
 
-    await this.audit.record({
-      actorUserId: context.userId,
-      actorRole: 'customer',
-      action: 'partner_application.submitted',
-      subjectType: 'partner_application',
-      subjectId: row.id,
-      /*
-        The business, not the person. `legalName` and the city are what a reviewer needs to
-        recognise the row later; the applicant's name, phone and address are on the record itself
-        and do not need a second copy in a table staff can export.
-      */
-      after: {
-        reference: row.reference,
-        legalName: input.legalName,
-        city: input.citySlug,
-      },
-      ...(context.ipAddress === undefined ? {} : { ipAddress: context.ipAddress }),
-      ...(context.userAgent === undefined ? {} : { userAgent: context.userAgent }),
+      if (!inserted) throw conflict(ERROR.PARTNER_APPLICATION_ALREADY_OPEN);
+
+      await this.audit.record(
+        {
+          actorUserId: context.userId,
+          actorRole: 'customer',
+          action: 'partner_application.submitted',
+          subjectType: 'partner_application',
+          subjectId: inserted.id,
+          /*
+            The business, not the person. `legalName` and the city are what a reviewer needs to
+            recognise the row later; the applicant's name, phone and address are on the record
+            itself and do not need a second copy in a table staff can export.
+          */
+          after: {
+            reference: inserted.reference,
+            legalName: input.legalName,
+            city: input.citySlug,
+          },
+          ...(context.ipAddress === undefined ? {} : { ipAddress: context.ipAddress }),
+          ...(context.userAgent === undefined ? {} : { userAgent: context.userAgent }),
+        },
+        tx as unknown as Database,
+      );
+
+      return inserted;
     });
 
     /* After the row exists. An acknowledgement for a request we failed to store would be a lie. */

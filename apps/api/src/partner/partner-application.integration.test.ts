@@ -18,6 +18,7 @@ import { SettingsService } from '../settings/settings.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { PartnerApplicationService } from './partner-application.service.js';
 import { PartnerInvitationService } from './partner-invitation.service.js';
+import { interleaved } from '../common/testing/interleaved.testing.js';
 
 /**
  * «انضم كشريك», against a real PostgreSQL.
@@ -84,6 +85,8 @@ describeIfDb('PartnerApplicationService', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   let db: Database;
   let service: PartnerApplicationService;
+  /** The same service over another handle, so a race can be staged against it. */
+  let serviceOver: (handle: Database) => PartnerApplicationService;
   let settings: SettingsService;
   let sent: OutgoingMail[];
   let issued: { userId: string; purpose: string }[];
@@ -180,6 +183,18 @@ describeIfDb('PartnerApplicationService', () => {
     const invitations = new PartnerInvitationService(authTokens, mail, env);
     settings = new SettingsService(db);
 
+    serviceOver = (handle) =>
+      new PartnerApplicationService(
+        handle,
+        audit,
+        authTokens,
+        mail,
+        passwords,
+        tokens,
+        env,
+        invitations,
+        settings,
+      );
     service = new PartnerApplicationService(
       db,
       audit,
@@ -261,6 +276,32 @@ describeIfDb('PartnerApplicationService', () => {
       ).rejects.toMatchObject({
         response: { code: ERROR.PARTNER_APPLICATION_ALREADY_OPEN },
       });
+    });
+
+    /*
+      The same, sent twice at once. The other form is submitted in full at the moment this one
+      opens its transaction, which is the gap the check leaves. Watched to fail against the bare
+      INSERT: the index refused it as a raw unique violation, which the applicant saw as a 500.
+    */
+    it('refuses the second of two requests sent at once with the same answer', async () => {
+      const raced = serviceOver(
+        interleaved(db, () =>
+          service.submit(application(), { userId: CUSTOMER_USER_ID }),
+        ),
+      );
+
+      await expect(
+        raced.submit(application(), { userId: CUSTOMER_USER_ID }),
+      ).rejects.toMatchObject({
+        response: { code: ERROR.PARTNER_APPLICATION_ALREADY_OPEN },
+      });
+
+      const open = await db.execute<{ n: string }>(sql`
+        SELECT count(*)::text AS n FROM partner_applications
+        WHERE lower(email) = lower(${CUSTOMER_EMAIL}) AND status IN ('submitted', 'contacted')
+      `);
+
+      expect(open.rows[0]?.n).toBe('1');
     });
 
     /** One open request per ACCOUNT, not per business — a second account may still apply. */

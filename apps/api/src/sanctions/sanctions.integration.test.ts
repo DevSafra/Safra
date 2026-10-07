@@ -30,7 +30,7 @@ const describeIfDb = DATABASE_URL ? describe : describe.skip;
 const SAMPLE_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <export generationDate="2026-07-28T03:00:00Z">
   <sanctionEntity logicalId="13579" euReferenceNumber="EU.1234.56">
-    <subjectType code="P" classificationCode="person"/>
+    <subjectType code="person" classificationCode="P"/>
     <regulation programme="SYR" numberTitle="36/2012"/>
     <nameAlias firstName="Bashar" lastName="Al-Assad" wholeName="Bashar Al-Assad"/>
     <nameAlias wholeName="Bachar Al Assad"/>
@@ -39,13 +39,13 @@ const SAMPLE_XML = `<?xml version="1.0" encoding="UTF-8"?>
     <remark>President of the Syrian Arab Republic</remark>
   </sanctionEntity>
   <sanctionEntity logicalId="24680" euReferenceNumber="EU.9876.54">
-    <subjectType code="E" classificationCode="enterprise"/>
+    <subjectType code="enterprise" classificationCode="E"/>
     <regulation programme="SYR" numberTitle="36/2012"/>
     <nameAlias wholeName="Commercial Bank of Syria"/>
     <nameAlias wholeName="Syrian Commercial Bank"/>
   </sanctionEntity>
   <sanctionEntity logicalId="11111">
-    <subjectType code="P" classificationCode="person"/>
+    <subjectType code="person" classificationCode="P"/>
     <nameAlias wholeName="Muhammad Nasif Khayrbik"/>
   </sanctionEntity>
 </export>`;
@@ -379,6 +379,24 @@ describe('parseEuSanctionsXml', () => {
     expect(person?.subjectType).toBe('person');
   });
 
+  /*
+    The sample above had the two attributes swapped (`code="P" classificationCode="person"`),
+    which is the one shape the old `code === 'P'` read happened to match; the published file
+    is the other way round and every person came out an entity. Watched to fail against it.
+  */
+  it('labels a person by either attribute the published file carries', () => {
+    const one = (subject: string) =>
+      parseEuSanctionsXml(`<export><sanctionEntity logicalId="1">
+        ${subject}
+        <nameAlias wholeName="Ali Mamluk"/>
+      </sanctionEntity></export>`).entries[0]?.subjectType;
+
+    expect(one('<subjectType code="person" classificationCode="P"/>')).toBe('person');
+    expect(one('<subjectType classificationCode="P"/>')).toBe('person');
+    expect(one('<subjectType code="person"/>')).toBe('person');
+    expect(one('<subjectType code="enterprise" classificationCode="E"/>')).toBe('entity');
+  });
+
   it('carries the programme and identifying details', () => {
     const parsed = parseEuSanctionsXml(SAMPLE_XML);
     const entry = parsed.entries.find((e) => e.name === 'Bashar Al-Assad');
@@ -393,7 +411,7 @@ describe('parseEuSanctionsXml', () => {
 
   it('falls back to name parts when wholeName is absent', () => {
     const xml = `<export><sanctionEntity logicalId="1">
-      <subjectType code="P"/>
+      <subjectType code="person"/>
       <nameAlias firstName="Ali" lastName="Mamluk"/>
     </sanctionEntity></export>`;
 
@@ -402,7 +420,7 @@ describe('parseEuSanctionsXml', () => {
 
   it('decodes XML entities in a name', () => {
     const xml = `<export><sanctionEntity logicalId="1">
-      <subjectType code="E"/>
+      <subjectType code="enterprise"/>
       <nameAlias wholeName="Smith &amp; Sons Trading"/>
     </sanctionEntity></export>`;
 

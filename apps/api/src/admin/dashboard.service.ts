@@ -8,6 +8,7 @@ import { DATABASE } from '../database/database.module.js';
 import { imageIsPublished } from '../storage/image-visibility.js';
 import { scopeFilter } from '../rbac/scope.sql.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { currencyTotals, seriesByCurrency } from './currency-totals.js';
 
 /** How many days the revenue sparkline covers, including today. */
 const REVENUE_DAYS = 7;
@@ -336,23 +337,22 @@ export class DashboardService {
     /**
      * SAFRA's revenue is the commission plus the service fee — never the booking total,
      * which is mostly the partner's money passing through (§13.3).
+     *
+     * Scoped like every counter above, and per currency. It was neither: the one money figure on
+     * the dashboard was the only number a city-scoped member saw for the whole country, and it
+     * added each booking's amounts in that booking's own currency and printed the sum as dollars.
      */
-    const money = await this.db.execute<{ usd: string; syp: string }>(sql`
-      SELECT
-        COALESCE(SUM(partner_commission_amount + customer_fee_amount), 0)::text AS usd,
-        COALESCE(SUM(total_syp * (
-          (partner_commission_amount + customer_fee_amount)
-          / NULLIF(total_amount, 0)
-        )), 0)::text AS syp
-      FROM bookings
-      WHERE paid_at::date = current_date AND deleted_at IS NULL
+    const money = await this.db.execute<{ currency: string; amount: string }>(sql`
+      SELECT cur.code AS currency,
+             SUM(b.partner_commission_amount + b.customer_fee_amount)::text AS amount
+      FROM bookings b
+      JOIN currencies cur ON cur.id = b.currency_id
+      WHERE b.paid_at::date = current_date AND b.deleted_at IS NULL
+        AND ${inScope('b')}
+      GROUP BY cur.code
     `);
 
-    return {
-      ...counters,
-      revenue_today_usd: money.rows[0]?.usd ?? '0',
-      revenue_today_syp: money.rows[0]?.syp ?? '0',
-    };
+    return { ...counters, revenue_today: currencyTotals(money.rows) };
   }
 
   /**
@@ -375,10 +375,20 @@ export class DashboardService {
      */
     const windowStart = sql.raw(String(REVENUE_DAYS - 1));
 
-    const rows = await this.db.execute<{ day: string; amount: string }>(sql`
-      SELECT d::date::text AS day,
+    /*
+      Grouped by the booking's currency as well as the day: one bar summing a dollar and a pound is
+      a bar whose height means nothing. `seriesByCurrency` turns the rows into one week per
+      currency, each with all seven days.
+    */
+    const rows = await this.db.execute<{
+      bucket: string;
+      currency: string | null;
+      value: string;
+    }>(sql`
+      SELECT d::date::text AS bucket,
+             cur.code AS currency,
              COALESCE(SUM(b.partner_commission_amount + b.customer_fee_amount), 0)::text
-               AS amount
+               AS value
       FROM generate_series(
              current_date - ${windowStart},
              current_date,
@@ -387,11 +397,15 @@ export class DashboardService {
       LEFT JOIN bookings b
         ON b.paid_at::date = d::date AND b.deleted_at IS NULL
        AND ${scopeFilter(actor, 'b.city_id')}
-      GROUP BY d
+      LEFT JOIN currencies cur ON cur.id = b.currency_id
+      GROUP BY d, cur.code
       ORDER BY d
     `);
 
-    return rows.rows.map((row) => ({ day: row.day, amount: row.amount }));
+    return seriesByCurrency(rows.rows).map(({ currency, series }) => ({
+      currency,
+      days: series.map((point) => ({ day: point.bucket, amount: point.value })),
+    }));
   }
 
   private async recentBookings(actor?: AccessTokenClaims) {

@@ -6,6 +6,8 @@ import { Redis } from 'ioredis';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { NotificationService } from '../notifications/notification.service.js';
+import { NotificationRedriveService } from '../notifications/notification-redrive.service.js';
+import type { Env } from '../config/env.js';
 import type { MailService } from '../mail/mail.service.js';
 import { DeadLetterService } from './dead-letter.service.js';
 import { MailProcessor } from './mail.processor.js';
@@ -66,6 +68,13 @@ describeIfReady('the mail queue', () => {
   let worker: Worker;
   let prefix = '';
   let notifications: NotificationService;
+  let redrive: NotificationRedriveService;
+
+  /* Unscoped: these tests are about the queue, not about geography. */
+  const anyCity = {
+    role: 'super_admin',
+    permissions: [],
+  } as unknown as Parameters<NotificationRedriveService['redriveOne']>[1];
 
   beforeEach(async () => {
     await harness.begin();
@@ -77,6 +86,11 @@ describeIfReady('the mail queue', () => {
     queue = new Queue('mail', { connection, prefix });
 
     notifications = new NotificationService(db, mail, queue);
+    redrive = new NotificationRedriveService(
+      db,
+      { APP_URL: 'https://safra.test', PARTNER_URL: 'https://partner.safra.test' } as Env,
+      notifications,
+    );
 
     const processor = new MailProcessor(notifications, new DeadLetterService(db));
 
@@ -251,6 +265,180 @@ describeIfReady('the mail queue', () => {
     /* And the row itself is failed, so the delivery log agrees with the dead letter. */
     expect(await statusOf('queue.test.dead')).toBe('failed');
   });
+
+  // ─── Re-driving a notice whose job is still in Redis ───────────────────────
+
+  /**
+   * A re-drive of an exhausted notice SENDS it — once, and as it was composed.
+   *
+   * The defect, which no double could show: `removeOnFail: false` keeps the failed job, so the
+   * re-drive's `add` under the same id was silently ignored. `redriveOne` answered «queued», the row
+   * went back to `queued`, and nothing was ever sent; the sweep then found that row every five
+   * minutes and did the same nothing.
+   *
+   * Pressed twice at once, because «exactly once» is the claim: BullMQ's retry moves the job only
+   * from the state named, so the second press finds it already waiting. And the mail that arrives is
+   * the ORIGINAL — its own link — not a rebuilt summary.
+   */
+  it(
+    're-sends an exhausted notice when re-driven, once, as it was composed',
+    { timeout: 30_000 },
+    async () => {
+      const id = await exhausted('review.received', {
+        to: 'host@safra.test',
+        subject: 'Queue test original',
+        text: 'Open https://partner.safra.test/reviews?from=original',
+      });
+
+      failEverySend = false;
+
+      const outcomes = await Promise.all([
+        redrive.redriveOne(id, anyCity),
+        redrive.redriveOne(id, anyCity),
+      ]);
+
+      expect(outcomes).toEqual(['queued', 'queued']);
+
+      expect(
+        await until(async () => (await statusOfId(id)) === 'sent'),
+        'the re-driven notice was delivered',
+      ).toBe(true);
+
+      /* Settled for longer than a second run would take, so a duplicate would have arrived. */
+      await new Promise((resolve) => setTimeout(resolve, 750));
+
+      expect(sent.map((message) => message.subject)).toEqual(['Queue test original']);
+    },
+  );
+
+  /** The timer takes the same path as the button, for a `failed` row its retries gave up on. */
+  it(
+    'sends a failed notice the sweep re-drives, when its job is still in Redis',
+    { timeout: 30_000 },
+    async () => {
+      /*
+        The sweep is global, so the development database's own undelivered rows would be counted
+        too. Settled inside this test's transaction, which rolls back.
+      */
+      await db.execute(
+        sql`UPDATE notifications SET status = 'sent' WHERE status IN ('queued', 'failed')`,
+      );
+
+      const id = await exhausted('review.received', {
+        to: 'host@safra.test',
+        subject: 'Queue test swept',
+        text: 'Open https://partner.safra.test/reviews',
+      });
+
+      failEverySend = false;
+
+      /* Old enough that its retry schedule cannot still be running. */
+      await db.execute(sql`
+        UPDATE notifications
+        SET status = 'failed', failed_at = now() - INTERVAL '2 hours'
+        WHERE id = ${id}::uuid
+      `);
+
+      expect((await redrive.run())['redriven']).toBe(1);
+
+      expect(
+        await until(async () => (await statusOfId(id)) === 'sent'),
+        'the swept notice was delivered',
+      ).toBe(true);
+      expect(sent.map((message) => message.subject)).toEqual(['Queue test swept']);
+    },
+  );
+
+  /** A job that COMPLETED was accepted by the provider. A re-drive must not send it again. */
+  it('does not re-send a notice whose job completed', { timeout: 30_000 }, async () => {
+    const row = await db.execute<{ id: string }>(sql`
+      INSERT INTO notifications (channel, template_key, locale, status)
+      VALUES ('email', 'review.received', 'ar', 'queued')
+      RETURNING id
+    `);
+    const id = row.rows[0]?.id ?? '';
+
+    await queue.add(
+      MAIL_JOB,
+      { notificationId: id, templateKey: 'review.received', mail: mailNamed('once') },
+      { jobId: mailJobId(id) },
+    );
+
+    expect(await until(async () => (await statusOfId(id)) === 'sent')).toBe(true);
+
+    /* As if the row had been left behind by a crash between the send and its update. */
+    await db.execute(
+      sql`UPDATE notifications SET status = 'failed' WHERE id = ${id}::uuid`,
+    );
+
+    expect(await redrive.redriveOne(id, anyCity)).toBeNull();
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    expect(sent).toHaveLength(1);
+  });
+
+  /** A row and a job that ran out of attempts against a refusing provider: what a re-drive meets. */
+  async function exhausted(
+    templateKey: string,
+    original: { to: string; subject: string; text: string },
+  ): Promise<string> {
+    failEverySend = true;
+
+    /*
+      A real partner behind the row, so a REBUILT notice would be sendable too. Without one the
+      re-drive could only answer «unreconstructable», and a test that passed would not show which of
+      the two messages went out — the original, or a summary composed over the top of it.
+    */
+    const row = await db.execute<{ id: string }>(sql`
+      WITH ref AS (
+        SELECT (SELECT id FROM cities WHERE deleted_at IS NULL ORDER BY id LIMIT 1) AS city_id,
+               (SELECT id FROM partner_types ORDER BY id LIMIT 1)                AS type_id
+      ), pu AS (
+        INSERT INTO users (email, phone, role, status, preferred_locale)
+        VALUES ('mq-p-' || gen_random_uuid() || '@safra.test', '+963900000083', 'partner',
+                'active', 'ar')
+        RETURNING id
+      ), pa AS (
+        INSERT INTO partners (user_id, partner_type_id, legal_name, display_name, city_id,
+                              address, phone, email, verification)
+        SELECT pu.id, ref.type_id, 'Queue Test', 'اختبار', ref.city_id, 'x',
+               '+963900000083', 'mq-p-' || gen_random_uuid() || '@safra.test', 'approved'
+        FROM pu, ref RETURNING id
+      )
+      INSERT INTO notifications (channel, template_key, locale, status, partner_id)
+      SELECT 'email', ${templateKey}, 'ar', 'queued', pa.id FROM pa
+      RETURNING id
+    `);
+    const id = row.rows[0]?.id ?? '';
+
+    await queue.add(
+      MAIL_JOB,
+      { notificationId: id, templateKey, mail: original },
+      { attempts: 1, jobId: mailJobId(id) },
+    );
+
+    expect(
+      await until(
+        async () => (await (await queue.getJob(mailJobId(id)))?.getState()) === 'failed',
+      ),
+      'the job ran out of attempts',
+    ).toBe(true);
+
+    /* The ceiling the console's re-drive exists for: attempts spent, nothing automatic left. */
+    await db.execute(sql`
+      UPDATE notifications SET status = 'abandoned', attempts = 5 WHERE id = ${id}::uuid
+    `);
+
+    return id;
+  }
+
+  const statusOfId = async (id: string): Promise<string | undefined> =>
+    (
+      await db.execute<{ status: string }>(sql`
+        SELECT status::text AS status FROM notifications WHERE id = ${id}::uuid
+      `)
+    ).rows[0]?.status;
 
   const deadLetters = async (): Promise<number> =>
     Number(

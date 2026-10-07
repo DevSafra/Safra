@@ -15,6 +15,11 @@ export const ar = {
   /** The document title and the wordmark line. */
   /* A PIPE, never a dash — see the admin catalogue's `meta.title` for the reason. */
   brand: 'سفرة | لوحة الشريك',
+  /**
+   * The Latin half of the logo, «سفرة | SAFRA» (2026-10-07). The Arabic half is drawn, so this is
+   * the only word of the logo a catalogue holds. The brand's own spelling in every language.
+   */
+  brandLatin: 'SAFRA',
 
   /** `partner_contract_kind` in the schema. */
   contractKinds: {
@@ -1422,6 +1427,8 @@ export const ar = {
     accountsLink: 'حسابات التحويل',
     /* The summary block's own heading, so the route beside it has something to sit against. */
     summaryHeading: 'ملخّص التحويلات',
+    /* The next page of transfers; the list used to stop at fifty with no way past it. */
+    loadMore: 'عرض تحويلات أقدم',
 
     /*
       The summary (Bashar, 2026-09-04: «design the pages … much better»).

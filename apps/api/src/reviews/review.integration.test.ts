@@ -2,9 +2,11 @@ import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createRollbackDatabase, type Database } from '@safra/db';
-import { PERMISSIONS as P } from '@safra/contracts';
+import { ERROR, PERMISSIONS as P } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
+import { codeOf } from '../common/errors/app-error.js';
+import { interleaved } from '../common/testing/interleaved.testing.js';
 import type { Env } from '../config/env.js';
 import type { MailService } from '../mail/mail.service.js';
 import { NotificationService } from '../notifications/notification.service.js';
@@ -277,6 +279,37 @@ describeIfDb('ReviewService', () => {
       ).rejects.toThrow();
     });
 
+    /*
+      And in the same words as a reference nobody issued. Watched to fail against the 403 with its
+      own code that a stranger used to get, which told them the reference was a real stay.
+    */
+    it("answers somebody else's booking exactly as one that does not exist", async () => {
+      const stranger: AccessTokenClaims = {
+        ...guest(),
+        sub: '00000000-0000-0000-0000-000000000009',
+      };
+      const answer = (reference: string) =>
+        service
+          .create(stranger, {
+            bookingReference: reference,
+            rating: 5,
+            body: 'never stayed',
+          })
+          .then(
+            () => 'accepted',
+            (error: unknown) => ({
+              code: codeOf(error),
+              status: (error as { status?: number }).status,
+            }),
+          );
+
+      const theirs = await answer(bookingReference);
+      const nobody = await answer('BKG-999999999');
+
+      expect(theirs).toEqual({ code: ERROR.BOOKING_NOT_FOUND, status: 404 });
+      expect(theirs).toEqual(nobody);
+    });
+
     it('refuses a second review of the same stay', async () => {
       await write();
 
@@ -311,6 +344,111 @@ describeIfDb('ReviewService', () => {
       await expect(
         service.create(unarmed, { bookingReference, rating: 5, body: 'no rights' }),
       ).rejects.toThrow();
+    });
+  });
+
+  /**
+   * Two presses at once.
+   *
+   * Each write read the review's state, decided, and only then wrote. The rollback harness has one
+   * connection, so the other press is run in full at the moment this one opens its transaction,
+   * which is the gap. Each was watched to fail against the unguarded write: a raw unique violation
+   * (a 500) for the review, and a silent overwrite for the reply, the report and the decision.
+   */
+  describe('two at once', () => {
+    const serviceOver = (handle: Database) =>
+      new ReviewService(handle, new AuditService(handle), notifications, {
+        APP_URL: 'http://localhost:3000',
+        PARTNER_URL: 'http://localhost:3002',
+      } as unknown as Env);
+
+    const refusalOf = (promise: Promise<unknown>) =>
+      promise.then(
+        () => 'accepted',
+        (error: unknown) => codeOf(error) ?? String(error),
+      );
+
+    it('writes one review and tells the second press it is already written', async () => {
+      const raced = serviceOver(interleaved(db, () => write(5, 'الأولى.')));
+
+      const code = await refusalOf(
+        raced.create(guest(), { bookingReference, rating: 1, body: 'الثانية.' }),
+      );
+
+      expect(code).toBe(ERROR.REVIEW_ALREADY_WRITTEN);
+
+      const rows = await db.execute<{ rating: number }>(sql`
+        SELECT r.rating FROM reviews r JOIN bookings b ON b.id = r.booking_id
+        WHERE b.reference = ${bookingReference}
+      `);
+
+      expect(rows.rows.map((r) => r.rating)).toEqual([5]);
+    });
+
+    it('keeps the first reply and refuses the second', async () => {
+      const { reference } = await write();
+      const raced = serviceOver(
+        interleaved(db, () => service.reply(partner(), reference, 'الرد الأول.')),
+      );
+
+      const code = await refusalOf(raced.reply(partner(), reference, 'الرد الثاني.'));
+
+      expect(code).toBe(ERROR.REVIEW_ALREADY_REPLIED);
+
+      const row = await db.execute<{ partner_reply: string }>(
+        sql`SELECT partner_reply FROM reviews WHERE reference = ${reference}`,
+      );
+
+      expect(row.rows[0]?.partner_reply).toBe('الرد الأول.');
+    });
+
+    it('keeps the first report and refuses the second', async () => {
+      const { reference } = await write();
+      const raced = serviceOver(
+        interleaved(db, () =>
+          service.report(partner(), reference, 'First report, with enough detail.'),
+        ),
+      );
+
+      const code = await refusalOf(
+        raced.report(partner(), reference, 'Second report, with enough detail.'),
+      );
+
+      expect(code).toBe(ERROR.REVIEW_ALREADY_REPORTED);
+
+      const row = await db.execute<{ report_reason: string }>(
+        sql`SELECT report_reason FROM reviews WHERE reference = ${reference}`,
+      );
+
+      expect(row.rows[0]?.report_reason).toBe('First report, with enough detail.');
+    });
+
+    it('lets the first moderator decide and refuses the second', async () => {
+      const { reference } = await write();
+      await service.report(partner(), reference, 'Describes a different property.');
+      const raced = serviceOver(
+        interleaved(db, () =>
+          service.moderate(staff(), reference, {
+            decision: 'uphold',
+            note: 'Confirmed: the guest reviewed the wrong listing.',
+          }),
+        ),
+      );
+
+      const code = await refusalOf(
+        raced.moderate(staff(), reference, {
+          decision: 'dismiss',
+          note: 'Looked again and the review stands as written.',
+        }),
+      );
+
+      expect(code).toBe(ERROR.REVIEW_NOT_REPORTED);
+
+      const row = await db.execute<{ status: string; report_status: string }>(sql`
+        SELECT status::text, report_status::text FROM reviews WHERE reference = ${reference}
+      `);
+
+      expect(row.rows[0]).toEqual({ status: 'hidden', report_status: 'upheld' });
     });
   });
 

@@ -18,6 +18,7 @@ import { JOB_OPTIONS } from '../queue/queue.definitions.js';
 import { EXPORTS_QUEUE } from '../queue/queue.tokens.js';
 import { StorageService } from '../storage/storage.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import type { ExportFilters } from './booking-export.service.js';
 import { badRequest, forbidden, notFound } from '../common/errors/app-error.js';
 import { describeError } from '../common/errors/safe-error.js';
 
@@ -89,7 +90,7 @@ export class ExportRequestService {
   /** Records the request, enqueues the build, and answers with the reference to come back for. */
   async request(
     claims: AccessTokenClaims | undefined,
-    filters: { q?: string | undefined; status?: string | undefined },
+    filters: ExportFilters,
   ): Promise<{ reference: string; status: string }> {
     const requesterId = claims?.sub;
 
@@ -98,14 +99,18 @@ export class ExportRequestService {
     /*
       Stored as an allow-listed object, never as whatever arrived.
 
-      These two fields ARE the filter vocabulary — the same pair `RegistriesController` validates for
-      the list, so the export and the registry cannot describe different sets. A spread of the
+      These four fields ARE the filter vocabulary — the ones `RegistriesController` validates for
+      the list, so the export and the registry cannot describe different sets. `expiring` was
+      missing, and `attention` with it, until 2026-10-06: an export from an alert view was a file
+      of everything. A spread of the
       request body would put arbitrary keys into a `jsonb` column that the worker later reads back
       and builds a query from.
     */
     const stored = {
       q: filters.q ?? null,
       status: filters.status ?? null,
+      expiring: filters.expiring ? '1' : null,
+      attention: filters.attention ?? null,
     };
 
     const created = await this.db.execute<{ id: string; reference: string }>(sql`

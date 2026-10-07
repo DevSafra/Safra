@@ -3,7 +3,7 @@ import type { Job } from 'bullmq';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import { ERROR } from '@safra/contracts';
+import { BOOKING_ATTENTION, ERROR } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { BookingExportService } from '../admin/booking-export.service.js';
@@ -12,18 +12,8 @@ import { StorageService } from '../storage/storage.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { QUEUE } from './queue.definitions.js';
 import { DeadLetterService } from './dead-letter.service.js';
-import { EXPORT_JOB, type ExportJobData } from './export.job.js';
+import { EXPORT_JOB, exportFileKey, type ExportJobData } from './export.job.js';
 import { describeError } from '../common/errors/safe-error.js';
-
-/**
- * Where a built CSV lives.
- *
- * `exports/`, outside the `properties/*` anonymous-read grant — the same reasoning as `incoming/`
- * and a stronger case: this is not one stranger's photograph, it is every booking a filter matched,
- * with customer names in it. It is fetched through the API by an authorised caller whose download
- * writes an audit row, never by a URL that works for anybody holding it.
- */
-const EXPORT_PREFIX = 'exports';
 
 /**
  * The `exports` queue's worker-side body.
@@ -115,10 +105,16 @@ export class ExportProcessor {
     const built = await this.exports.toCsv(actor, {
       q: row.filters['q'] ?? undefined,
       status: row.filters['status'] ?? undefined,
+      /*
+        Read back against the same vocabulary the request was validated with: the row is ours, but
+        a value this worker does not recognise must narrow nothing silently, never widen by a guess.
+      */
+      expiring: row.filters['expiring'] === '1',
+      attention: oneOf(row.filters['attention'], BOOKING_ATTENTION),
       audit: false,
     });
 
-    const fileKey = `${EXPORT_PREFIX}/${row.reference}.csv`;
+    const fileKey = exportFileKey(row.reference);
 
     await this.storage.put(
       fileKey,
@@ -241,4 +237,13 @@ export class ExportProcessor {
       );
     }
   }
+}
+
+function oneOf<T extends string>(
+  value: string | null | undefined,
+  allowed: readonly T[],
+): T | undefined {
+  return (allowed as readonly (string | null | undefined)[]).includes(value)
+    ? (value as T)
+    : undefined;
 }

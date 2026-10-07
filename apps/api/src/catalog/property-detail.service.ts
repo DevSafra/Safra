@@ -9,6 +9,7 @@ import { SettingsService } from '../settings/settings.service.js';
 import { ERROR, PUBLIC_FAQ_LIMIT, publicDistanceMetres } from '@safra/contracts';
 import { notFound } from '../common/errors/app-error.js';
 import { publicCoordinate } from './public-location.js';
+import { openListing } from './open-listing.js';
 import { BLOCKING_STATUS_SQL } from '../bookings/booking-state.js';
 
 /**
@@ -27,9 +28,12 @@ export class PropertyDetailService {
   /**
    * Full public detail for one property (§5.6).
    *
-   * Only `published` inventory is reachable, so an unverified or suspended listing
-   * 404s exactly like a nonexistent one — no way to tell from outside whether a
-   * slug exists but is hidden.
+   * Only an OPEN listing is reachable (`openListing`): published, in an open city of an open
+   * country, from a partner who is not suspended. Anything else 404s exactly like a nonexistent
+   * one — no way to tell from outside whether a slug exists but is hidden.
+   *
+   * The page is a door to the checkout, so it had to close with the market. Until 2026-10-06 it
+   * checked only `published`, and a listing search no longer offered was one click from a booking.
    */
   async bySlug(slug: string, stay?: { checkIn: string; checkOut: string }) {
     const rows = await this.db.execute<Record<string, unknown>>(sql`
@@ -79,8 +83,7 @@ export class PropertyDetailService {
       JOIN property_types pt ON pt.id = p.property_type_id
       JOIN cancellation_policies cp ON cp.id = p.cancellation_policy_id
       WHERE p.slug = ${slug}
-        AND p.status = 'published'
-        AND p.deleted_at IS NULL
+        AND ${openListing(sql`p`)}
       LIMIT 1
     `);
 

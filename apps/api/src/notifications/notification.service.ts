@@ -12,6 +12,7 @@ import { redactContactDetails } from '../messaging/redaction.js';
 import { JOB_OPTIONS, maxAttempts } from '../queue/queue.definitions.js';
 import { MAIL_JOB, mailJobId, type MailJobData } from '../queue/mail.job.js';
 import { MAIL_QUEUE } from '../queue/queue.tokens.js';
+import { requeue } from '../queue/requeue.js';
 import { describeError } from '../common/errors/safe-error.js';
 
 /**
@@ -181,7 +182,8 @@ export class NotificationService {
   }
 
   /**
-   * Puts a lost notification back on the queue, from a mail somebody else rebuilt.
+   * Puts an undelivered notification back on the queue — the ORIGINAL message when Redis still
+   * holds it, a rebuilt one when it does not.
    *
    * ## Why this is separate from `notify`
    *
@@ -190,35 +192,53 @@ export class NotificationService {
    * show two notices where one was owed. That log is the first thing read when somebody disputes a
    * §6.4 fine, so an extra row is not a cosmetic problem.
    *
+   * ## What it re-sends
+   *
+   * A job whose attempts ran out is still in Redis (`removeOnFail: false`), carrying the mail exactly
+   * as it was composed: the right template, the right links, the attachment. That is what is owed,
+   * so it is what is re-sent, and `rebuild` is only asked when the job is truly gone — a Redis loss,
+   * where the row is all there is. See `requeue` for why the finished job has to be RETRIED rather
+   * than re-added: adding over it was a silent no-op, and every re-drive reported success while
+   * sending nothing.
+   *
+   * ## What it will not do
+   *
+   * Send twice. A job still waiting or running is left alone, and one that COMPLETED is reported as
+   * delivered and never repeated — completion means the provider accepted the message.
+   *
    * ## The enqueue failure is swallowed, again
    *
    * Same reasoning as `notify`, and more so here: this runs inside a recurring job during whatever
-   * incident lost the queue in the first place. A throw would fail the whole batch on the first
-   * row, and that row would still be `queued` — so the next occurrence would try it first and fail
-   * identically. Returning false lets the batch continue and the count be honest.
-   *
-   * `mailJobId` is deterministic, so a row whose job still exists is refused by BullMQ rather than
-   * sent twice. That is the safety net that makes re-driving optimistically the right default.
+   * incident lost the queue in the first place. A throw would fail the whole batch on the first row,
+   * so it answers `error` and the batch carries on.
    */
   async reenqueue(
     notificationId: string,
     templateKey: string,
-    mail: OutgoingMail,
-  ): Promise<boolean> {
+    rebuild: () => Promise<OutgoingMail | null>,
+  ): Promise<'queued' | 'in_flight' | 'delivered' | 'unreconstructable' | 'error'> {
     try {
-      await this.queue.add(
+      const outcome = await requeue<MailJobData>(
+        this.queue,
         MAIL_JOB,
-        { notificationId, templateKey, mail } satisfies MailJobData,
         { ...JOB_OPTIONS.mail, jobId: mailJobId(notificationId) },
+        async () => {
+          const mail = await rebuild();
+
+          return mail ? { notificationId, templateKey, mail } : null;
+        },
+        { repeatCompleted: false },
       );
+
+      if (outcome === 'unbuildable') return 'unreconstructable';
+      if (outcome === 'completed') return 'delivered';
+      if (outcome === 'in_flight') return 'in_flight';
 
       /*
         Back to `queued`, because the row is once again a notice waiting on a worker.
 
         Without this a re-driven `failed` row stays `failed` and the sweep finds it again on every
-        five-minute tick until it succeeds — no duplicate email, since `mailJobId` is deterministic
-        and BullMQ refuses the second job, but the batch fills with rows already in flight and the
-        count the job reports stops describing anything. The state should say where the notice IS.
+        five-minute tick. The state should say where the notice IS.
 
         `attempts` is deliberately NOT reset. It is the total across every attempt this notice has
         ever had, so the abandonment boundary in `deliver` still bites: a row re-driven after four
@@ -234,13 +254,13 @@ export class NotificationService {
         WHERE id = ${notificationId} AND status = 'failed'
       `);
 
-      return true;
+      return 'queued';
     } catch (error) {
       this.logger.error(
         `Could not re-drive notification ${notificationId}: ` + `${describeError(error)}`,
       );
 
-      return false;
+      return 'error';
     }
   }
 

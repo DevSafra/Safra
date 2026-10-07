@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { digitString } from './digits.js';
+
 import { ERROR } from './error-codes.js';
 
 /** What kind of business is advertising. Restaurants and activities are the launch set. */
@@ -102,10 +104,9 @@ export const campaignCreateSchema = z
     descriptionDe: adDescription,
     targetUrl: adTargetUrlSchema,
     billingPeriod: z.enum(AD_BILLING_PERIODS, { message: ERROR.VALIDATION_REQUIRED }),
-    priceAmount: z
-      .string()
-      .regex(/^\d{1,10}(\.\d{1,3})?$/, ERROR.VALIDATION_DECIMAL_STRING)
-      .optional(),
+    priceAmount: digitString(
+      z.string().regex(/^\d{1,10}(\.\d{1,3})?$/, ERROR.VALIDATION_DECIMAL_STRING),
+    ).optional(),
     priceCurrency: z
       .string()
       .regex(/^[A-Z]{3}$/, ERROR.VALIDATION_CURRENCY_CODE)

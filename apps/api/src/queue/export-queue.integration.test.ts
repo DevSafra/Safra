@@ -51,6 +51,7 @@ describeIfReady('the exports queue', () => {
       return Promise.resolve({ key, contentType, size: body.byteLength });
     },
     get: (key: string) => Promise.resolve(objects.get(key) ?? null),
+    read: (key: string) => Promise.resolve(objects.get(key) ?? null),
     remove: (key: string) => {
       objects.delete(key);
 

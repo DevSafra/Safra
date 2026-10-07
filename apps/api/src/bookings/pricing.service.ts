@@ -15,6 +15,7 @@ import {
 } from '../common/money.js';
 import { customerFeeMinor, customerFeeRule } from './customer-fee.js';
 import { mergeBasketLines } from './basket.js';
+import { openListing } from '../catalog/open-listing.js';
 import { DEFAULT_MONEY_CURRENCY, ERROR } from '@safra/contracts';
 import { notFound, badRequest } from '../common/errors/app-error.js';
 
@@ -175,6 +176,12 @@ export class PricingService {
         : [{ unitId: input.unitId, rooms: input.rooms ?? 1 }],
     );
 
+    /*
+      Only a room of an OPEN listing has a price (audit 2026-10-06). This query is the one every
+      customer door goes through — the quote, the coupon preview and the booking itself — so a
+      closed market, a suspended partner or a withdrawn room answers «not found» on all three from
+      one line, and the loop below refuses any basket line that drops out here.
+    */
     const rows = await this.db.execute<{
       unit_id: string;
       date: string;
@@ -212,7 +219,9 @@ export class PricingService {
       WHERE u.id IN (${sql.join(
         basket.map((line) => sql`${line.unitId}`),
         sql`, `,
-      )}) AND u.deleted_at IS NULL
+      )})
+        AND u.is_active AND u.deleted_at IS NULL
+        AND ${openListing(sql`prop`)}
       ORDER BY u.id, d.day
     `);
 

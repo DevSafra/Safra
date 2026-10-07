@@ -403,6 +403,15 @@ export class CalendarService {
 
       const daysAffected = Number(written.rows[0]?.count ?? 0);
 
+      /*
+        A nightly price is in the UNIT's currency, and the audit row says which. Without it the
+        trail read «السعر 120.00», which on a platform pricing in five currencies is not a price.
+      */
+      const priced = await tx.execute<{ code: string }>(sql`
+        SELECT cur.code FROM units u JOIN currencies cur ON cur.id = u.currency_id
+        WHERE u.id = ${unitId}::uuid
+      `);
+
       await this.audit.record(
         {
           actorUserId: claims?.sub,
@@ -415,6 +424,7 @@ export class CalendarService {
             to: input.to,
             status: input.status,
             price: input.price,
+            currency: priced.rows[0]?.code,
             minNights: input.minNights,
             daysAffected,
           },

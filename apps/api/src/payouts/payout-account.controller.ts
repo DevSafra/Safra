@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseUUIDPipe,
   Post,
   Put,
 } from '@nestjs/common';
@@ -74,7 +75,7 @@ export class PartnerPayoutAccountController {
   @AuditExempt('Audited by PayoutAccountService as payout_account.updated.')
   async update(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(payoutAccountInputSchema)) body: PayoutAccountInput,
   ) {
     return this.accounts.updateOwn(id, body, user);
@@ -87,7 +88,7 @@ export class PartnerPayoutAccountController {
   @AuditExempt('Audited by PayoutAccountService as payout_account.removed.')
   async remove(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
     await this.accounts.removeOwn(id, user);
   }
@@ -140,7 +141,7 @@ export class AdminPayoutAccountController {
   @AuditExempt('Audited by PayoutAccountService as payout_account.updated.')
   async update(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(payoutAccountInputSchema)) body: PayoutAccountInput,
   ) {
     return this.accounts.updateForPartner(id, body, user);
@@ -151,7 +152,7 @@ export class AdminPayoutAccountController {
   @AuditExempt('Audited by PayoutAccountService as payout_account.verified.')
   async verify(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.accounts.verify(id, user);
   }
@@ -161,7 +162,7 @@ export class AdminPayoutAccountController {
   @AuditExempt('Audited by PayoutAccountService as payout_account.rejected.')
   async reject(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(payoutAccountRejectSchema)) body: PayoutAccountReject,
   ) {
     return this.accounts.reject(id, body.reason, user);
@@ -173,7 +174,7 @@ export class AdminPayoutAccountController {
   @AuditExempt('Audited by PayoutAccountService as payout_account.removed.')
   async remove(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
     await this.accounts.removeForPartner(id, user);
   }

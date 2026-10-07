@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { SupportService } from './support.service.js';
+import { interleaved } from '../common/testing/interleaved.testing.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
 /**
@@ -323,6 +324,73 @@ describeIfDb('SupportService', () => {
 
     expect(seen.closed).toBe(true);
     expect(seen.messages).toHaveLength(1);
+  });
+
+  // ─── Two at once ──────────────────────────────────────────────────────────
+
+  /*
+    The other press is run in full at the moment this one opens its transaction, which is the gap
+    the checks outside it leave. Each was watched to fail against the unlocked write.
+  */
+  const unreadOf = async (reference: string) =>
+    (
+      await db.execute<{ unread: number }>(sql`
+        SELECT unread_for_staff AS unread FROM conversations WHERE reference = ${reference}`)
+    ).rows[0]?.unread;
+
+  it('writes a reply pressed twice at once once, and counts it once', async () => {
+    const thread = await support.open(customer(), LONG);
+    const raced = new SupportService(
+      interleaved(db, () =>
+        support.reply(customer(), thread.reference, 'Any news on this?'),
+      ),
+    );
+
+    const after = await raced.reply(customer(), thread.reference, 'Any news on this?');
+
+    expect(after.messages.map((m) => m.body)).toEqual([LONG, 'Any news on this?']);
+    expect(await unreadOf(thread.reference)).toBe(2);
+  });
+
+  it('still writes a different message sent at the same moment', async () => {
+    const thread = await support.open(customer(), LONG);
+    const raced = new SupportService(
+      interleaved(db, () =>
+        support.reply(customer(), thread.reference, 'Any news on this?'),
+      ),
+    );
+
+    const after = await raced.reply(
+      customer(),
+      thread.reference,
+      'And the hot water too.',
+    );
+
+    expect(after.messages).toHaveLength(3);
+  });
+
+  it('refuses a reply that races the asker closing the ticket', async () => {
+    const thread = await support.open(customer(), LONG);
+    const raced = new SupportService(
+      interleaved(db, () => support.close(customer(), thread.reference)),
+    );
+
+    await expect(
+      raced.reply(customer(), thread.reference, 'One more thing about this.'),
+    ).rejects.toMatchObject({ status: 400, response: { code: 'support.ticket_closed' } });
+
+    expect((await support.thread(customer(), thread.reference)).messages).toHaveLength(1);
+  });
+
+  it('opens one ticket when the form is sent twice at once', async () => {
+    const raced = new SupportService(
+      interleaved(db, () => support.open(customer(), LONG)),
+    );
+
+    const second = await raced.open(customer(), LONG);
+    const mine = await support.list(customer(), { limit: 20 });
+
+    expect(mine.items.map((t) => t.reference)).toEqual([second.reference]);
   });
 
   // ─── Closing it yourself ──────────────────────────────────────────────────

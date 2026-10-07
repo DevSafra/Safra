@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { digitString } from './digits.js';
+
 import { tripAttributeSchema } from './search.js';
 import { ERROR } from './error-codes.js';
 
@@ -61,15 +63,19 @@ const translatedText = (max: number) =>
   });
 
 /** Decimal degrees as strings, so no precision is lost through a float. */
-const latitudeSchema = z
-  .string()
-  .regex(/^-?\d{1,2}(\.\d{1,8})?$/, ERROR.VALIDATION_LATITUDE_FORMAT)
-  .refine((v) => Math.abs(Number(v)) <= 90, ERROR.VALIDATION_LATITUDE_RANGE);
+const latitudeSchema = digitString(
+  z
+    .string()
+    .regex(/^-?\d{1,2}(\.\d{1,8})?$/, ERROR.VALIDATION_LATITUDE_FORMAT)
+    .refine((v) => Math.abs(Number(v)) <= 90, ERROR.VALIDATION_LATITUDE_RANGE),
+);
 
-const longitudeSchema = z
-  .string()
-  .regex(/^-?\d{1,3}(\.\d{1,8})?$/, ERROR.VALIDATION_LONGITUDE_FORMAT)
-  .refine((v) => Math.abs(Number(v)) <= 180, ERROR.VALIDATION_LONGITUDE_RANGE);
+const longitudeSchema = digitString(
+  z
+    .string()
+    .regex(/^-?\d{1,3}(\.\d{1,8})?$/, ERROR.VALIDATION_LONGITUDE_FORMAT)
+    .refine((v) => Math.abs(Number(v)) <= 180, ERROR.VALIDATION_LONGITUDE_RANGE),
+);
 
 /**
  * Every field a listing carries, with no cross-field rule applied.

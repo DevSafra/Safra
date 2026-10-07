@@ -1,9 +1,14 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 import type { Queue } from 'bullmq';
 
 import type { Database } from '@safra/db';
-import { ERROR, PERMISSIONS as P } from '@safra/contracts';
+import {
+  ERROR,
+  PARTNER_APP_ROLES,
+  PERMISSIONS as P,
+  isPartnerAppRole,
+} from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
@@ -74,10 +79,44 @@ function filedByOf(
     replaced. Defaulting an unknown role to «staff» is the wrong direction anyway: it would put
     SAFRA's name on a file somebody else filed.
   */
-  if (claims?.role === 'partner') return 'partner';
+  if (claims?.role && isPartnerAppRole(claims.role)) return 'partner';
   if (claims?.role === 'customer' || !claims?.role) return 'customer';
 
   return 'staff';
+}
+
+/**
+ * Whether the uploader's account belongs to the PARTNER side, as SQL over a joined `users` alias.
+ *
+ * `PARTNER_APP_ROLES`, never the literal `'partner'`. A receptionist files as `partner_employee`,
+ * and the literal labelled every one of their photographs «قدّمه فريق سفرة»: SAFRA's name on the
+ * host's evidence, in the file of a case SAFRA is deciding, and withheld from the partner's own
+ * view of a file their own staff filed.
+ *
+ * Each role its own bound parameter, as `scopeFilter` binds its ids. `userAlias` is interpolated
+ * raw, so every call site passes a literal.
+ */
+export function uploadedByPartnerSql(userAlias: string): SQL {
+  const roles = sql.join(
+    PARTNER_APP_ROLES.map((role) => sql`${role}`),
+    sql`, `,
+  );
+
+  return sql`(${sql.raw(userAlias)}.role::text IN (${roles}))`;
+}
+
+/**
+ * `filedByOf` as SQL — the same three answers, for the reads.
+ *
+ * One fragment rather than a CASE per query: four copies is how three of them came to say
+ * `'partner'` while the employee's upload read as staff in every one.
+ */
+export function filedBySql(evidenceAlias: string, userAlias: string): SQL {
+  return sql`CASE
+    WHEN ${sql.raw(evidenceAlias)}.uploaded_by_user_id IS NULL THEN 'customer'
+    WHEN ${uploadedByPartnerSql(userAlias)} THEN 'partner'
+    ELSE 'staff'
+  END`;
 }
 
 /** The width evidence is shown at — a photograph read on a screen, not zoomed into. */
@@ -483,11 +522,7 @@ export class DisputeEvidenceService {
     }>(sql`
       SELECT e.id, e.dispute_id, b.city_id, e.file_name,
              e.shared_with_partner AS already,
-             CASE
-               WHEN e.uploaded_by_user_id IS NULL THEN 'customer'
-               WHEN u.role = 'partner' THEN 'partner'
-               ELSE 'staff'
-             END AS filed_by
+             ${filedBySql('e', 'u')} AS filed_by
       FROM dispute_evidence e
       JOIN disputes d      ON d.id = e.dispute_id AND d.deleted_at IS NULL
       LEFT JOIN bookings b ON b.id = d.booking_id
@@ -566,11 +601,7 @@ export class DisputeEvidenceService {
       SELECT e.id, e.storage_key, e.file_name, e.variant_widths,
              to_char(e.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS at,
              -- Three answers from the uploader's own role, not a boolean. See the interface.
-             CASE
-               WHEN e.uploaded_by_user_id IS NULL THEN 'customer'
-               WHEN u.role = 'partner' THEN 'partner'
-               ELSE 'staff'
-             END AS filed_by,
+             ${filedBySql('e', 'u')} AS filed_by,
              e.shared_with_partner
         FROM dispute_evidence e
         LEFT JOIN users u ON u.id = e.uploaded_by_user_id
@@ -611,7 +642,7 @@ export class DisputeEvidenceService {
    *
    * Not in the screen that decides which thumbnails to draw. A partner who reads an evidence id out
    * of the page source and asks for it directly gets the same answer as one who guesses: the
-   * `shared_with_partner OR u.role = 'partner'` clause is a WHERE, so «not released to you» is
+   * `shared_with_partner OR uploadedByPartnerSql('u')` clause is a WHERE, so «not released to you» is
    * indistinguishable from «does not exist». The list withholds the id as well, which is a courtesy
    * on top rather than the control.
    */
@@ -647,7 +678,7 @@ export class DisputeEvidenceService {
       WHERE e.id = ${evidenceId}::uuid AND e.deleted_at IS NULL
         AND d.partner_id = ${partnerId}
         -- Their own upload, or one an operator released to them. Nothing else, ever.
-        AND (e.shared_with_partner OR u.role = 'partner')
+        AND (e.shared_with_partner OR ${uploadedByPartnerSql('u')})
       LIMIT 1
     `;
 

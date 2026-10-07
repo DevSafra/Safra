@@ -95,6 +95,18 @@ describeIfDb('a fine two operators waive at once', () => {
     expect(row.rows[0]?.waived).not.toBeNull();
   });
 
+  /* The fine on the audit row carries its currency. Watched to fail against `fineAmount` alone. */
+  it('audits the waived fine with its currency', async () => {
+    await waive(serviceOver(db));
+
+    const row = await db.execute<{ before: Record<string, unknown> }>(sql`
+      SELECT before FROM audit_log
+      WHERE action = 'fine.waived' AND subject_id = ${partnerId}::uuid
+    `);
+
+    expect(row.rows[0]?.before).toMatchObject({ fineAmount: '50.000', currency: 'USD' });
+  });
+
   /** A fined violation on a partner of this test's own, and the operator waiving it. */
   async function seed(): Promise<void> {
     const made = await db.execute<{

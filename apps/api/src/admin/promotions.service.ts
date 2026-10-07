@@ -6,6 +6,8 @@ import { COUNT_CAP, ERROR, type OffsetPage, offsetPage } from '@safra/contracts'
 
 import { DATABASE } from '../database/database.module.js';
 import { notFound } from '../common/errors/app-error.js';
+import type { AccessTokenClaims } from '../auth/token.service.js';
+import { scopeFilter } from '../rbac/scope.sql.js';
 
 /**
  * بطاقات الهدايا and الكوبونات (design handoff §8).
@@ -166,6 +168,15 @@ export class PromotionsService {
    * this is `OFFSET` + `COUNT_CAP` exactly as the registries are, and the search narrows by the
    * partner's name or reference. The counts are capped too: past the cap the console prints
    * «أكثر من…» rather than an exact figure it cannot stand behind.
+   *
+   * ## The coupon is global, its PARTNERS are not
+   *
+   * `coupons` is an unscoped resource and `partners` is a scoped one, and every row here is a
+   * partner: a name, a reference and a city. Read without the actor, a member scoped to one city
+   * read the partner directory of every other city through any platform-wide coupon. So the rows,
+   * the page count and the three tallies are all narrowed by the PARTNER's city, the same
+   * predicate the partner registry uses; the counts then describe the coupon as this reader can
+   * see it, and agree with the rows under them.
    */
   async couponParticipation(
     code: string,
@@ -175,6 +186,7 @@ export class PromotionsService {
       status?: string | undefined;
       q?: string | undefined;
     },
+    actor: AccessTokenClaims | undefined,
   ): Promise<{
     counts: Record<'pending' | 'accepted' | 'rejected', CouponPartnerTally>;
     partners: OffsetPage<CouponPartnerRow>;
@@ -192,6 +204,7 @@ export class PromotionsService {
       sql`cpn.coupon_id = ${couponId}::uuid`,
       sql`cpn.deleted_at IS NULL`,
       sql`p.deleted_at IS NULL`,
+      scopeFilter(actor, 'p.city_id'),
     ];
 
     if (query.status) {
@@ -248,6 +261,7 @@ export class PromotionsService {
                    JOIN partners p ON p.id = cpn.partner_id
                    WHERE cpn.coupon_id = ${couponId}::uuid
                      AND cpn.deleted_at IS NULL AND p.deleted_at IS NULL
+                     AND ${scopeFilter(actor, 'p.city_id')}
                      AND cpn.status = s.status
                    LIMIT ${COUNT_CAP + 1}
                  ) capped

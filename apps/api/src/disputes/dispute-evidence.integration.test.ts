@@ -9,6 +9,12 @@ import { ERROR } from '@safra/contracts';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
+import { DisputeService } from '../admin/dispute.service.js';
+import { silentDisputeNotifier } from '../admin/dispute-notifier.testing.js';
+import { FxRateService } from '../fx/fx-rate.service.js';
+import { LedgerService } from '../ledger/ledger.service.js';
+import { PartnerDisputesService } from '../partner/partner-disputes.service.js';
+import { WalletService } from '../wallet/wallet.service.js';
 import {
   DisputeEvidenceService,
   EVIDENCE_WIDTH,
@@ -791,5 +797,97 @@ describeIfDb('evidence on a dispute', () => {
     await expect(service.share(staff([cityId]), guests.id, true)).resolves.toMatchObject({
       shared: true,
     });
+  });
+
+  /**
+   * A partner's EMPLOYEE files as the partner, on every surface that reads the file.
+   *
+   * The reads tested `u.role = 'partner'`, so a receptionist's photograph (`partner_employee`) was
+   * labelled «قدّمه فريق سفرة» in the case file, offered to staff as something to «share» with the
+   * business that filed it, and hidden from that business's own portal. Five readers, one
+   * assertion each, because they were five copies of the predicate rather than one.
+   */
+  it('files an employee’s photograph as the partner’s, never as SAFRA’s', async () => {
+    const employee = await db.execute<{ id: string }>(sql`
+      INSERT INTO users (email, phone, role, status)
+      VALUES (${`ev-e-${randomUUID()}@safra.test`}, '+963900000166', 'partner_employee', 'active')
+      RETURNING id
+    `);
+    const employeeClaims = {
+      sub: employee.rows[0]?.id,
+      role: 'partner_employee',
+      partnerId,
+      permissions: ['dispute.respond_own'],
+    } as unknown as AccessTokenClaims;
+
+    const added = await service.addAsPartner(employeeClaims, reference, {
+      buffer: PHOTO,
+      originalname: 'reception-desk.jpg',
+    });
+
+    expect(added.filedBy, 'the write').toBe('partner');
+    expect(
+      (await service.forDispute(disputeId)).map((one) => one.filedBy),
+      'the case file',
+    ).toStrictEqual(['partner']);
+
+    const audit = await db.execute<{ filed_by: string }>(sql`
+      SELECT after->>'filedBy' AS filed_by FROM audit_log
+      WHERE action = 'dispute.evidence_added' AND subject_id = ${disputeId}::uuid
+    `);
+
+    expect(
+      audit.rows.map((row) => row.filed_by),
+      'the audit row',
+    ).toStrictEqual(['partner']);
+
+    await expect(
+      service.share(staff(), added.id, true),
+      'nothing to release to the business that filed it',
+    ).rejects.toMatchObject({ response: { code: ERROR.EVIDENCE_ALREADY_PARTNERS } });
+
+    /* The console's queue, which aggregates the same file in its own query. */
+    const disputes = new DisputeService(
+      db,
+      new AuditService(db),
+      new WalletService(db, new FxRateService(db, new AuditService(db))),
+      new LedgerService(db),
+      new FxRateService(db, new AuditService(db)),
+      silentDisputeNotifier(),
+    );
+    const queue = await disputes.list({
+      limit: 25,
+      page: 1,
+      q: reference,
+      actor: staff(),
+    });
+
+    expect(
+      queue.items
+        .find((row) => row.reference === reference)
+        ?.evidence.map((one) => one.filedBy),
+      'the console queue',
+    ).toStrictEqual(['partner']);
+
+    /* And the business sees it as its own: listed, and served, without any release. */
+    const portal = await new PartnerDisputesService(db, new AuditService(db)).detail(
+      reference,
+      partner(),
+    );
+
+    expect(
+      portal.evidence.map((one) => one.mine),
+      'the portal',
+    ).toStrictEqual([true]);
+    expect(portal.withheldEvidenceCount).toBe(0);
+
+    await db.execute(sql`
+      UPDATE dispute_evidence SET variant_widths = ARRAY[400, 800] WHERE id = ${added.id}::uuid
+    `);
+
+    await expect(
+      service.readFile(added.id, partner(), 'partner'),
+      'the file itself',
+    ).resolves.toMatchObject({ contentType: 'image/avif' });
   });
 });

@@ -1,4 +1,6 @@
 import { z } from 'zod';
+
+import { digitString } from './digits.js';
 import { ERROR } from './error-codes.js';
 
 /**
@@ -25,10 +27,12 @@ export const walletAdjustSchema = z
      * rather than quantising it silently — an operator who typed 10.005 USD gets told,
      * instead of discovering later that SAFRA moved 10.01.
      */
-    amount: z
-      .string()
-      .regex(/^\d+(\.\d{1,3})?$/, ERROR.VALIDATION_DECIMAL_STRING)
-      .refine((v) => Number(v) > 0, ERROR.VALIDATION_AMOUNT_POSITIVE),
+    amount: digitString(
+      z
+        .string()
+        .regex(/^\d+(\.\d{1,3})?$/, ERROR.VALIDATION_DECIMAL_STRING)
+        .refine((v) => Number(v) > 0, ERROR.VALIDATION_AMOUNT_POSITIVE),
+    ),
 
     /**
      * Credit hands money to the customer; debit takes it back.

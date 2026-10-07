@@ -117,97 +117,7 @@ export class BookingListService {
   }
 
   async list(query: BookingListQuery): Promise<OffsetPage<BookingListRow>> {
-    // Geographic scope first, so it can never be forgotten behind a later `if`.
-    const conditions: SQL[] = [scopeFilter(query.actor, 'b.city_id')];
-
-    if (query.status) {
-      /**
-       * Cast rather than interpolate. The value is already validated against the enum by the
-       * controller's schema, so this is defence in depth: a value that somehow reached here
-       * unvalidated fails as a Postgres cast error, never as injected SQL.
-       */
-      conditions.push(sql`b.status = ${query.status}::booking_status`);
-    }
-
-    if (query.expiring) {
-      /*
-        The same predicate the dashboard counts, so the alert and this list cannot disagree.
-
-        `bookings_sla_idx` is (status, confirmation_deadline_at) WHERE status = 'pending_confirmation',
-        which serves exactly this — the status term is implied by the partial index and stated anyway,
-        because a filter that depended on the index's WHERE clause to be correct would break silently
-        if the index were ever redefined.
-      */
-      conditions.push(sql`
-        b.status = 'pending_confirmation'::booking_status
-        AND b.confirmation_deadline_at IS NOT NULL
-        AND b.confirmation_deadline_at
-              <= now() + (${SLA_EXPIRY_WARNING_MINUTES}::int * INTERVAL '1 minute')`);
-    }
-
-    /*
-      EC-011 — arrived by the calendar, and nobody recorded it.
-
-      In the PROPERTY's timezone, exactly as the counter computes it.
-
-      A correlated subquery rather than a join, deliberately: `fromWhere` is shared by the list and
-      its count (the house rule — a total must never describe a different set), and adding a join
-      there would make every OTHER view of this registry pay for a filter that is usually off. The
-      status term bounds this to the few hundred `confirmed` rows, which is what makes an unindexed
-      date comparison acceptable here and would not be over the whole table.
-    */
-    if (query.attention === 'no_check_in') {
-      conditions.push(sql`
-        b.status = 'confirmed'::booking_status
-        AND b.checked_in_at IS NULL
-        AND b.check_in < ((now() AT TIME ZONE
-              (SELECT ci.timezone FROM cities ci WHERE ci.id = b.city_id))
-              - (${ARRIVAL_ALERT_HOURS}::int * INTERVAL '1 hour'))::date`);
-    }
-
-    /* EC-004 — answered by the partner and never moved. Should be empty; see the counter. */
-    if (query.attention === 'unconfirmed') {
-      conditions.push(sql`
-        b.status = 'pending_confirmation'::booking_status
-        AND b.partner_responded_at IS NOT NULL`);
-    }
-
-    /*
-      §6.4 — SAFRA cancelled a paid booking and nothing is on its way back.
-
-      The SAME predicate as the dashboard's `refunds_owed` counter and as SystemRefundService's own
-      working set, minus the retry backoff: a booking waiting out an hour before its next attempt is
-      still a booking owed money, and an operator looking at this list wants to see it. Written out
-      rather than shared as a fragment because the three live in three packages; they are held in
-      step by `refund-owed-parity.integration.test.ts`, which fails if they ever disagree.
-    */
-    if (query.attention === 'refund_owed') {
-      conditions.push(sql`
-        b.status = 'cancelled'::booking_status
-        AND b.paid_at IS NOT NULL
-        AND b.cancellation_reason LIKE 'system.%'
-        AND EXISTS (
-          SELECT 1 FROM payments p2
-          WHERE p2.booking_id = b.id
-            AND p2.status IN ('captured', 'partially_refunded')
-        )
-        AND NOT EXISTS (
-          SELECT 1 FROM refunds r
-          WHERE r.booking_id = b.id
-            AND r.status IN ('pending', 'processing', 'completed')
-        )`);
-    }
-
-    if (query.q) {
-      const term = `%${query.q}%`;
-
-      conditions.push(
-        sql`(b.reference ILIKE ${query.q + '%'}
-             OR p.name_ar ILIKE ${term}
-             OR p.name_en ILIKE ${term}
-             OR c.full_name ILIKE ${term})`,
-      );
-    }
+    const conditions = bookingRegistryConditions(query);
 
     const where =
       conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
@@ -327,4 +237,116 @@ export class BookingListService {
       capped: Object.values(byStatus).some((n) => n > COUNT_CAP),
     };
   }
+}
+
+/** The filters that decide WHICH bookings the registry means — everything but the page. */
+export type BookingRegistryFilters = Pick<
+  BookingListQuery,
+  'actor' | 'status' | 'q' | 'expiring' | 'attention'
+>;
+
+/**
+ * The registry's predicate, for the list, its count and the CSV export alike.
+ *
+ * The export wrote its own copy of `status` and `q` and knew nothing of `expiring` or `attention`,
+ * so «تصدير CSV» pressed on «٤٢٨ لم يُسجَّل وصولهم» built a file of every booking in scope: a
+ * different set from the one on screen, under a button whose whole promise is that it is the same
+ * one (go-live audit, 2026-10-06). One function means a filter added here reaches the file too.
+ *
+ * Aliases `b`, `p` and `c` are the caller's joins: bookings, properties, customer_profiles.
+ */
+export function bookingRegistryConditions(filters: BookingRegistryFilters): SQL[] {
+  // Geographic scope first, so it can never be forgotten behind a later `if`.
+  const conditions: SQL[] = [scopeFilter(filters.actor, 'b.city_id')];
+
+  if (filters.status) {
+    /**
+     * Cast rather than interpolate. The value is already validated against the enum by the
+     * controller's schema, so this is defence in depth: a value that somehow reached here
+     * unvalidated fails as a Postgres cast error, never as injected SQL.
+     */
+    conditions.push(sql`b.status = ${filters.status}::booking_status`);
+  }
+
+  if (filters.expiring) {
+    /*
+      The same predicate the dashboard counts, so the alert and this list cannot disagree.
+
+      `bookings_sla_idx` is (status, confirmation_deadline_at) WHERE status = 'pending_confirmation',
+      which serves exactly this — the status term is implied by the partial index and stated anyway,
+      because a filter that depended on the index's WHERE clause to be correct would break silently
+      if the index were ever redefined.
+    */
+    conditions.push(sql`
+      b.status = 'pending_confirmation'::booking_status
+      AND b.confirmation_deadline_at IS NOT NULL
+      AND b.confirmation_deadline_at
+            <= now() + (${SLA_EXPIRY_WARNING_MINUTES}::int * INTERVAL '1 minute')`);
+  }
+
+  /*
+    EC-011 — arrived by the calendar, and nobody recorded it.
+
+    In the PROPERTY's timezone, exactly as the counter computes it.
+
+    A correlated subquery rather than a join, deliberately: `fromWhere` is shared by the list and
+    its count (the house rule — a total must never describe a different set), and adding a join
+    there would make every OTHER view of this registry pay for a filter that is usually off. The
+    status term bounds this to the few hundred `confirmed` rows, which is what makes an unindexed
+    date comparison acceptable here and would not be over the whole table.
+  */
+  if (filters.attention === 'no_check_in') {
+    conditions.push(sql`
+      b.status = 'confirmed'::booking_status
+      AND b.checked_in_at IS NULL
+      AND b.check_in < ((now() AT TIME ZONE
+            (SELECT ci.timezone FROM cities ci WHERE ci.id = b.city_id))
+            - (${ARRIVAL_ALERT_HOURS}::int * INTERVAL '1 hour'))::date`);
+  }
+
+  /* EC-004 — answered by the partner and never moved. Should be empty; see the counter. */
+  if (filters.attention === 'unconfirmed') {
+    conditions.push(sql`
+      b.status = 'pending_confirmation'::booking_status
+      AND b.partner_responded_at IS NOT NULL`);
+  }
+
+  /*
+    §6.4 — SAFRA cancelled a paid booking and nothing is on its way back.
+
+    The SAME predicate as the dashboard's `refunds_owed` counter and as SystemRefundService's own
+    working set, minus the retry backoff: a booking waiting out an hour before its next attempt is
+    still a booking owed money, and an operator looking at this list wants to see it. Written out
+    rather than shared as a fragment because the three live in three packages; they are held in
+    step by `refund-owed-parity.integration.test.ts`, which fails if they ever disagree.
+  */
+  if (filters.attention === 'refund_owed') {
+    conditions.push(sql`
+      b.status = 'cancelled'::booking_status
+      AND b.paid_at IS NOT NULL
+      AND b.cancellation_reason LIKE 'system.%'
+      AND EXISTS (
+        SELECT 1 FROM payments p2
+        WHERE p2.booking_id = b.id
+          AND p2.status IN ('captured', 'partially_refunded')
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM refunds r
+        WHERE r.booking_id = b.id
+          AND r.status IN ('pending', 'processing', 'completed')
+      )`);
+  }
+
+  if (filters.q) {
+    const term = `%${filters.q}%`;
+
+    conditions.push(
+      sql`(b.reference ILIKE ${filters.q + '%'}
+           OR p.name_ar ILIKE ${term}
+           OR p.name_en ILIKE ${term}
+           OR c.full_name ILIKE ${term})`,
+    );
+  }
+
+  return conditions;
 }

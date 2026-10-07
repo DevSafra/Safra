@@ -326,6 +326,10 @@ describeIfDb('cancelling a gift card', () => {
     expect(entry.actor).toBe(staffId);
     expect(entry.reason).toContain('عنوان خاطئ');
     expect(entry.before, 'what it was worth before').toContain('60.00');
+    /* And in what: a balance without its currency is a number nobody can act on. */
+    expect(JSON.parse(entry.before)).toMatchObject({
+      currency: expect.stringMatching(/^[A-Z]{3}$/),
+    });
     expect(entry.after).toContain(reference);
   });
 });

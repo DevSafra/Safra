@@ -16,6 +16,7 @@ import { SCHEDULED_JOBS, type ScheduledJobData } from './scheduled.job.js';
 import { SystemRefundService } from '../payments/system-refund.service.js';
 import { GiftCardExpiryService } from '../gift-cards/gift-card-expiry.service.js';
 import { AdExpiryService } from '../admin/ad-expiry.service.js';
+import { ExportRetentionService } from '../admin/export-retention.service.js';
 import { StayCompletionService } from '../bookings/stay-completion.service.js';
 import { describeError } from '../common/errors/safe-error.js';
 
@@ -71,6 +72,7 @@ export class ScheduledProcessor {
     private readonly systemRefunds: SystemRefundService,
     private readonly giftCardExpiry: GiftCardExpiryService,
     private readonly adExpiry: AdExpiryService,
+    private readonly exportRetention: ExportRetentionService,
     private readonly runs: JobRunService,
     private readonly deadLetters: DeadLetterService,
   ) {}
@@ -115,6 +117,8 @@ export class ScheduledProcessor {
         return this.retention.prune();
       case 'credential-retention':
         return this.credentials.prune();
+      case 'export-retention':
+        return this.exportRetention.sweep();
       case 'notification-redrive':
         /*
           Wrapped HERE rather than inside the service, unlike the other five.

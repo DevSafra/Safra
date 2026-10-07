@@ -960,6 +960,44 @@ describeIfDb('PropertiesService.readOwn', () => {
       expect(await kind(), 'untouched by an unrelated edit').toBe('single');
     });
 
+    /*
+      A base price is money in the unit's currency, on the row that creates it and on the row that
+      changes it. Watched to fail against the payloads that carried `basePrice` alone.
+    */
+    it('audits a base price with its currency, on creation and on change', async () => {
+      const created = await service.addUnit(partner(otherPartnerId), otherReference, {
+        name: { ar: 'وحدة للسعر' },
+        maxGuests: 2,
+        bedrooms: 1,
+        beds: 1,
+        bedType: 'double',
+        bathrooms: 1,
+        basePrice: 100,
+        currencyCode: 'USD',
+        minNights: 1,
+        quantity: 1,
+        amenityCodes: [],
+      });
+
+      await service.updateUnit(partner(otherPartnerId), created.unitId, {
+        basePrice: 120,
+      });
+
+      const rows = await db.execute<{
+        action: string;
+        after: Record<string, unknown>;
+      }>(sql`
+        SELECT action, after FROM audit_log
+        WHERE subject_id = ${created.unitId}::uuid AND action IN ('unit.created', 'unit.updated')
+        ORDER BY created_at, id
+      `);
+
+      expect(rows.rows.map((row) => [row.action, row.after['currency']])).toEqual([
+        ['unit.created', 'USD'],
+        ['unit.updated', 'USD'],
+      ]);
+    });
+
     /**
      * No bed on this platform is untyped, and the refusal is at the BOUNDARY.
      *

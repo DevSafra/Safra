@@ -23,6 +23,15 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 const REFERENCE_PATTERN = /^CNV-\d{1,12}$/;
 
 /**
+ * How long an identical message from the same person counts as the same press.
+ *
+ * A form that is double-submitted, or retried by a browser on a slow line, arrives twice within
+ * seconds with the same body. Sixty seconds covers that and nothing a person does on purpose: a
+ * nudge after an unanswered hour is a new message and is written.
+ */
+const REPLAY_WINDOW_SECONDS = 60;
+
+/**
  * Who is asking, and therefore which threads exist for them.
  *
  * A customer and a partner are scoped by DIFFERENT columns, and neither may name the column's value —
@@ -222,10 +231,12 @@ export class SupportService {
       -- sb is the thread's SUBJECT booking — how both sides of a three-party thread reach it.
       -- (No backticks in here: they would end this sql template.)
       LEFT JOIN bookings sb ON sb.id = c.booking_id
-      LEFT JOIN (
-        SELECT conversation_id, count(*) AS n FROM messages
-        WHERE internal = false GROUP BY conversation_id
-      ) m ON m.conversation_id = c.id
+      -- Counted per thread, never grouped over the whole messages table: a grouped subquery is
+      -- built in full before the join, so every list call aggregated every message ever written.
+      LEFT JOIN LATERAL (
+        SELECT count(*) AS n FROM messages
+        WHERE conversation_id = c.id AND internal = false
+      ) m ON TRUE
       LEFT JOIN LATERAL (
         SELECT body FROM messages
         WHERE conversation_id = c.id AND internal = false
@@ -313,6 +324,34 @@ export class SupportService {
     const redacted = redactIncomingMessage(body);
 
     const created = await this.db.transaction(async (tx) => {
+      /*
+        Serialised per person, then the replay looked for under the lock.
+
+        Two presses of «إرسال» opened two tickets with the same words, and staff answered both.
+        There is no row to lock before the ticket exists, so the lock is on the asker; the second
+        press waits for the first to commit, finds its ticket, and is answered with it.
+      */
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtextextended(${`support.open:${asker.userId}`}, 0))`,
+      );
+
+      const replay = await tx.execute<{ id: string; reference: string }>(sql`
+        SELECT c.id, c.reference
+        FROM conversations c
+        JOIN messages m ON m.conversation_id = c.id AND m.internal = false
+        WHERE c.opened_by_user_id = ${asker.userId}::uuid
+          AND c.deleted_at IS NULL
+          AND c.created_at > now() - make_interval(secs => ${REPLAY_WINDOW_SECONDS})
+          AND m.sender_user_id = ${asker.userId}::uuid
+          AND m.body = ${redacted.body}
+        ORDER BY c.created_at DESC, c.id DESC
+        LIMIT 1
+      `);
+
+      const earlier = replay.rows.at(0);
+
+      if (earlier) return earlier;
+
       const rows = await tx.execute<{ id: string; reference: string }>(sql`
         INSERT INTO conversations
           (customer_profile_id, partner_id, opened_by_user_id, last_message_at, unread_for_staff)
@@ -374,6 +413,37 @@ export class SupportService {
     const redacted = redactIncomingMessage(body);
 
     await this.db.transaction(async (tx) => {
+      /*
+        The thread is locked and read again before anything is written.
+
+        The check above was made outside the transaction, so a reply racing a close was written
+        into a closed thread, and two presses of «إرسال» wrote the same message twice and counted
+        it twice in `unread_for_staff`. Under the lock the second press sees the first and is
+        answered with the thread as it now stands.
+      */
+      const locked = await tx.execute<{ closed: boolean; replay: boolean }>(sql`
+        SELECT c.closed_at IS NOT NULL AS closed,
+               coalesce(
+                 (SELECT m.sender_user_id = ${asker.userId}::uuid
+                         AND m.body = ${redacted.body}
+                         AND m.created_at > now() - make_interval(secs => ${REPLAY_WINDOW_SECONDS})
+                  FROM messages m
+                  WHERE m.conversation_id = c.id AND m.internal = false
+                  ORDER BY m.created_at DESC, m.id DESC
+                  LIMIT 1),
+                 false
+               ) AS replay
+        FROM conversations c
+        WHERE c.id = ${row.id}::uuid
+        FOR UPDATE OF c
+      `);
+
+      const state = locked.rows.at(0);
+
+      if (!state) throw notFound(ERROR.SUPPORT_TICKET_NOT_FOUND);
+      if (state.closed) throw badRequest(ERROR.SUPPORT_TICKET_CLOSED);
+      if (state.replay) return;
+
       await tx.execute(sql`
         INSERT INTO messages
           (conversation_id, sender_kind, sender_user_id, body, redacted_count, internal)

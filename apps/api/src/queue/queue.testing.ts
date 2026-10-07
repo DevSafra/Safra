@@ -84,6 +84,11 @@ export function createInlineQueue<T>(): InlineQueue<T> {
 
         return { id: options?.jobId };
       },
+      /*
+        No job is ever retained, so a re-drive always finds the id free — the state after a Redis
+        loss. The retained-job case is BullMQ's behaviour and is tested against a real Redis.
+      */
+      getJob: () => Promise.resolve(undefined),
       /* eslint-disable-next-line @typescript-eslint/require-await -- ditto. */
       close: async () => undefined,
     } as unknown as Queue,

@@ -433,34 +433,117 @@ export class PayoutAccountService {
       material || current.status === 'rejected' ? 'pending' : current.status;
     const staysPrimary = nextStatus === 'verified' && current.is_primary;
 
-    await this.db.execute(sql`
-      UPDATE partner_payout_accounts
-      SET method = ${input.method},
-          account_holder = ${input.accountHolder},
-          account_number_encrypted = ${this.crypto.encrypt(input.accountNumber)},
-          account_number_last4 = ${last4(input.accountNumber)},
-          bank_name = ${input.bankName ?? null},
-          swift_code = ${swift},
-          currency_id = ${currencyId},
-          /*
-            A material change drops it back to pending AND strips primary in the same statement.
-            Two statements would leave a window in which the account is unverified and still the
-            one the release path picks, and that window is exactly the one worth attacking.
-          */
-          status = ${nextStatus},
-          is_primary = ${staysPrimary},
-          verified_at = ${nextStatus === 'verified' ? current.verified_at : null},
-          verified_by_user_id =
-            CASE WHEN ${nextStatus === 'verified'} THEN verified_by_user_id ELSE NULL END,
-          rejected_at = NULL,
-          rejected_by_user_id = NULL,
-          rejection_reason = NULL,
-          submitted_by_user_id = ${claims?.sub ?? null},
-          updated_at = now()
-      WHERE id = ${id}
-    `);
+    /* Encrypted once, whichever row it lands in. */
+    const ciphertext = this.crypto.encrypt(input.accountNumber);
 
-    await this.record(claims, 'payout_account.updated', id, {
+    const written = await this.db.transaction(async (tx) => {
+      /*
+        An account a PAID payout went to is never edited in place (audit 2026-10-06).
+
+        The payout row names its destination by `payout_account_id`, and the detail screen reads
+        the account through it. Edited in place, a transfer made in March to one IBAN read, after a
+        correction in May, as though it had gone to the new one: the record of where money went
+        rewritten by an edit that came later. So the old row is retired as it stands, which keeps
+        it exactly as it was when the money left, and the edit becomes a new row.
+
+        Locked first, so a payment being recorded against this account at the same moment is
+        either counted here or happens after the swap.
+      */
+      /*
+        Live rows only. Two edits at once used to both pass this lock: the second, waiting here,
+        then retired a row the first had already retired and inserted a second replacement, leaving
+        two live accounts (security pass, 2026-10-06). An edit that finds its row retired is an
+        edit of something that no longer exists.
+      */
+      const locked = await tx.execute(
+        sql`SELECT id FROM partner_payout_accounts
+            WHERE id = ${id} AND deleted_at IS NULL FOR UPDATE`,
+      );
+
+      if (locked.rows.length === 0) throw notFound(ERROR.PAYOUT_ACCOUNT_NOT_FOUND);
+
+      const paid = await tx.execute<{ n: number }>(sql`
+        SELECT count(*)::int AS n FROM partner_payouts
+        WHERE payout_account_id = ${id} AND status = 'paid'
+      `);
+
+      if ((paid.rows[0]?.n ?? 0) === 0) {
+        await tx.execute(sql`
+          UPDATE partner_payout_accounts
+          SET method = ${input.method},
+              account_holder = ${input.accountHolder},
+              account_number_encrypted = ${ciphertext},
+              account_number_last4 = ${last4(input.accountNumber)},
+              bank_name = ${input.bankName ?? null},
+              swift_code = ${swift},
+              currency_id = ${currencyId},
+              /*
+                A material change drops it back to pending AND strips primary in the same
+                statement. Two statements would leave a window in which the account is unverified
+                and still the one the release path picks, and that window is exactly the one worth
+                attacking.
+              */
+              status = ${nextStatus},
+              is_primary = ${staysPrimary},
+              verified_at = ${nextStatus === 'verified' ? current.verified_at : null},
+              verified_by_user_id =
+                CASE WHEN ${nextStatus === 'verified'} THEN verified_by_user_id ELSE NULL END,
+              rejected_at = NULL,
+              rejected_by_user_id = NULL,
+              rejection_reason = NULL,
+              submitted_by_user_id = ${claims?.sub ?? null},
+              updated_at = now()
+          WHERE id = ${id}
+        `);
+
+        return id;
+      }
+
+      /* Retired before the replacement exists, so the two are never both primary. */
+      await tx.execute(sql`
+        UPDATE partner_payout_accounts
+        SET deleted_at = now(), is_primary = false, updated_at = now()
+        WHERE id = ${id}
+      `);
+
+      const replacement = await tx.execute<{ id: string }>(sql`
+        INSERT INTO partner_payout_accounts
+          (partner_id, method, account_holder, account_number_encrypted,
+           account_number_last4, bank_name, swift_code, currency_id,
+           is_primary, status, submitted_by_user_id, verified_at, verified_by_user_id)
+        SELECT a.partner_id, ${input.method}, ${input.accountHolder},
+               ${ciphertext}, ${last4(input.accountNumber)},
+               ${input.bankName ?? null}, ${swift}, ${currencyId},
+               ${staysPrimary}, ${nextStatus}::payout_account_status, ${claims?.sub ?? null},
+               ${nextStatus === 'verified' ? current.verified_at : null}::timestamptz,
+               CASE WHEN ${nextStatus === 'verified'} THEN a.verified_by_user_id END
+        FROM partner_payout_accounts a
+        WHERE a.id = ${id}
+        RETURNING id
+      `);
+
+      const replacementId = replacement.rows[0]?.id;
+
+      if (!replacementId) throw notFound(ERROR.PAYOUT_ACCOUNT_NOT_FOUND);
+
+      /*
+        A transfer released but not yet paid follows the account to its new row.
+
+        It has not gone anywhere yet, so its destination is the account as it now reads, and
+        `markPaid` re-checks that row: pending after a material change refuses until somebody
+        verifies it, exactly as the edit in place did. Left on the retired row it could never be
+        paid at all.
+      */
+      await tx.execute(sql`
+        UPDATE partner_payouts
+        SET payout_account_id = ${replacementId}, updated_at = now()
+        WHERE payout_account_id = ${id} AND status IN ('scheduled', 'on_hold')
+      `);
+
+      return replacementId;
+    });
+
+    await this.record(claims, 'payout_account.updated', written, {
       partnerId: current.partner_id,
       method: input.method,
       accountHolder: input.accountHolder,
@@ -471,7 +554,7 @@ export class PayoutAccountService {
       reverified: material,
     });
 
-    return this.require(id, null).then(toView);
+    return this.require(written, null).then(toView);
   }
 
   private async remove(

@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
@@ -8,7 +8,7 @@ import { ERROR } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { ImageService } from '../storage/image.service.js';
-import { StorageService } from '../storage/storage.service.js';
+import { StorageService, isStorageUnavailable } from '../storage/storage.service.js';
 import { QUEUE } from './queue.definitions.js';
 import { DeadLetterService } from './dead-letter.service.js';
 import { MEDIA_JOB, type MediaJobData, type MediaSubject } from './media.job.js';
@@ -71,9 +71,20 @@ export class MediaProcessor {
     */
     const claimed =
       subject === 'ad_campaign'
-        ? await this.db.execute<{ id: string }>(sql`
+        ? /*
+            The FILE is part of the claim, not only the row.
+
+            A campaign has one creative and a replacement reuses the row, so «this campaign is
+            processing» is true of the NEW upload while the OLD one's job may still be queued. A
+            claim on the row alone let that old job render the old picture, publish it under the
+            row now pointing at the new key, and delete its original — `ready` over variants that
+            were never written, and the new job then finding nothing at `processing` to do. The
+            console showed a broken image with no way back but a third upload.
+          */
+          await this.db.execute<{ id: string }>(sql`
             UPDATE ad_campaigns SET updated_at = now()
             WHERE id = ${imageId}::uuid AND image_status = 'processing'
+              AND image_file_key = ${fileKey}
             RETURNING id
           `)
         : subject === 'dispute_evidence'
@@ -99,14 +110,19 @@ export class MediaProcessor {
       return;
     }
 
-    const original = await this.storage.get(originalKey);
+    /*
+      `read`, not `get`: null here means the object does not exist, and a store that could not
+      answer THROWS — which retries the job with backoff instead of reaching the terminal branch
+      below on a five-second blip. See `StorageUnavailableError`.
+    */
+    const original = await this.storage.read(originalKey);
 
     if (!original) {
       /*
         Terminal, and deliberately not a retry: the bytes are gone, and no number of attempts
         brings them back. Throwing would burn three attempts to reach the same place slower.
       */
-      await this.fail(imageId, ERROR.UPLOAD_FILE_MISSING, subject);
+      await this.fail(imageId, ERROR.UPLOAD_FILE_MISSING, subject, fileKey);
       this.logger.error(`Image ${imageId}: the uploaded object ${originalKey} is gone.`);
 
       return;
@@ -135,7 +151,12 @@ export class MediaProcessor {
         .set({ variantWidths: widths })
         .where(eq(schema.disputeEvidence.id, imageId));
     } else if (subject === 'ad_campaign') {
-      await this.db
+      /*
+        Guarded on the same file as the claim. A replacement that landed DURING this render points
+        the row at a newer key, and publishing these widths over it would mark that upload ready
+        before anything rendered it. The bytes written above are then simply unused.
+      */
+      const published = await this.db
         .update(schema.adCampaigns)
         .set({
           imageStatus: 'ready',
@@ -145,7 +166,19 @@ export class MediaProcessor {
           imageOriginalKey: null,
           imageFailureCode: null,
         })
-        .where(eq(schema.adCampaigns.id, imageId));
+        .where(
+          and(
+            eq(schema.adCampaigns.id, imageId),
+            eq(schema.adCampaigns.imageFileKey, fileKey),
+          ),
+        )
+        .returning({ id: schema.adCampaigns.id });
+
+      if (published.length === 0) {
+        this.logger.log(
+          `Creative ${fileKey} was replaced while rendering; not published.`,
+        );
+      }
     } else {
       await this.db
         .update(schema.propertyImages)
@@ -196,7 +229,33 @@ export class MediaProcessor {
 
     if (job.attemptsMade < attempts) return;
 
-    await this.fail(job.data.imageId, ERROR.UPLOAD_IMAGE_PROCESSING_FAILED);
+    if (isStorageUnavailable(error)) {
+      /*
+        The STORE failed, not the photograph — so the row stays `processing`.
+
+        Three attempts span seconds, and an object-store incident can last longer than that. Marking
+        the upload failed would make it permanent, when nothing about the file is wrong: the
+        original is still parked under `incoming/`, and `media-redrive` re-enqueues a row like this
+        one every five minutes until the store answers again. The dead letter is still recorded
+        below, because a store that is down is exactly what somebody should be paged for.
+      */
+      this.logger.error(
+        `Image ${job.data.imageId}: object storage unavailable after ${job.attemptsMade} ` +
+          'attempts. Left processing; media-redrive will try again.',
+      );
+    } else {
+      /*
+        With the job's own SUBJECT and FILE. Without the subject a campaign creative was "failed"
+        in `property_images`, matched nothing, and sat at `processing` for ever; without the file,
+        an exhausted job for a REPLACED creative would mark the new upload failed.
+      */
+      await this.fail(
+        job.data.imageId,
+        ERROR.UPLOAD_IMAGE_PROCESSING_FAILED,
+        job.data.subject ?? 'property_image',
+        job.data.fileKey,
+      );
+    }
 
     await this.deadLetters.record({
       queue: QUEUE.media,
@@ -224,7 +283,8 @@ export class MediaProcessor {
   private async fail(
     imageId: string,
     code: string,
-    subject: MediaSubject = 'property_image',
+    subject: MediaSubject,
+    fileKey: string,
   ): Promise<void> {
     /*
       A campaign's creative fails on its own, with none of the gallery's consequences.
@@ -244,10 +304,30 @@ export class MediaProcessor {
     }
 
     if (subject === 'ad_campaign') {
-      await this.db
-        .update(schema.adCampaigns)
-        .set({ imageStatus: 'failed', imageFailureCode: code })
-        .where(eq(schema.adCampaigns.id, imageId));
+      /*
+        Only while the row still holds THIS file and is still waiting on it. A replacement since
+        then is somebody else's upload, and a creative already `ready` or removed has nothing a
+        late failure should overwrite.
+      */
+      try {
+        await this.db
+          .update(schema.adCampaigns)
+          .set({ imageStatus: 'failed', imageFailureCode: code })
+          .where(
+            and(
+              eq(schema.adCampaigns.id, imageId),
+              eq(schema.adCampaigns.imageFileKey, fileKey),
+              eq(schema.adCampaigns.imageStatus, 'processing'),
+            ),
+          );
+      } catch (error) {
+        /* Swallowed for the reason the gallery branch below gives. */
+        this.logger.error(
+          `Could not mark creative ${imageId} failed: ${describeError(error)}`,
+        );
+
+        return;
+      }
 
       this.logger.warn(`Campaign creative ${imageId} failed: ${code}.`);
 

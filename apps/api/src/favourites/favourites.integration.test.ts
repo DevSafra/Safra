@@ -310,6 +310,77 @@ describeIfDb('FavouritesService', () => {
     expect(page.items).toHaveLength(1);
     expect(page.items[0]?.isAvailable).toBe(false);
   });
+
+  /**
+   * REGRESSION (audit 2026-10-06): the flagged row could not be removed.
+   *
+   * `remove` resolved the slug through the PUBLISHED lookup, so once a saved listing was unpublished
+   * the delete answered 404 and the row marked «no longer available» stayed on the list for good.
+   * Every way a listing stops being public is driven, because each is a separate column.
+   */
+  it.each([
+    [
+      'unpublished',
+      sql`UPDATE properties SET status = 'suspended' WHERE slug = ${PUBLISHED_SLUG}`,
+    ],
+    [
+      'deleted',
+      sql`UPDATE properties SET deleted_at = now() WHERE slug = ${PUBLISHED_SLUG}`,
+    ],
+    [
+      'in a closed city',
+      sql`UPDATE cities SET is_active = false
+          WHERE id = (SELECT city_id FROM properties WHERE slug = ${PUBLISHED_SLUG})`,
+    ],
+    [
+      'from a suspended partner',
+      sql`UPDATE partners SET suspended_at = now() WHERE id = ${PARTNER_ID}::uuid`,
+    ],
+  ])('removes a saved listing that is now %s', async (_label, closure) => {
+    await service.save(customer(), PUBLISHED_SLUG);
+    await db.execute(closure);
+
+    await expect(service.remove(customer(), PUBLISHED_SLUG)).resolves.toStrictEqual({
+      slug: PUBLISHED_SLUG,
+      saved: false,
+    });
+
+    const page = await service.list(customer(), { limit: 20 });
+
+    expect(page.items).toStrictEqual([]);
+  });
+
+  /**
+   * Removing by slug can only ever touch the CALLER's own row.
+   *
+   * The remove no longer goes through the published lookup, so this is what stops it becoming a
+   * reach into anybody else's list: the other customer's saved row is still there afterwards.
+   */
+  it('removes only the caller’s own favourite', async () => {
+    await service.save(customer(), PUBLISHED_SLUG);
+    await service.save(customer(OTHER_PROFILE_ID, OTHER_USER_ID), PUBLISHED_SLUG);
+
+    await service.remove(customer(), PUBLISHED_SLUG);
+
+    const mine = await service.list(customer(), { limit: 20 });
+    const theirs = await service.list(customer(OTHER_PROFILE_ID, OTHER_USER_ID), {
+      limit: 20,
+    });
+
+    expect(mine.items).toStrictEqual([]);
+    expect(theirs.items.map((item) => item.slug)).toStrictEqual([PUBLISHED_SLUG]);
+  });
+
+  /** A draft, a slug that names nothing, and one never saved all answer the same: no probe. */
+  it.each([DRAFT_SLUG, 'no-such-listing'])(
+    'answers removing %s exactly as removing something never saved',
+    async (slug) => {
+      await expect(service.remove(customer(), slug)).resolves.toStrictEqual({
+        slug,
+        saved: false,
+      });
+    },
+  );
 });
 
 async function seed(db: Database): Promise<void> {

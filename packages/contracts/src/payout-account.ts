@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { westernDigits } from './digits.js';
 import { ERROR } from './error-codes.js';
 
 /**
@@ -35,8 +36,11 @@ const SWIFT = /^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/;
 const accountNumber = z
   .string()
   .trim()
-  /* An IBAN is written in groups of four and read back with the spaces; neither is the value. */
-  .transform((value) => value.replace(/[\s-]/g, ''))
+  /*
+    An IBAN is written in groups of four and read back with the spaces; neither is the value. And an
+    Arabic keyboard types «١٢٣٤», which is the same account as «1234» (audit 2026-10-06).
+  */
+  .transform((value) => westernDigits(value).replace(/[\s-]/g, ''))
   .pipe(z.string().regex(ACCOUNT_NUMBER, ERROR.VALIDATION_ACCOUNT_NUMBER));
 
 const holder = z

@@ -7,6 +7,7 @@ import { ERROR, type CursorQuery, decodeCursor, encodeCursor } from '@safra/cont
 import { DATABASE } from '../database/database.module.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { badRequest, notFound, unauthorized } from '../common/errors/app-error.js';
+import { openListing } from '../catalog/open-listing.js';
 
 /** A uuid, checked before it reaches a `::uuid` cast so a forged cursor is a 400 and not a 500. */
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -96,12 +97,14 @@ export class FavouritesService {
              p.rating::text AS rating,
              p.reviews_count,
              /*
-               Whether the listing can still be booked.
+               Whether the listing can still be booked: the SAME predicate the property page, the
+               quote and the booking use, so a closed market or a suspended partner reads as
+               unavailable here rather than as a card that leads to a 404.
 
                Reported rather than filtered: a saved property that was unpublished should say so, not
                vanish. Silently dropping it would look like the save had failed.
              */
-             (p.status = 'published' AND p.deleted_at IS NULL) AS is_available,
+             ${openListing(sql`p`)} AS is_available,
              cheapest.base_price::text AS from_price,
              cheapest.code             AS currency_code
       FROM favourites f
@@ -226,14 +229,26 @@ export class FavouritesService {
    */
   async remove(claims: AccessTokenClaims | undefined, slug: string) {
     const profileId = this.profileOf(claims);
-    const propertyId = await this.publishedPropertyId(slug);
 
+    /*
+      Resolved through the caller's OWN favourites, never through `publishedPropertyId`.
+
+      It used the published lookup, so the moment a saved listing was unpublished, closed or
+      suspended its slug stopped resolving and the remove answered 404: the one row المفضلة flags as
+      «no longer available» was the one row nobody could take off the list (audit 2026-10-06).
+
+      Joining from favourites is what keeps this from becoming a probe. The only rows it can touch
+      are the caller's, and it answers the same `saved: false` whether the slug was saved, never
+      saved, or names nothing at all, so it says nothing about drafts or about anybody else.
+    */
     await this.db.execute(sql`
-      UPDATE favourites
+      UPDATE favourites f
       SET deleted_at = now(), updated_at = now()
-      WHERE customer_profile_id = ${profileId}
-        AND property_id = ${propertyId}
-        AND deleted_at IS NULL
+      FROM properties p
+      WHERE p.id = f.property_id
+        AND p.slug = ${slug}
+        AND f.customer_profile_id = ${profileId}
+        AND f.deleted_at IS NULL
     `);
 
     return { slug, saved: false };
@@ -242,13 +257,14 @@ export class FavouritesService {
   /**
    * The id behind a slug, for a listing the public can actually see.
    *
-   * `published` is the check that matters: without it a slug could be probed for existence, and a
-   * draft could be saved before its partner ever published it.
+   * `openListing` is the check that matters: without it a slug could be probed for existence, a
+   * draft could be saved before its partner ever published it, and a listing in a closed market
+   * could be shortlisted from a stale link the property page itself now refuses.
    */
   private async publishedPropertyId(slug: string): Promise<string> {
     const found = await this.db.execute<{ id: string }>(sql`
-      SELECT id FROM properties
-      WHERE slug = ${slug} AND status = 'published' AND deleted_at IS NULL
+      SELECT p.id FROM properties p
+      WHERE p.slug = ${slug} AND ${openListing(sql`p`)}
       LIMIT 1
     `);
 

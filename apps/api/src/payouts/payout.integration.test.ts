@@ -1046,7 +1046,7 @@ describeIfDb('PayoutService', () => {
     } as AccessTokenClaims;
 
     const mine = await service.listForPartner(claims);
-    const references = mine.map((payout) => payout.reference);
+    const references = mine.items.map((payout) => payout.reference);
 
     expect(references.length).toBeGreaterThan(0);
 

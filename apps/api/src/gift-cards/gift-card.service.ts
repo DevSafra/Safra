@@ -363,12 +363,22 @@ export class GiftCardService {
           action: 'gift_card.redeem',
           subjectType: 'gift_card',
           subjectId: card.id,
-          before: { status: card.status, remainingAmount: amount },
+          /* With the card's currency on both sides: a balance is not a number, it is money. */
+          before: {
+            status: card.status,
+            remainingAmount: amount,
+            currency: card.currency_code,
+          },
           /*
             Never the code, and never the last four either — an audit row is read by staff, and the
             reference already identifies the card without narrowing anybody's guess at its code.
           */
-          after: { status: 'used', remainingAmount: '0', reference: card.reference },
+          after: {
+            status: 'used',
+            remainingAmount: '0',
+            currency: card.currency_code,
+            reference: card.reference,
+          },
         },
         tx as unknown as Database,
       );
@@ -521,7 +531,8 @@ export class GiftCardService {
             reference: row.reference,
             amount: input.amount,
             currencyCode: wallet.currencyCode,
-            recipientEmail: input.recipientEmail ?? null,
+            /* Whether it went to somebody, never their address: the card's own row holds that. */
+            toRecipient: Boolean(input.recipientEmail),
           },
         },
         tx as unknown as Database,
@@ -703,7 +714,8 @@ export class GiftCardService {
             amount: input.amount,
             currency: input.currency,
             expiresAt: input.expiresOn ?? null,
-            recipientEmail: input.recipientEmail ?? null,
+            /* Whether it went to somebody, never their address: the card's own row holds that. */
+            toRecipient: Boolean(input.recipientEmail),
           },
           reason: input.reason,
         },
@@ -906,7 +918,11 @@ export class GiftCardService {
           action: 'gift_card.cancelled',
           subjectType: 'gift_card',
           subjectId: card.id,
-          before: { status: 'active', remainingAmount: remaining },
+          before: {
+            status: 'active',
+            remainingAmount: remaining,
+            currency: card.currency_code,
+          },
           /* The reference identifies it; the code never appears, here or anywhere. */
           after: {
             status: 'cancelled',

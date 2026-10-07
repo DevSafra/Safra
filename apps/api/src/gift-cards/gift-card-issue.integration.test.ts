@@ -252,6 +252,13 @@ describeIfDb('a gift card issued by staff', () => {
 
     /* The payload is read on سجل التدقيق — a code there is a spendable code on a screen. */
     expect(entry.after).not.toContain(normaliseGiftCode(result.code));
+
+    /*
+      No address of any kind (CLAUDE.md §1: IDs, never addresses), asked generally rather than for
+      the one address this fixture uses, and the fact that a recipient was named survives.
+    */
+    expect(entry.after, 'an email address in the audit payload').not.toMatch(/@/);
+    expect(JSON.parse(entry.after)).toMatchObject({ toRecipient: true });
   });
 
   /**

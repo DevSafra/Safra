@@ -1,5 +1,7 @@
 import { isValidPhoneNumber } from 'libphonenumber-js/max';
 import { z } from 'zod';
+
+import { digitString } from './digits.js';
 import { ERROR } from './error-codes.js';
 import { ROLES, type Role } from './permissions.js';
 import {
@@ -228,10 +230,9 @@ export const loginSchema = z
     email: emailSchema,
     password: z.string().min(1).max(256),
     /** Required only once a staff account has TOTP enabled. */
-    totpCode: z
-      .string()
-      .regex(/^\d{6}$/, ERROR.VALIDATION_CODE_SIX_DIGITS)
-      .optional(),
+    totpCode: digitString(
+      z.string().regex(/^\d{6}$/, ERROR.VALIDATION_CODE_SIX_DIGITS),
+    ).optional(),
     /**
      * Accepted in place of totpCode when the authenticator is lost. Single-use:
      * consumed on a successful sign-in.
@@ -250,10 +251,9 @@ export const loginSchema = z
      * the caller meant — the wrong guess being an attacker feeding a stale email code where an
      * authenticator was expected.
      */
-    emailCode: z
-      .string()
-      .regex(/^\d{6}$/, ERROR.VALIDATION_CODE_SIX_DIGITS)
-      .optional(),
+    emailCode: digitString(
+      z.string().regex(/^\d{6}$/, ERROR.VALIDATION_CODE_SIX_DIGITS),
+    ).optional(),
   })
   .strict();
 export type LoginInput = z.infer<typeof loginSchema>;

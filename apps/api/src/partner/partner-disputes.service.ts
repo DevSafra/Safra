@@ -9,7 +9,10 @@ import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
 import { badRequest, notFound } from '../common/errors/app-error.js';
 import { redactContactDetails } from '../messaging/redaction.js';
-import { evidenceVariant } from '../disputes/dispute-evidence.service.js';
+import {
+  evidenceVariant,
+  uploadedByPartnerSql,
+} from '../disputes/dispute-evidence.service.js';
 import { requirePartnerId } from '../rbac/ownership.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
@@ -206,7 +209,8 @@ export class PartnerDisputesService {
       shared: boolean;
     }>(sql`
       SELECT e.id::text, e.file_name, e.kind, e.created_at::text, e.variant_widths,
-             (u.role = 'partner') AS mine,
+             -- Any partner-side account: an employee's upload is the business's own file.
+             ${uploadedByPartnerSql('u')} AS mine,
              e.shared_with_partner AS shared
         FROM dispute_evidence e
         LEFT JOIN users u ON u.id = e.uploaded_by_user_id

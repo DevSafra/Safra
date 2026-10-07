@@ -4,6 +4,7 @@ import {
   Delete,
   Inject,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   UploadedFile,
@@ -149,7 +150,7 @@ export class CityImagesController {
   async update(
     @CurrentUser() user: AccessTokenClaims | undefined,
     @Param('slug') slug: string,
-    @Param('imageId') imageId: string,
+    @Param('imageId', ParseUUIDPipe) imageId: string,
     @Body(new ZodValidationPipe(updateCityImageSchema)) body: UpdateCityImageInput,
   ) {
     const found = await this.db.execute<{ id: string; city_id: string }>(sql`
@@ -246,7 +247,10 @@ export class CityImagesController {
     subjectType: 'city_image',
     subjectParam: 'imageId',
   })
-  async remove(@Param('slug') slug: string, @Param('imageId') imageId: string) {
+  async remove(
+    @Param('slug') slug: string,
+    @Param('imageId', ParseUUIDPipe) imageId: string,
+  ) {
     const found = await this.db
       .select({
         id: schema.cityImages.id,

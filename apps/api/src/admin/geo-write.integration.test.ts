@@ -666,6 +666,36 @@ describeIfDb('creating and correcting geography', () => {
       expect(alive.rows[0]?.n).toBe('1');
     });
 
+    /*
+      A trip TO the city. It was not counted, so the city went and its published trips stayed on
+      the public section. Watched to fail against the old list; the archived trip is the opposite
+      control, since a trip that was ever published can only be archived, never deleted.
+    */
+    it('refuses a city a live group trip goes to, and is not held by an archived one', async () => {
+      const city = await spareCity();
+      const trip = async (slug: string, status: string) =>
+        db.execute(sql`
+          INSERT INTO group_trips (slug, city_id, title_ar, summary_ar, description_ar,
+                                   starts_on, ends_on, status)
+          VALUES (${`${slug}-${city.slug}`}, ${city.id}::uuid, 'رحلة', 'سطر.', 'وصف كافٍ.',
+                  '2027-05-01', '2027-05-07', ${status}::group_trip_status)
+        `);
+
+      await trip('live', 'published');
+
+      await expect(service.deleteCity(staff(), city.slug)).rejects.toMatchObject({
+        response: { code: ERROR.GEO_CITY_IN_USE },
+      });
+
+      await db.execute(sql`
+        UPDATE group_trips SET status = 'archived' WHERE city_id = ${city.id}::uuid
+      `);
+
+      await expect(service.deleteCity(staff(), city.slug)).resolves.toEqual({
+        slug: city.slug,
+      });
+    });
+
     /**
      * The city's OWN children go with it, and do not block it.
      *

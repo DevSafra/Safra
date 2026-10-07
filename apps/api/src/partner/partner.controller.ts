@@ -371,7 +371,7 @@ export class PartnerController {
   @RequirePermissions(P.PROPERTY_MANAGE_OWN)
   async updateUnit(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('unitId') unitId: string,
+    @Param('unitId', ParseUUIDPipe) unitId: string,
     @Body(new ZodValidationPipe(unitUpdateSchema)) body: UnitUpdateInput,
   ) {
     return this.properties.updateUnit(user, unitId, body);
@@ -401,7 +401,7 @@ export class PartnerController {
   @RequirePermissions(P.CALENDAR_MANAGE_OWN)
   async readCalendar(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('unitId') unitId: string,
+    @Param('unitId', ParseUUIDPipe) unitId: string,
     @Query(new ZodValidationPipe(calendarQuerySchema)) query: CalendarQuery,
   ) {
     return this.calendar.read(user, unitId, query);
@@ -415,7 +415,7 @@ export class PartnerController {
   @RequirePermissions(P.CALENDAR_MANAGE_OWN)
   async updateCalendar(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('unitId') unitId: string,
+    @Param('unitId', ParseUUIDPipe) unitId: string,
     @Body(new ZodValidationPipe(calendarRangeUpdateSchema)) body: CalendarRangeUpdate,
   ) {
     return this.calendar.updateRange(user, unitId, body);

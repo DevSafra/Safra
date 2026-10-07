@@ -266,6 +266,33 @@ describeIfDb('GiftCardService', () => {
     expect(rows.rows[0]?.payload).toContain('GIF-');
   });
 
+  /*
+    The balance either side carries the card's currency. Watched to fail against the payload that
+    wrote `remainingAmount` alone, which the console printed as a bare number.
+  */
+  it('audits the balance either side with the card’s currency', async () => {
+    const code = 'ABCDE-FGHJK-MNPQR-STVWX';
+    const reference = await issue({ code });
+
+    await giftCards.redeem(customer(), code);
+
+    const row = await db.execute<{
+      before: Record<string, unknown>;
+      after: Record<string, unknown>;
+      currency: string;
+    }>(sql`
+      SELECT a.before, a.after, cur.code AS currency
+      FROM audit_log a
+      JOIN gift_cards g ON g.id = a.subject_id
+      JOIN currencies cur ON cur.id = g.currency_id
+      WHERE a.action = 'gift_card.redeem' AND g.reference = ${reference}`);
+    const entry = row.rows[0];
+
+    expect(entry?.before['remainingAmount']).toBeDefined();
+    expect(entry?.before['currency']).toBe(entry?.currency);
+    expect(entry?.after['currency']).toBe(entry?.currency);
+  });
+
   /**
    * Normalisation is the same at both ends, so a code typed the way people type it works.
    *
@@ -668,6 +695,27 @@ describeIfDb('GiftCardService', () => {
     expect(rows.rows).toHaveLength(1);
     expect(rows.rows[0]?.payload).not.toContain(normaliseGiftCode(bought.code));
     expect(rows.rows[0]?.payload).toContain('GIF-');
+  });
+
+  it('audits a gift for somebody without recording their address', async () => {
+    await fund('30.000');
+
+    const bought = await giftCards.purchase(customer(), {
+      amount: '25.00',
+      recipientName: 'ليلى',
+      recipientEmail: 'laila@safra.test',
+    });
+
+    const rows = await db.execute<{ after: Record<string, unknown> }>(sql`
+      SELECT a.after FROM audit_log a
+      JOIN gift_cards g ON g.id = a.subject_id
+      WHERE a.action = 'gift_card.purchase' AND g.reference = ${bought.card.reference}`);
+
+    expect(
+      JSON.stringify(rows.rows[0]?.after),
+      'an address in the audit payload',
+    ).not.toMatch(/@/);
+    expect(rows.rows[0]?.after).toMatchObject({ toRecipient: true });
   });
 
   it('keeps the recipient as a label when one is given', async () => {

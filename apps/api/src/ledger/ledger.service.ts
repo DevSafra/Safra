@@ -50,6 +50,63 @@ export interface LedgerContext {
   createdByUserId?: string | undefined;
 }
 
+/** SYP carries two decimals, the scale of `ledger_entries.amount_syp`. */
+const SYP_SCALE = 2;
+
+/**
+ * Each leg's `amount_syp`, rounded so that each SIDE sums to its own total converted once.
+ *
+ * ## Why not each leg converted on its own
+ *
+ * That was the rule, and the balance trigger compares the rounded figures. With a whole-number rate
+ * the product never needs rounding, so it held by accident; with a fractional one it does not. At
+ * 1.005, a debit of 1.000 is 1.01 SYP and two credits of 0.500 are 0.50 each, so a group balanced
+ * to the last fils in its own currency was refused at COMMIT, and the payment or refund posting it
+ * failed with it.
+ *
+ * ## So the rounding difference is allocated
+ *
+ * A side is converted ONCE, from the sum of its legs, and the few hundredths its rounded legs fall
+ * short or over are put on the side's largest leg. A balanced group has equal sides in its own
+ * currency, so both sides convert to the same figure and balance in SYP by construction. An
+ * unbalanced one still converts to two different figures, and the trigger still refuses it: this
+ * changes where a rounding unit lands, never whether the books balance.
+ */
+function sypAmountsOf(legs: readonly LedgerLeg[], fxRateToSyp: string): string[] {
+  const minor = legs.map((leg) =>
+    toMinor(multiplyDecimalStrings(leg.amount, fxRateToSyp, SYP_SCALE), SYP_SCALE),
+  );
+
+  for (const direction of ['debit', 'credit'] as const) {
+    const side = legs.flatMap((leg, index) =>
+      leg.direction === direction ? [index] : [],
+    );
+
+    if (side.length < 2) continue;
+
+    const total = side.reduce(
+      (sum, index) => sum + toMinor(legs[index]?.amount ?? '0', MONEY_SCALE),
+      0n,
+    );
+    const target = toMinor(
+      multiplyDecimalStrings(fromMinor(total, MONEY_SCALE), fxRateToSyp, SYP_SCALE),
+      SYP_SCALE,
+    );
+    const rounded = side.reduce((sum, index) => sum + (minor[index] ?? 0n), 0n);
+    const largest = side.reduce((best, index) =>
+      abs(minor[index] ?? 0n) > abs(minor[best] ?? 0n) ? index : best,
+    );
+
+    minor[largest] = (minor[largest] ?? 0n) + (target - rounded);
+  }
+
+  return minor.map((value) => fromMinor(value, SYP_SCALE));
+}
+
+function abs(value: bigint): bigint {
+  return value < 0n ? -value : value;
+}
+
 /**
  * Double-entry bookkeeping (SRS §13.3: "every financial operation needs an immutable
  * transaction record").
@@ -84,9 +141,10 @@ export class LedgerService {
     }
 
     const entryGroupId = uuidv7();
+    const inSyp = sypAmountsOf(legs, context.fxRateToSyp);
 
-    for (const leg of legs) {
-      const amountSyp = multiplyDecimalStrings(leg.amount, context.fxRateToSyp, 2);
+    for (const [index, leg] of legs.entries()) {
+      const amountSyp = inSyp[index];
 
       await tx.execute(sql`
         INSERT INTO ledger_entries
