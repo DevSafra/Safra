@@ -213,10 +213,12 @@ deleting it; the reason something was blocked is often the reason it comes back.
 > on the customer dashboard (`conversations.customer_seen_at`, `disputes.customer_seen_status`,
 > migration 0087, which starts every existing thread and dispute as seen). Every cursor list in
 > the customer account and the partner portal shows fifteen rows and grows by fifteen in place,
-> up to 300 per window (`@safra/contracts/show-more`, `ShowMore` in `@safra/ui`). **Left open:**
-> the partner portal has no unread tracking of its own (a business has several readers of one
-> thread, so «seen» needs a per-person decision); the console's tables keep their numbered pager
-> by standing rule; only the wallet statement animates the rows a press adds.
+> up to 300 per window (`@safra/contracts/show-more`, `ShowMore` in `@safra/ui`). The partner
+> portal followed the same day: الدعم counts replies unread PER PERSON (`conversation_reads`,
+> migration 0088), while النزاعات (unanswered live disputes) and الكوبونات (offers awaiting a
+> decision) are shared queues that fall when anyone at the business acts; each is withheld from a
+> reader whose permissions do not open that section. **Left open:** the console's tables keep
+> their numbered pager by standing rule; only the wallet statement animates the rows a press adds.
 >
 > **Found beside the work, not changed:** SAFRA's own payout accounts are still edited in place;
 > two staff starting one conversation at once can make two; the key-rotation setting
