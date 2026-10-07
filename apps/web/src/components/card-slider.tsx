@@ -57,7 +57,6 @@ export function CardSlider({
   children,
   labels,
   footers,
-  bleed = true,
   arrowsOnPhone = false,
   arrows = 'float',
 }: {
@@ -81,14 +80,6 @@ export function CardSlider({
    * which is nothing for six and not nothing for a home page of twenty destinations.
    */
   readonly footers?: readonly React.ReactNode[];
-  /**
-   * Whether the rail runs to the container's edge, as the home page's rows do.
-   *
-   * `-mx-4 px-4` cancels the page's own padding so a card can sit half-off the edge and say «there
-   * is more this way». Inside a PANEL there is no padding to cancel and nothing to bleed past, so
-   * the rail keeps its box — see the reviews in the booking card (Bashar, 2026-09-15).
-   */
-  readonly bleed?: boolean;
   /**
    * Whether the arrows appear below `sm`.
    *
@@ -193,15 +184,15 @@ export function CardSlider({
     /*
       ## The start tolerance is the rail's own padding, and that is a measured fix
 
-      The row bleeds to the container edge with `-mx-4 px-4`, so its content begins one padding in,
-      and `snap-mandatory` parks the first card's start edge on that padding rather than on the
+      When the row bled to the container edge with `-mx-4 px-4`, its content began one padding in,
+      and `snap-mandatory` parked the first card's start edge on that padding rather than on the
       scroll origin. At rest the position is therefore 16, not 0 — measured — so a `position <= 1`
       test never fires and the «previous» arrow stayed visible against a row that could not move
       back. The end test was against `scrollWidth - clientWidth`, which IS the true maximum, which
       is why only one of the two arrows misbehaved and the bug looked like half a bug.
 
-      Reading the padding rather than writing `16` keeps the two in step: the row is `px-4` at every
-      width today, and a future `sm:px-6` would silently break an equality against a literal.
+      The rail has no padding since 2026-10-07, so this reads zero today. It reads the value rather
+      than assuming it, so a rail given padding again cannot quietly bring the bug back.
 
       The extra pixel on both ends is for zoom. A scroll position is a float once the page is
       scaled, so an exact comparison against either bound is false for ever at that bound.
@@ -368,9 +359,14 @@ export function CardSlider({
         */
         onPointerDown={release}
         onWheel={release}
-        className={`slider-rail flex snap-x snap-mandatory overflow-x-auto pb-1 ${
-          bleed ? '-mx-4 gap-3 px-4 sm:gap-4' : 'gap-3'
-        }`}
+        /*
+          The rail keeps its column (Bashar, 2026-10-07: «its width is more than the other
+          components»). It used to run to the page edge with `-mx-4 px-4`, which made every rail
+          wider than whatever sat above it. Callers size their cards as a SHARE of the rail, so the
+          cards in view are whole at rest and the arrows page to the next set; a fixed width left
+          the last visible card cut at most widths.
+        */
+        className="slider-rail flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1"
       >
         {children}
       </ul>

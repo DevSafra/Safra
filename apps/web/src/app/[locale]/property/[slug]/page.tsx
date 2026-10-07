@@ -1066,7 +1066,6 @@ export default async function PropertyPage({
                   */}
                     <div className="mt-4">
                       <CardSlider
-                        bleed={false}
                         arrowsOnPhone
                         arrows="side"
                         labels={{
@@ -1077,7 +1076,7 @@ export default async function PropertyPage({
                         {property.reviews.map((review) => (
                           <li
                             key={review.reference}
-                            className="flex w-[86%] shrink-0 snap-start flex-col rounded-card border border-line bg-card p-6 sm:w-[23rem]"
+                            className="flex w-[86%] shrink-0 snap-start flex-col rounded-card border border-line bg-card p-6 sm:w-[calc((100%-0.75rem)/2)]"
                           >
                             {/*
                               No monogram disc beside the name (Bashar, 2026-09-16: «remove the
@@ -1233,8 +1232,7 @@ export default async function PropertyPage({
             than the whole section.
 
             `CardSlider` is the site's one slider, the same component the home page's destinations
-            use — not a second one written for this panel. What it needed was two knobs: no bleed,
-            because there is no page padding to cancel inside a card, and arrows on a phone,
+            use — not a second one written for this panel. What it needed was arrows on a phone,
             because a one-item rail shows no neighbour peeking to say it moves.
 
             The arrows FLANK the quote (Bashar, 2026-09-16: «move the buttons to the left and right
@@ -1280,7 +1278,6 @@ export default async function PropertyPage({
                       */
                         <div className="mt-2">
                           <CardSlider
-                            bleed={false}
                             arrowsOnPhone
                             arrows="below"
                             labels={{

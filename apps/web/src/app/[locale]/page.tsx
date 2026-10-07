@@ -371,7 +371,7 @@ export default async function HomePage({
                 {recommended.outcome.items.map((item) => (
                   <li
                     key={item.propertyReference}
-                    className="flex w-[16rem] shrink-0 snap-start sm:w-[19rem] lg:w-[21rem]"
+                    className="flex w-[16rem] shrink-0 snap-start sm:w-[calc((100%-0.75rem)/2)] lg:w-[calc((100%-1.5rem)/3)] xl:w-[calc((100%-2.25rem)/4)]"
                   >
                     {/*
                       The card's own nights, not the page's. Where the cutoff pushed this row to
@@ -424,7 +424,7 @@ export default async function HomePage({
                     key={trip.slug}
                     trip={trip}
                     locale={locale}
-                    className="flex w-[16rem] shrink-0 snap-start sm:w-[19rem] lg:w-[21rem]"
+                    className="flex w-[16rem] shrink-0 snap-start sm:w-[calc((100%-0.75rem)/2)] lg:w-[calc((100%-1.5rem)/3)] xl:w-[calc((100%-2.25rem)/4)]"
                     labels={{
                       priceFrom: (amount) => tg('priceFrom', { amount }),
                       priceOnRequest: tg('priceOnRequest'),
