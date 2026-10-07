@@ -6,6 +6,8 @@ import { createRollbackDatabase, type Database } from '@safra/db';
 import { GiftCardExpiryService } from './gift-card-expiry.service.js';
 import { unlockedJobRuns } from '../common/jobs/job-run.testing.js';
 import { PromotionsService } from '../admin/promotions.service.js';
+import { LedgerService } from '../ledger/ledger.service.js';
+import { FxRateService } from '../fx/fx-rate.service.js';
 
 /**
  * `expired` was a gift card status nothing could ever write.
@@ -33,7 +35,12 @@ const describeIfDb = DATABASE_URL ? describe : describe.skip;
 describeIfDb('a gift card past its expiry', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   const db: Database = harness.db;
-  const expiry = new GiftCardExpiryService(db, unlockedJobRuns(db));
+  const expiry = new GiftCardExpiryService(
+    db,
+    unlockedJobRuns(db),
+    new LedgerService(db),
+    new FxRateService(db, {} as never),
+  );
   const promotions = new PromotionsService(db);
 
   beforeEach(() => harness.begin());
@@ -47,16 +54,22 @@ describeIfDb('a gift card past its expiry', () => {
    * `timestamptz` placeholder is bound as a literal and Postgres refuses it. The arithmetic belongs
    * in the statement; only the number crosses as a parameter.
    */
-  async function card(hours: number | null, status = 'active'): Promise<string> {
+  async function card(
+    hours: number | null,
+    status = 'active',
+    options: { remaining?: string; bought?: boolean; currency?: string } = {},
+  ): Promise<string> {
     const made = await db.execute<{ reference: string }>(sql`
       INSERT INTO gift_cards
-        (code_hash, code_last4, original_amount, remaining_amount, currency_id, status, expires_at)
+        (code_hash, code_last4, original_amount, remaining_amount, currency_id, status, expires_at,
+         purchased_by_customer_id)
       VALUES (
-        'hash-' || gen_random_uuid(), '4242', '100.00', '100.00',
-        (SELECT id FROM currencies WHERE code = 'USD'),
+        'hash-' || gen_random_uuid(), '4242', '100.00', ${options.remaining ?? '100.00'},
+        (SELECT id FROM currencies WHERE code = ${options.currency ?? 'USD'}),
         ${status}::gift_card_status,
         CASE WHEN ${hours}::int IS NULL THEN NULL
-             ELSE now() + (${hours}::int * interval '1 hour') END
+             ELSE now() + (${hours}::int * interval '1 hour') END,
+        ${options.bought ? sql`(SELECT id FROM customer_profiles ORDER BY created_at LIMIT 1)` : sql`NULL`}
       )
       RETURNING reference
     `);
@@ -143,5 +156,96 @@ describeIfDb('a gift card past its expiry', () => {
 
     /* The control: the column itself is still `active`, so this is the SELECT and not the sweep. */
     expect(await statusOf(due)).toBe('active');
+  });
+
+  /**
+   * The balance leaves the books when the card lapses (Bashar, 2026-10-07).
+   *
+   * Until then the sweep changed only the status, and every expired card's balance stayed on
+   * `gift_card_redemption`, so the books said SAFRA owed money nobody could ever claim.
+   */
+  describe('and its unspent balance', () => {
+    /** The ledger legs written for this card, by its reference: a fresh card has no others. */
+    const legsOf = async (reference: string) =>
+      (
+        await db.execute<{ account: string; direction: string; amount: string }>(sql`
+          SELECT account::text, direction::text, amount::text FROM ledger_entries
+          WHERE description LIKE ${'%' + reference + '%'}
+          ORDER BY account
+        `)
+      ).rows;
+
+    it('becomes SAFRA income when a customer bought the card', async () => {
+      const due = await card(-1, 'active', { remaining: '60.00', bought: true });
+
+      await expiry.sweep();
+
+      expect(await legsOf(due)).toEqual([
+        { account: 'gift_card_breakage', direction: 'credit', amount: '60.000' },
+        { account: 'gift_card_redemption', direction: 'debit', amount: '60.000' },
+      ]);
+    });
+
+    it('reverses the giveaway when SAFRA issued the card', async () => {
+      const due = await card(-1, 'active', { remaining: '25.00' });
+
+      await expiry.sweep();
+
+      expect(await legsOf(due)).toEqual([
+        { account: 'gift_card_issued', direction: 'credit', amount: '25.000' },
+        { account: 'gift_card_redemption', direction: 'debit', amount: '25.000' },
+      ]);
+    });
+
+    /* Nothing owed, nothing to move: a ledger group of zeros would be noise in every report. */
+    it('posts nothing for a card with nothing left on it', async () => {
+      const due = await card(-1, 'active', { remaining: '0.00', bought: true });
+
+      await expiry.sweep();
+
+      expect(await statusOf(due)).toBe('expired');
+      expect(await legsOf(due)).toEqual([]);
+    });
+
+    /* The guard is the status: a second sweep finds the card retired and posts nothing again. */
+    it('posts once however many times the sweep runs', async () => {
+      const due = await card(-1, 'active', { remaining: '40.00', bought: true });
+
+      await expiry.sweep();
+      await expiry.sweep();
+
+      expect(await legsOf(due)).toHaveLength(2);
+    });
+
+    /*
+      A currency with no rate to SYP cannot be valued, so its card cannot be posted. It must stay
+      active, liability standing, rather than be retired with the books still owing it, and it
+      must not stop the cards behind it.
+    */
+    it('leaves a card it cannot value active, and retires the rest', async () => {
+      /*
+        A currency of the test's own, made inside its rolled-back transaction: a fresh database has a
+        rate for every currency it seeds, so borrowing one without a rate found nothing on CI.
+      */
+      const code = 'ZZX';
+
+      await db.execute(sql`
+        INSERT INTO currencies (code, name_ar, name_en, name_de, symbol)
+        VALUES (${code}, 'عملة اختبار', 'Test currency', 'Testwährung', '¤')
+      `);
+
+      const stuck = await card(-2, 'active', { currency: code, bought: true });
+      const fine = await card(-1, 'active', { bought: true });
+
+      await expiry.sweep();
+
+      expect(await statusOf(stuck), 'not retired with its liability standing').toBe(
+        'active',
+      );
+      expect(await legsOf(stuck)).toEqual([]);
+      expect(await statusOf(fine), 'and the card behind it still retired').toBe(
+        'expired',
+      );
+    });
   });
 });

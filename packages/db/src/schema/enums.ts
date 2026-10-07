@@ -308,6 +308,16 @@ export const ledgerAccount = pgEnum('ledger_account', [
    */
   'gift_card_issued',
   /**
+   * What an expired card that somebody BOUGHT leaves behind: SAFRA's income (Bashar, 2026-10-07).
+   *
+   * At expiry the card's remaining balance stops being owed. Left on `gift_card_redemption` it was a
+   * liability for ever, overstating what SAFRA owes; it is moved here instead, which is the usual
+   * treatment of unredeemed gift cards (breakage). A card SAFRA GAVE away is not income when it
+   * lapses: its balance reverses `gift_card_issued`, the expense it was booked against, exactly as
+   * a cancellation does.
+   */
+  'gift_card_breakage',
+  /**
    * Revenue SAFRA gave up to win a booking — the other side of a coupon discount.
    *
    * The capture group's identity is `total = fee + commission + payable`. A discount makes the
