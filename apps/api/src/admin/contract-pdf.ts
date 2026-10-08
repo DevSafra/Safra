@@ -1,7 +1,5 @@
 import { chromium, type Browser } from 'playwright-core';
 
-import { CONTRACT_PAGE_FOOTER, CONTRACT_PAGE_HEADER } from './contract-template.js';
-
 /**
  * A contract HTML document, printed to PDF by a headless browser we run.
  *
@@ -34,6 +32,44 @@ import { CONTRACT_PAGE_FOOTER, CONTRACT_PAGE_HEADER } from './contract-template.
  */
 const MAX_CONCURRENT = 2;
 const RENDER_TIMEOUT_MS = 20_000;
+
+/**
+ * A running header and footer, printed in every page's margin.
+ *
+ * OPT-IN, and only the partner contract opts in. The voucher prints through this same renderer, and
+ * on 2026-10-07 the contract's footer was briefly applied to everything, so every booking voucher
+ * would have carried «اتفاقية شراكة تجارية … صفحة N» under the guest's QR code. A document that
+ * passes none prints exactly as it did before page chrome existed.
+ */
+export interface PageChrome {
+  readonly header: string;
+  readonly footer: string;
+}
+
+/** The fixed moment written over Chromium's own, the same length to the byte: see below. */
+const FIXED_PDF_MOMENT = '20000101000000';
+
+/**
+ * Replaces the creation and modification times Chromium stamps on every PDF with a fixed one.
+ *
+ * Chromium writes the current second into the document's info dictionary
+ * (`/CreationDate (D:20261007150119+00'00')`), so two prints of the same contract a second apart
+ * differed and so did their hashes — while the template promised identical bytes for identical
+ * terms, and a returned scan is matched to the hash it was signed against (found 2026-10-07).
+ *
+ * The digits are replaced IN PLACE with a value of exactly the same length, so every byte offset in
+ * the file's cross-reference table stays true and the PDF stays valid. `latin1` maps each byte to
+ * one character and back, so nothing else in the binary stream is touched.
+ */
+export function withFixedTimestamps(pdf: Buffer): Buffer {
+  const text = pdf.toString('latin1');
+  const fixed = text.replace(
+    /(\/(?:CreationDate|ModDate) \(D:)\d{14}/g,
+    (_, key: string) => `${key}${FIXED_PDF_MOMENT}`,
+  );
+
+  return fixed === text ? pdf : Buffer.from(fixed, 'latin1');
+}
 
 /** How the browser is started. A parameter so a test can hand in one that fails. */
 export type LaunchBrowser = () => Promise<Browser>;
@@ -109,7 +145,7 @@ export function createContractRenderer(
      *   caller — nothing here escapes anything, because everything that needed escaping was
      *   escaped where the values were known.
      */
-    async render(html: string): Promise<Buffer> {
+    async render(html: string, chrome?: PageChrome): Promise<Buffer> {
       await acquire();
 
       try {
@@ -132,18 +168,24 @@ export function createContractRenderer(
           await page.emulateMedia({ media: 'print' });
 
           /*
-            The running header and footer the contract itself has (its name at the top, its title
-            and «صفحة N» at the foot). `preferCSSPageSize` keeps the template's own `@page` margins,
-            which is where Chromium draws them.
+            Page chrome only when the caller asks for it. With it, `preferCSSPageSize` keeps the
+            document's own `@page` margins, which is where Chromium draws the header and footer;
+            without it, the options are the ones every document had before chrome existed.
           */
-          return await page.pdf({
+          const bytes = await page.pdf({
             format: 'A4',
             printBackground: true,
-            preferCSSPageSize: true,
-            displayHeaderFooter: true,
-            headerTemplate: CONTRACT_PAGE_HEADER,
-            footerTemplate: CONTRACT_PAGE_FOOTER,
+            ...(chrome
+              ? {
+                  preferCSSPageSize: true,
+                  displayHeaderFooter: true,
+                  headerTemplate: chrome.header,
+                  footerTemplate: chrome.footer,
+                }
+              : {}),
           });
+
+          return withFixedTimestamps(bytes);
         } finally {
           await context.close().catch(() => undefined);
         }
@@ -166,8 +208,8 @@ export function createContractRenderer(
 
 const shared = createContractRenderer();
 
-export function renderContractPdf(html: string): Promise<Buffer> {
-  return shared.render(html);
+export function renderContractPdf(html: string, chrome?: PageChrome): Promise<Buffer> {
+  return shared.render(html, chrome);
 }
 
 /** Closes the shared browser. For tests, which must not leave a Chromium process behind. */

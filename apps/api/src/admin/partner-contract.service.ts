@@ -21,7 +21,11 @@ import { ENV, type Env } from '../config/env.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { canFileJointContract, ERROR } from '@safra/contracts';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
-import { renderContractHtml } from './contract-template.js';
+import {
+  CONTRACT_PAGE_FOOTER,
+  CONTRACT_PAGE_HEADER,
+  renderContractHtml,
+} from './contract-template.js';
 import { renderContractPdf } from './contract-pdf.js';
 import { actorName } from '../common/actor-name.sql.js';
 import { describeError } from '../common/errors/safe-error.js';
@@ -558,7 +562,11 @@ export class PartnerContractService {
       issuedOn,
     });
 
-    const bytes = await renderContractPdf(html);
+    /* The contract's own running header and footer; no other document prints them. */
+    const bytes = await renderContractPdf(html, {
+      header: CONTRACT_PAGE_HEADER,
+      footer: CONTRACT_PAGE_FOOTER,
+    });
     const documentHash = createHash('sha256').update(bytes).digest('hex');
     const key = `partner-contracts/${row.id}/${Date.now()}-${randomUUID()}-${kind}.pdf`;
     const fileName = `${row.reference}-${kind}.pdf`;
