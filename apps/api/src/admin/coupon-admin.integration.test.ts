@@ -35,12 +35,30 @@ describeIfDb('creating a coupon', () => {
     db = harness.db;
     service = new CouponAdminService(db, new AuditService(db));
 
+    /*
+      Its OWN staff member and partner, never whatever the database happens to hold: CI starts from
+      a fresh database with no super admin in it, and borrowing one made all three tests fail there
+      (2026-10-08) while passing on every developer machine.
+    */
     const actor = await db.execute<{ id: string }>(sql`
-      SELECT id::text FROM users WHERE role = 'super_admin' AND deleted_at IS NULL LIMIT 1
+      INSERT INTO users (email, role)
+      VALUES (${`coupon-admin-${Date.now()}@safra.test`}, 'super_admin'::user_role)
+      RETURNING id::text
+    `);
+    const owner = await db.execute<{ id: string }>(sql`
+      INSERT INTO users (email, role)
+      VALUES (${`coupon-partner-${Date.now()}@safra.test`}, 'partner'::user_role)
+      RETURNING id::text
     `);
     const partner = await db.execute<{ id: string; reference: string }>(sql`
-      SELECT id::text, reference FROM partners
-      WHERE verification = 'approved' AND deleted_at IS NULL LIMIT 1
+      INSERT INTO partners (user_id, partner_type_id, legal_name, display_name, city_id,
+                            address, phone, email, verification)
+      SELECT ${owner.rows[0]?.id}::uuid, pt.id, 'Coupon Test', 'كوبون', c.id,
+             'Addr', '+963900000077', 'coupon-partner@safra.test', 'approved'
+      FROM partner_types pt, cities c
+      WHERE pt.code = 'accommodation' AND c.slug = 'damascus'
+      LIMIT 1
+      RETURNING id::text, reference
     `);
 
     staff = {
