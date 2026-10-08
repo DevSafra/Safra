@@ -107,8 +107,24 @@ jobs:
       # (playwright-core), and voucher.integration.test.ts renders a real one. The runner has no
       # browser, so the last failure after the testbed fix was «Executable doesn't exist». Installed
       # through the repository's own Playwright so the build matches what the code asks for.
+      #
+      # Bounded and retried (2026-10-08). It takes about 30 seconds, and on 2026-10-07 one run's
+      # download stalled for thirteen minutes until the job's 20-minute limit cancelled everything,
+      # so no test ran and the run read «cancelled» rather than naming what broke. Each attempt is
+      # killed after three minutes and tried again; the step's own limit is the backstop, and a
+      # final failure says it was this step.
       - name: Install the browser the PDF renderer uses
-        run: pnpm exec playwright install --with-deps chromium
+        timeout-minutes: 10
+        run: |
+          for attempt in 1 2 3; do
+            if timeout 180 pnpm exec playwright install --with-deps chromium; then
+              exit 0
+            fi
+            echo "::warning::Chromium install attempt $attempt failed or stalled; retrying."
+            sleep 10
+          done
+          echo "::error::Chromium could not be installed after 3 attempts."
+          exit 1
 
       - name: Test (including database integration tests)
         run: pnpm exec vitest run
